@@ -6,6 +6,11 @@ export type PlayerProfile = {
   coins: number;
   level: number;
   xp: number;
+  battle_rating: number;
+  battle_wins: number;
+  battle_losses: number;
+  battle_streak: number;
+  best_battle_streak: number;
   created_at: string;
   last_daily_claim_at: string | null;
 };
@@ -36,7 +41,7 @@ export async function getMyProfile() {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id, username, coins, level, xp, created_at, last_daily_claim_at')
+    .select('id, username, coins, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, created_at, last_daily_claim_at')
     .eq('id', userData.user.id)
     .single();
 
@@ -56,10 +61,7 @@ export async function getMyBag(search?: string) {
     .gt('quantity', 0)
     .order('first_obtained_at', { ascending: false });
 
-  if (search?.trim()) {
-    query = query.ilike('cards.pokemon_name', `%${search.trim()}%`);
-  }
-
+  if (search?.trim()) query = query.ilike('cards.pokemon_name', `%${search.trim()}%`);
   const { data, error } = await query;
   if (error) throw error;
   return data as unknown as OwnedCardEntry[];
@@ -69,15 +71,10 @@ export async function getOwnedCard(cardId: string): Promise<OwnedCardEntry> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (!userData.user) throw new Error('Usuário não autenticado.');
-
   const { data, error } = await supabase
     .from('player_cards')
     .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, tcg_data)')
-    .eq('player_id', userData.user.id)
-    .eq('card_id', cardId)
-    .gt('quantity', 0)
-    .single();
-
+    .eq('player_id', userData.user.id).eq('card_id', cardId).gt('quantity', 0).single();
   if (error) throw error;
   return data as unknown as OwnedCardEntry;
 }
@@ -85,18 +82,10 @@ export async function getOwnedCard(cardId: string): Promise<OwnedCardEntry> {
 export async function findPlayers(username: string) {
   const term = username.trim();
   if (term.length < 2) return [];
-
   const { data: userData } = await supabase.auth.getUser();
   const myId = userData.user?.id;
-
-  let query = supabase
-    .from('players')
-    .select('id, username, level')
-    .ilike('username', `%${term}%`)
-    .limit(20);
-
+  let query = supabase.from('players').select('id, username, level, battle_rating').ilike('username', `%${term}%`).limit(20);
   if (myId) query = query.neq('id', myId);
-
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
@@ -107,26 +96,14 @@ export async function getMyProfileStats() {
   if (userError) throw userError;
   const user = userData.user;
   if (!user) throw new Error('Usuário não autenticado.');
-
   const [bag, openings, trades] = await Promise.all([
     getMyBag(),
     supabase.from('pack_openings').select('id', { count: 'exact', head: true }).eq('player_id', user.id),
     supabase.from('trades').select('id', { count: 'exact', head: true }).eq('status', 'completed').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
   ]);
-
   const totalCards = bag.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0);
   const uniqueCards = bag.length;
   const favorites = bag.filter((item) => item.favorite).length;
-  const species = new Set(
-    bag.map((item) => item.cards?.pokedex_numbers?.[0]).filter((value): value is number => typeof value === 'number')
-  ).size;
-
-  return {
-    totalCards,
-    uniqueCards,
-    favorites,
-    species,
-    packsOpened: openings.count ?? 0,
-    completedTrades: trades.count ?? 0,
-  };
+  const species = new Set(bag.map((item) => item.cards?.pokedex_numbers?.[0]).filter((value): value is number => typeof value === 'number')).size;
+  return { totalCards, uniqueCards, favorites, species, packsOpened: openings.count ?? 0, completedTrades: trades.count ?? 0 };
 }
