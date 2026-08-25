@@ -8,6 +8,18 @@ export type PokedexEntry = {
   representative_card_id: string;
 };
 
+export type PokemonCardVersion = {
+  id: string;
+  pokemon_name: string;
+  set_id: string;
+  set_name: string;
+  card_number: string | null;
+  rarity: string | null;
+  types: string[];
+  image_small: string | null;
+  image_large: string | null;
+};
+
 export async function getPokedexCatalog(): Promise<PokedexEntry[]> {
   const { data, error } = await supabase
     .from('pokedex_catalog')
@@ -17,6 +29,18 @@ export async function getPokedexCatalog(): Promise<PokedexEntry[]> {
 
   if (error) throw error;
   return (data ?? []) as PokedexEntry[];
+}
+
+export async function getPokemonCardVersions(pokedexNumber: number): Promise<PokemonCardVersion[]> {
+  const { data, error } = await supabase
+    .from('cards')
+    .select('id,pokemon_name,set_id,set_name,card_number,rarity,types,image_small,image_large')
+    .contains('pokedex_numbers', [pokedexNumber])
+    .order('set_name', { ascending: false })
+    .limit(500);
+
+  if (error) throw error;
+  return (data ?? []) as PokemonCardVersion[];
 }
 
 export function generationForNumber(number: number) {
