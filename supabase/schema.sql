@@ -50,6 +50,8 @@ create table public.packs (
   active boolean not null default true
 );
 
+create unique index packs_set_id_unique on public.packs(set_id);
+
 create table public.pack_openings (
   id uuid primary key default gen_random_uuid(),
   player_id uuid not null references public.players(id) on delete cascade,
@@ -100,6 +102,9 @@ grant usage on schema public to authenticated;
 grant select on public.players, public.cards, public.player_cards, public.packs,
   public.pack_openings, public.friendships, public.trades, public.trade_cards to authenticated;
 
+grant usage on schema public to service_role;
+grant select, insert, update on public.cards, public.packs to service_role;
+
 create policy "cards readable by authenticated players" on public.cards for select to authenticated using (true);
 create policy "packs readable by authenticated players" on public.packs for select to authenticated using (active = true);
 create policy "players readable by authenticated players" on public.players for select to authenticated using (true);
@@ -131,8 +136,9 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure private.handle_new_user();
 
--- Server-only RPC. A single PostgreSQL function means coins, inventory and
--- opening history commit together or roll back together on any exception.
+-- Server-only RPC. Coins, inventory and opening history commit together.
+-- Packs prefer a real-like composition: commons + uncommons + at least one
+-- rare-or-higher when that set has those rarity pools, then random fallback.
 create or replace function public.server_open_pack(p_player_id uuid, p_pack_id uuid)
 returns jsonb
 language plpgsql
@@ -156,12 +162,43 @@ begin
   select count(*) into v_count from public.cards where set_id = v_pack.set_id;
   if v_count < 1 then raise exception 'EMPTY_PACK_POOL'; end if;
 
-  with picked as (
+  with common_pick as (
+    select id, pokemon_name, rarity, image_large
+    from public.cards
+    where set_id = v_pack.set_id and lower(coalesce(rarity, '')) = 'common'
+    order by random()
+    limit greatest(v_pack.cards_per_pack - 3, 0)
+  ), uncommon_pick as (
+    select id, pokemon_name, rarity, image_large
+    from public.cards
+    where set_id = v_pack.set_id and lower(coalesce(rarity, '')) = 'uncommon'
+      and id not in (select id from common_pick)
+    order by random()
+    limit least(2, greatest(v_pack.cards_per_pack - 1, 0))
+  ), rare_pick as (
     select id, pokemon_name, rarity, image_large
     from public.cards
     where set_id = v_pack.set_id
+      and rarity is not null
+      and lower(rarity) not in ('common', 'uncommon')
+      and id not in (select id from common_pick)
+      and id not in (select id from uncommon_pick)
     order by random()
-    limit v_pack.cards_per_pack
+    limit case when v_pack.cards_per_pack > 0 then 1 else 0 end
+  ), preset as (
+    select * from common_pick
+    union all select * from uncommon_pick
+    union all select * from rare_pick
+  ), filler as (
+    select id, pokemon_name, rarity, image_large
+    from public.cards
+    where set_id = v_pack.set_id
+      and id not in (select id from preset)
+    order by random()
+    limit greatest(v_pack.cards_per_pack - (select count(*) from preset), 0)
+  ), picked as (
+    select * from preset
+    union all select * from filler
   ), upserted as (
     insert into public.player_cards (player_id, card_id, quantity)
     select p_player_id, id, 1 from picked
@@ -191,4 +228,4 @@ revoke all on function public.server_open_pack(uuid, uuid) from public, anon, au
 grant execute on function public.server_open_pack(uuid, uuid) to service_role;
 
 -- Client users receive only SELECT grants. Mutations involving coins, Bag,
--- boosters and trade settlement stay server-side.
+-- boosters, catalog administration and trade settlement stay server-side.
