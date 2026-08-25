@@ -1,7 +1,7 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { AppearanceMode, getMySettings, PlayerSettings, ThemeName, updateMySettings } from '@/services/settings';
+import { AppearanceMode, getMySettings, PlayerSettings, SettingsPatch, ThemeName, updateMySettings } from '@/services/settings';
 
 export type AppColors = {
   bg: string; surface: string; surfaceAlt: string; border: string; text: string; muted: string;
@@ -36,7 +36,7 @@ type ThemeContextValue = {
   themeName: ThemeName;
   isLight: boolean;
   settings: PlayerSettings | null;
-  updatePreferences: (patch: Partial<Pick<PlayerSettings, 'appearance' | 'theme' | 'chat_notifications' | 'battle_invites'>>) => Promise<void>;
+  updatePreferences: (patch: SettingsPatch) => Promise<void>;
   refresh: () => Promise<void>;
 };
 
@@ -62,7 +62,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     return () => data.subscription.unsubscribe();
   }, [refresh]);
 
-  const updatePreferences = useCallback(async (patch: Partial<Pick<PlayerSettings, 'appearance' | 'theme' | 'chat_notifications' | 'battle_invites'>>) => {
+  const updatePreferences = useCallback(async (patch: SettingsPatch) => {
     const updated = await updateMySettings(patch);
     setSettings(updated);
   }, []);
