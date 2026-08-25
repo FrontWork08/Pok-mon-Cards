@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
 import { listPacks, openPack, type OpenedCard, type Pack } from '@/services/packs';
@@ -8,10 +9,10 @@ import { getMyProfile } from '@/services/player';
 import { gameTheme } from '@/theme/gameTheme';
 
 const PAGE_SIZE = 18;
-
 type Notice = { kind: 'error' | 'success'; text: string } | null;
 
 export default function PacksScreen() {
+  const { width } = useWindowDimensions();
   const [packs, setPacks] = useState<Pack[]>([]);
   const [coins, setCoins] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -20,22 +21,20 @@ export default function PacksScreen() {
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const [packData, profile] = await Promise.all([listPacks(), getMyProfile()]);
       setPacks(packData);
       setCoins(profile.coins);
-    } catch (error) {
-      console.warn(error);
+    } catch {
       setNotice({ kind: 'error', text: 'Não foi possível atualizar a loja agora.' });
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -44,30 +43,22 @@ export default function PacksScreen() {
   }, [packs, search]);
 
   const visiblePacks = filtered.slice(0, visibleCount);
+  const packWidth = width < 540 ? '100%' : width >= 1050 ? '32.4%' : '49%';
 
   function choosePack(pack: Pack) {
     if (coins < pack.price) {
-      setNotice({
-        kind: 'error',
-        text: `Moedas insuficientes: você tem 🪙 ${coins.toLocaleString('pt-BR')} e este booster custa 🪙 ${pack.price.toLocaleString('pt-BR')}.`,
-      });
+      setNotice({ kind: 'error', text: `Moedas insuficientes: você tem 🪙 ${coins.toLocaleString('pt-BR')} e este booster custa 🪙 ${pack.price.toLocaleString('pt-BR')}.` });
       return;
     }
-
     setNotice(null);
     setSelectedPack(pack);
   }
 
   async function purchaseSelectedPack(): Promise<OpenedCard[]> {
     if (!selectedPack) throw new Error('Nenhum booster selecionado.');
-
-    // Refresh before buying so the UI never relies on a stale balance.
     const before = await getMyProfile();
     setCoins(before.coins);
-
-    if (before.coins < selectedPack.price) {
-      throw new Error(`Moedas insuficientes. Seu saldo atual é 🪙 ${before.coins.toLocaleString('pt-BR')}.`);
-    }
+    if (before.coins < selectedPack.price) throw new Error(`Moedas insuficientes. Seu saldo atual é 🪙 ${before.coins.toLocaleString('pt-BR')}.`);
 
     try {
       const result = await openPack(selectedPack.id);
@@ -84,83 +75,57 @@ export default function PacksScreen() {
   return (
     <Screen title="Pack Shop" subtitle="Escolha uma coleção, abra o booster e torça pelo pull raro.">
       <View style={styles.balanceRow}>
-        <View>
-          <Text style={styles.balanceLabel}>SEU SALDO</Text>
-          <Text style={styles.balanceValue}>🪙 {coins.toLocaleString('pt-BR')}</Text>
-        </View>
-        <View style={styles.balanceBadge}>
-          <Ionicons name="wallet-outline" size={20} color={gameTheme.colors.yellow} />
-        </View>
+        <View><Text style={styles.balanceLabel}>SEU SALDO</Text><Text style={styles.balanceValue}>🪙 {coins.toLocaleString('pt-BR')}</Text></View>
+        <View style={styles.balanceBadge}><Ionicons name="wallet-outline" size={20} color={gameTheme.colors.yellow} /></View>
       </View>
 
       {notice ? (
         <View style={[styles.notice, notice.kind === 'error' ? styles.noticeError : styles.noticeSuccess]}>
-          <Ionicons
-            name={notice.kind === 'error' ? 'alert-circle' : 'checkmark-circle'}
-            size={21}
-            color={notice.kind === 'error' ? '#FF9C9C' : '#72DEA0'}
-          />
+          <Ionicons name={notice.kind === 'error' ? 'alert-circle' : 'checkmark-circle'} size={21} color={notice.kind === 'error' ? '#FF9C9C' : '#72DEA0'} />
           <Text style={styles.noticeText}>{notice.text}</Text>
-          <Pressable onPress={() => setNotice(null)} hitSlop={8}>
-            <Ionicons name="close" size={19} color="#D7E2F2" />
-          </Pressable>
+          <Pressable onPress={() => setNotice(null)} hitSlop={8}><Ionicons name="close" size={19} color="#D7E2F2" /></Pressable>
         </View>
       ) : null}
 
       <View style={styles.shopHero}>
         <View style={styles.shopHeroIcon}><Ionicons name="sparkles" size={22} color={gameTheme.colors.yellow} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.shopHeroKicker}>CATÁLOGO ONLINE</Text>
-          <Text style={styles.shopHeroTitle}>{packs.length || 173} boosters disponíveis</Text>
-          <Text style={styles.shopHeroText}>Somente cards de Pokémon. Energy e Trainer ficam fora dos packs.</Text>
-        </View>
+        <View style={{ flex: 1 }}><Text style={styles.shopHeroKicker}>CATÁLOGO ONLINE</Text><Text style={styles.shopHeroTitle}>{packs.length || 173} boosters disponíveis</Text><Text style={styles.shopHeroText}>Somente cards de Pokémon. Energy e Trainer ficam fora dos packs.</Text></View>
       </View>
 
       <View style={styles.searchBox}>
         <Ionicons name="search" size={20} color={gameTheme.colors.muted} />
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Buscar booster ou set..."
-          placeholderTextColor="#70839F"
-          autoCapitalize="none"
-          style={styles.searchInput}
-        />
+        <TextInput value={search} onChangeText={(value) => { setSearch(value); setVisibleCount(PAGE_SIZE); }} placeholder="Buscar booster ou set..." placeholderTextColor="#70839F" autoCapitalize="none" style={styles.searchInput} />
         {search ? <Pressable onPress={() => setSearch('')}><Ionicons name="close-circle" size={20} color={gameTheme.colors.muted} /></Pressable> : null}
       </View>
 
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Boosters</Text>
-        <Text style={styles.resultCount}>{filtered.length} encontrados</Text>
-      </View>
-
+      <View style={styles.sectionRow}><Text style={styles.sectionTitle}>Boosters</Text><Text style={styles.resultCount}>{filtered.length} encontrados</Text></View>
       {loading ? <ActivityIndicator size="large" color={gameTheme.colors.yellow} /> : null}
 
       {!loading && filtered.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons name="search-outline" size={30} color={gameTheme.colors.muted} />
-          <Text style={styles.emptyTitle}>Nenhum booster encontrado</Text>
-          <Text style={styles.muted}>Tente pesquisar por outro nome de coleção.</Text>
-        </View>
+        <View style={styles.empty}><Ionicons name="search-outline" size={30} color={gameTheme.colors.muted} /><Text style={styles.emptyTitle}>Nenhum booster encontrado</Text><Text style={styles.muted}>Tente pesquisar por outro nome de coleção.</Text></View>
       ) : null}
 
       <View style={styles.packGrid}>
         {visiblePacks.map((pack) => {
           const affordable = coins >= pack.price;
-
           return (
-            <View key={pack.id} style={[styles.pack, !affordable && styles.packUnaffordable]}>
+            <View key={pack.id} style={[styles.pack, { width: packWidth as any }, !affordable && styles.packUnaffordable]}>
               <View style={styles.imageWrap}>
-                {pack.image_url ? <Image source={{ uri: pack.image_url }} style={styles.packImage} resizeMode="contain" /> : <View style={styles.placeholder}><Ionicons name="cube" size={36} color="#55739F" /><Text style={styles.placeholderText}>BOOSTER</Text></View>}
+                <View style={styles.foilPack}>
+                  <View style={styles.foilTop} />
+                  <View style={styles.foilGlow} />
+                  <Text style={styles.foilKicker}>POKÉMON TCG</Text>
+                  {pack.image_url ? <Image source={{ uri: pack.image_url }} style={styles.packImage} resizeMode="contain" /> : <View style={styles.placeholder}><Ionicons name="cube" size={38} color="#7FA2D2" /><Text style={styles.placeholderText}>BOOSTER</Text></View>}
+                  <Text style={styles.foilSet}>{pack.set_id.toUpperCase()}</Text>
+                  <View style={styles.foilBottom} />
+                </View>
                 <View style={styles.cardCountBadge}><Text style={styles.cardCountText}>{pack.cards_per_pack} cards</Text></View>
               </View>
               <Text numberOfLines={2} style={styles.packName}>{pack.name}</Text>
               <Text numberOfLines={1} style={styles.setId}>{pack.set_id.toUpperCase()}</Text>
               <View style={styles.packFooter}>
                 <Text style={[styles.price, !affordable && styles.priceDisabled]}>🪙 {pack.price}</Text>
-                <Pressable style={[styles.openButton, !affordable && styles.noBalanceButton]} onPress={() => choosePack(pack)}>
-                  <Text style={styles.openButtonText}>{affordable ? 'ABRIR' : 'SEM SALDO'}</Text>
-                </Pressable>
+                <Pressable style={[styles.openButton, !affordable && styles.noBalanceButton]} onPress={() => choosePack(pack)}><Text style={styles.openButtonText}>{affordable ? 'ABRIR' : 'SEM SALDO'}</Text></Pressable>
               </View>
             </View>
           );
@@ -168,10 +133,7 @@ export default function PacksScreen() {
       </View>
 
       {visibleCount < filtered.length ? (
-        <Pressable style={styles.loadMore} onPress={() => setVisibleCount((value) => value + PAGE_SIZE)}>
-          <Text style={styles.loadMoreText}>VER MAIS BOOSTERS</Text>
-          <Ionicons name="chevron-down" size={18} color={gameTheme.colors.blue} />
-        </Pressable>
+        <Pressable style={styles.loadMore} onPress={() => setVisibleCount((value) => value + PAGE_SIZE)}><Text style={styles.loadMoreText}>VER MAIS BOOSTERS</Text><Ionicons name="chevron-down" size={18} color={gameTheme.colors.blue} /></Pressable>
       ) : null}
 
       <PackOpeningModal
@@ -179,7 +141,7 @@ export default function PacksScreen() {
         pack={selectedPack}
         onClose={() => setSelectedPack(null)}
         onPurchase={purchaseSelectedPack}
-        onFinished={() => setNotice({ kind: 'success', text: 'Booster aberto! Os cards já estão na sua Bag.' })}
+        onFinished={() => setNotice({ kind: 'success', text: 'Booster aberto! Os cards já estão na sua Bag e você ganhou +20 XP.' })}
       />
     </Screen>
   );
@@ -208,13 +170,19 @@ const styles = StyleSheet.create({
   emptyTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
   muted: { color: gameTheme.colors.muted, fontSize: 13, textAlign: 'center' },
   packGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  pack: { width: '48.5%', backgroundColor: gameTheme.colors.surface, borderRadius: 20, padding: 10, borderWidth: 1, borderColor: gameTheme.colors.border },
+  pack: { backgroundColor: gameTheme.colors.surface, borderRadius: 20, padding: 10, borderWidth: 1, borderColor: gameTheme.colors.border },
   packUnaffordable: { opacity: 0.78 },
-  imageWrap: { height: 184, borderRadius: 16, backgroundColor: '#0A1627', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
-  packImage: { width: '88%', height: '92%' },
+  imageWrap: { height: 270, borderRadius: 16, backgroundColor: '#081421', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
+  foilPack: { width: 155, height: 230, borderRadius: 15, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#152B4B', borderWidth: 1, borderColor: '#3A628F' },
+  foilTop: { position: 'absolute', top: 0, width: '100%', height: 14, backgroundColor: '#D9B83E', opacity: 0.85 },
+  foilBottom: { position: 'absolute', bottom: 0, width: '100%', height: 14, backgroundColor: '#D9B83E', opacity: 0.85 },
+  foilGlow: { position: 'absolute', width: 210, height: 70, backgroundColor: '#3269AA', opacity: 0.26, transform: [{ rotate: '-25deg' }] },
+  foilKicker: { position: 'absolute', top: 22, color: '#D9E7FB', fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
+  foilSet: { position: 'absolute', bottom: 23, color: '#A8BED9', fontSize: 8, fontWeight: '900', letterSpacing: 1.1 },
+  packImage: { width: '88%', height: '62%' },
   placeholder: { alignItems: 'center', gap: 8 },
-  placeholderText: { color: '#55739F', fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
-  cardCountBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#07111FCC', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999 },
+  placeholderText: { color: '#8AA8CE', fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
+  cardCountBadge: { position: 'absolute', top: 9, right: 9, backgroundColor: '#07111FDD', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999 },
   cardCountText: { color: '#C5D4E8', fontSize: 9, fontWeight: '800' },
   packName: { color: gameTheme.colors.text, fontSize: 14, lineHeight: 18, fontWeight: '900', marginTop: 10, minHeight: 36 },
   setId: { color: '#6F85A4', fontSize: 10, fontWeight: '800', marginTop: 2 },
