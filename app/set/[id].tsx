@@ -20,8 +20,8 @@ export default function SetDetailScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [setCards, bag] = await Promise.all([getSetCards(String(id)), getMyBag()]);
-      setCards(setCards);
+      const [setCardRows, bag] = await Promise.all([getSetCards(String(id)), getMyBag()]);
+      setCards(setCardRows);
       setOwnedIds(new Set(bag.map((item) => item.cards?.id).filter((value): value is string => Boolean(value))));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível carregar este set.');
