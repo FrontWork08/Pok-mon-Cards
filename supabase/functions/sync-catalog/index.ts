@@ -1,0 +1,121 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
+
+const RAW = "https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master";
+
+function getSecretKey() {
+  const modern = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (modern) {
+    try {
+      const parsed = JSON.parse(modern);
+      if (parsed.default) return parsed.default as string;
+    } catch (_) {}
+  }
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
+
+function chunk<T>(items: T[], size: number) {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!token) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const secret = getSecretKey();
+  if (!url || !secret) return Response.json({ error: "Server configuration error" }, { status: 500 });
+
+  const admin = createClient(url, secret, { auth: { persistSession: false } });
+  const { data: userData, error: userError } = await admin.auth.getUser(token);
+  const user = userData.user;
+  if (userError || !user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (user.app_metadata?.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const offset = Math.max(0, Number(body.offset ?? 0));
+  const limit = Math.min(8, Math.max(1, Number(body.limit ?? 8)));
+
+  const setsResp = await fetch(`${RAW}/sets/en.json`, {
+    headers: { "User-Agent": "Pokemon-Cards-Private-Project" },
+  });
+  if (!setsResp.ok) return Response.json({ error: `sets fetch failed: ${setsResp.status}` }, { status: 502 });
+
+  const allSets = await setsResp.json();
+  const selectedSets = allSets.slice(offset, offset + limit);
+
+  let importedCards = 0;
+  let importedPacks = 0;
+  const errors: Array<{ setId: string; error: string }> = [];
+
+  for (const set of selectedSets) {
+    try {
+      const cardsResp = await fetch(`${RAW}/cards/en/${set.id}.json`, {
+        headers: { "User-Agent": "Pokemon-Cards-Private-Project" },
+      });
+      if (!cardsResp.ok) {
+        errors.push({ setId: set.id, error: `cards fetch ${cardsResp.status}` });
+        continue;
+      }
+
+      const rawCards = await cardsResp.json();
+      const pokemonCards = rawCards.filter((c: any) => c.supertype === "Pokémon");
+      const rows = pokemonCards.map((c: any) => ({
+        id: c.id,
+        pokemon_name: c.name,
+        pokedex_numbers: c.nationalPokedexNumbers ?? [],
+        set_id: set.id,
+        set_name: set.name,
+        card_number: c.number ?? null,
+        rarity: c.rarity ?? null,
+        types: c.types ?? [],
+        image_small: c.images?.small ?? null,
+        image_large: c.images?.large ?? null,
+        tcg_data: {
+          supertype: c.supertype,
+          subtypes: c.subtypes ?? [],
+          hp: c.hp ?? null,
+          artist: c.artist ?? null,
+          regulationMark: c.regulationMark ?? null,
+        },
+      }));
+
+      for (const batch of chunk(rows, 200)) {
+        const { error } = await admin.from("cards").upsert(batch, { onConflict: "id" });
+        if (error) throw error;
+      }
+      importedCards += rows.length;
+
+      const releaseYear = Number(String(set.releaseDate ?? "").slice(0, 4));
+      const price = releaseYear > 0 && releaseYear <= 2010 ? 650 : releaseYear <= 2019 ? 575 : 500;
+      const { error: packError } = await admin.from("packs").upsert(
+        {
+          name: `${set.name} Booster`,
+          set_id: set.id,
+          price,
+          cards_per_pack: Math.min(10, Math.max(5, rows.length)),
+          image_url: set.images?.logo ?? null,
+          active: rows.length > 0,
+        },
+        { onConflict: "set_id" },
+      );
+      if (packError) throw packError;
+      importedPacks += 1;
+    } catch (e) {
+      errors.push({ setId: set.id, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  return Response.json({
+    offset,
+    processedSets: selectedSets.length,
+    totalSets: allSets.length,
+    importedCards,
+    importedPacks,
+    errors,
+  });
+});
