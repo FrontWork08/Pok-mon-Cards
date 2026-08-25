@@ -67,23 +67,37 @@ export default function ProfileScreen() {
         <Stat icon="people" value={friendCount} label="Amigos" />
       </View>
 
-      <Pressable style={styles.feature} onPress={() => router.push('/friends')}>
-        <View style={styles.featureIcon}><Ionicons name="people" size={23} color={gameTheme.colors.blue} /></View>
-        <View style={styles.featureBody}>
-          <Text style={styles.featureTitle}>Amigos</Text>
-          <Text style={styles.featureText}>{friendCount} amigos{incomingCount > 0 ? ` • ${incomingCount} solicitação${incomingCount > 1 ? 'ões' : ''} aguardando` : ' • encontre treinadores e inicie trocas'}</Text>
-        </View>
-        {incomingCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{incomingCount}</Text></View> : <Ionicons name="chevron-forward" size={20} color="#687E9A" />}
-      </Pressable>
-
-      <Pressable style={styles.feature} onPress={() => router.push('/pokedex')}>
-        <View style={styles.featureIcon}><Ionicons name="book" size={23} color={gameTheme.colors.yellow} /></View>
-        <View style={styles.featureBody}>
-          <Text style={styles.featureTitle}>Pokédex</Text>
-          <Text style={styles.featureText}>Veja espécies descobertas, gerações e o que ainda falta.</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color="#687E9A" />
-      </Pressable>
+      <View style={styles.featureGrid}>
+        <FeatureLink
+          icon="people"
+          iconColor={gameTheme.colors.blue}
+          title="Amigos"
+          text={friendCount + ' amigos' + (incomingCount > 0 ? ` • ${incomingCount} solicitação${incomingCount > 1 ? 'ões' : ''} aguardando` : ' • encontre treinadores e inicie trocas')}
+          onPress={() => router.push('/friends')}
+          badge={incomingCount || undefined}
+        />
+        <FeatureLink
+          icon="book"
+          iconColor={gameTheme.colors.yellow}
+          title="Pokédex"
+          text="Veja as 1.025 espécies, gerações e todas as versões de cards descobertas."
+          onPress={() => router.push('/pokedex')}
+        />
+        <FeatureLink
+          icon="layers"
+          iconColor="#65D894"
+          title="Coleções por Set"
+          text="Acompanhe seu progresso, cards faltantes e sets completados."
+          onPress={() => router.push('/sets')}
+        />
+        <FeatureLink
+          icon="time"
+          iconColor="#B26CFF"
+          title="Histórico de Packs"
+          text={`${stats?.packsOpened ?? 0} boosters abertos • reveja seus melhores pulls.`}
+          onPress={() => router.push('/history')}
+        />
+      </View>
 
       <View style={styles.progressCard}>
         <View style={styles.progressTop}><Text style={styles.progressTitle}>Progresso do nível</Text><Text style={styles.progressValue}>{Number(profile?.xp ?? 0) % 250} / 250 XP</Text></View>
@@ -109,6 +123,16 @@ function Stat({ icon, value, label }: { icon: keyof typeof Ionicons.glyphMap; va
   );
 }
 
+function FeatureLink({ icon, iconColor, title, text, onPress, badge }: { icon: keyof typeof Ionicons.glyphMap; iconColor: string; title: string; text: string; onPress: () => void; badge?: number }) {
+  return (
+    <Pressable style={styles.feature} onPress={onPress}>
+      <View style={styles.featureIcon}><Ionicons name={icon} size={23} color={iconColor} /></View>
+      <View style={styles.featureBody}><Text style={styles.featureTitle}>{title}</Text><Text style={styles.featureText}>{text}</Text></View>
+      {badge ? <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View> : <Ionicons name="chevron-forward" size={20} color="#687E9A" />}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 12, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' },
   errorText: { flex: 1, color: '#FFD7DD', fontWeight: '700', fontSize: 12 },
@@ -127,7 +151,8 @@ const styles = StyleSheet.create({
   statIcon: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#102A4E', alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
   statValue: { color: '#fff', fontSize: 20, fontWeight: '900' },
   statLabel: { color: '#8297B2', fontSize: 10, fontWeight: '800', marginTop: 2 },
-  feature: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, backgroundColor: '#101D30', borderWidth: 1, borderColor: '#263E5C' },
+  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  feature: { flexGrow: 1, flexBasis: 360, minWidth: 280, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, backgroundColor: '#101D30', borderWidth: 1, borderColor: '#263E5C' },
   featureIcon: { width: 45, height: 45, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0C1A2D' },
   featureBody: { flex: 1 },
   featureTitle: { color: '#fff', fontSize: 15, fontWeight: '900' },
