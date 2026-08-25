@@ -1,0 +1,208 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { supabase } from '@/lib/supabase';
+import { getMyBag } from '@/services/player';
+import { cancelBattle, getBattle, getBattleEvents, getBattleRounds, lockBattleCard, resolveBattleTimeout, respondToBattle, subscribeToBattle } from '@/services/battles';
+import { gameTheme } from '@/theme/gameTheme';
+
+export default function BattleScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const [userId, setUserId] = useState('');
+  const [battle, setBattle] = useState<any>(null);
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [bag, setBag] = useState<any[]>([]);
+  const [players, setPlayers] = useState<Record<string, any>>({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [remaining, setRemaining] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const timeoutRound = useRef<number | null>(null);
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    try {
+      const [{ data: auth }, battleData, roundData, eventData, bagData] = await Promise.all([
+        supabase.auth.getUser(), getBattle(id), getBattleRounds(id), getBattleEvents(id), getMyBag(),
+      ]);
+      const uid = auth.user?.id ?? '';
+      setUserId(uid);
+      setBattle(battleData);
+      setRounds(roundData);
+      setEvents(eventData);
+      setBag(bagData ?? []);
+      const ids = [battleData.challenger_id, battleData.opponent_id];
+      const { data: playerRows } = await supabase.from('players').select('id,username,level').in('id', ids);
+      setPlayers(Object.fromEntries((playerRows ?? []).map((p) => [p.id, p])));
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Não foi possível carregar a batalha.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!id) return;
+    return subscribeToBattle(id, () => load());
+  }, [id, load]);
+
+  useEffect(() => {
+    if (!battle?.selection_deadline || battle.status !== 'selecting') { setRemaining(0); return; }
+    const tick = () => setRemaining(Math.max(0, Math.ceil((new Date(battle.selection_deadline).getTime() - Date.now()) / 1000)));
+    tick();
+    const timer = setInterval(tick, 250);
+    return () => clearInterval(timer);
+  }, [battle?.selection_deadline, battle?.status]);
+
+  useEffect(() => {
+    if (!battle || battle.status !== 'selecting' || remaining > 0 || !id) return;
+    if (timeoutRound.current === battle.active_round) return;
+    timeoutRound.current = battle.active_round;
+    resolveBattleTimeout(id).then(() => load()).catch((err) => {
+      if (!String(err?.message ?? err).includes('NOT_EXPIRED')) setNotice(err instanceof Error ? err.message : 'Falha ao resolver o tempo.');
+    });
+  }, [battle, id, load, remaining]);
+
+  const currentRound = Number(battle?.active_round ?? 1);
+  const lockedPlayers = useMemo(() => new Set(events
+    .filter((event) => ['card_locked', 'auto_locked'].includes(event.event_type) && Number(event.payload?.round) === currentRound)
+    .map((event) => event.payload?.playerId)
+    .filter(Boolean)), [currentRound, events]);
+  const selfLocked = lockedPlayers.has(userId);
+  const otherId = battle ? (battle.challenger_id === userId ? battle.opponent_id : battle.challenger_id) : '';
+  const opponentLocked = lockedPlayers.has(otherId);
+  const amChallenger = battle?.challenger_id === userId;
+  const latestRound = rounds.length ? rounds[rounds.length - 1] : null;
+
+  const cards = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return bag.filter((entry) => {
+      const card = Array.isArray(entry.cards) ? entry.cards[0] : entry.cards;
+      return card && (!term || String(card.pokemon_name).toLowerCase().includes(term) || String(card.rarity ?? '').toLowerCase().includes(term));
+    });
+  }, [bag, search]);
+
+  async function respond(accept: boolean) {
+    if (!id) return;
+    try { setWorking(true); await respondToBattle(id, accept); await load(); }
+    catch (err) { setNotice(err instanceof Error ? err.message : 'Não foi possível responder.'); }
+    finally { setWorking(false); }
+  }
+
+  async function lock() {
+    if (!id || !selectedId || selfLocked) return;
+    try { setWorking(true); const result = await lockBattleCard(id, selectedId); if (result?.resolved) setNotice('As duas cartas foram travadas. Resultado revelado!'); await load(); }
+    catch (err) { setNotice(err instanceof Error ? err.message : 'Não foi possível travar a carta.'); }
+    finally { setWorking(false); }
+  }
+
+  async function cancel() {
+    if (!id) return;
+    try { setWorking(true); await cancelBattle(id); router.back(); }
+    catch (err) { setNotice(err instanceof Error ? err.message : 'Não foi possível cancelar.'); }
+    finally { setWorking(false); }
+  }
+
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={gameTheme.colors.yellow} /></View>;
+  if (!battle) return <View style={styles.center}><Text style={styles.white}>Batalha não encontrada.</Text></View>;
+
+  const challenger = players[battle.challenger_id];
+  const opponent = players[battle.opponent_id];
+  const winnerName = players[battle.winner_id]?.username;
+  const gridWidth = width >= 1100 ? '18.8%' : width >= 760 ? '23.5%' : '48.5%';
+
+  return (
+    <View style={styles.safe}>
+      <Stack.Screen options={{ headerShown: true, title: battle.mode === 'mystery' ? 'Mystery Battle' : 'Quick Battle', headerStyle: { backgroundColor: '#060B13' }, headerTintColor: '#fff' }} />
+      <ScrollView contentContainerStyle={styles.content}>
+        {notice ? <Pressable style={styles.notice} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={19} color={gameTheme.colors.yellow} /><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
+
+        <View style={styles.hero}>
+          <View style={styles.playerSide}><Text style={styles.sideLabel}>DESAFIANTE</Text><Text style={styles.playerName}>@{challenger?.username ?? 'Treinador'}</Text><Text style={styles.score}>{battle.challenger_score}</Text></View>
+          <View style={styles.vs}><Text style={styles.vsText}>VS</Text><Text style={styles.mode}>{battle.mode === 'mystery' ? 'MELHOR DE 3' : '1 CARTA'}</Text>{battle.stake_type === 'coins' ? <Text style={styles.wager}>🪙 {Number(battle.wager_coins).toLocaleString('pt-BR')} CADA</Text> : <Text style={styles.casual}>CASUAL</Text>}</View>
+          <View style={[styles.playerSide, styles.right]}><Text style={styles.sideLabel}>OPONENTE</Text><Text style={styles.playerName}>@{opponent?.username ?? 'Treinador'}</Text><Text style={styles.score}>{battle.opponent_score}</Text></View>
+        </View>
+
+        {battle.status === 'invited' ? (
+          <View style={styles.panel}>
+            <Ionicons name="game-controller" size={42} color="#A98BFF" />
+            <Text style={styles.panelTitle}>{amChallenger ? 'Desafio enviado' : 'Você foi desafiado!'}</Text>
+            <Text style={styles.panelText}>{amChallenger ? 'Aguardando o outro treinador aceitar.' : `@${challenger?.username ?? 'Treinador'} quer uma ${battle.mode === 'mystery' ? 'Mystery Battle melhor de 3' : 'Quick Battle'}.`}</Text>
+            {!amChallenger ? <View style={styles.actions}><Pressable style={styles.decline} onPress={() => respond(false)} disabled={working}><Text style={styles.declineText}>RECUSAR</Text></Pressable><Pressable style={styles.accept} onPress={() => respond(true)} disabled={working}><Text style={styles.acceptText}>ACEITAR</Text></Pressable></View> : <Pressable style={styles.decline} onPress={cancel} disabled={working}><Text style={styles.declineText}>CANCELAR DESAFIO</Text></Pressable>}
+          </View>
+        ) : null}
+
+        {battle.status === 'selecting' ? (
+          <>
+            <View style={styles.timerPanel}>
+              <Text style={styles.roundLabel}>RODADA {currentRound}</Text>
+              <Text style={[styles.timer, remaining <= 5 && styles.timerDanger]}>{String(Math.floor(remaining / 60)).padStart(2, '0')}:{String(remaining % 60).padStart(2, '0')}</Text>
+              <Text style={styles.timerHint}>Escolha em segredo. Ao zerar, o servidor escolhe automaticamente.</Text>
+            </View>
+
+            <View style={styles.arena}>
+              <MysterySlot label="SUA CARTA" locked={selfLocked} card={selectedId ? bag.map((x) => Array.isArray(x.cards) ? x.cards[0] : x.cards).find((c) => c?.id === selectedId) : null} showCard={Boolean(selectedId)} />
+              <View style={styles.arenaVs}><Ionicons name="flash" size={27} color={gameTheme.colors.yellow} /><Text style={styles.arenaVsText}>MYSTERY</Text></View>
+              <MysterySlot label="CARTA INIMIGA" locked={opponentLocked} card={null} showCard={false} />
+            </View>
+
+            {!selfLocked ? (
+              <>
+                <View style={styles.searchBox}><Ionicons name="search" size={18} color="#7890AE" /><TextInput value={search} onChangeText={setSearch} placeholder="Escolha uma carta da Bag..." placeholderTextColor="#637895" style={styles.search} /></View>
+                <View style={styles.grid}>{cards.map((entry) => { const card = Array.isArray(entry.cards) ? entry.cards[0] : entry.cards; if (!card) return null; const selected = selectedId === card.id; return <Pressable key={card.id} style={[styles.cardTile, { width: gridWidth as any }, selected && styles.cardSelected]} onPress={() => setSelectedId(card.id)}>{card.image_small ? <Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.cardImage} /> : <View style={styles.cardImage} />}<Text numberOfLines={1} style={styles.cardName}>{card.pokemon_name}</Text><Text numberOfLines={1} style={styles.cardMeta}>{card.rarity ?? 'Comum'} • x{entry.quantity}</Text>{selected ? <View style={styles.selectedBadge}><Ionicons name="checkmark" size={16} color="#07111F" /></View> : null}</Pressable>; })}</View>
+                <Pressable style={[styles.lockButton, !selectedId && styles.disabled]} onPress={lock} disabled={!selectedId || working}><Ionicons name="lock-closed" size={18} color="#07111F" /><Text style={styles.lockText}>TRAVAR CARTA</Text></Pressable>
+              </>
+            ) : <View style={styles.lockedNotice}><Ionicons name="lock-closed" size={20} color="#77D9A5" /><Text style={styles.lockedText}>Sua carta está travada. O adversário vê apenas “?”.</Text></View>}
+          </>
+        ) : null}
+
+        {latestRound ? (
+          <View style={styles.revealSection}>
+            <Text style={styles.sectionTitle}>Última revelação</Text>
+            <View style={styles.revealRow}>
+              <RevealedCard card={latestRound.c1} score={Number(latestRound.challenger_power) * Number(latestRound.challenger_roll)} winner={latestRound.winner_id === battle.challenger_id} />
+              <Text style={styles.revealVs}>VS</Text>
+              <RevealedCard card={latestRound.c2} score={Number(latestRound.opponent_power) * Number(latestRound.opponent_roll)} winner={latestRound.winner_id === battle.opponent_id} />
+            </View>
+          </View>
+        ) : null}
+
+        {battle.status === 'completed' ? (
+          <View style={styles.completed}>
+            <Ionicons name="trophy" size={48} color={gameTheme.colors.yellow} />
+            <Text style={styles.completedKicker}>BATALHA ENCERRADA</Text>
+            <Text style={styles.completedTitle}>@{winnerName ?? 'Treinador'} venceu!</Text>
+            <Text style={styles.completedText}>{battle.stake_type === 'coins' ? `O pote de 🪙 ${(Number(battle.wager_coins) * 2).toLocaleString('pt-BR')} já foi pago pelo servidor.` : 'XP e progresso de missão foram atualizados.'}</Text>
+            <Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>VOLTAR</Text></Pressable>
+          </View>
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+function MysterySlot({ label, locked, card, showCard }: { label: string; locked: boolean; card: any; showCard: boolean }) {
+  return <View style={styles.slot}><Text style={styles.slotLabel}>{label}</Text><View style={[styles.cardBack, locked && styles.cardBackLocked]}>{showCard && card?.image_small ? <Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.slotCardImage} /> : <><View style={styles.questionCircle}><Text style={styles.question}>?</Text></View><Text style={styles.secretText}>{locked ? 'TRAVADA' : 'AGUARDANDO'}</Text></>}</View></View>;
+}
+function RevealedCard({ card, score, winner }: { card: any; score: number; winner: boolean }) {
+  return <View style={[styles.revealed, winner && styles.revealedWinner]}>{winner ? <View style={styles.winBadge}><Text style={styles.winText}>VENCEU</Text></View> : null}{card?.image_small ? <Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.revealedImage} /> : null}<Text style={styles.revealedName}>{card?.pokemon_name ?? 'Pokémon'}</Text><Text style={styles.power}>POWER {Math.round(score)}</Text></View>;
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#060B13' }, center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#060B13' }, white: { color: '#fff' }, content: { width: '100%', maxWidth: 1180, alignSelf: 'center', padding: 16, paddingBottom: 50, gap: 14 },
+  notice: { flexDirection: 'row', gap: 8, padding: 11, borderRadius: 14, backgroundColor: '#2B2818', borderWidth: 1, borderColor: '#5A5125' }, noticeText: { flex: 1, color: '#F8EFCB', fontSize: 11, fontWeight: '700' },
+  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 22, backgroundColor: '#0D1929', borderWidth: 1, borderColor: '#273D5B' }, playerSide: { flex: 1 }, right: { alignItems: 'flex-end' }, sideLabel: { color: '#7186A3', fontSize: 8, fontWeight: '900', letterSpacing: 1.1 }, playerName: { color: '#fff', fontSize: 16, fontWeight: '900', marginTop: 3 }, score: { color: gameTheme.colors.yellow, fontSize: 27, fontWeight: '900', marginTop: 3 }, vs: { alignItems: 'center', paddingHorizontal: 10 }, vsText: { color: '#fff', fontSize: 25, fontWeight: '900' }, mode: { color: '#A98BFF', fontSize: 8, fontWeight: '900', marginTop: 2 }, wager: { color: gameTheme.colors.yellow, fontSize: 8, fontWeight: '900', marginTop: 5 }, casual: { color: '#6FDCA3', fontSize: 8, fontWeight: '900', marginTop: 5 },
+  panel: { alignItems: 'center', gap: 8, padding: 28, borderRadius: 22, backgroundColor: '#111829', borderWidth: 1, borderColor: '#302A59' }, panelTitle: { color: '#fff', fontSize: 22, fontWeight: '900' }, panelText: { color: '#93A4BC', textAlign: 'center', maxWidth: 480, lineHeight: 19 }, actions: { flexDirection: 'row', gap: 9, marginTop: 8 }, accept: { paddingHorizontal: 22, paddingVertical: 13, borderRadius: 12, backgroundColor: gameTheme.colors.yellow }, acceptText: { color: '#07111F', fontWeight: '900', fontSize: 10 }, decline: { paddingHorizontal: 18, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: '#6A3441' }, declineText: { color: '#FF9FAF', fontWeight: '900', fontSize: 10 },
+  timerPanel: { alignItems: 'center', padding: 12 }, roundLabel: { color: '#8498B4', fontSize: 9, fontWeight: '900', letterSpacing: 1.4 }, timer: { color: '#fff', fontSize: 39, fontWeight: '900', fontVariant: ['tabular-nums'] }, timerDanger: { color: '#FF6574' }, timerHint: { color: '#7388A4', fontSize: 9, textAlign: 'center' },
+  arena: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 16, paddingVertical: 8 }, arenaVs: { alignItems: 'center', minWidth: 80 }, arenaVsText: { color: '#8E75D7', fontSize: 9, fontWeight: '900' }, slot: { alignItems: 'center', gap: 7 }, slotLabel: { color: '#8195B0', fontSize: 9, fontWeight: '900', letterSpacing: 1 }, cardBack: { width: 180, height: 250, borderRadius: 16, borderWidth: 2, borderColor: '#334A69', backgroundColor: '#0A1422', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, cardBackLocked: { borderColor: '#7559C4', backgroundColor: '#14102B' }, questionCircle: { width: 86, height: 86, borderRadius: 43, borderWidth: 3, borderColor: '#7559C4', alignItems: 'center', justifyContent: 'center' }, question: { color: '#A98BFF', fontSize: 48, fontWeight: '900' }, secretText: { color: '#8071B3', fontSize: 8, fontWeight: '900', marginTop: 12, letterSpacing: 1.1 }, slotCardImage: { width: '100%', height: '100%' },
+  searchBox: { height: 50, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderRadius: 15, backgroundColor: '#0D1929', borderWidth: 1, borderColor: '#263C59' }, search: { flex: 1, color: '#fff', height: '100%' }, grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, cardTile: { position: 'relative', padding: 7, borderRadius: 15, backgroundColor: '#0D1929', borderWidth: 1, borderColor: '#263C59' }, cardSelected: { borderColor: gameTheme.colors.yellow, backgroundColor: '#222113' }, cardImage: { width: '100%', aspectRatio: 0.72, borderRadius: 9 }, cardName: { color: '#fff', fontSize: 11, fontWeight: '900', marginTop: 6 }, cardMeta: { color: '#7186A3', fontSize: 8, marginTop: 2 }, selectedBadge: { position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: 14, backgroundColor: gameTheme.colors.yellow, alignItems: 'center', justifyContent: 'center' }, lockButton: { minHeight: 52, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: gameTheme.colors.yellow, borderRadius: 13 }, lockText: { color: '#07111F', fontWeight: '900', fontSize: 11, letterSpacing: 0.5 }, disabled: { opacity: 0.4 }, lockedNotice: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, backgroundColor: '#122C23', borderWidth: 1, borderColor: '#285540' }, lockedText: { color: '#AEEBC9', fontSize: 11, fontWeight: '800' },
+  revealSection: { gap: 10, paddingTop: 6 }, sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '900' }, revealRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 12 }, revealVs: { color: '#fff', fontSize: 20, fontWeight: '900' }, revealed: { width: 190, padding: 8, borderRadius: 16, backgroundColor: '#0D1929', borderWidth: 1, borderColor: '#263C59', alignItems: 'center', position: 'relative' }, revealedWinner: { borderColor: gameTheme.colors.yellow }, revealedImage: { width: '100%', aspectRatio: 0.72 }, revealedName: { color: '#fff', fontWeight: '900', fontSize: 12, marginTop: 6 }, power: { color: '#8EA4C0', fontSize: 9, fontWeight: '900', marginTop: 2 }, winBadge: { position: 'absolute', top: 8, left: 8, zIndex: 2, backgroundColor: gameTheme.colors.yellow, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }, winText: { color: '#07111F', fontSize: 7, fontWeight: '900' },
+  completed: { alignItems: 'center', padding: 26, gap: 7, borderRadius: 22, backgroundColor: '#151B20', borderWidth: 1, borderColor: '#5A5125' }, completedKicker: { color: gameTheme.colors.yellow, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 }, completedTitle: { color: '#fff', fontSize: 25, fontWeight: '900' }, completedText: { color: '#94A5BA', textAlign: 'center' }, backButton: { marginTop: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, backgroundColor: gameTheme.colors.yellow }, backText: { color: '#07111F', fontSize: 10, fontWeight: '900' },
+});
