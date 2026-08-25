@@ -1,5 +1,17 @@
 import { supabase } from '../lib/supabase';
 
+export type TradeCardInput = {
+  card_id: string;
+  quantity: number;
+};
+
+async function invokeTradeAction(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke('trade-action', { body });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data?.data;
+}
+
 export async function getMyTrades() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
@@ -48,5 +60,18 @@ export async function getTrade(tradeId: string) {
   return data;
 }
 
-// Criação, confirmação e conclusão de trocas serão feitas por RPC/Edge Function.
-// O cliente não altera inventário diretamente.
+export async function createTrade(receiverId: string) {
+  return invokeTradeAction({ action: 'create', receiverId });
+}
+
+export async function setTradeCards(tradeId: string, cards: TradeCardInput[]) {
+  return invokeTradeAction({ action: 'set_cards', tradeId, cards });
+}
+
+export async function confirmTrade(tradeId: string) {
+  return invokeTradeAction({ action: 'confirm', tradeId });
+}
+
+export async function cancelTrade(tradeId: string) {
+  return invokeTradeAction({ action: 'cancel', tradeId });
+}
