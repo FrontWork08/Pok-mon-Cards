@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { OpenedCard, Pack } from '@/services/packs';
 import { gameTheme } from '@/theme/gameTheme';
@@ -14,6 +14,8 @@ type Props = {
 
 type Stage = 'sealed' | 'opening' | 'burst' | 'cards' | 'summary';
 type RarityTheme = { color: string; soft: string; label: string };
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 function rarityTheme(rarity?: string | null): RarityTheme {
   const value = (rarity ?? '').toLowerCase();
@@ -56,8 +58,8 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     rarityPulse.setValue(0);
 
     const floating = Animated.loop(Animated.sequence([
-      Animated.timing(packY, { toValue: -10, duration: 1100, useNativeDriver: true }),
-      Animated.timing(packY, { toValue: 7, duration: 1100, useNativeDriver: true }),
+      Animated.timing(packY, { toValue: -10, duration: 1100, useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(packY, { toValue: 7, duration: 1100, useNativeDriver: USE_NATIVE_DRIVER }),
     ]));
     floating.start();
     return () => floating.stop();
@@ -67,16 +69,16 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     cardScale.setValue(0.84);
     cardOpacity.setValue(0);
     Animated.parallel([
-      Animated.spring(cardScale, { toValue: 1, friction: 7, tension: 75, useNativeDriver: true }),
-      Animated.timing(cardOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, friction: 7, tension: 75, useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(cardOpacity, { toValue: 1, duration: 260, useNativeDriver: USE_NATIVE_DRIVER }),
     ]).start();
   }
 
   function startRarityPulse() {
     rarityPulse.setValue(0);
     Animated.loop(Animated.sequence([
-      Animated.timing(rarityPulse, { toValue: 1, duration: 650, useNativeDriver: true }),
-      Animated.timing(rarityPulse, { toValue: 0, duration: 650, useNativeDriver: true }),
+      Animated.timing(rarityPulse, { toValue: 1, duration: 650, useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(rarityPulse, { toValue: 0, duration: 650, useNativeDriver: USE_NATIVE_DRIVER }),
     ]), { iterations: 3 }).start();
   }
 
@@ -90,22 +92,22 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
       Animated.sequence([
         Animated.parallel([
           Animated.sequence([
-            Animated.timing(packRotate, { toValue: -1, duration: 80, useNativeDriver: true }),
-            Animated.timing(packRotate, { toValue: 1, duration: 80, useNativeDriver: true }),
-            Animated.timing(packRotate, { toValue: -1, duration: 70, useNativeDriver: true }),
-            Animated.timing(packRotate, { toValue: 1, duration: 70, useNativeDriver: true }),
-            Animated.timing(packRotate, { toValue: 0, duration: 70, useNativeDriver: true }),
+            Animated.timing(packRotate, { toValue: -1, duration: 80, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: 1, duration: 80, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: -1, duration: 70, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: 1, duration: 70, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: 0, duration: 70, useNativeDriver: USE_NATIVE_DRIVER }),
           ]),
           Animated.sequence([
-            Animated.timing(packScale, { toValue: 1.08, duration: 180, useNativeDriver: true }),
-            Animated.timing(packScale, { toValue: 0.96, duration: 130, useNativeDriver: true }),
-            Animated.timing(packScale, { toValue: 1.15, duration: 180, useNativeDriver: true }),
+            Animated.timing(packScale, { toValue: 1.08, duration: 180, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packScale, { toValue: 0.96, duration: 130, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packScale, { toValue: 1.15, duration: 180, useNativeDriver: USE_NATIVE_DRIVER }),
           ]),
         ]),
         Animated.parallel([
-          Animated.timing(packScale, { toValue: 0.02, duration: 210, useNativeDriver: true }),
-          Animated.timing(burst, { toValue: 1, duration: 240, useNativeDriver: true }),
-          Animated.timing(beam, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(packScale, { toValue: 0.02, duration: 210, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(burst, { toValue: 1, duration: 240, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(beam, { toValue: 1, duration: 300, useNativeDriver: USE_NATIVE_DRIVER }),
         ]),
         Animated.delay(330),
       ]).start(() => resolve());
