@@ -1,4 +1,5 @@
 create extension if not exists pgcrypto;
+create schema if not exists private;
 
 create type public.friend_status as enum ('pending', 'accepted', 'blocked');
 create type public.trade_status as enum ('pending', 'accepted', 'rejected', 'cancelled', 'completed');
@@ -98,12 +99,37 @@ alter table public.trade_cards enable row level security;
 create policy "cards readable by authenticated players" on public.cards for select to authenticated using (true);
 create policy "packs readable by authenticated players" on public.packs for select to authenticated using (active = true);
 create policy "players readable by authenticated players" on public.players for select to authenticated using (true);
-create policy "own inventory readable" on public.player_cards for select to authenticated using (player_id = auth.uid());
-create policy "own openings readable" on public.pack_openings for select to authenticated using (player_id = auth.uid());
-create policy "trade participants can read trades" on public.trades for select to authenticated using (sender_id = auth.uid() or receiver_id = auth.uid());
-create policy "trade participants can read trade cards" on public.trade_cards for select to authenticated using (exists (select 1 from public.trades t where t.id = trade_id and (t.sender_id = auth.uid() or t.receiver_id = auth.uid())));
-create policy "friend participants can read" on public.friendships for select to authenticated using (requester_id = auth.uid() or addressee_id = auth.uid());
+create policy "own inventory readable" on public.player_cards for select to authenticated using (player_id = (select auth.uid()));
+create policy "own openings readable" on public.pack_openings for select to authenticated using (player_id = (select auth.uid()));
+create policy "trade participants can read trades" on public.trades for select to authenticated using (sender_id = (select auth.uid()) or receiver_id = (select auth.uid()));
+create policy "trade participants can read trade cards" on public.trade_cards for select to authenticated using (exists (select 1 from public.trades t where t.id = trade_id and (t.sender_id = (select auth.uid()) or t.receiver_id = (select auth.uid()))));
+create policy "friend participants can read" on public.friendships for select to authenticated using (requester_id = (select auth.uid()) or addressee_id = (select auth.uid()));
 
--- Intencionalmente não existem policies de INSERT/UPDATE para moedas,
--- inventário, packs abertos ou conclusão de trocas. Essas mutações devem
--- acontecer por funções server-side usando uma service role.
+create or replace function private.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  desired_username text;
+begin
+  desired_username := coalesce(nullif(trim(new.raw_user_meta_data ->> 'username'), ''), 'trainer_' || substr(new.id::text, 1, 8));
+
+  insert into public.players (id, username)
+  values (new.id, desired_username);
+
+  return new;
+end;
+$$;
+
+revoke all on function private.handle_new_user() from public, anon, authenticated;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure private.handle_new_user();
+
+-- Não existem policies de INSERT/UPDATE para moedas, inventário, packs abertos
+-- ou conclusão de trocas. Essas mutações devem acontecer somente em código
+-- server-side autenticado e validado.
