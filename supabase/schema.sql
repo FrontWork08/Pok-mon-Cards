@@ -96,6 +96,11 @@ alter table public.friendships enable row level security;
 alter table public.trades enable row level security;
 alter table public.trade_cards enable row level security;
 
+-- New Supabase projects may require explicit Data API grants.
+grant usage on schema public to authenticated;
+grant select on public.players, public.cards, public.player_cards, public.packs,
+  public.pack_openings, public.friendships, public.trades, public.trade_cards to authenticated;
+
 create policy "cards readable by authenticated players" on public.cards for select to authenticated using (true);
 create policy "packs readable by authenticated players" on public.packs for select to authenticated using (active = true);
 create policy "players readable by authenticated players" on public.players for select to authenticated using (true);
@@ -130,6 +135,6 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure private.handle_new_user();
 
--- Não existem policies de INSERT/UPDATE para moedas, inventário, packs abertos
--- ou conclusão de trocas. Essas mutações devem acontecer somente em código
--- server-side autenticado e validado.
+-- Não existem grants/policies de INSERT/UPDATE para moedas, inventário,
+-- packs abertos ou conclusão de trocas. Essas mutações devem acontecer
+-- somente em código server-side autenticado e validado.
