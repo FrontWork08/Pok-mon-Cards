@@ -9,8 +9,13 @@ export type PlayerSettings = {
   theme: ThemeName;
   chat_notifications: boolean;
   battle_invites: boolean;
+  push_notifications: boolean;
+  battle_sounds: boolean;
+  battle_vibration: boolean;
   updated_at: string;
 };
+
+export type SettingsPatch = Partial<Pick<PlayerSettings, 'appearance' | 'theme' | 'chat_notifications' | 'battle_invites' | 'push_notifications' | 'battle_sounds' | 'battle_vibration'>>;
 
 export async function getMySettings(): Promise<PlayerSettings> {
   const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -19,19 +24,28 @@ export async function getMySettings(): Promise<PlayerSettings> {
 
   const { data, error } = await supabase
     .from('player_settings')
-    .select('player_id,appearance,theme,chat_notifications,battle_invites,updated_at')
+    .select('player_id,appearance,theme,chat_notifications,battle_invites,push_notifications,battle_sounds,battle_vibration,updated_at')
     .eq('player_id', auth.user.id)
     .maybeSingle();
   if (error) throw error;
   if (data) return data as PlayerSettings;
 
-  const defaults = { player_id: auth.user.id, appearance: 'dark' as AppearanceMode, theme: 'trainer' as ThemeName, chat_notifications: true, battle_invites: true };
+  const defaults = {
+    player_id: auth.user.id,
+    appearance: 'dark' as AppearanceMode,
+    theme: 'trainer' as ThemeName,
+    chat_notifications: true,
+    battle_invites: true,
+    push_notifications: true,
+    battle_sounds: true,
+    battle_vibration: true,
+  };
   const { data: created, error: createError } = await supabase.from('player_settings').insert(defaults).select().single();
   if (createError) throw createError;
   return created as PlayerSettings;
 }
 
-export async function updateMySettings(patch: Partial<Pick<PlayerSettings, 'appearance' | 'theme' | 'chat_notifications' | 'battle_invites'>>) {
+export async function updateMySettings(patch: SettingsPatch) {
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   if (!auth.user) throw new Error('Usuário não autenticado.');
