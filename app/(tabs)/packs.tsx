@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { listPacks, openPack, type Pack } from '@/services/packs';
+import { getMyProfile } from '@/services/player';
 import { gameTheme } from '@/theme/gameTheme';
 
 type OpenedCard = { id: string; name: string; rarity: string | null; image: string | null };
@@ -11,6 +12,7 @@ const PAGE_SIZE = 18;
 
 export default function PacksScreen() {
   const [packs, setPacks] = useState<Pack[]>([]);
+  const [coins, setCoins] = useState(0);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<OpenedCard[]>([]);
@@ -20,7 +22,9 @@ export default function PacksScreen() {
   async function load() {
     try {
       setLoading(true);
-      setPacks(await listPacks());
+      const [packData, profile] = await Promise.all([listPacks(), getMyProfile()]);
+      setPacks(packData);
+      setCoins(profile.coins);
     } catch (error) {
       console.warn(error);
     } finally {
@@ -40,13 +44,22 @@ export default function PacksScreen() {
   const visiblePacks = filtered.slice(0, visibleCount);
 
   async function handleOpen(pack: Pack) {
+    if (coins < pack.price) {
+      Alert.alert('Moedas insuficientes', `Você tem 🪙 ${coins}, mas este booster custa 🪙 ${pack.price}.`);
+      return;
+    }
+
     try {
       setOpening(pack.id);
       setRevealed([]);
       const result = await openPack(pack.id);
       setRevealed(result.cards);
+      const profile = await getMyProfile();
+      setCoins(profile.coins);
     } catch (error: any) {
       Alert.alert('Não foi possível abrir', error?.message ?? 'Tente novamente.');
+      const profile = await getMyProfile().catch(() => null);
+      if (profile) setCoins(profile.coins);
     } finally {
       setOpening(null);
     }
@@ -54,6 +67,16 @@ export default function PacksScreen() {
 
   return (
     <Screen title="Pack Shop" subtitle="Escolha uma coleção, abra o booster e torça pelo pull raro.">
+      <View style={styles.balanceRow}>
+        <View>
+          <Text style={styles.balanceLabel}>SEU SALDO</Text>
+          <Text style={styles.balanceValue}>🪙 {coins.toLocaleString('pt-BR')}</Text>
+        </View>
+        <View style={styles.balanceBadge}>
+          <Ionicons name="wallet-outline" size={20} color={gameTheme.colors.yellow} />
+        </View>
+      </View>
+
       <View style={styles.shopHero}>
         <View style={styles.shopHeroIcon}><Ionicons name="sparkles" size={22} color={gameTheme.colors.yellow} /></View>
         <View style={{ flex: 1 }}>
@@ -92,22 +115,27 @@ export default function PacksScreen() {
       ) : null}
 
       <View style={styles.packGrid}>
-        {visiblePacks.map((pack) => (
-          <View key={pack.id} style={styles.pack}>
-            <View style={styles.imageWrap}>
-              {pack.image_url ? <Image source={{ uri: pack.image_url }} style={styles.packImage} resizeMode="contain" /> : <View style={styles.placeholder}><Ionicons name="cube" size={36} color="#55739F" /><Text style={styles.placeholderText}>BOOSTER</Text></View>}
-              <View style={styles.cardCountBadge}><Text style={styles.cardCountText}>{pack.cards_per_pack} cards</Text></View>
+        {visiblePacks.map((pack) => {
+          const affordable = coins >= pack.price;
+          const disabled = opening !== null || !affordable;
+
+          return (
+            <View key={pack.id} style={[styles.pack, !affordable && styles.packUnaffordable]}>
+              <View style={styles.imageWrap}>
+                {pack.image_url ? <Image source={{ uri: pack.image_url }} style={styles.packImage} resizeMode="contain" /> : <View style={styles.placeholder}><Ionicons name="cube" size={36} color="#55739F" /><Text style={styles.placeholderText}>BOOSTER</Text></View>}
+                <View style={styles.cardCountBadge}><Text style={styles.cardCountText}>{pack.cards_per_pack} cards</Text></View>
+              </View>
+              <Text numberOfLines={2} style={styles.packName}>{pack.name}</Text>
+              <Text numberOfLines={1} style={styles.setId}>{pack.set_id.toUpperCase()}</Text>
+              <View style={styles.packFooter}>
+                <Text style={[styles.price, !affordable && styles.priceDisabled]}>🪙 {pack.price}</Text>
+                <Pressable style={[styles.openButton, disabled && styles.disabled]} disabled={disabled} onPress={() => handleOpen(pack)}>
+                  <Text style={styles.openButtonText}>{opening === pack.id ? '...' : affordable ? 'ABRIR' : 'SEM SALDO'}</Text>
+                </Pressable>
+              </View>
             </View>
-            <Text numberOfLines={2} style={styles.packName}>{pack.name}</Text>
-            <Text numberOfLines={1} style={styles.setId}>{pack.set_id.toUpperCase()}</Text>
-            <View style={styles.packFooter}>
-              <Text style={styles.price}>🪙 {pack.price}</Text>
-              <Pressable style={[styles.openButton, opening !== null && styles.disabled]} disabled={opening !== null} onPress={() => handleOpen(pack)}>
-                <Text style={styles.openButtonText}>{opening === pack.id ? '...' : 'ABRIR'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       {visibleCount < filtered.length ? (
@@ -139,6 +167,10 @@ export default function PacksScreen() {
 }
 
 const styles = StyleSheet.create({
+  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#141F31', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 13, borderWidth: 1, borderColor: '#273C59' },
+  balanceLabel: { color: '#7990AD', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  balanceValue: { color: gameTheme.colors.yellow, fontSize: 22, fontWeight: '900', marginTop: 2 },
+  balanceBadge: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#2C291B', alignItems: 'center', justifyContent: 'center' },
   shopHero: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#132A45', borderRadius: 22, padding: 16, borderWidth: 1, borderColor: '#27486E' },
   shopHeroIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#302B19' },
   shopHeroKicker: { color: gameTheme.colors.yellow, fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
@@ -154,6 +186,7 @@ const styles = StyleSheet.create({
   muted: { color: gameTheme.colors.muted, fontSize: 13, textAlign: 'center' },
   packGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   pack: { width: '48.5%', backgroundColor: gameTheme.colors.surface, borderRadius: 20, padding: 10, borderWidth: 1, borderColor: gameTheme.colors.border },
+  packUnaffordable: { opacity: 0.68 },
   imageWrap: { height: 184, borderRadius: 16, backgroundColor: '#0A1627', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
   packImage: { width: '88%', height: '92%' },
   placeholder: { alignItems: 'center', gap: 8 },
@@ -164,6 +197,7 @@ const styles = StyleSheet.create({
   setId: { color: '#6F85A4', fontSize: 10, fontWeight: '800', marginTop: 2 },
   packFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
   price: { color: gameTheme.colors.yellow, fontSize: 13, fontWeight: '900' },
+  priceDisabled: { color: '#7D8797' },
   openButton: { backgroundColor: gameTheme.colors.blue, paddingHorizontal: 13, paddingVertical: 9, borderRadius: 11 },
   openButtonText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
   disabled: { opacity: 0.45 },
