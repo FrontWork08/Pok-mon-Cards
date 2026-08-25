@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase';
 
+export type BattleStakeType = 'none' | 'coins' | 'card';
+export type BattleMode = 'quick' | 'mystery';
+
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('battle-action', { body });
   if (error) throw error;
@@ -7,13 +10,18 @@ async function invoke(body: Record<string, unknown>) {
   return data?.data;
 }
 
-export async function createBattle(opponentId: string, mode: 'quick' | 'mystery' = 'quick', stakeType: 'none' | 'coins' = 'none', wagerCoins = 0) {
-  const data = await invoke({ action: 'create', opponentId, mode, stakeType, wagerCoins });
+export async function createBattle(opponentId: string, mode: BattleMode = 'quick', stakeType: BattleStakeType = 'none', wagerCoins = 0, stakeCardId?: string | null, rematchOf?: string | null) {
+  const data = await invoke({ action: 'create', opponentId, mode, stakeType, wagerCoins, stakeCardId: stakeCardId ?? null, rematchOf: rematchOf ?? null });
   return data.battleId as string;
 }
 
-export async function respondToBattle(battleId: string, accept: boolean) {
-  return invoke({ action: 'respond', battleId, accept });
+export async function respondToBattle(battleId: string, accept: boolean, stakeCardId?: string | null) {
+  return invoke({ action: 'respond', battleId, accept, stakeCardId: stakeCardId ?? null });
+}
+
+export async function rematchBattle(battleId: string) {
+  const data = await invoke({ action: 'rematch', battleId });
+  return data.battleId as string;
 }
 
 export async function lockBattleCard(battleId: string, cardId: string) {
@@ -31,11 +39,20 @@ export async function cancelBattle(battleId: string) {
 export async function getBattle(battleId: string) {
   const { data, error } = await supabase
     .from('battles')
-    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,rounds_to_win,active_round,selection_seconds,selection_deadline,challenger_score,opponent_score,winner_id,created_at,updated_at,completed_at')
+    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,rounds_to_win,active_round,selection_seconds,selection_deadline,challenger_score,opponent_score,winner_id,reward_eligible,rematch_of,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,created_at,updated_at,completed_at')
     .eq('id', battleId)
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function getBattleCardStakes(battleId: string) {
+  const { data, error } = await supabase
+    .from('battle_card_stakes')
+    .select('battle_id,player_id,card_id,quantity,status,cards(id,pokemon_name,image_small,image_large,rarity,types)')
+    .eq('battle_id', battleId);
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function getBattleRounds(battleId: string) {
@@ -54,6 +71,32 @@ export async function getBattleEvents(battleId: string) {
     .select('id,event_type,payload,created_at')
     .eq('battle_id', battleId)
     .order('id', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getMyBattleHistory(limit = 50) {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  const id = auth.user?.id;
+  if (!id) throw new Error('Usuário não autenticado.');
+  const { data, error } = await supabase
+    .from('battles')
+    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,challenger_score,opponent_score,winner_id,reward_eligible,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,created_at,completed_at,challenger:players!battles_challenger_id_fkey(id,username,battle_rating),opponent:players!battles_opponent_id_fkey(id,username,battle_rating)')
+    .or(`challenger_id.eq.${id},opponent_id.eq.${id}`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getBattleLeaderboard(limit = 50) {
+  const { data, error } = await supabase
+    .from('players')
+    .select('id,username,level,battle_rating,battle_wins,battle_losses,battle_streak,best_battle_streak')
+    .order('battle_rating', { ascending: false })
+    .order('battle_wins', { ascending: false })
+    .limit(limit);
   if (error) throw error;
   return data ?? [];
 }
