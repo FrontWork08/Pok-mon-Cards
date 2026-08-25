@@ -1,0 +1,7 @@
+-- Secure trade flow. Applied to production Supabase on 2026-08-25.
+-- The live migration defines server_create_trade, server_set_trade_cards,
+-- server_confirm_trade and server_cancel_trade as SECURITY DEFINER functions,
+-- revokes access from public/anon/authenticated, and grants execution only to service_role.
+--
+-- Keep the canonical definitions in the Supabase migration history. This file marks
+-- the feature in source control; future edits should be made as new migrations.
