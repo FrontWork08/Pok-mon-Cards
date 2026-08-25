@@ -20,6 +20,10 @@ export async function lockBattleCard(battleId: string, cardId: string) {
   return invoke({ action: 'lock', battleId, cardId });
 }
 
+export async function resolveBattleTimeout(battleId: string) {
+  return invoke({ action: 'timeout', battleId });
+}
+
 export async function cancelBattle(battleId: string) {
   return invoke({ action: 'cancel', battleId });
 }
