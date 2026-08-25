@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Pokémon Cards",
+    "slug": "pokemon-cards",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "pokemoncards",
+    "userInterfaceStyle": "dark",
+    "plugins": ["expo-router", "expo-secure-store"],
+    "android": {
+      "package": "com.frontwork.pokemoncards"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
