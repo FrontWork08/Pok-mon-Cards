@@ -96,7 +96,6 @@ alter table public.friendships enable row level security;
 alter table public.trades enable row level security;
 alter table public.trade_cards enable row level security;
 
--- New Supabase projects may require explicit Data API grants.
 grant usage on schema public to authenticated;
 grant select on public.players, public.cards, public.player_cards, public.packs,
   public.pack_openings, public.friendships, public.trades, public.trade_cards to authenticated;
@@ -120,10 +119,7 @@ declare
   desired_username text;
 begin
   desired_username := coalesce(nullif(trim(new.raw_user_meta_data ->> 'username'), ''), 'trainer_' || substr(new.id::text, 1, 8));
-
-  insert into public.players (id, username)
-  values (new.id, desired_username);
-
+  insert into public.players (id, username) values (new.id, desired_username);
   return new;
 end;
 $$;
@@ -135,6 +131,64 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure private.handle_new_user();
 
--- Não existem grants/policies de INSERT/UPDATE para moedas, inventário,
--- packs abertos ou conclusão de trocas. Essas mutações devem acontecer
--- somente em código server-side autenticado e validado.
+-- Server-only RPC. A single PostgreSQL function means coins, inventory and
+-- opening history commit together or roll back together on any exception.
+create or replace function public.server_open_pack(p_player_id uuid, p_pack_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_pack public.packs%rowtype;
+  v_coins bigint;
+  v_cards jsonb;
+  v_opening_id uuid;
+  v_count integer;
+begin
+  select * into v_pack from public.packs where id = p_pack_id and active = true for share;
+  if not found then raise exception 'PACK_NOT_FOUND'; end if;
+
+  select coins into v_coins from public.players where id = p_player_id for update;
+  if not found then raise exception 'PLAYER_NOT_FOUND'; end if;
+  if v_coins < v_pack.price then raise exception 'NOT_ENOUGH_COINS'; end if;
+
+  select count(*) into v_count from public.cards where set_id = v_pack.set_id;
+  if v_count < 1 then raise exception 'EMPTY_PACK_POOL'; end if;
+
+  with picked as (
+    select id, pokemon_name, rarity, image_large
+    from public.cards
+    where set_id = v_pack.set_id
+    order by random()
+    limit v_pack.cards_per_pack
+  ), upserted as (
+    insert into public.player_cards (player_id, card_id, quantity)
+    select p_player_id, id, 1 from picked
+    on conflict (player_id, card_id)
+    do update set quantity = public.player_cards.quantity + 1
+    returning card_id
+  )
+  select jsonb_agg(jsonb_build_object(
+    'id', p.id,
+    'name', p.pokemon_name,
+    'rarity', p.rarity,
+    'image', p.image_large
+  )) into v_cards
+  from picked p;
+
+  update public.players set coins = coins - v_pack.price where id = p_player_id;
+
+  insert into public.pack_openings (player_id, pack_id, cards_received)
+  values (p_player_id, p_pack_id, coalesce(v_cards, '[]'::jsonb))
+  returning id into v_opening_id;
+
+  return jsonb_build_object('openingId', v_opening_id, 'cards', coalesce(v_cards, '[]'::jsonb));
+end;
+$$;
+
+revoke all on function public.server_open_pack(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.server_open_pack(uuid, uuid) to service_role;
+
+-- Client users receive only SELECT grants. Mutations involving coins, Bag,
+-- boosters and trade settlement stay server-side.
