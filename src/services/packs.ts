@@ -10,6 +10,13 @@ export type Pack = {
   active: boolean;
 };
 
+export type OpenedCard = {
+  id: string;
+  name: string;
+  rarity: string | null;
+  image: string | null;
+};
+
 export async function listPacks(): Promise<Pack[]> {
   const { data, error } = await supabase
     .from('packs')
@@ -49,5 +56,5 @@ export async function openPack(packId: string) {
     throw new Error(message);
   }
 
-  return data as { openingId: string; cards: Array<{ id: string; name: string; rarity: string | null; image: string | null }> };
+  return data as { openingId: string; cards: OpenedCard[] };
 }
