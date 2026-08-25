@@ -10,6 +10,7 @@ import { createTrade } from '@/services/trades';
 import { gameTheme } from '@/theme/gameTheme';
 
 const emptyState: SocialState = { friends: [], incoming: [], outgoing: [] };
+type RelationshipState = 'friend' | 'incoming' | 'outgoing';
 
 export default function FriendsScreen() {
   const router = useRouter();
@@ -28,11 +29,13 @@ export default function FriendsScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const known = useMemo(() => new Map([
-    ...social.friends.map((p) => [p.id, 'friend']),
-    ...social.incoming.map((p) => [p.id, 'incoming']),
-    ...social.outgoing.map((p) => [p.id, 'outgoing']),
-  ]), [social]);
+  const known = useMemo(() => {
+    const entries: Array<[string, RelationshipState]> = [];
+    social.friends.forEach((p) => entries.push([p.id, 'friend']));
+    social.incoming.forEach((p) => entries.push([p.id, 'incoming']));
+    social.outgoing.forEach((p) => entries.push([p.id, 'outgoing']));
+    return new Map<string, RelationshipState>(entries);
+  }, [social]);
 
   async function doSearch() {
     if (search.trim().length < 2) return;
@@ -68,14 +71,8 @@ export default function FriendsScreen() {
   return (
     <Screen title="Amigos" subtitle="Converse, desafie para batalhas e negocie cards com seus treinadores.">
       <Pressable style={styles.backRow} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color="#A9BDD7" /><Text style={styles.backText}>Voltar ao perfil</Text></Pressable>
-
       {notice ? <View style={styles.notice}><Ionicons name="information-circle" size={20} color={gameTheme.colors.yellow} /><Text style={styles.noticeText}>{notice}</Text><Pressable onPress={() => setNotice(null)}><Ionicons name="close" size={18} color="#fff" /></Pressable></View> : null}
-
-      <View style={styles.searchBox}>
-        <Ionicons name="search" size={20} color={gameTheme.colors.muted} />
-        <TextInput value={search} onChangeText={setSearch} onSubmitEditing={doSearch} placeholder="Buscar treinador por username..." placeholderTextColor="#70839F" autoCapitalize="none" style={styles.search} />
-        <Pressable style={styles.searchButton} onPress={doSearch} disabled={searching}><Text style={styles.searchButtonText}>{searching ? '...' : 'BUSCAR'}</Text></Pressable>
-      </View>
+      <View style={styles.searchBox}><Ionicons name="search" size={20} color={gameTheme.colors.muted} /><TextInput value={search} onChangeText={setSearch} onSubmitEditing={doSearch} placeholder="Buscar treinador por username..." placeholderTextColor="#70839F" autoCapitalize="none" style={styles.search} /><Pressable style={styles.searchButton} onPress={doSearch} disabled={searching}><Text style={styles.searchButtonText}>{searching ? '...' : 'BUSCAR'}</Text></Pressable></View>
 
       {results.length > 0 ? <Section title="Resultados" count={results.length}>{results.map((player) => {
         const state = known.get(player.id);
@@ -85,7 +82,6 @@ export default function FriendsScreen() {
       })}</Section> : null}
 
       {loading ? <ActivityIndicator size="large" color={gameTheme.colors.yellow} /> : null}
-
       {social.incoming.length > 0 ? <Section title="Solicitações recebidas" count={social.incoming.length}>{social.incoming.map((player) => <PlayerRow key={player.id} player={player}><View style={styles.actionRow}><Pressable style={styles.declineButton} onPress={() => action(player.id, 'decline')} disabled={workingId === player.id}><Ionicons name="close" size={18} color="#FFB0B0" /></Pressable><Pressable style={styles.primaryButton} onPress={() => action(player.id, 'accept')} disabled={workingId === player.id}><Text style={styles.primaryButtonText}>ACEITAR</Text></Pressable></View></PlayerRow>)}</Section> : null}
 
       <Section title="Meus amigos" count={social.friends.length}>
