@@ -14,12 +14,24 @@ function AppStack() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
     let disposed = false;
-    let subscription: { remove: () => void } | null = null;
+    let notificationSubscription: { remove: () => void } | null = null;
 
-    registerPushNotifications().catch(() => null);
+    const registerPush = () => {
+      if (disposed) return;
+      registerPushNotifications().catch(() => null);
+    };
+
+    // Try immediately for an already-restored session, and retry whenever Auth
+    // establishes a session after login. This prevents a first-launch race where
+    // push registration happens before the user is authenticated.
+    registerPush();
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) registerPush();
+    });
+
     import('expo-notifications').then((Notifications) => {
       if (disposed) return;
-      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      notificationSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data as Record<string, any>;
         if (data?.battleId) router.push(`/battle/${data.battleId}`);
         else if (data?.senderId) router.push(`/chat/${data.senderId}`);
@@ -29,7 +41,8 @@ function AppStack() {
 
     return () => {
       disposed = true;
-      subscription?.remove();
+      notificationSubscription?.remove();
+      authListener.subscription.unsubscribe();
     };
   }, [router]);
 
