@@ -2,6 +2,7 @@
   "expo": {
     "name": "Pokémon Cards",
     "slug": "pokemon-cards",
+    "owner": "frontwork",
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "pokemoncards",
@@ -9,6 +10,11 @@
     "plugins": ["expo-router", "expo-secure-store", "expo-notifications"],
     "android": {
       "package": "com.frontwork.pokemoncards"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e02b9525-0e99-4b45-a84f-1c44501633be"
+      }
     },
     "experiments": {
       "typedRoutes": true
