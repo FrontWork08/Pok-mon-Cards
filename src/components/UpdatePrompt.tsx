@@ -21,7 +21,7 @@ export function UpdatePrompt() {
   const canUseUpdates = Platform.OS !== 'web' && !__DEV__ && Updates.isEnabled;
 
   const checkForUpdate = useCallback(async (force = false) => {
-    if (!canUseUpdates || checkingRef.current || dismissed || state === 'downloading') return;
+    if (!canUseUpdates || checkingRef.current || dismissed || state !== 'idle') return;
 
     const now = Date.now();
     if (!force && now - lastCheckRef.current < FOREGROUND_CHECK_COOLDOWN_MS) return;
@@ -31,7 +31,7 @@ export function UpdatePrompt() {
 
     try {
       const result = await Updates.checkForUpdateAsync();
-      if (result.isAvailable) {
+      if (result.isAvailable || result.isRollBackToEmbedded) {
         setErrorText('');
         setState('available');
       }
