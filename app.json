@@ -11,9 +11,14 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/e02b9525-0e99-4b45-a84f-1c44501633be"
+      "url": "https://u.expo.dev/e02b9525-0e99-4b45-a84f-1c44501633be",
+      "checkAutomatically": "ON_ERROR_RECOVERY"
     },
-    "plugins": ["expo-router", "expo-secure-store", "expo-notifications"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications"
+    ],
     "android": {
       "package": "com.frontwork.pokemoncards",
       "googleServicesFile": "./google-services.json"
