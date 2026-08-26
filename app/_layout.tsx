@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
 import { ThemeProvider, useAppTheme } from '@/theme/ThemeProvider';
 import { registerPushNotifications } from '@/services/notifications';
 import { playBattleSound } from '@/services/battleEffects';
@@ -12,14 +12,25 @@ function AppStack() {
   const router = useRouter();
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let disposed = false;
+    let subscription: { remove: () => void } | null = null;
+
     registerPushNotifications().catch(() => null);
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as Record<string, any>;
-      if (data?.battleId) router.push(`/battle/${data.battleId}`);
-      else if (data?.senderId) router.push(`/chat/${data.senderId}`);
-      else router.push('/inbox');
-    });
-    return () => subscription.remove();
+    import('expo-notifications').then((Notifications) => {
+      if (disposed) return;
+      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data as Record<string, any>;
+        if (data?.battleId) router.push(`/battle/${data.battleId}`);
+        else if (data?.senderId) router.push(`/chat/${data.senderId}`);
+        else router.push('/inbox');
+      });
+    }).catch(() => null);
+
+    return () => {
+      disposed = true;
+      subscription?.remove();
+    };
   }, [router]);
 
   useEffect(() => {
