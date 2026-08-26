@@ -22,7 +22,9 @@ export default function SetsScreen() {
       setSets(catalog);
       const map = new Map<string, number>();
       for (const item of bag) {
-        const setId = item.cards?.set_id;
+        const relation = item.cards as any;
+        const card = Array.isArray(relation) ? relation[0] : relation;
+        const setId = card?.set_id;
         if (setId) map.set(setId, (map.get(setId) ?? 0) + 1);
       }
       setOwnedBySet(map);
