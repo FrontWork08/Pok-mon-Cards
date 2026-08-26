@@ -34,6 +34,6 @@ export const supabase = createClient(url, publishableKey, {
     storage: Platform.OS === 'web' ? WebStorageAdapter : NativeSecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
