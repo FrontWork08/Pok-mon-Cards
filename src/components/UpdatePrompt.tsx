@@ -74,15 +74,7 @@ export function UpdatePrompt() {
         return;
       }
 
-      await Updates.reloadAsync({
-        reloadScreenOptions: {
-          spinner: {
-            enabled: true,
-            color: colors.yellow,
-            size: 'large',
-          },
-        },
-      });
+      await Updates.reloadAsync();
     } catch (error) {
       setErrorText(error instanceof Error ? error.message : 'Não foi possível instalar a atualização agora.');
       setState('error');
