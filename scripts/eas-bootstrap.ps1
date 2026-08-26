@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $SupabaseUrl = 'https://mhddpovueqvvncrforao.supabase.co'
 $SupabasePublishableKey = 'sb_publishable_CB-2EJcfJYuApL9BIBpBCQ_DsNb0qNp'
+$PokemonTcgApiKey = $null
 
 function Invoke-Eas {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
@@ -9,6 +10,14 @@ function Invoke-Eas {
   & npx --yes eas-cli@latest @Arguments
   if ($LASTEXITCODE -ne 0) {
     throw "EAS command failed: eas $($Arguments -join ' ')"
+  }
+}
+
+# Reuse the optional local Pokemon TCG key without ever committing .env.
+if (Test-Path '.env') {
+  $PokemonKeyLine = Get-Content '.env' | Where-Object { $_ -match '^\s*EXPO_PUBLIC_POKEMON_TCG_API_KEY\s*=' } | Select-Object -First 1
+  if ($PokemonKeyLine) {
+    $PokemonTcgApiKey = ($PokemonKeyLine -split '=', 2)[1].Trim().Trim('"').Trim("'")
   }
 }
 
@@ -31,6 +40,11 @@ foreach ($EnvironmentName in $Environments) {
   Write-Host "Configuring Supabase variables for $EnvironmentName..." -ForegroundColor Cyan
   Invoke-Eas env:set --environment $EnvironmentName --name EXPO_PUBLIC_SUPABASE_URL --value $SupabaseUrl --visibility plaintext
   Invoke-Eas env:set --environment $EnvironmentName --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value $SupabasePublishableKey --visibility plaintext
+
+  if ($PokemonTcgApiKey) {
+    Write-Host "Configuring optional Pokemon TCG API key for $EnvironmentName..." -ForegroundColor Cyan
+    Invoke-Eas env:set --environment $EnvironmentName --name EXPO_PUBLIC_POKEMON_TCG_API_KEY --value $PokemonTcgApiKey --visibility sensitive
+  }
 }
 
 Write-Host 'Checking linked project...' -ForegroundColor Cyan
