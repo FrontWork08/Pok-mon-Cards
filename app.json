@@ -7,6 +7,12 @@
     "orientation": "portrait",
     "scheme": "pokemoncards",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e02b9525-0e99-4b45-a84f-1c44501633be"
+    },
     "plugins": ["expo-router", "expo-secure-store", "expo-notifications"],
     "android": {
       "package": "com.frontwork.pokemoncards",
