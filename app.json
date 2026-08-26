@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "plugins": ["expo-router", "expo-secure-store", "expo-notifications"],
     "android": {
-      "package": "com.frontwork.pokemoncards"
+      "package": "com.frontwork.pokemoncards",
+      "googleServicesFile": "./google-services.json"
     },
     "extra": {
       "eas": {
