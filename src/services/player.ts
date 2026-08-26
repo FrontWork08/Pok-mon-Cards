@@ -30,6 +30,7 @@ export type OwnedCardEntry = {
     types: string[];
     image_small: string | null;
     image_large: string | null;
+    game_value: number;
     tcg_data?: Record<string, unknown>;
   } | null;
 };
@@ -56,7 +57,7 @@ export async function getMyBag(search?: string) {
 
   let query = supabase
     .from('player_cards')
-    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large)')
+    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value)')
     .eq('player_id', userData.user.id)
     .gt('quantity', 0)
     .order('first_obtained_at', { ascending: false });
@@ -73,7 +74,7 @@ export async function getOwnedCard(cardId: string): Promise<OwnedCardEntry> {
   if (!userData.user) throw new Error('Usuário não autenticado.');
   const { data, error } = await supabase
     .from('player_cards')
-    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, tcg_data)')
+    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, tcg_data)')
     .eq('player_id', userData.user.id).eq('card_id', cardId).gt('quantity', 0).single();
   if (error) throw error;
   return data as unknown as OwnedCardEntry;
@@ -105,5 +106,20 @@ export async function getMyProfileStats() {
   const uniqueCards = bag.length;
   const favorites = bag.filter((item) => item.favorite).length;
   const species = new Set(bag.map((item) => item.cards?.pokedex_numbers?.[0]).filter((value): value is number => typeof value === 'number')).size;
-  return { totalCards, uniqueCards, favorites, species, packsOpened: openings.count ?? 0, completedTrades: trades.count ?? 0 };
+  const collectionValue = bag.reduce((sum, item) => sum + Number(item.cards?.game_value ?? 0) * Number(item.quantity ?? 0), 0);
+  const mostValuable = bag.reduce<OwnedCardEntry | null>((best, item) => {
+    if (!item.cards) return best;
+    if (!best?.cards || Number(item.cards.game_value ?? 0) > Number(best.cards.game_value ?? 0)) return item;
+    return best;
+  }, null);
+  return {
+    totalCards,
+    uniqueCards,
+    favorites,
+    species,
+    collectionValue,
+    mostValuableCard: mostValuable?.cards ?? null,
+    packsOpened: openings.count ?? 0,
+    completedTrades: trades.count ?? 0,
+  };
 }
