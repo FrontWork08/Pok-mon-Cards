@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { OpenedCard, Pack } from '@/services/packs';
 import { PremiumBackground } from '@/components/PremiumBackground';
 
- type Props = {
+type Props = {
   visible: boolean;
   pack: Pack | null;
   onClose: () => void;
@@ -13,12 +13,7 @@ import { PremiumBackground } from '@/components/PremiumBackground';
 };
 
 type Stage = 'sealed' | 'opening' | 'burst' | 'cards' | 'summary';
-type RarityTheme = {
-  color: string;
-  soft: string;
-  label: string;
-  tier: number;
-};
+type RarityTheme = { color: string; soft: string; label: string; tier: number };
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const RAYS = Array.from({ length: 12 }, (_, index) => index * 30);
@@ -105,12 +100,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
   function animateCardIn() {
     cardEnter.setValue(0);
-    Animated.spring(cardEnter, {
-      toValue: 1,
-      friction: 8,
-      tension: 62,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
+    Animated.spring(cardEnter, { toValue: 1, friction: 8, tension: 62, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }
 
   function startRarityPulse() {
@@ -207,12 +197,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     setFaceUp(true);
     revealBurst.setValue(0);
     Animated.parallel([
-      Animated.spring(flip, {
-        toValue: 1,
-        friction: 8,
-        tension: 62,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
+      Animated.spring(flip, { toValue: 1, friction: 8, tension: 62, useNativeDriver: USE_NATIVE_DRIVER }),
       Animated.sequence([
         Animated.timing(revealBurst, { toValue: 1, duration: 180, useNativeDriver: USE_NATIVE_DRIVER }),
         Animated.timing(revealBurst, { toValue: 0, duration: 420, useNativeDriver: USE_NATIVE_DRIVER }),
@@ -250,20 +235,16 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
   const currentCard = cards[cardIndex];
   const theme = rarityTheme(currentCard?.rarity);
-
   const packRotation = packRotate.interpolate({ inputRange: [-1, 1], outputRange: ['-5deg', '5deg'] });
   const burstScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.25, 5.4] });
   const burstOpacity = burst.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.95, 0] });
   const beamOpacity = beam.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, 0.82, 0.36] });
   const floorScale = floorPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1.35] });
-
   const cardTranslateY = cardEnter.interpolate({ inputRange: [0, 1], outputRange: [34, 0] });
   const cardScale = cardEnter.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
-  const cardOpacity = cardEnter;
   const auraScale = rarityPulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] });
   const auraOpacity = rarityPulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, theme.tier >= 4 ? 0.48 : 0.28] });
   const pedestalScale = rarityPulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.04] });
-
   const backRotation = flip.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
   const frontRotation = flip.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] });
   const backOpacity = flip.interpolate({ inputRange: [0, 0.49, 0.5, 1], outputRange: [1, 1, 0, 0] });
@@ -271,14 +252,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const revealScale = revealBurst.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1.45] });
 
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent={false}
-      onRequestClose={() => {
-        if (stage !== 'opening' && stage !== 'burst') onClose();
-      }}
-    >
+    <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={() => { if (stage !== 'opening' && stage !== 'burst') onClose(); }}>
       <View style={styles.container}>
         <PremiumBackground />
         <View style={styles.cinematicShadeTop} />
@@ -290,9 +264,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
             <Text numberOfLines={1} style={styles.title}>{pack.name}</Text>
           </View>
           {stage !== 'opening' && stage !== 'burst' ? (
-            <Pressable style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={21} color="#F4F4F4" />
-            </Pressable>
+            <Pressable style={styles.closeButton} onPress={onClose}><Ionicons name="close" size={21} color="#F4F4F4" /></Pressable>
           ) : null}
         </View>
 
@@ -303,52 +275,28 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
             <Animated.View style={[styles.burstRing, { opacity: burstOpacity, transform: [{ scale: burstScale }] }]} />
             <Animated.View style={[styles.openingBeam, { opacity: beamOpacity, transform: [{ scaleY: beam }] }]} />
 
-            <Animated.View
-              style={{
-                opacity: packOpacity,
-                transform: [
-                  { translateY: packY },
-                  { rotate: packRotation },
-                  { scale: packScale },
-                ],
-              }}
-            >
+            <Animated.View style={{ opacity: packOpacity, transform: [{ translateY: packY }, { rotate: packRotation }, { scale: packScale }] }}>
               <FoilBooster pack={pack} compact={compact} seamCharge={seamCharge} tear={tear} />
             </Animated.View>
 
             <View style={styles.openingCopy}>
-              <Text style={styles.stageEyebrow}>
-                {stage === 'sealed' ? 'PACOTE SELADO' : stage === 'opening' ? 'ENERGIA NO LACRE' : 'ABERTURA CONCLUÍDA'}
-              </Text>
-              <Text style={styles.stageTitle}>
-                {stage === 'sealed' ? 'Rasgue o lacre.' : stage === 'opening' ? 'Não tire os olhos do pack.' : 'Sinal de raridade detectado.'}
-              </Text>
+              <Text style={styles.stageEyebrow}>{stage === 'sealed' ? 'PACOTE SELADO' : stage === 'opening' ? 'ENERGIA NO LACRE' : 'ABERTURA CONCLUÍDA'}</Text>
+              <Text style={styles.stageTitle}>{stage === 'sealed' ? 'Rasgue o lacre.' : stage === 'opening' ? 'Não tire os olhos do pack.' : 'Sinal de raridade detectado.'}</Text>
               <Text style={styles.stageSubtitle}>
-                {stage === 'sealed'
-                  ? `${pack.cards_per_pack} cards • 🪙 ${pack.price}`
-                  : stage === 'opening'
-                    ? 'A compra está sendo validada enquanto o pack é aberto.'
-                    : 'Preparando a primeira recompensa.'}
+                {stage === 'sealed' ? `${pack.cards_per_pack} cards • 🪙 ${pack.price}` : stage === 'opening' ? 'A compra está sendo validada enquanto o pack é aberto.' : 'Preparando a primeira recompensa.'}
               </Text>
             </View>
 
             {error ? (
-              <View style={styles.errorBox}>
-                <Ionicons name="alert-circle" size={19} color="#FF7A82" />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
+              <View style={styles.errorBox}><Ionicons name="alert-circle" size={19} color="#FF7A82" /><Text style={styles.errorText}>{error}</Text></View>
             ) : null}
 
             {stage === 'sealed' ? (
               <Pressable style={styles.openButton} onPress={startOpening}>
-                <View style={styles.openButtonLine} />
-                <Text style={styles.openButtonText}>ABRIR PACK</Text>
-                <Ionicons name="chevron-forward" size={18} color="#070707" />
+                <View style={styles.openButtonLine} /><Text style={styles.openButtonText}>ABRIR PACK</Text><Ionicons name="chevron-forward" size={18} color="#070707" />
               </Pressable>
             ) : (
-              <View style={styles.loadingTrack}>
-                <Animated.View style={[styles.loadingSweep, { opacity: seamCharge, transform: [{ scaleX: seamCharge }] }]} />
-              </View>
+              <View style={styles.loadingTrack}><Animated.View style={[styles.loadingSweep, { opacity: seamCharge, transform: [{ scaleX: seamCharge }] }]} /></View>
             )}
           </View>
         ) : null}
@@ -358,101 +306,45 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
             <View style={styles.rewardHeader}>
               <Text style={styles.rewardCounter}>RECOMPENSA {cardIndex + 1} / {cards.length}</Text>
               <View style={[styles.raritySignal, { borderColor: `${theme.color}80`, backgroundColor: theme.soft }]}>
-                <View style={[styles.signalDot, { backgroundColor: theme.color }]} />
-                <Text style={[styles.signalText, { color: theme.color }]}>{theme.label}</Text>
+                <View style={[styles.signalDot, { backgroundColor: theme.color }]} /><Text style={[styles.signalText, { color: theme.color }]}>{theme.label}</Text>
               </View>
             </View>
 
             <View style={styles.revealArena}>
               <Animated.View style={[styles.rarityAura, { backgroundColor: theme.color, opacity: auraOpacity, transform: [{ scale: auraScale }] }]} />
               <Animated.View style={[styles.revealFlash, { backgroundColor: theme.color, opacity: revealBurst, transform: [{ scale: revealScale }] }]} />
-
               {RAYS.map((rotation) => (
-                <Animated.View
-                  key={rotation}
-                  style={[
-                    styles.ray,
-                    {
-                      backgroundColor: theme.color,
-                      opacity: revealBurst,
-                      transform: [{ rotate: `${rotation}deg` }, { translateY: -148 }, { scaleY: revealBurst }],
-                    },
-                  ]}
-                />
+                <Animated.View key={rotation} style={[styles.ray, { backgroundColor: theme.color, opacity: revealBurst, transform: [{ rotate: `${rotation}deg` }, { translateY: -148 }, { scaleY: revealBurst }] }]} />
               ))}
-
               <Animated.View style={[styles.pedestalGlow, { borderColor: theme.color, opacity: auraOpacity, transform: [{ scaleX: pedestalScale }] }]} />
               <View style={styles.pedestalBase} />
 
               <Pressable style={styles.rewardTapArea} onPress={!faceUp ? revealCurrent : undefined}>
-                <Animated.View
-                  style={[
-                    styles.flipScene,
-                    compact && styles.flipSceneCompact,
-                    {
-                      opacity: cardOpacity,
-                      transform: [{ translateY: cardTranslateY }, { scale: cardScale }],
-                    },
-                  ]}
-                >
-                  <Animated.View
-                    style={[
-                      styles.cardFace,
-                      styles.cardBack,
-                      {
-                        opacity: backOpacity,
-                        borderColor: theme.color,
-                        transform: [{ perspective: 900 }, { rotateY: backRotation }],
-                      },
-                    ]}
-                  >
+                <Animated.View style={[styles.flipScene, compact && styles.flipSceneCompact, { opacity: cardEnter, transform: [{ translateY: cardTranslateY }, { scale: cardScale }] }]}>
+                  <Animated.View style={[styles.cardFace, styles.cardBack, { opacity: backOpacity, borderColor: theme.color, transform: [{ perspective: 900 }, { rotateY: backRotation }] }]}>
                     <View style={[styles.backInnerGlow, { backgroundColor: theme.soft }]} />
                     <View style={[styles.backRingOuter, { borderColor: `${theme.color}66` }]}>
-                      <View style={[styles.backRingInner, { borderColor: theme.color }]}>
-                        <Ionicons name="help" size={54} color={theme.color} />
-                      </View>
+                      <View style={[styles.backRingInner, { borderColor: theme.color }]}><Ionicons name="help" size={54} color={theme.color} /></View>
                     </View>
                     <Text style={styles.hiddenTitle}>RECOMPENSA OCULTA</Text>
                     <Text style={[styles.hiddenHint, { color: theme.color }]}>TOQUE PARA REVELAR</Text>
                   </Animated.View>
 
-                  <Animated.View
-                    style={[
-                      styles.cardFace,
-                      styles.cardFront,
-                      {
-                        opacity: frontOpacity,
-                        borderColor: theme.color,
-                        transform: [{ perspective: 900 }, { rotateY: frontRotation }],
-                      },
-                    ]}
-                  >
+                  <Animated.View style={[styles.cardFace, styles.cardFront, { opacity: frontOpacity, borderColor: theme.color, transform: [{ perspective: 900 }, { rotateY: frontRotation }] }]}>
                     <View style={[styles.frontTopLine, { backgroundColor: theme.color }]} />
                     {currentCard.image && !failedImages[currentCard.id] ? (
-                      <Image
-                        source={{ uri: currentCard.image }}
-                        resizeMode="contain"
-                        style={styles.rewardImage}
-                        onError={() => setFailedImages((value) => ({ ...value, [currentCard.id]: true }))}
-                      />
+                      <Image source={{ uri: currentCard.image }} resizeMode="contain" style={styles.rewardImage as any} onError={() => setFailedImages((value) => ({ ...value, [currentCard.id]: true }))} />
                     ) : (
-                      <View style={styles.imageFallback}>
-                        <Ionicons name="image-outline" size={54} color="#666" />
-                      </View>
+                      <View style={styles.imageFallback}><Ionicons name="image-outline" size={54} color="#666" /></View>
                     )}
-                    <View style={styles.rewardInfo}>
-                      <Text style={styles.rewardName}>{currentCard.name}</Text>
-                      <Text style={[styles.rewardRarity, { color: theme.color }]}>{currentCard.rarity ?? 'Comum'}</Text>
-                    </View>
+                    <View style={styles.rewardInfo}><Text style={styles.rewardName}>{currentCard.name}</Text><Text style={[styles.rewardRarity, { color: theme.color }]}>{currentCard.rarity ?? 'Comum'}</Text></View>
                   </Animated.View>
                 </Animated.View>
               </Pressable>
             </View>
 
             <Pressable style={[styles.nextButton, { borderColor: `${theme.color}90` }]} onPress={nextCard}>
-              <Text style={styles.nextButtonText}>
-                {!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}
-              </Text>
+              <Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text>
               <Ionicons name="arrow-forward" size={18} color="#F4F4F4" />
             </Pressable>
           </View>
@@ -464,10 +356,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
               <Text style={styles.summaryKicker}>PACK FINALIZADO</Text>
               <Text style={styles.summaryTitle}>Coleção atualizada.</Text>
               {bestPull ? (
-                <View style={styles.bestPullRow}>
-                  <View style={[styles.bestDot, { backgroundColor: rarityTheme(bestPull.rarity).color }]} />
-                  <Text style={styles.bestPullText}>Melhor pull: {bestPull.name}</Text>
-                </View>
+                <View style={styles.bestPullRow}><View style={[styles.bestDot, { backgroundColor: rarityTheme(bestPull.rarity).color }]} /><Text style={styles.bestPullText}>Melhor pull: {bestPull.name}</Text></View>
               ) : null}
               <Text style={styles.summarySubtitle}>Todos os cards foram enviados para sua Bag • +20 XP</Text>
             </View>
@@ -480,12 +369,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
                   <View key={`${card.id}-${index}`} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>
                     <View style={[styles.summaryTopLine, { backgroundColor: cardTheme.color }]} />
                     {card.image && !imageFailed ? (
-                      <Image
-                        source={{ uri: card.image }}
-                        resizeMode="contain"
-                        style={styles.summaryImage}
-                        onError={() => setFailedImages((value) => ({ ...value, [`summary-${card.id}-${index}`]: true }))}
-                      />
+                      <Image source={{ uri: card.image }} resizeMode="contain" style={styles.summaryImage as any} onError={() => setFailedImages((value) => ({ ...value, [`summary-${card.id}-${index}`]: true }))} />
                     ) : (
                       <View style={styles.summaryFallback}><Ionicons name="image-outline" size={28} color="#555" /></View>
                     )}
@@ -496,9 +380,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
               })}
             </View>
 
-            <Pressable style={styles.summaryButton} onPress={onClose}>
-              <Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text>
-            </Pressable>
+            <Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable>
           </ScrollView>
         ) : null}
       </View>
@@ -515,23 +397,14 @@ function FoilBooster({ pack, compact, seamCharge, tear }: { pack: Pack; compact:
 
   return (
     <View style={[styles.foilPack, compact && styles.foilPackCompact]}>
-      <View style={styles.foilBodyTexture} />
-      <View style={styles.foilSlashOne} />
-      <View style={styles.foilSlashTwo} />
+      <View style={styles.foilBodyTexture} /><View style={styles.foilSlashOne} /><View style={styles.foilSlashTwo} />
       <Text style={styles.foilBrand}>POKÉMON TCG</Text>
-
       {pack.image_url ? (
-        <Image source={{ uri: pack.image_url }} resizeMode="contain" style={styles.foilLogo} />
+        <Image source={{ uri: pack.image_url }} resizeMode="contain" style={styles.foilLogo as any} />
       ) : (
-        <View style={styles.foilPlaceholder}>
-          <Ionicons name="cube-outline" size={48} color="#8B8F98" />
-          <Text style={styles.foilPlaceholderText}>BOOSTER</Text>
-        </View>
+        <View style={styles.foilPlaceholder}><Ionicons name="cube-outline" size={48} color="#8B8F98" /><Text style={styles.foilPlaceholderText}>BOOSTER</Text></View>
       )}
-
-      <Text style={styles.foilSet}>{pack.set_id.toUpperCase()}</Text>
-      <View style={styles.foilBottom} />
-
+      <Text style={styles.foilSet}>{pack.set_id.toUpperCase()}</Text><View style={styles.foilBottom} />
       <Animated.View style={[styles.seamGlow, { opacity: seamOpacity, transform: [{ scaleX: seamCharge }] }]} />
       <Animated.View style={[styles.sealHalf, styles.sealLeft, { transform: [{ translateX: leftSealX }, { rotate: leftSealRotate }] }]} />
       <Animated.View style={[styles.sealHalf, styles.sealRight, { transform: [{ translateX: rightSealX }, { rotate: rightSealRotate }] }]} />
@@ -559,7 +432,7 @@ const styles = StyleSheet.create({
   stageSubtitle: { color: '#8D8D8D', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
   openButton: { marginTop: 22, minWidth: 208, height: 52, borderRadius: 12, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#FFD447', overflow: 'hidden' },
   openButtonLine: { position: 'absolute', top: 0, left: 22, right: 22, height: 2, backgroundColor: 'rgba(255,255,255,0.75)' },
-  openButtonText: { color: '#070707', fontSize: 12, fontWeight: '950', letterSpacing: 0.8 },
+  openButtonText: { color: '#070707', fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
   loadingTrack: { marginTop: 22, width: 230, height: 3, borderRadius: 99, overflow: 'hidden', backgroundColor: '#202020' },
   loadingSweep: { width: '100%', height: '100%', backgroundColor: '#FFD447' },
   errorBox: { marginTop: 18, maxWidth: 480, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: '#5A2528', backgroundColor: '#1A0D0E' },
@@ -586,7 +459,7 @@ const styles = StyleSheet.create({
   rewardCounter: { color: '#797979', fontSize: 9, fontWeight: '900', letterSpacing: 1.7 },
   raritySignal: { minHeight: 32, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', gap: 7, alignItems: 'center' },
   signalDot: { width: 7, height: 7, borderRadius: 99 },
-  signalText: { fontSize: 9, fontWeight: '950', letterSpacing: 1.1 },
+  signalText: { fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
   revealArena: { flex: 1, width: '100%', maxWidth: 820, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   rarityAura: { position: 'absolute', width: 390, height: 390, borderRadius: 390 },
   revealFlash: { position: 'absolute', width: 270, height: 270, borderRadius: 270 },
@@ -601,22 +474,22 @@ const styles = StyleSheet.create({
   backInnerGlow: { ...StyleSheet.absoluteFillObject, opacity: 0.42 },
   backRingOuter: { width: 154, height: 154, borderRadius: 154, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   backRingInner: { width: 112, height: 112, borderRadius: 112, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#080808' },
-  hiddenTitle: { marginTop: 28, color: '#E9E9E9', fontSize: 12, fontWeight: '950', letterSpacing: 1.8 },
+  hiddenTitle: { marginTop: 28, color: '#E9E9E9', fontSize: 12, fontWeight: '900', letterSpacing: 1.8 },
   hiddenHint: { marginTop: 8, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
   cardFront: { justifyContent: 'flex-start', padding: 10 },
   frontTopLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 4, zIndex: 4 },
   rewardImage: { width: '100%', flex: 1, minHeight: 0 },
   imageFallback: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#101010' },
   rewardInfo: { width: '100%', minHeight: 58, alignItems: 'center', justifyContent: 'center', paddingTop: 5 },
-  rewardName: { color: '#F6F6F6', fontSize: 15, fontWeight: '950', textAlign: 'center' },
+  rewardName: { color: '#F6F6F6', fontSize: 15, fontWeight: '900', textAlign: 'center' },
   rewardRarity: { fontSize: 10, fontWeight: '900', marginTop: 4 },
   nextButton: { width: '100%', maxWidth: 330, height: 48, borderRadius: 12, borderWidth: 1, backgroundColor: '#101010', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  nextButtonText: { color: '#F4F4F4', fontSize: 10, fontWeight: '950', letterSpacing: 1.1 },
+  nextButtonText: { color: '#F4F4F4', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
 
   summaryContent: { width: '100%', maxWidth: 1040, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   summaryHero: { alignItems: 'center', paddingVertical: 22 },
-  summaryKicker: { color: '#FFD447', fontSize: 9, fontWeight: '950', letterSpacing: 2 },
-  summaryTitle: { color: '#F6F6F6', fontSize: 28, fontWeight: '950', marginTop: 7 },
+  summaryKicker: { color: '#FFD447', fontSize: 9, fontWeight: '900', letterSpacing: 2 },
+  summaryTitle: { color: '#F6F6F6', fontSize: 28, fontWeight: '900', marginTop: 7 },
   bestPullRow: { marginTop: 12, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#111', borderWidth: 1, borderColor: '#292929' },
   bestDot: { width: 8, height: 8, borderRadius: 99 },
   bestPullText: { color: '#D8D8D8', fontSize: 11, fontWeight: '800' },
@@ -629,5 +502,5 @@ const styles = StyleSheet.create({
   summaryName: { color: '#F1F1F1', fontSize: 10, fontWeight: '900', marginTop: 5 },
   summaryRarity: { fontSize: 8, fontWeight: '800', marginTop: 2 },
   summaryButton: { alignSelf: 'center', marginTop: 24, minWidth: 220, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFD447' },
-  summaryButtonText: { color: '#060606', fontSize: 10, fontWeight: '950', letterSpacing: 1 },
+  summaryButtonText: { color: '#060606', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
 });
