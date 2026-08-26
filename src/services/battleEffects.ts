@@ -1,6 +1,4 @@
 import { Platform } from 'react-native';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
 
 export type BattleSound = 'lock' | 'reveal' | 'win' | 'loss';
 
@@ -94,6 +92,7 @@ function createWav(notes: Note[]) {
 async function ensureNativeSound(kind: BattleSound) {
   const cached = cachedUris.get(kind);
   if (cached) return cached;
+  const FileSystem = await import('expo-file-system');
   if (!FileSystem.cacheDirectory) throw new Error('Audio cache unavailable');
   const uri = `${FileSystem.cacheDirectory}pokemon-battle-${kind}.wav`;
   const info = await FileSystem.getInfoAsync(uri);
@@ -128,6 +127,7 @@ function playWeb(kind: BattleSound) {
 export async function playBattleSound(kind: BattleSound) {
   if (Platform.OS === 'web') { playWeb(kind); return; }
   try {
+    const { Audio } = await import('expo-av');
     if (!configured) {
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: false, shouldDuckAndroid: true });
       configured = true;
