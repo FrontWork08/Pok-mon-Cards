@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "818435701896",
+    "project_id": "pokemon-cards-d5fa0",
+    "storage_bucket": "pokemon-cards-d5fa0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:818435701896:android:2b27584df71231a85ef33d",
+        "android_client_info": {
+          "package_name": "com.frontwork.pokemoncards"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBt7uIQg5JYumhAFz9Hq7ua9bz9YbffSZk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
