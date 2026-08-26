@@ -1,15 +1,43 @@
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
+import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useAppTheme } from '@/theme/ThemeProvider';
 import { registerPushNotifications } from '@/services/notifications';
 import { playBattleSound } from '@/services/battleEffects';
+import { completeOAuthFromUrl, isOAuthCallbackUrl } from '@/services/auth';
 import { supabase } from '@/lib/supabase';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
   const router = useRouter();
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let disposed = false;
+
+    const handleOAuthUrl = async (url?: string | null) => {
+      if (disposed || !url || !isOAuthCallbackUrl(url)) return;
+      try {
+        const session = await completeOAuthFromUrl(url);
+        if (!disposed && session?.user) router.replace('/(tabs)');
+      } catch (error) {
+        console.warn('Google OAuth callback failed:', error);
+        if (!disposed) router.replace('/');
+      }
+    };
+
+    Linking.getInitialURL().then(handleOAuthUrl).catch(() => null);
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleOAuthUrl(url).catch(() => null);
+    });
+
+    return () => {
+      disposed = true;
+      subscription.remove();
+    };
+  }, [router]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
