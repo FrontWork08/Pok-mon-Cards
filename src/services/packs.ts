@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { normalizeFunctionError } from '@/services/functionErrors';
 
 export type Pack = {
   id: string;
@@ -7,6 +8,7 @@ export type Pack = {
   price: number;
   cards_per_pack: number;
   image_url: string | null;
+  art_url: string | null;
   active: boolean;
 };
 
@@ -20,7 +22,7 @@ export type OpenedCard = {
 export async function listPacks(): Promise<Pack[]> {
   const { data, error } = await supabase
     .from('packs')
-    .select('id,name,set_id,price,cards_per_pack,image_url,active')
+    .select('id,name,set_id,price,cards_per_pack,image_url,art_url,active')
     .eq('active', true)
     .order('price', { ascending: true });
 
@@ -29,32 +31,8 @@ export async function listPacks(): Promise<Pack[]> {
 }
 
 export async function openPack(packId: string) {
-  const { data, error } = await supabase.functions.invoke('open-pack', {
-    body: { packId },
-  });
-
-  if (error) {
-    let message = error.message || 'Não foi possível abrir o booster.';
-    const response = (error as any).context as Response | undefined;
-
-    if (response) {
-      try {
-        const payload = await response.clone().json();
-        if (payload?.error) message = String(payload.error);
-      } catch {
-        // Keep the original Functions error when the response body is not JSON.
-      }
-    }
-
-    if (message.includes('NOT_ENOUGH_COINS')) {
-      throw new Error('Você não tem moedas suficientes para abrir este booster.');
-    }
-    if (message.includes('PACK_NOT_FOUND')) {
-      throw new Error('Este booster não está mais disponível.');
-    }
-
-    throw new Error(message);
-  }
-
+  const { data, error } = await supabase.functions.invoke('open-pack', { body: { packId } });
+  if (error) throw await normalizeFunctionError(error, 'Não foi possível abrir este booster.');
+  if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível abrir este booster.');
   return data as { openingId: string; cards: OpenedCard[] };
 }
