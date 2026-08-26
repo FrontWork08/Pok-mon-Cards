@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Native/generated build output
+android/
+ios/
+*.apk
+*.aab
+
+# Signing and service credentials
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+credentials.json
+service-account*.json
+firebase-adminsdk*.json
+
+# Logs and caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+.cache/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
