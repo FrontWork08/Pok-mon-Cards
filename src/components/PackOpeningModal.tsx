@@ -16,7 +16,8 @@ type Stage = 'sealed' | 'opening' | 'burst' | 'cards' | 'summary';
 type RarityTheme = { color: string; soft: string; label: string; tier: number };
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const RAYS = Array.from({ length: 12 }, (_, index) => index * 30);
+const RAYS = Array.from({ length: 16 }, (_, index) => index * 22.5);
+const SPARKS = Array.from({ length: 18 }, (_, index) => index * 20);
 
 function rarityTheme(rarity?: string | null): RarityTheme {
   const value = (rarity ?? '').toLowerCase();
@@ -37,6 +38,14 @@ function rarityTheme(rarity?: string | null): RarityTheme {
 
 function rarityScore(card: OpenedCard) {
   return rarityTheme(card.rarity).tier;
+}
+
+function flashStrengthForTier(tier: number) {
+  if (tier >= 5) return 0.96;
+  if (tier === 4) return 0.88;
+  if (tier === 3) return 0.72;
+  if (tier === 2) return 0.54;
+  return 0.38;
 }
 
 export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinished }: Props) {
@@ -64,6 +73,10 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const flip = useRef(new Animated.Value(0)).current;
   const rarityPulse = useRef(new Animated.Value(0)).current;
   const revealBurst = useRef(new Animated.Value(0)).current;
+  const screenFlash = useRef(new Animated.Value(0)).current;
+  const coreFlash = useRef(new Animated.Value(0)).current;
+  const shockwave = useRef(new Animated.Value(0)).current;
+  const cardImpact = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!visible) return;
@@ -87,6 +100,10 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     flip.setValue(0);
     rarityPulse.setValue(0);
     revealBurst.setValue(0);
+    screenFlash.setValue(0);
+    coreFlash.setValue(0);
+    shockwave.setValue(0);
+    cardImpact.setValue(0);
 
     const floating = Animated.loop(
       Animated.sequence([
@@ -96,7 +113,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     );
     floating.start();
     return () => floating.stop();
-  }, [beam, burst, cardEnter, flip, floorPulse, pack?.id, packOpacity, packRotate, packScale, packY, rarityPulse, revealBurst, seamCharge, tear, visible]);
+  }, [beam, burst, cardEnter, cardImpact, coreFlash, flip, floorPulse, pack?.id, packOpacity, packRotate, packScale, packY, rarityPulse, revealBurst, screenFlash, seamCharge, shockwave, tear, visible]);
 
   function animateCardIn() {
     cardEnter.setValue(0);
@@ -108,11 +125,20 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     rarityPulse.setValue(0);
     Animated.loop(
       Animated.sequence([
-        Animated.timing(rarityPulse, { toValue: 1, duration: 920, useNativeDriver: USE_NATIVE_DRIVER }),
-        Animated.timing(rarityPulse, { toValue: 0, duration: 920, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(rarityPulse, { toValue: 1, duration: 900, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(rarityPulse, { toValue: 0, duration: 900, useNativeDriver: USE_NATIVE_DRIVER }),
       ]),
-      { iterations: 5 },
+      { iterations: 6 },
     ).start();
+  }
+
+  function resetRevealEffects() {
+    flip.setValue(0);
+    revealBurst.setValue(0);
+    screenFlash.setValue(0);
+    coreFlash.setValue(0);
+    shockwave.setValue(0);
+    cardImpact.setValue(0);
   }
 
   function runOpeningAnimation() {
@@ -172,7 +198,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
       setCards(receivedCards);
       setCardIndex(0);
       setFaceUp(false);
-      flip.setValue(0);
+      resetRevealEffects();
       setStage('cards');
       requestAnimationFrame(() => {
         animateCardIn();
@@ -194,13 +220,44 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
   function revealCurrent() {
     if (faceUp) return;
+
+    const activeTheme = rarityTheme(cards[cardIndex]?.rarity);
+    const flashStrength = flashStrengthForTier(activeTheme.tier);
+    const highTier = activeTheme.tier >= 4;
+
     setFaceUp(true);
     revealBurst.setValue(0);
+    screenFlash.setValue(0);
+    coreFlash.setValue(0);
+    shockwave.setValue(0);
+    cardImpact.setValue(0);
+
     Animated.parallel([
-      Animated.spring(flip, { toValue: 1, friction: 8, tension: 62, useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.spring(flip, { toValue: 1, friction: 7, tension: 72, useNativeDriver: USE_NATIVE_DRIVER }),
       Animated.sequence([
-        Animated.timing(revealBurst, { toValue: 1, duration: 180, useNativeDriver: USE_NATIVE_DRIVER }),
-        Animated.timing(revealBurst, { toValue: 0, duration: 420, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.delay(45),
+        Animated.timing(screenFlash, { toValue: flashStrength, duration: highTier ? 70 : 90, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.delay(highTier ? 28 : 12),
+        Animated.timing(screenFlash, { toValue: 0, duration: highTier ? 230 : 180, useNativeDriver: USE_NATIVE_DRIVER }),
+      ]),
+      Animated.sequence([
+        Animated.delay(35),
+        Animated.timing(coreFlash, { toValue: 1, duration: highTier ? 85 : 110, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(coreFlash, { toValue: 0, duration: highTier ? 380 : 300, useNativeDriver: USE_NATIVE_DRIVER }),
+      ]),
+      Animated.sequence([
+        Animated.delay(75),
+        Animated.timing(shockwave, { toValue: 1, duration: highTier ? 620 : 500, useNativeDriver: USE_NATIVE_DRIVER }),
+      ]),
+      Animated.sequence([
+        Animated.delay(60),
+        Animated.timing(revealBurst, { toValue: 1, duration: highTier ? 150 : 185, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(revealBurst, { toValue: 0, duration: highTier ? 620 : 500, useNativeDriver: USE_NATIVE_DRIVER }),
+      ]),
+      Animated.sequence([
+        Animated.delay(70),
+        Animated.timing(cardImpact, { toValue: 1, duration: 105, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.spring(cardImpact, { toValue: 0, friction: 5, tension: 75, useNativeDriver: USE_NATIVE_DRIVER }),
       ]),
     ]).start();
   }
@@ -218,8 +275,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
     setCardIndex((value) => value + 1);
     setFaceUp(false);
-    flip.setValue(0);
-    revealBurst.setValue(0);
+    resetRevealEffects();
     requestAnimationFrame(() => {
       animateCardIn();
       startRarityPulse();
@@ -235,21 +291,42 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
   const currentCard = cards[cardIndex];
   const theme = rarityTheme(currentCard?.rarity);
+  const highTier = theme.tier >= 4;
+
   const packRotation = packRotate.interpolate({ inputRange: [-1, 1], outputRange: ['-5deg', '5deg'] });
   const burstScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.25, 5.4] });
   const burstOpacity = burst.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.95, 0] });
   const beamOpacity = beam.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, 0.82, 0.36] });
   const floorScale = floorPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1.35] });
+
   const cardTranslateY = cardEnter.interpolate({ inputRange: [0, 1], outputRange: [34, 0] });
-  const cardScale = cardEnter.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
-  const auraScale = rarityPulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] });
-  const auraOpacity = rarityPulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, theme.tier >= 4 ? 0.48 : 0.28] });
-  const pedestalScale = rarityPulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.04] });
+  const baseCardScale = cardEnter.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
+  const impactScale = cardImpact.interpolate({ inputRange: [0, 1], outputRange: [1, highTier ? 1.075 : 1.045] });
+  const combinedCardScale = Animated.multiply(baseCardScale, impactScale);
+
+  const auraScale = rarityPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, highTier ? 1.2 : 1.12] });
+  const auraOpacity = rarityPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [theme.tier === 1 ? 0.16 : 0.24, theme.tier >= 5 ? 0.82 : theme.tier === 4 ? 0.72 : theme.tier === 3 ? 0.56 : 0.42],
+  });
+  const pedestalScale = rarityPulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, highTier ? 1.1 : 1.05] });
+
   const backRotation = flip.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
   const frontRotation = flip.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] });
   const backOpacity = flip.interpolate({ inputRange: [0, 0.49, 0.5, 1], outputRange: [1, 1, 0, 0] });
   const frontOpacity = flip.interpolate({ inputRange: [0, 0.49, 0.5, 1], outputRange: [0, 0, 1, 1] });
-  const revealScale = revealBurst.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1.45] });
+
+  const revealScale = revealBurst.interpolate({ inputRange: [0, 1], outputRange: [0.15, highTier ? 3.05 : 2.45] });
+  const colorWashOpacity = revealBurst.interpolate({ inputRange: [0, 0.22, 1], outputRange: [0, highTier ? 0.23 : 0.13, 0] });
+  const coreScale = coreFlash.interpolate({ inputRange: [0, 1], outputRange: [0.12, highTier ? 3.25 : 2.65] });
+  const coreOpacity = coreFlash.interpolate({ inputRange: [0, 0.28, 1], outputRange: [0, 1, 0.95] });
+  const shockwaveScale = shockwave.interpolate({ inputRange: [0, 1], outputRange: [0.38, highTier ? 3.9 : 3.15] });
+  const secondShockwaveScale = shockwave.interpolate({ inputRange: [0, 1], outputRange: [0.2, highTier ? 4.8 : 3.8] });
+  const shockwaveOpacity = shockwave.interpolate({ inputRange: [0, 0.12, 0.55, 1], outputRange: [0, 1, 0.48, 0] });
+  const secondShockwaveOpacity = shockwave.interpolate({ inputRange: [0, 0.28, 0.72, 1], outputRange: [0, highTier ? 0.82 : 0.48, 0.25, 0] });
+  const sparkTravel = shockwave.interpolate({ inputRange: [0, 1], outputRange: [0, highTier ? -255 : -205] });
+  const sparkOpacity = shockwave.interpolate({ inputRange: [0, 0.12, 0.62, 1], outputRange: [0, 1, 0.55, 0] });
+  const rayScaleY = revealBurst.interpolate({ inputRange: [0, 1], outputRange: [0.2, highTier ? 2.4 : 1.75] });
 
   return (
     <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={() => { if (stage !== 'opening' && stage !== 'burst') onClose(); }}>
@@ -311,16 +388,47 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
             </View>
 
             <View style={styles.revealArena}>
-              <Animated.View style={[styles.rarityAura, { backgroundColor: theme.color, opacity: auraOpacity, transform: [{ scale: auraScale }] }]} />
-              <Animated.View style={[styles.revealFlash, { backgroundColor: theme.color, opacity: revealBurst, transform: [{ scale: revealScale }] }]} />
+              <Animated.View style={[styles.rarityAura, styles.noPointerEvents, { backgroundColor: theme.color, opacity: auraOpacity, transform: [{ scale: auraScale }] }]} />
+              <Animated.View style={[styles.coreFlash, styles.noPointerEvents, { opacity: coreOpacity, transform: [{ scale: coreScale }] }]} />
+              <Animated.View style={[styles.revealFlash, styles.noPointerEvents, { backgroundColor: theme.color, opacity: revealBurst, transform: [{ scale: revealScale }] }]} />
+              <Animated.View style={[styles.shockwave, styles.noPointerEvents, { borderColor: '#FFFFFF', opacity: shockwaveOpacity, transform: [{ scale: shockwaveScale }] }]} />
+              <Animated.View style={[styles.shockwaveSecondary, styles.noPointerEvents, { borderColor: theme.color, opacity: secondShockwaveOpacity, transform: [{ scale: secondShockwaveScale }] }]} />
+
               {RAYS.map((rotation) => (
-                <Animated.View key={rotation} style={[styles.ray, { backgroundColor: theme.color, opacity: revealBurst, transform: [{ rotate: `${rotation}deg` }, { translateY: -148 }, { scaleY: revealBurst }] }]} />
+                <Animated.View
+                  key={`ray-${rotation}`}
+                  style={[
+                    styles.ray,
+                    styles.noPointerEvents,
+                    {
+                      backgroundColor: theme.color,
+                      opacity: revealBurst,
+                      transform: [{ rotate: `${rotation}deg` }, { translateY: highTier ? -190 : -165 }, { scaleY: rayScaleY }],
+                    },
+                  ]}
+                />
               ))}
+
+              {theme.tier >= 3 ? SPARKS.map((rotation) => (
+                <Animated.View
+                  key={`spark-${rotation}`}
+                  style={[
+                    styles.spark,
+                    styles.noPointerEvents,
+                    {
+                      backgroundColor: rotation % 40 === 0 ? '#FFFFFF' : theme.color,
+                      opacity: sparkOpacity,
+                      transform: [{ rotate: `${rotation}deg` }, { translateY: sparkTravel }],
+                    },
+                  ]}
+                />
+              )) : null}
+
               <Animated.View style={[styles.pedestalGlow, { borderColor: theme.color, opacity: auraOpacity, transform: [{ scaleX: pedestalScale }] }]} />
               <View style={styles.pedestalBase} />
 
               <Pressable style={styles.rewardTapArea} onPress={!faceUp ? revealCurrent : undefined}>
-                <Animated.View style={[styles.flipScene, compact && styles.flipSceneCompact, { opacity: cardEnter, transform: [{ translateY: cardTranslateY }, { scale: cardScale }] }]}>
+                <Animated.View style={[styles.flipScene, compact && styles.flipSceneCompact, { opacity: cardEnter, transform: [{ translateY: cardTranslateY }, { scale: combinedCardScale }] }]}>
                   <Animated.View style={[styles.cardFace, styles.cardBack, { opacity: backOpacity, borderColor: theme.color, transform: [{ perspective: 900 }, { rotateY: backRotation }] }]}>
                     <View style={[styles.backInnerGlow, { backgroundColor: theme.soft }]} />
                     <View style={[styles.backRingOuter, { borderColor: `${theme.color}66` }]}>
@@ -383,6 +491,13 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
             <Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable>
           </ScrollView>
         ) : null}
+
+        {stage === 'cards' && currentCard ? (
+          <>
+            <Animated.View style={[styles.colorWash, styles.noPointerEvents, { backgroundColor: theme.color, opacity: colorWashOpacity }]} />
+            <Animated.View style={[styles.screenFlash, styles.noPointerEvents, { opacity: screenFlash }]} />
+          </>
+        ) : null}
       </View>
     </Modal>
   );
@@ -414,6 +529,7 @@ function FoilBooster({ pack, compact, seamCharge, tear }: { pack: Pack; compact:
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#030303', overflow: 'hidden' },
+  noPointerEvents: { pointerEvents: 'none' } as any,
   cinematicShadeTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 130, backgroundColor: 'rgba(0,0,0,0.50)' },
   cinematicShadeBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 130, backgroundColor: 'rgba(0,0,0,0.46)' },
   header: { minHeight: 76, paddingHorizontal: 24, paddingTop: 18, flexDirection: 'row', alignItems: 'flex-start', gap: 16, zIndex: 20 },
@@ -460,12 +576,16 @@ const styles = StyleSheet.create({
   raritySignal: { minHeight: 32, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', gap: 7, alignItems: 'center' },
   signalDot: { width: 7, height: 7, borderRadius: 99 },
   signalText: { fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
-  revealArena: { flex: 1, width: '100%', maxWidth: 820, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  rarityAura: { position: 'absolute', width: 390, height: 390, borderRadius: 390 },
-  revealFlash: { position: 'absolute', width: 270, height: 270, borderRadius: 270 },
-  ray: { position: 'absolute', width: 2, height: 96, top: '50%', left: '50%', borderRadius: 10 },
-  pedestalGlow: { position: 'absolute', bottom: '9%', width: 300, height: 68, borderRadius: 200, borderWidth: 2, backgroundColor: 'rgba(255,255,255,0.02)' },
-  pedestalBase: { position: 'absolute', bottom: '7.5%', width: 220, height: 26, borderRadius: 100, backgroundColor: '#090909', borderWidth: 1, borderColor: '#343434' },
+  revealArena: { flex: 1, width: '100%', maxWidth: 920, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  rarityAura: { position: 'absolute', width: 540, height: 540, borderRadius: 540 },
+  coreFlash: { position: 'absolute', width: 250, height: 250, borderRadius: 250, backgroundColor: '#FFFFFF', zIndex: 3 },
+  revealFlash: { position: 'absolute', width: 350, height: 350, borderRadius: 350, zIndex: 2 },
+  shockwave: { position: 'absolute', width: 260, height: 260, borderRadius: 260, borderWidth: 4, backgroundColor: 'rgba(255,255,255,0.06)', zIndex: 3 },
+  shockwaveSecondary: { position: 'absolute', width: 220, height: 220, borderRadius: 220, borderWidth: 3, backgroundColor: 'transparent', zIndex: 2 },
+  ray: { position: 'absolute', width: 3, height: 155, top: '50%', left: '50%', borderRadius: 10, zIndex: 2 },
+  spark: { position: 'absolute', width: 5, height: 26, top: '50%', left: '50%', borderRadius: 6, zIndex: 4 },
+  pedestalGlow: { position: 'absolute', bottom: '9%', width: 360, height: 82, borderRadius: 200, borderWidth: 2, backgroundColor: 'rgba(255,255,255,0.035)' },
+  pedestalBase: { position: 'absolute', bottom: '7.5%', width: 240, height: 28, borderRadius: 100, backgroundColor: '#090909', borderWidth: 1, borderColor: '#343434' },
   rewardTapArea: { alignItems: 'center', justifyContent: 'center', zIndex: 6 },
   flipScene: { width: 292, height: 430 },
   flipSceneCompact: { width: 238, height: 350 },
@@ -485,6 +605,9 @@ const styles = StyleSheet.create({
   rewardRarity: { fontSize: 10, fontWeight: '900', marginTop: 4 },
   nextButton: { width: '100%', maxWidth: 330, height: 48, borderRadius: 12, borderWidth: 1, backgroundColor: '#101010', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   nextButtonText: { color: '#F4F4F4', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
+
+  colorWash: { ...StyleSheet.absoluteFillObject, zIndex: 90 },
+  screenFlash: { ...StyleSheet.absoluteFillObject, backgroundColor: '#FFFFFF', zIndex: 100 },
 
   summaryContent: { width: '100%', maxWidth: 1040, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   summaryHero: { alignItems: 'center', paddingVertical: 22 },
