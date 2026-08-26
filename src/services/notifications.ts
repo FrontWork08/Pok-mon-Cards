@@ -1,16 +1,25 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+let notificationHandlerConfigured = false;
+
+async function getNativeNotifications() {
+  if (Platform.OS === 'web') return null;
+  const Notifications = await import('expo-notifications');
+  if (!notificationHandlerConfigured) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+    notificationHandlerConfigured = true;
+  }
+  return Notifications;
+}
 
 export async function getConversationInbox() {
   const { data, error } = await supabase.rpc('get_my_conversation_summaries');
@@ -39,7 +48,9 @@ export async function markNotificationRead(id: string) {
 }
 
 export async function registerPushNotifications() {
-  if (Platform.OS === 'web') return null;
+  const Notifications = await getNativeNotifications();
+  if (!Notifications) return null;
+
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;
   if (!user) return null;
@@ -78,7 +89,8 @@ export async function registerPushNotifications() {
 }
 
 export async function disableCurrentPushToken() {
-  if (Platform.OS === 'web') return;
+  const Notifications = await getNativeNotifications();
+  if (!Notifications) return;
   const projectId = Constants.easConfig?.projectId ?? (Constants.expoConfig?.extra as any)?.eas?.projectId;
   if (!projectId) return;
   const status = await Notifications.getPermissionsAsync();
