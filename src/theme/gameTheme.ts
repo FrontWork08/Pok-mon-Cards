@@ -1,11 +1,11 @@
 export const gameTheme = {
   colors: {
     bg: '#050505',
-    surface: '#0D0D0D',
-    surfaceAlt: '#171717',
-    border: '#2A2A2A',
+    surface: '#0B0B0C',
+    surfaceAlt: '#141416',
+    border: '#26262A',
     text: '#F7F7F7',
-    muted: '#9A9A9A',
+    muted: '#9A9A9F',
     blue: '#4D8DFF',
     blueDeep: '#245EDB',
     yellow: '#FFD54A',
