@@ -5,18 +5,45 @@ $ErrorActionPreference = 'Continue'
 $SupabaseUrl = 'https://mhddpovueqvvncrforao.supabase.co'
 $SupabasePublishableKey = 'sb_publishable_CB-2EJcfJYuApL9BIBpBCQ_DsNb0qNp'
 $PokemonTcgApiKey = $null
+$NpxCacheDir = Join-Path $env:LOCALAPPDATA 'npm-cache\_npx'
 
-function Invoke-Eas {
-  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+function Clear-NpxTempCache {
+  if (Test-Path $NpxCacheDir) {
+    Write-Host 'Repairing temporary npx cache...' -ForegroundColor Yellow
+    try {
+      Remove-Item -Recurse -Force $NpxCacheDir -ErrorAction Stop
+      Write-Host 'Temporary npx cache cleared.' -ForegroundColor Green
+    } catch {
+      Write-Host "Could not clear the full npx cache automatically: $($_.Exception.Message)" -ForegroundColor Yellow
+      Write-Host "Delete this folder manually if needed: $NpxCacheDir" -ForegroundColor Yellow
+    }
+  }
+}
+
+function Invoke-EasOnce {
+  param([string[]]$Arguments)
 
   $PreviousPreference = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
     & npx.cmd --yes eas-cli@latest @Arguments
-    $ExitCode = $LASTEXITCODE
+    return $LASTEXITCODE
   } finally {
     $ErrorActionPreference = $PreviousPreference
   }
+}
+
+function Invoke-Eas {
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+
+  $ExitCode = Invoke-EasOnce -Arguments $Arguments
+  if ($ExitCode -eq 0) { return }
+
+  # A partially downloaded package in npm-cache/_npx can produce JSON parse errors
+  # such as cli-spinners/spinners.json: Unexpected end of JSON input.
+  Clear-NpxTempCache
+  Write-Host 'Retrying EAS command with a fresh npx download...' -ForegroundColor Cyan
+  $ExitCode = Invoke-EasOnce -Arguments $Arguments
 
   if ($ExitCode -ne 0) {
     throw "EAS command failed with exit code ${ExitCode}: eas $($Arguments -join ' ')"
@@ -27,7 +54,6 @@ function Test-EasLogin {
   $PreviousPreference = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
-    # npm may print harmless deprecation warnings to stderr. Hide them for this probe.
     & npx.cmd --yes eas-cli@latest whoami 1>$null 2>$null
     $ExitCode = $LASTEXITCODE
   } finally {
@@ -50,6 +76,9 @@ Write-Host 'This script links the app to Expo/EAS and configures build environme
 Write-Host ''
 
 if (-not (Test-EasLogin)) {
+  # If the login probe failed because the npx package cache is corrupt, clear it
+  # before opening the interactive login command.
+  Clear-NpxTempCache
   Write-Host 'Expo login required. Your browser will open now.' -ForegroundColor Yellow
   Invoke-Eas login --browser
 }
