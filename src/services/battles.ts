@@ -1,12 +1,13 @@
 import { supabase } from '@/lib/supabase';
+import { normalizeFunctionError } from '@/services/functionErrors';
 
 export type BattleStakeType = 'none' | 'coins' | 'card';
 export type BattleMode = 'quick' | 'mystery';
 
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('battle-action', { body });
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
+  if (error) throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da batalha.');
+  if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível concluir a ação da batalha.');
   return data?.data;
 }
 
@@ -49,7 +50,7 @@ export async function getBattle(battleId: string) {
 export async function getBattleCardStakes(battleId: string) {
   const { data, error } = await supabase
     .from('battle_card_stakes')
-    .select('battle_id,player_id,card_id,quantity,status,cards(id,pokemon_name,image_small,image_large,rarity,types)')
+    .select('battle_id,player_id,card_id,quantity,status,cards(id,pokemon_name,image_small,image_large,rarity,types,game_value)')
     .eq('battle_id', battleId);
   if (error) throw error;
   return data ?? [];
@@ -58,7 +59,7 @@ export async function getBattleCardStakes(battleId: string) {
 export async function getBattleRounds(battleId: string) {
   const { data, error } = await supabase
     .from('battle_rounds')
-    .select('battle_id,round_no,challenger_card_id,opponent_card_id,challenger_power,opponent_power,challenger_roll,opponent_roll,winner_id,resolved_at,c1:cards!battle_rounds_challenger_card_id_fkey(id,pokemon_name,image_small,image_large,rarity,types),c2:cards!battle_rounds_opponent_card_id_fkey(id,pokemon_name,image_small,image_large,rarity,types)')
+    .select('battle_id,round_no,challenger_card_id,opponent_card_id,challenger_power,opponent_power,challenger_roll,opponent_roll,winner_id,resolved_at,c1:cards!battle_rounds_challenger_card_id_fkey(id,pokemon_name,image_small,image_large,rarity,types,game_value),c2:cards!battle_rounds_opponent_card_id_fkey(id,pokemon_name,image_small,image_large,rarity,types,game_value)')
     .eq('battle_id', battleId)
     .order('round_no', { ascending: true });
   if (error) throw error;
