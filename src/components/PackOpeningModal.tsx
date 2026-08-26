@@ -68,6 +68,10 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const burst = useRef(new Animated.Value(0)).current;
   const beam = useRef(new Animated.Value(0)).current;
   const floorPulse = useRef(new Animated.Value(0)).current;
+  const openingScreenFlash = useRef(new Animated.Value(0)).current;
+  const openingCoreFlash = useRef(new Animated.Value(0)).current;
+  const openingShockwave = useRef(new Animated.Value(0)).current;
+  const openingColorBurst = useRef(new Animated.Value(0)).current;
 
   const cardEnter = useRef(new Animated.Value(0)).current;
   const flip = useRef(new Animated.Value(0)).current;
@@ -96,6 +100,10 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     burst.setValue(0);
     beam.setValue(0);
     floorPulse.setValue(0);
+    openingScreenFlash.setValue(0);
+    openingCoreFlash.setValue(0);
+    openingShockwave.setValue(0);
+    openingColorBurst.setValue(0);
     cardEnter.setValue(0);
     flip.setValue(0);
     rarityPulse.setValue(0);
@@ -113,7 +121,31 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     );
     floating.start();
     return () => floating.stop();
-  }, [beam, burst, cardEnter, cardImpact, coreFlash, flip, floorPulse, pack?.id, packOpacity, packRotate, packScale, packY, rarityPulse, revealBurst, screenFlash, seamCharge, shockwave, tear, visible]);
+  }, [
+    beam,
+    burst,
+    cardEnter,
+    cardImpact,
+    coreFlash,
+    flip,
+    floorPulse,
+    openingColorBurst,
+    openingCoreFlash,
+    openingScreenFlash,
+    openingShockwave,
+    pack?.id,
+    packOpacity,
+    packRotate,
+    packScale,
+    packY,
+    rarityPulse,
+    revealBurst,
+    screenFlash,
+    seamCharge,
+    shockwave,
+    tear,
+    visible,
+  ]);
 
   function animateCardIn() {
     cardEnter.setValue(0);
@@ -141,6 +173,13 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     cardImpact.setValue(0);
   }
 
+  function resetOpeningEffects() {
+    openingScreenFlash.setValue(0);
+    openingCoreFlash.setValue(0);
+    openingShockwave.setValue(0);
+    openingColorBurst.setValue(0);
+  }
+
   function runOpeningAnimation() {
     packRotate.setValue(0);
     packScale.setValue(1);
@@ -150,35 +189,59 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     burst.setValue(0);
     beam.setValue(0);
     floorPulse.setValue(0);
+    resetOpeningEffects();
 
     return new Promise<void>((resolve) => {
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(packScale, { toValue: 0.95, duration: 180, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(packScale, { toValue: 0.94, duration: 190, useNativeDriver: USE_NATIVE_DRIVER }),
           Animated.timing(seamCharge, { toValue: 1, duration: 520, useNativeDriver: USE_NATIVE_DRIVER }),
         ]),
         Animated.parallel([
           Animated.sequence([
-            Animated.timing(packRotate, { toValue: -1, duration: 65, useNativeDriver: USE_NATIVE_DRIVER }),
-            Animated.timing(packRotate, { toValue: 1, duration: 65, useNativeDriver: USE_NATIVE_DRIVER }),
-            Animated.timing(packRotate, { toValue: -0.8, duration: 55, useNativeDriver: USE_NATIVE_DRIVER }),
-            Animated.timing(packRotate, { toValue: 0.8, duration: 55, useNativeDriver: USE_NATIVE_DRIVER }),
-            Animated.timing(packRotate, { toValue: 0, duration: 55, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: -1, duration: 62, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: 1, duration: 62, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: -0.9, duration: 52, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: 0.9, duration: 52, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packRotate, { toValue: 0, duration: 52, useNativeDriver: USE_NATIVE_DRIVER }),
           ]),
-          Animated.timing(packScale, { toValue: 1.045, duration: 295, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.sequence([
+            Animated.timing(packScale, { toValue: 1.05, duration: 190, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(packScale, { toValue: 0.98, duration: 90, useNativeDriver: USE_NATIVE_DRIVER }),
+          ]),
         ]),
         Animated.parallel([
-          Animated.timing(tear, { toValue: 1, duration: 280, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(packScale, { toValue: 1.1, duration: 280, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(floorPulse, { toValue: 1, duration: 280, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(tear, { toValue: 1, duration: 250, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(packScale, { toValue: 1.12, duration: 250, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(floorPulse, { toValue: 1, duration: 250, useNativeDriver: USE_NATIVE_DRIVER }),
         ]),
         Animated.parallel([
-          Animated.timing(packOpacity, { toValue: 0, duration: 180, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(packScale, { toValue: 0.74, duration: 200, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(burst, { toValue: 1, duration: 260, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(beam, { toValue: 1, duration: 340, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.sequence([
+            Animated.timing(openingScreenFlash, { toValue: 0.98, duration: 68, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.delay(30),
+            Animated.timing(openingScreenFlash, { toValue: 0.18, duration: 150, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(openingScreenFlash, { toValue: 0.5, duration: 70, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(openingScreenFlash, { toValue: 0, duration: 230, useNativeDriver: USE_NATIVE_DRIVER }),
+          ]),
+          Animated.sequence([
+            Animated.timing(openingCoreFlash, { toValue: 1, duration: 90, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(openingCoreFlash, { toValue: 0, duration: 500, useNativeDriver: USE_NATIVE_DRIVER }),
+          ]),
+          Animated.sequence([
+            Animated.delay(50),
+            Animated.timing(openingShockwave, { toValue: 1, duration: 720, useNativeDriver: USE_NATIVE_DRIVER }),
+          ]),
+          Animated.sequence([
+            Animated.delay(40),
+            Animated.timing(openingColorBurst, { toValue: 1, duration: 160, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(openingColorBurst, { toValue: 0, duration: 610, useNativeDriver: USE_NATIVE_DRIVER }),
+          ]),
+          Animated.timing(packOpacity, { toValue: 0, duration: 220, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(packScale, { toValue: 0.6, duration: 250, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(burst, { toValue: 1, duration: 340, useNativeDriver: USE_NATIVE_DRIVER }),
+          Animated.timing(beam, { toValue: 1, duration: 420, useNativeDriver: USE_NATIVE_DRIVER }),
         ]),
-        Animated.delay(260),
+        Animated.delay(220),
       ]).start(() => resolve());
     });
   }
@@ -215,6 +278,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
       burst.setValue(0);
       beam.setValue(0);
       floorPulse.setValue(0);
+      resetOpeningEffects();
     }
   }
 
@@ -294,10 +358,21 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const highTier = theme.tier >= 4;
 
   const packRotation = packRotate.interpolate({ inputRange: [-1, 1], outputRange: ['-5deg', '5deg'] });
-  const burstScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.25, 5.4] });
-  const burstOpacity = burst.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.95, 0] });
-  const beamOpacity = beam.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, 0.82, 0.36] });
-  const floorScale = floorPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1.35] });
+  const burstScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.2, 6.2] });
+  const burstOpacity = burst.interpolate({ inputRange: [0, 0.22, 1], outputRange: [0, 1, 0] });
+  const beamOpacity = beam.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 1, 0.28] });
+  const floorScale = floorPulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.7] });
+
+  const openingCoreScale = openingCoreFlash.interpolate({ inputRange: [0, 1], outputRange: [0.1, 3.6] });
+  const openingCoreOpacity = openingCoreFlash.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0, 1, 0.88] });
+  const openingShockScale = openingShockwave.interpolate({ inputRange: [0, 1], outputRange: [0.3, 4.8] });
+  const openingShockScaleTwo = openingShockwave.interpolate({ inputRange: [0, 1], outputRange: [0.18, 6] });
+  const openingShockOpacity = openingShockwave.interpolate({ inputRange: [0, 0.12, 0.6, 1], outputRange: [0, 1, 0.42, 0] });
+  const openingShockOpacityTwo = openingShockwave.interpolate({ inputRange: [0, 0.28, 0.75, 1], outputRange: [0, 0.8, 0.22, 0] });
+  const openingRayScaleY = openingColorBurst.interpolate({ inputRange: [0, 1], outputRange: [0.1, 2.8] });
+  const openingSparkTravel = openingShockwave.interpolate({ inputRange: [0, 1], outputRange: [0, -290] });
+  const openingSparkOpacity = openingShockwave.interpolate({ inputRange: [0, 0.1, 0.65, 1], outputRange: [0, 1, 0.5, 0] });
+  const openingColorWashOpacity = openingColorBurst.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.32, 0] });
 
   const cardTranslateY = cardEnter.interpolate({ inputRange: [0, 1], outputRange: [34, 0] });
   const baseCardScale = cardEnter.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
@@ -349,10 +424,42 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
           <View style={styles.openingStage}>
             <View style={styles.stageGrid} />
             <Animated.View style={[styles.floorHalo, { opacity: floorPulse, transform: [{ scaleX: floorScale }] }]} />
+            <Animated.View style={[styles.openingCoreBlast, styles.noPointerEvents, { opacity: openingCoreOpacity, transform: [{ scale: openingCoreScale }] }]} />
+            <Animated.View style={[styles.openingShockwave, styles.noPointerEvents, { borderColor: '#FFFFFF', opacity: openingShockOpacity, transform: [{ scale: openingShockScale }] }]} />
+            <Animated.View style={[styles.openingShockwaveSecondary, styles.noPointerEvents, { borderColor: '#FFD447', opacity: openingShockOpacityTwo, transform: [{ scale: openingShockScaleTwo }] }]} />
             <Animated.View style={[styles.burstRing, { opacity: burstOpacity, transform: [{ scale: burstScale }] }]} />
             <Animated.View style={[styles.openingBeam, { opacity: beamOpacity, transform: [{ scaleY: beam }] }]} />
 
-            <Animated.View style={{ opacity: packOpacity, transform: [{ translateY: packY }, { rotate: packRotation }, { scale: packScale }] }}>
+            {RAYS.map((rotation) => (
+              <Animated.View
+                key={`opening-ray-${rotation}`}
+                style={[
+                  styles.openingRay,
+                  styles.noPointerEvents,
+                  {
+                    opacity: openingColorBurst,
+                    transform: [{ rotate: `${rotation}deg` }, { translateY: -205 }, { scaleY: openingRayScaleY }],
+                  },
+                ]}
+              />
+            ))}
+
+            {SPARKS.map((rotation) => (
+              <Animated.View
+                key={`opening-spark-${rotation}`}
+                style={[
+                  styles.openingSpark,
+                  styles.noPointerEvents,
+                  {
+                    backgroundColor: rotation % 40 === 0 ? '#FFFFFF' : '#FFD447',
+                    opacity: openingSparkOpacity,
+                    transform: [{ rotate: `${rotation}deg` }, { translateY: openingSparkTravel }],
+                  },
+                ]}
+              />
+            ))}
+
+            <Animated.View style={{ zIndex: 7, opacity: packOpacity, transform: [{ translateY: packY }, { rotate: packRotation }, { scale: packScale }] }}>
               <FoilBooster pack={pack} compact={compact} seamCharge={seamCharge} tear={tear} />
             </Animated.View>
 
@@ -492,6 +599,13 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
           </ScrollView>
         ) : null}
 
+        {(stage === 'opening' || stage === 'burst') ? (
+          <>
+            <Animated.View style={[styles.openingColorWashOverlay, styles.noPointerEvents, { opacity: openingColorWashOpacity }]} />
+            <Animated.View style={[styles.openingScreenFlash, styles.noPointerEvents, { opacity: openingScreenFlash }]} />
+          </>
+        ) : null}
+
         {stage === 'cards' && currentCard ? (
           <>
             <Animated.View style={[styles.colorWash, styles.noPointerEvents, { backgroundColor: theme.color, opacity: colorWashOpacity }]} />
@@ -539,19 +653,24 @@ const styles = StyleSheet.create({
 
   openingStage: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingBottom: 42, overflow: 'hidden' },
   stageGrid: { position: 'absolute', width: '62%', height: 1, backgroundColor: 'rgba(255,255,255,0.04)', bottom: '26%', transform: [{ rotate: '-8deg' }] },
-  floorHalo: { position: 'absolute', bottom: '24%', width: 330, height: 74, borderRadius: 200, backgroundColor: 'rgba(255,212,71,0.09)' },
-  burstRing: { position: 'absolute', width: 92, height: 92, borderRadius: 92, borderWidth: 2, borderColor: '#FFF3C0', backgroundColor: 'rgba(255,255,255,0.08)' },
-  openingBeam: { position: 'absolute', width: 150, height: 520, backgroundColor: 'rgba(255,235,170,0.09)', borderRadius: 120 },
-  openingCopy: { alignItems: 'center', marginTop: 26, maxWidth: 520 },
+  floorHalo: { position: 'absolute', bottom: '24%', width: 360, height: 86, borderRadius: 220, backgroundColor: 'rgba(255,212,71,0.13)' },
+  openingCoreBlast: { position: 'absolute', width: 280, height: 280, borderRadius: 280, backgroundColor: '#FFFFFF', zIndex: 3 },
+  openingShockwave: { position: 'absolute', width: 270, height: 270, borderRadius: 270, borderWidth: 5, backgroundColor: 'rgba(255,255,255,0.08)', zIndex: 4 },
+  openingShockwaveSecondary: { position: 'absolute', width: 225, height: 225, borderRadius: 225, borderWidth: 4, backgroundColor: 'rgba(255,212,71,0.04)', zIndex: 3 },
+  openingRay: { position: 'absolute', width: 4, height: 185, top: '50%', left: '50%', borderRadius: 10, backgroundColor: '#FFD447', zIndex: 3 },
+  openingSpark: { position: 'absolute', width: 6, height: 30, top: '50%', left: '50%', borderRadius: 8, zIndex: 5 },
+  burstRing: { position: 'absolute', width: 108, height: 108, borderRadius: 108, borderWidth: 3, borderColor: '#FFF7D6', backgroundColor: 'rgba(255,255,255,0.12)', zIndex: 3 },
+  openingBeam: { position: 'absolute', width: 190, height: 620, backgroundColor: 'rgba(255,241,184,0.18)', borderRadius: 140, zIndex: 2 },
+  openingCopy: { alignItems: 'center', marginTop: 26, maxWidth: 520, zIndex: 8 },
   stageEyebrow: { color: '#858585', fontSize: 9, fontWeight: '900', letterSpacing: 2 },
   stageTitle: { color: '#F7F7F7', fontSize: 23, lineHeight: 29, fontWeight: '900', textAlign: 'center', marginTop: 6 },
   stageSubtitle: { color: '#8D8D8D', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
-  openButton: { marginTop: 22, minWidth: 208, height: 52, borderRadius: 12, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#FFD447', overflow: 'hidden' },
+  openButton: { marginTop: 22, minWidth: 208, height: 52, borderRadius: 12, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#FFD447', overflow: 'hidden', zIndex: 8 },
   openButtonLine: { position: 'absolute', top: 0, left: 22, right: 22, height: 2, backgroundColor: 'rgba(255,255,255,0.75)' },
   openButtonText: { color: '#070707', fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
-  loadingTrack: { marginTop: 22, width: 230, height: 3, borderRadius: 99, overflow: 'hidden', backgroundColor: '#202020' },
+  loadingTrack: { marginTop: 22, width: 230, height: 3, borderRadius: 99, overflow: 'hidden', backgroundColor: '#202020', zIndex: 8 },
   loadingSweep: { width: '100%', height: '100%', backgroundColor: '#FFD447' },
-  errorBox: { marginTop: 18, maxWidth: 480, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: '#5A2528', backgroundColor: '#1A0D0E' },
+  errorBox: { marginTop: 18, maxWidth: 480, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: '#5A2528', backgroundColor: '#1A0D0E', zIndex: 8 },
   errorText: { color: '#FFB3B7', fontSize: 11, fontWeight: '700', flex: 1 },
 
   foilPack: { width: 230, height: 340, borderRadius: 18, overflow: 'hidden', alignItems: 'center', backgroundColor: '#111318', borderWidth: 1, borderColor: '#5B5F68' },
@@ -606,6 +725,8 @@ const styles = StyleSheet.create({
   nextButton: { width: '100%', maxWidth: 330, height: 48, borderRadius: 12, borderWidth: 1, backgroundColor: '#101010', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   nextButtonText: { color: '#F4F4F4', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
 
+  openingColorWashOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#FFD447', zIndex: 95 },
+  openingScreenFlash: { ...StyleSheet.absoluteFillObject, backgroundColor: '#FFFFFF', zIndex: 110 },
   colorWash: { ...StyleSheet.absoluteFillObject, zIndex: 90 },
   screenFlash: { ...StyleSheet.absoluteFillObject, backgroundColor: '#FFFFFF', zIndex: 100 },
 
