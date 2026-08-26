@@ -9,7 +9,7 @@ export type AppColors = {
 };
 
 const accents: Record<ThemeName, { accent: string; secondary: string; soft: string }> = {
-  trainer: { accent: '#4D8DFF', secondary: '#FFD54A', soft: '#102A4E' },
+  trainer: { accent: '#4D8DFF', secondary: '#FFD54A', soft: '#151515' },
   midnight: { accent: '#9B7BFF', secondary: '#5EDCFF', soft: '#241B4C' },
   poke_red: { accent: '#FF5264', secondary: '#FFD54A', soft: '#451923' },
   electric: { accent: '#FFD83D', secondary: '#4F9BFF', soft: '#3B3413' },
@@ -21,12 +21,12 @@ const accents: Record<ThemeName, { accent: string; secondary: string; soft: stri
 function colorsFor(light: boolean, theme: ThemeName): AppColors {
   const a = accents[theme];
   if (light) return {
-    bg: '#EFF4FA', surface: '#FFFFFF', surfaceAlt: '#E7EEF7', border: '#C8D5E5', text: '#101A29', muted: '#65758C',
-    blue: a.accent, blueDeep: a.accent, yellow: a.secondary, red: '#D84454', green: '#249B68', accent: a.accent, accentSoft: `${a.accent}22`,
+    bg: '#F4F4F4', surface: '#FFFFFF', surfaceAlt: '#ECECEC', border: '#D2D2D2', text: '#111111', muted: '#686868',
+    blue: a.accent, blueDeep: a.accent, yellow: a.secondary, red: '#D84454', green: '#249B68', accent: a.accent, accentSoft: `${a.accent}18`,
   };
   return {
-    bg: '#07111F', surface: '#0E1A2B', surfaceAlt: '#14243A', border: '#223753', text: '#F7FAFF', muted: '#91A2BB',
-    blue: a.accent, blueDeep: a.accent, yellow: a.secondary, red: '#FF5C68', green: '#53D69A', accent: a.accent, accentSoft: a.soft,
+    bg: '#050505', surface: '#0D0D0D', surfaceAlt: '#171717', border: '#2A2A2A', text: '#F7F7F7', muted: '#9A9A9A',
+    blue: a.accent, blueDeep: a.accent, yellow: a.secondary, red: '#FF5C68', green: '#53D69A', accent: a.accent, accentSoft: theme === 'trainer' ? '#151515' : a.soft,
   };
 }
 
