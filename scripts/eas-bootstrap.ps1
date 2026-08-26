@@ -1,65 +1,52 @@
-# Keep PowerShell from turning npm/node stderr warnings into terminating errors.
-# Native command failures are checked explicitly through $LASTEXITCODE below.
+# Pokemon Cards EAS bootstrap for Windows PowerShell.
+# Native command failures are checked explicitly with $LASTEXITCODE.
 $ErrorActionPreference = 'Continue'
 
 $SupabaseUrl = 'https://mhddpovueqvvncrforao.supabase.co'
 $SupabasePublishableKey = 'sb_publishable_CB-2EJcfJYuApL9BIBpBCQ_DsNb0qNp'
 $PokemonTcgApiKey = $null
-$NpxCacheDir = Join-Path $env:LOCALAPPDATA 'npm-cache\_npx'
 
-function Clear-NpxTempCache {
-  if (Test-Path $NpxCacheDir) {
-    Write-Host 'Repairing temporary npx cache...' -ForegroundColor Yellow
-    try {
-      Remove-Item -Recurse -Force $NpxCacheDir -ErrorAction Stop
-      Write-Host 'Temporary npx cache cleared.' -ForegroundColor Green
-    } catch {
-      Write-Host "Could not clear the full npx cache automatically: $($_.Exception.Message)" -ForegroundColor Yellow
-      Write-Host "Delete this folder manually if needed: $NpxCacheDir" -ForegroundColor Yellow
-    }
+function Ensure-EasCli {
+  $Existing = Get-Command eas.cmd -ErrorAction SilentlyContinue
+  if ($Existing) {
+    Write-Host "Using installed EAS CLI: $($Existing.Source)" -ForegroundColor Green
+    return
   }
-}
 
-function Invoke-EasOnce {
-  param([string[]]$Arguments)
-
-  $PreviousPreference = $ErrorActionPreference
-  $ErrorActionPreference = 'Continue'
-  try {
-    & npx.cmd --yes eas-cli@latest @Arguments
-    return $LASTEXITCODE
-  } finally {
-    $ErrorActionPreference = $PreviousPreference
+  Write-Host 'EAS CLI is not installed globally. Installing it once...' -ForegroundColor Yellow
+  Write-Host 'Cleaning npm cache first to avoid the corrupted npx cache seen previously...' -ForegroundColor Cyan
+  & npm.cmd cache clean --force
+  if ($LASTEXITCODE -ne 0) {
+    throw "npm cache clean failed with exit code $LASTEXITCODE"
   }
+
+  Write-Host 'Installing eas-cli globally. npm deprecation warnings can be ignored.' -ForegroundColor Cyan
+  & npm.cmd install --global eas-cli@latest --no-audit --no-fund
+  if ($LASTEXITCODE -ne 0) {
+    throw "Global eas-cli installation failed with exit code $LASTEXITCODE"
+  }
+
+  $Installed = Get-Command eas.cmd -ErrorAction SilentlyContinue
+  if (-not $Installed) {
+    throw 'eas.cmd was installed but is not available in PATH. Close/reopen the terminal and run the script again.'
+  }
+
+  Write-Host "EAS CLI installed: $($Installed.Source)" -ForegroundColor Green
 }
 
 function Invoke-Eas {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 
-  $ExitCode = Invoke-EasOnce -Arguments $Arguments
-  if ($ExitCode -eq 0) { return }
-
-  # A partially downloaded package in npm-cache/_npx can produce JSON parse errors
-  # such as cli-spinners/spinners.json: Unexpected end of JSON input.
-  Clear-NpxTempCache
-  Write-Host 'Retrying EAS command with a fresh npx download...' -ForegroundColor Cyan
-  $ExitCode = Invoke-EasOnce -Arguments $Arguments
-
+  & eas.cmd @Arguments
+  $ExitCode = $LASTEXITCODE
   if ($ExitCode -ne 0) {
     throw "EAS command failed with exit code ${ExitCode}: eas $($Arguments -join ' ')"
   }
 }
 
 function Test-EasLogin {
-  $PreviousPreference = $ErrorActionPreference
-  $ErrorActionPreference = 'Continue'
-  try {
-    & npx.cmd --yes eas-cli@latest whoami 1>$null 2>$null
-    $ExitCode = $LASTEXITCODE
-  } finally {
-    $ErrorActionPreference = $PreviousPreference
-  }
-  return ($ExitCode -eq 0)
+  & eas.cmd whoami 1>$null 2>$null
+  return ($LASTEXITCODE -eq 0)
 }
 
 # Reuse the optional local Pokemon TCG key without ever committing .env.
@@ -75,10 +62,12 @@ Write-Host '=== Pokemon Cards - EAS bootstrap ===' -ForegroundColor Cyan
 Write-Host 'This script links the app to Expo/EAS and configures build environments.'
 Write-Host ''
 
+Ensure-EasCli
+
+Write-Host 'EAS CLI version:' -ForegroundColor Cyan
+Invoke-Eas --version
+
 if (-not (Test-EasLogin)) {
-  # If the login probe failed because the npx package cache is corrupt, clear it
-  # before opening the interactive login command.
-  Clear-NpxTempCache
   Write-Host 'Expo login required. Your browser will open now.' -ForegroundColor Yellow
   Invoke-Eas login --browser
 }
