@@ -75,3 +75,24 @@ export async function confirmTrade(tradeId: string) {
 export async function cancelTrade(tradeId: string) {
   return invokeTradeAction({ action: 'cancel', tradeId });
 }
+
+
+export function subscribeToTrade(tradeId: string, onChange: () => void) {
+  const channel = supabase
+    .channel(`trade:${tradeId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'trades', filter: `id=eq.${tradeId}` },
+      onChange,
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'trade_cards', filter: `trade_id=eq.${tradeId}` },
+      onChange,
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
