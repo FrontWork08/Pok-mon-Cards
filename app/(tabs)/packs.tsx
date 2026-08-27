@@ -34,12 +34,20 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 
 type Notice = { kind: 'error' | 'success'; text: string } | null;
+type SortMode = 'newest' | 'oldest' | 'price-high' | 'price-low' | 'az';
+const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
+  { id: 'newest', label: 'MAIS NOVOS' },
+  { id: 'oldest', label: 'MAIS ANTIGOS' },
+  { id: 'price-high', label: 'MAIOR PREÇO' },
+  { id: 'price-low', label: 'MENOR PREÇO' },
+  { id: 'az', label: 'A–Z' },
+];
 
 const DIAMOND_PACK_BASE: Pack = {
   id:'diamond-legendary',name:'Cofre Lendário',set_id:'legendary-vault',
   price:25,base_price:25,free_until:null,cards_per_pack:1,image_url:null,art_url:null,
   booster_art_url:null,booster_art_urls:[],booster_back_url:null,booster_logo_url:null,
-  booster_art_source:'trainer-vault',active:true,currency:'diamonds',
+  booster_art_source:'trainer-vault',release_date:null,active:true,currency:'diamonds',
 };
 
 export default function PacksScreen() {
@@ -52,6 +60,7 @@ export default function PacksScreen() {
   const [diamondCost, setDiamondCost] = useState(25);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoriteOnly, setFavoriteOnly] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
@@ -134,12 +143,21 @@ export default function PacksScreen() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return packs.filter((pack) => {
+    const visible = packs.filter((pack) => {
       if (favoriteOnly && !favoriteIds.has(pack.id)) return false;
       if (!term) return true;
       return pack.name.toLowerCase().includes(term) || pack.set_id.toLowerCase().includes(term);
     });
-  }, [packs, search, favoriteOnly, favoriteIds]);
+
+    return [...visible].sort((a, b) => {
+      if (sortMode === 'price-high') return b.base_price - a.base_price;
+      if (sortMode === 'price-low') return a.base_price - b.base_price;
+      if (sortMode === 'az') return a.name.localeCompare(b.name, 'pt-BR');
+      const aDate = a.release_date ? new Date(a.release_date).getTime() : 0;
+      const bDate = b.release_date ? new Date(b.release_date).getTime() : 0;
+      return sortMode === 'oldest' ? aDate - bDate : bDate - aDate;
+    });
+  }, [packs, search, favoriteOnly, favoriteIds, sortMode]);
 
   function choosePack(pack: Pack) {
     if (coins < pack.price) {
@@ -341,6 +359,29 @@ export default function PacksScreen() {
         <Text style={[styles.resultCount, { color: colors.muted }]}>{filtered.length} encontrados</Text>
       </View>
 
+      <View style={styles.sortRow}>
+        {SORT_OPTIONS.map((option) => {
+          const active = sortMode === option.id;
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => setSortMode(option.id)}
+              style={[
+                styles.sortChip,
+                {
+                  backgroundColor: active ? colors.accentSoft : colors.surface,
+                  borderColor: active ? colors.accent : colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.sortChipText, { color: active ? colors.accent : colors.muted }]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <Text style={[styles.sectionTitle, { color: colors.text }]}>Boosters</Text>
     </View>
   );
@@ -519,6 +560,9 @@ const styles = StyleSheet.create({
   favoriteFilter: { minHeight: 39, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
   favoriteFilterText: { fontSize: 9, fontWeight: '900', letterSpacing: .4 },
   resultCount: { fontSize: 12, fontWeight: '700' },
+  sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 9 },
+  sortChip: { minHeight: 34, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
+  sortChipText: { fontSize: 8, fontWeight: '900', letterSpacing: .35 },
   sectionTitle: { fontSize: 21, fontWeight: '900' },
 
   itemWrap: { paddingHorizontal: 6, paddingBottom: 12 },
