@@ -39,3 +39,7 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Expo/local generated files
+expo-env.d.ts
+.gitignore-local-backup
