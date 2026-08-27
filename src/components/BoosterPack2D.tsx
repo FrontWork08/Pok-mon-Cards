@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Animated, Image, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import type { Pack } from '@/services/packs';
 
@@ -23,7 +24,7 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-export function BoosterPack2D({ pack, width = 224, tear, seamCharge, style }: Props) {
+function BoosterPack2DComponent({ pack, width = 224, tear, seamCharge, style }: Props) {
   const height = width * 1.72;
   const [accent, deep, highlight] = paletteFor(pack.set_id);
   const safeTear = tear ?? new Animated.Value(0);
@@ -164,6 +165,8 @@ export function BoosterPack2D({ pack, width = 224, tear, seamCharge, style }: Pr
     </View>
   );
 }
+
+export const BoosterPack2D = memo(BoosterPack2DComponent);
 
 const styles = StyleSheet.create({
   shadowWrap: {
