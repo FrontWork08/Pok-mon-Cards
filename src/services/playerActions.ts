@@ -23,6 +23,7 @@ async function invokePlayerAction(body: Record<string, unknown>) {
     if (message.includes('USERNAME_TAKEN')) throw new Error('Esse nickname já está sendo usado por outro treinador.');
     if (message.includes('USERNAME_LENGTH')) throw new Error('O nickname precisa ter entre 3 e 24 caracteres.');
     if (message.includes('USERNAME_INVALID')) throw new Error('Esse nickname contém caracteres inválidos.');
+    if (message.includes('ACHIEVEMENT_LOCKED')) throw new Error('Essa conquista ainda não foi desbloqueada.');
     throw new Error(message);
   }
 
