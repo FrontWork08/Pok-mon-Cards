@@ -1,0 +1,2 @@
+-- Secure service-role wrapper for user/global market price refreshes.
+-- Supports scoped force-refresh while preserving server-side authorization.
