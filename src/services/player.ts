@@ -18,6 +18,10 @@ export type PlayerProfile = {
   show_battle_rating: boolean;
   created_at: string;
   last_daily_claim_at: string | null;
+  account_status: 'active' | 'suspended' | 'banned';
+  suspended_until: string | null;
+  moderation_reason: string | null;
+  warning_count: number;
 };
 
 export type OwnedCardEntry = {
@@ -53,7 +57,7 @@ export async function getMyProfile() {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id, username, coins, diamonds, profile_icon, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), show_battle_rating, created_at, last_daily_claim_at')
+    .select('id, username, coins, diamonds, profile_icon, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), show_battle_rating, created_at, last_daily_claim_at, account_status, suspended_until, moderation_reason, warning_count')
     .eq('id', userData.user.id)
     .single();
 
