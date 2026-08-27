@@ -155,7 +155,7 @@ export default function AdminScreen() {
             <Metric icon="people" label="USUÁRIOS" value={overview.users.total} hint={`+${overview.users.created24h} em 24h`} />
             <Metric icon="wallet" label="MOEDAS EM CIRCULAÇÃO" value={overview.users.coinsInCirculation} coin />
             <Metric icon="albums" label="CARDS NO CATÁLOGO" value={overview.catalog.cards} />
-            <Metric icon="cash" label="CARDS COM PREÇO USD" value={overview.catalog.cardsWithUsdPrice} />
+            <Metric icon="cash" label="CARDS COM PREÇO USD" value={overview.catalog.cardsWithUsdPrice} hint={`${overview.catalog.ownedCardsWithUsdPrice}/${overview.catalog.ownedUniqueCards} cards possuídos • ${Number(overview.catalog.ownedPriceCoveragePct ?? 0).toFixed(0)}%`} />
             <Metric icon="layers" label="CÓPIAS EM CONTAS" value={overview.catalog.ownedCardCopies} />
             <Metric icon="diamond" label="VALOR GLOBAL DAS COLEÇÕES" valueText={formatUsd(overview.catalog.ownedMarketValueUsd)} />
           </View>
