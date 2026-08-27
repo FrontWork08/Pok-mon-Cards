@@ -72,8 +72,9 @@ export default function BagScreen() {
       setLoading(true);
       const entries = await getMyBag();
       setCards(entries);
-      if (entries.some((entry) => entry.cards?.market_price_updated_at == null)) {
-        refreshPrices(entries, false);
+      const missingPrices = entries.filter((entry) => entry.cards?.market_price_usd == null);
+      if (missingPrices.length) {
+        refreshPrices(missingPrices, false);
       }
     } catch {
       setCards([]);
