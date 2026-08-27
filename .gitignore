@@ -12,6 +12,7 @@ web-build/
 !.env.example
 
 # Native/generated build output
+builds/
 android/
 ios/
 *.apk
