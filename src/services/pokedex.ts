@@ -20,15 +20,39 @@ export type PokemonCardVersion = {
   image_large: string | null;
 };
 
-export async function getPokedexCatalog(): Promise<PokedexEntry[]> {
-  const { data, error } = await supabase
-    .from('pokedex_catalog')
-    .select('pokedex_number,pokemon_name,types,image_small,representative_card_id')
-    .order('pokedex_number', { ascending: true })
-    .limit(2000);
+let pokedexCatalogCache: PokedexEntry[] | null = null;
+let pokedexCatalogRequest: Promise<PokedexEntry[]> | null = null;
 
+export async function getPokedexCatalog(force = false): Promise<PokedexEntry[]> {
+  if (!force && pokedexCatalogCache) return pokedexCatalogCache;
+  if (!force && pokedexCatalogRequest) return pokedexCatalogRequest;
+
+  pokedexCatalogRequest = (async () => {
+    const { data, error } = await supabase
+      .from('pokedex_catalog')
+      .select('pokedex_number,pokemon_name,types,image_small,representative_card_id')
+      .order('pokedex_number', { ascending: true })
+      .limit(2000);
+
+    if (error) throw error;
+    const rows = (data ?? []) as PokedexEntry[];
+    pokedexCatalogCache = rows;
+    return rows;
+  })();
+
+  try {
+    return await pokedexCatalogRequest;
+  } finally {
+    pokedexCatalogRequest = null;
+  }
+}
+
+export async function getMyOwnedPokedexNumbers(): Promise<number[]> {
+  const { data, error } = await supabase.rpc('get_my_owned_pokedex_numbers');
   if (error) throw error;
-  return (data ?? []) as PokedexEntry[];
+  return Array.isArray(data)
+    ? data.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+    : [];
 }
 
 export async function getPokemonCardVersions(pokedexNumber: number): Promise<PokemonCardVersion[]> {
