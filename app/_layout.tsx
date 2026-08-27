@@ -9,6 +9,7 @@ import { ThemeProvider, useAppTheme } from '@/theme/ThemeProvider';
 import { registerPushNotifications, subscribeToMyNotifications } from '@/services/notifications';
 import { playBattleSound } from '@/services/battleEffects';
 import { completeOAuthFromUrl, isOAuthCallbackUrl } from '@/services/auth';
+import { getMyProfile, type PlayerProfile } from '@/services/player';
 import { supabase } from '@/lib/supabase';
 import { WalletProvider } from '@/wallet/WalletProvider';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ function AppStack() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [liveNotification, setLiveNotification] = useState<any>(null);
+  const [accountRestriction, setAccountRestriction] = useState<PlayerProfile | null>(null);
   const liveNotificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -137,6 +139,63 @@ function AppStack() {
   }
 
   useEffect(() => {
+    let disposed = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let sequence = 0;
+
+    const clearChannel = () => {
+      if (!channel) return;
+      void supabase.removeChannel(channel);
+      channel = null;
+    };
+
+    const refreshAccount = async () => {
+      try {
+        const profile = await getMyProfile();
+        if (disposed) return;
+        setAccountRestriction(profile.account_status === 'active' ? null : profile);
+      } catch {
+        if (!disposed) setAccountRestriction(null);
+      }
+    };
+
+    const attach = async (userId?: string | null) => {
+      clearChannel();
+      if (!userId || disposed) {
+        setAccountRestriction(null);
+        return;
+      }
+
+      await refreshAccount();
+      if (disposed) return;
+
+      sequence += 1;
+      channel = supabase
+        .channel(`account-status-${userId}-${sequence}-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${userId}` },
+          () => { void refreshAccount(); },
+        );
+      channel.subscribe();
+    };
+
+    supabase.auth.getUser().then(({ data }) => {
+      void attach(data.user?.id ?? null);
+    }).catch(() => null);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void attach(session?.user?.id ?? null);
+    });
+
+    return () => {
+      disposed = true;
+      clearChannel();
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!(settings?.battle_sounds ?? true)) return;
     let disposed = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -166,7 +225,41 @@ function AppStack() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
       <UpdatePrompt />
       <GlobalAnnouncementOverlay />
-      {liveNotification ? (
+      {accountRestriction ? (
+        <View style={styles.accountBlocker}>
+          <View style={[styles.accountBlockerCard, { backgroundColor: colors.surface, borderColor: accountRestriction.account_status === 'banned' ? '#A84250' : '#D97732' }]}>
+            <View style={[styles.accountBlockerIcon, { backgroundColor: accountRestriction.account_status === 'banned' ? '#351A24' : '#3B2313' }]}>
+              <Text style={styles.accountBlockerEmoji}>{accountRestriction.account_status === 'banned' ? '⛔' : '⏳'}</Text>
+            </View>
+            <Text style={[styles.accountBlockerTitle, { color: colors.text }]}>
+              {accountRestriction.account_status === 'banned' ? 'Conta banida' : 'Conta suspensa'}
+            </Text>
+            <Text style={[styles.accountBlockerText, { color: colors.muted }]}>
+              {accountRestriction.account_status === 'banned'
+                ? 'Seu acesso ao jogo foi bloqueado pela moderação.'
+                : 'Seu acesso ao jogo está temporariamente suspenso.'}
+            </Text>
+            {accountRestriction.moderation_reason ? (
+              <View style={[styles.accountReason, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                <Text style={[styles.accountReasonLabel, { color: colors.muted }]}>MOTIVO</Text>
+                <Text style={[styles.accountReasonText, { color: colors.text }]}>{accountRestriction.moderation_reason}</Text>
+              </View>
+            ) : null}
+            {accountRestriction.account_status === 'suspended' && accountRestriction.suspended_until ? (
+              <Text style={[styles.accountUntil, { color: '#FFB16A' }]}>
+                Até {new Date(accountRestriction.suspended_until).toLocaleString('pt-BR')}
+              </Text>
+            ) : null}
+            <Pressable
+              onPress={() => { void supabase.auth.signOut(); }}
+              style={[styles.accountSignOut, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]}
+            >
+              <Text style={[styles.accountSignOutText, { color: colors.text }]}>SAIR DA CONTA</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+      {liveNotification && !accountRestriction ? (
         <View pointerEvents="box-none" style={[styles.liveNotificationHost, { top: Math.max(insets.top + 8, 14) }]}>
           <Pressable
             accessibilityRole="button"
@@ -197,6 +290,39 @@ export default function RootLayout() {
 
 
 const styles = StyleSheet.create({
+  accountBlocker: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5000,
+    backgroundColor: 'rgba(0,0,0,.82)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+  },
+  accountBlockerCard: {
+    width: '100%',
+    maxWidth: 430,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 22,
+    alignItems: 'center',
+  },
+  accountBlockerIcon: {
+    width: 66,
+    height: 66,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  accountBlockerEmoji: { fontSize: 30 },
+  accountBlockerTitle: { fontSize: 25, fontWeight: '900', textAlign: 'center' },
+  accountBlockerText: { fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
+  accountReason: { width: '100%', borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 15 },
+  accountReasonLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  accountReasonText: { fontSize: 12, lineHeight: 17, marginTop: 4 },
+  accountUntil: { fontSize: 11, fontWeight: '900', marginTop: 12 },
+  accountSignOut: { minHeight: 48, minWidth: 180, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 18, paddingHorizontal: 16 },
+  accountSignOutText: { fontSize: 9, fontWeight: '900', letterSpacing: .5 },
   liveNotificationHost: {
     position: 'absolute',
     left: 12,
