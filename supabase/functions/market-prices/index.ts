@@ -165,7 +165,7 @@ Deno.serve(async (req: Request) => {
       .limit(2000);
 
     if (ownedError) throw ownedError;
-    allowedIds = [...new Set((ownedRows ?? []).map((row: any) => row.card_id))].slice(0, 120);
+    allowedIds = [...new Set((ownedRows ?? []).map((row: any) => row.card_id))];
   } else {
     if (!requestedIds.length) return json({ data: { results: [], refreshed: 0 } });
 
