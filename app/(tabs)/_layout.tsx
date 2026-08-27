@@ -9,7 +9,7 @@ const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
   packs: 'cube',
   bag: 'albums',
   trade: 'swap-horizontal',
-  profile: 'person',
+  battles: 'game-controller',
 };
 
 export default function TabsLayout() {
@@ -82,7 +82,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="packs" options={{ title: 'Packs' }} />
       <Tabs.Screen name="bag" options={{ title: 'Bag' }} />
       <Tabs.Screen name="trade" options={{ title: 'Trocas' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
+      <Tabs.Screen name="battles" options={{ title: 'Batalhas' }} />
+      <Tabs.Screen name="profile" options={{ href: null }} />
     </Tabs>
   );
 }

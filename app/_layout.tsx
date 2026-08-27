@@ -11,6 +11,7 @@ import { playBattleSound } from '@/services/battleEffects';
 import { completeOAuthFromUrl, isOAuthCallbackUrl } from '@/services/auth';
 import { supabase } from '@/lib/supabase';
 import { WalletProvider } from '@/wallet/WalletProvider';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
@@ -112,5 +113,5 @@ function AppStack() {
 }
 
 export default function RootLayout() {
-  return <ThemeProvider><WalletProvider><AppStack /></WalletProvider></ThemeProvider>;
+  return <SafeAreaProvider><ThemeProvider><WalletProvider><AppStack /></WalletProvider></ThemeProvider></SafeAreaProvider>;
 }

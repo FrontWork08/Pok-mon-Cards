@@ -536,7 +536,7 @@ export default function AdminScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.marketTitle, { color: colors.text }]}>Tabela de valores fixa</Text>
                 <Text style={[styles.marketText, { color: colors.muted }]}>
-                  {overview.catalog.cardsWithUsdPrice.toLocaleString('pt-BR')} de {overview.catalog.cards.toLocaleString('pt-BR')} cards possuem valor em USD. Não existe atualização online de preço durante o jogo.
+                  {overview.catalog.cardsWithUsdPrice.toLocaleString('pt-BR')} de {overview.catalog.cards.toLocaleString('pt-BR')} cards possuem preço em USD. O catálogo está sendo revisado por set com o snapshot do TCGplayer.
                 </Text>
               </View>
             </View>

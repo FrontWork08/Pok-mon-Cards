@@ -5,17 +5,17 @@ import {
   Image,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
-import { CurrencyBar } from '@/components/CurrencyBar';
+import { TrainerNavigation } from '@/components/TrainerNavigation';
 import {
   getMyBagOverview,
   getMyBagPage,
@@ -142,18 +142,18 @@ export default function BagScreen() {
 
   const header = (
     <View style={styles.headerContent}>
+      <TrainerNavigation />
       <View style={styles.pageHeaderRow}>
         <View style={styles.pageHeader}>
           <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
           <Text style={[styles.title, { color: colors.text }]}>Pokémon Bag</Text>
           <Text style={[styles.subtitle, { color: colors.muted }]}>Coleção rápida, paginada e com carregamento sob demanda.</Text>
         </View>
-        <CurrencyBar compact />
       </View>
 
       <View style={[styles.summary, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
         <View style={styles.summaryMain}>
-          <Text style={[styles.summaryKicker, { color: colors.yellow }]}>VALOR FIXO DA COLEÇÃO</Text>
+          <Text style={[styles.summaryKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text>
           <Text style={[styles.summaryValue, { color: colors.yellow }]}>{formatUsd(overview?.collectionValueUsd)}</Text>
           <Text style={[styles.summaryLabel, { color: colors.muted }]}>{Number(overview?.totalCards ?? 0).toLocaleString('pt-BR')} cards • {Number(overview?.uniqueCards ?? 0).toLocaleString('pt-BR')} diferentes</Text>
         </View>

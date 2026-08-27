@@ -46,7 +46,7 @@ export default function CollectionRankingScreen() {
   return (
     <Screen
       title="Ranking de Coleções"
-      subtitle="Ranking global pelo valor fixo em USD das cartas de cada treinador."
+      subtitle="Ranking global pelo valor de mercado em USD das cartas de cada treinador."
     >
       <View style={styles.topRow}>
         <Pressable style={[styles.back, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.back()}>
@@ -67,9 +67,9 @@ export default function CollectionRankingScreen() {
       <View style={[styles.info, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Ionicons name="diamond-outline" size={23} color={colors.yellow} />
         <View style={{ flex: 1 }}>
-          <Text style={[styles.infoTitle, { color: colors.text }]}>Tabela fixa de valores</Text>
+          <Text style={[styles.infoTitle, { color: colors.text }]}>Preços TCGplayer</Text>
           <Text style={[styles.infoText, { color: colors.muted }]}>
-            Todas as cartas do catálogo atual já possuem um valor fixo em USD. O ranking não depende de API de preço e só muda quando as coleções dos jogadores mudam.
+            O ranking usa o snapshot mais recente dos preços de mercado do TCGplayer e é recalculado com todas as cópias das coleções.
           </Text>
         </View>
       </View>
@@ -105,7 +105,7 @@ export default function CollectionRankingScreen() {
                     @{row.username}{mine ? ' • VOCÊ' : ''}
                   </Text>
                   <Text style={[styles.coverage, { color: colors.muted }]}>
-                    {row.total_card_copies.toLocaleString('pt-BR')} cards • tabela fixa
+                    {row.total_card_copies.toLocaleString('pt-BR')} cards • mercado TCGplayer
                   </Text>
                 </View>
 

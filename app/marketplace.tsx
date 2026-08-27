@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CurrencyBar } from '@/components/CurrencyBar';
+import { TrainerNavigation } from '@/components/TrainerNavigation';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { getMyBagPage } from '@/services/bag';
@@ -101,7 +102,8 @@ export default function MarketplaceScreen() {
   }
 
   const header=<View style={styles.headerStack}>
-    <View style={styles.top}><View style={{flex:1,minWidth:220}}><Text style={[styles.eyebrow,{color:colors.yellow}]}>TRAINER MARKET</Text><Text style={[styles.pageTitle,{color:colors.text}]}>Mercado de Treinadores</Text><Text style={[styles.subtitle,{color:colors.muted}]}>Lojas ao vivo, cartas em custódia segura e pagamento em Coins.</Text></View><CurrencyBar compact/></View>
+    <TrainerNavigation/>
+    <View style={styles.top}><View style={{flex:1,minWidth:220}}><Text style={[styles.eyebrow,{color:colors.yellow}]}>TRAINER MARKET</Text><Text style={[styles.pageTitle,{color:colors.text}]}>Mercado de Treinadores</Text><Text style={[styles.subtitle,{color:colors.muted}]}>Lojas ao vivo, cartas em custódia segura e pagamento em Coins.</Text></View></View>
     <Pressable style={styles.back} onPress={()=>router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
     {notice?<View style={styles.notice}><Ionicons name="checkmark-circle" size={19} color="#65D894"/><Text style={styles.noticeText}>{notice}</Text><Pressable onPress={()=>setNotice(null)}><Ionicons name="close" size={18} color="#AEF0CC"/></Pressable></View>:null}
     {error?<Pressable style={styles.error} onPress={()=>setError(null)}><Ionicons name="alert-circle" size={19} color="#FF9FAF"/><Text style={styles.errorText}>{error}</Text></Pressable>:null}

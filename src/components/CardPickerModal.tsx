@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
-import { FlatList, Image, Modal, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { FlatList, Image, Modal, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { OwnedCardEntry } from '@/services/player';
 import { formatUsd } from '@/services/market';

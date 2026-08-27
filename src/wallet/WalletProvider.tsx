@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 
 type WalletState = {
   userId: string | null;
+  username: string | null;
+  profileIcon: string | null;
   coins: number;
   diamonds: number;
   loading: boolean;
@@ -13,6 +15,8 @@ const WalletContext = createContext<WalletState | null>(null);
 
 export function WalletProvider({ children }: PropsWithChildren) {
   const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const [profileIcon, setProfileIcon] = useState<string | null>(null);
   const [coins, setCoins] = useState(0);
   const [diamonds, setDiamonds] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -22,6 +26,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
     const id = auth.user?.id ?? null;
     setUserId(id);
     if (!id) {
+      setUsername(null);
+      setProfileIcon(null);
       setCoins(0);
       setDiamonds(0);
       setLoading(false);
@@ -29,10 +35,12 @@ export function WalletProvider({ children }: PropsWithChildren) {
     }
     const { data, error } = await supabase
       .from('players')
-      .select('coins,diamonds')
+      .select('username,profile_icon,coins,diamonds')
       .eq('id', id)
       .single();
     if (!error && data) {
+      setUsername(data.username ?? null);
+      setProfileIcon(data.profile_icon ?? null);
       setCoins(Number(data.coins ?? 0));
       setDiamonds(Number(data.diamonds ?? 0));
     }
@@ -55,7 +63,9 @@ export function WalletProvider({ children }: PropsWithChildren) {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${userId}` },
         (change) => {
-          const row = change.new as { coins?: number | string; diamonds?: number | string };
+          const row = change.new as { username?: string; profile_icon?: string; coins?: number | string; diamonds?: number | string };
+          if (row.username != null) setUsername(row.username);
+          if (row.profile_icon != null) setProfileIcon(row.profile_icon);
           if (row.coins != null) setCoins(Number(row.coins));
           if (row.diamonds != null) setDiamonds(Number(row.diamonds));
         },
@@ -65,8 +75,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
   }, [userId]);
 
   const value = useMemo(
-    () => ({ userId, coins, diamonds, loading, refresh }),
-    [userId, coins, diamonds, loading, refresh],
+    () => ({ userId, username, profileIcon, coins, diamonds, loading, refresh }),
+    [userId, username, profileIcon, coins, diamonds, loading, refresh],
   );
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 }

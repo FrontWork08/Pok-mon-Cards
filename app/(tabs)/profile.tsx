@@ -6,8 +6,7 @@ import { Screen } from '@/components/Screen';
 import { signOut } from '@/services/auth';
 import { getMyProfile, getMyProfileStats, type PlayerProfile } from '@/services/player';
 import { getMySocial } from '@/services/social';
-import { getUnreadConversationCount } from '@/services/notifications';
-import { formatUsd, isCurrentUserAdmin } from '@/services/market';
+import { formatUsd } from '@/services/market';
 import { changeUsername } from '@/services/playerActions';
 import { getTrainerRank } from '@/services/ranks';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -18,9 +17,6 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [friendCount, setFriendCount] = useState(0);
-  const [incomingCount, setIncomingCount] = useState(0);
-  const [unread, setUnread] = useState(0);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nicknameOpen, setNicknameOpen] = useState(false);
@@ -31,19 +27,14 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     try {
       setLoading(true); setError(null);
-      const [p, s, social, unreadCount, adminAccess] = await Promise.all([
+      const [p, s, social] = await Promise.all([
         getMyProfile(),
         getMyProfileStats(),
         getMySocial(),
-        getUnreadConversationCount().catch(() => 0),
-        isCurrentUserAdmin().catch(() => false),
       ]);
       setProfile(p);
       setStats(s);
       setFriendCount(social.friends.length);
-      setIncomingCount(social.incoming.length);
-      setUnread(unreadCount);
-      setIsAdmin(adminAccess);
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível atualizar seu perfil.'); }
     finally { setLoading(false); }
   }, []);
@@ -95,10 +86,10 @@ export default function ProfileScreen() {
     <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><TrainerAvatar icon={profile?.profile_icon} color={colors.accent} backgroundColor={colors.surfaceAlt} size={70}/><View style={styles.heroInfo}><Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER ID</Text><View style={styles.usernameRow}><Text style={[styles.rankSymbol, { color: colors.yellow }]}>{trainerRank.symbol}</Text><Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{profile?.username ?? '---'}</Text><Pressable accessibilityLabel="Alterar nickname" onPress={openNicknameEditor} style={[styles.editNameButton, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="pencil" size={14} color={colors.yellow} /></Pressable></View>{equippedDefinition ? <Text style={[styles.equippedTitle, { color: colors.yellow }]}>{equippedDefinition.icon} {equippedDefinition.title}</Text> : null}<Text style={[styles.meta, { color: colors.muted }]}>Nível {profile?.level ?? 1} • {xp.toLocaleString('pt-BR')} XP • {trainerRank.displayName} • ELO {profile?.battle_rating ?? 1000}</Text></View><View style={[styles.coinBox, { backgroundColor: colors.surface }]}><Text style={[styles.coinLabel, { color: colors.muted }]}>CARTEIRA</Text><Text style={[styles.coins, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text><Text style={[styles.coins, { color: '#68D9FF' }]}>💎 {Number(profile?.diamonds ?? 0).toLocaleString('pt-BR')}</Text></View></View>
 
     <View style={[styles.worthPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
-      <View style={styles.worthHeader}><View style={{ flex: 1 }}><Text style={[styles.worthKicker, { color: colors.yellow }]}>VALOR FIXO DA COLEÇÃO</Text><Text style={[styles.worthTotal, { color: colors.text }]}>{formatUsd(collectionMarketValueUsd)}</Text><Text style={[styles.worthHint, { color: colors.muted }]}>Tabela fixa em USD • não depende de preço online</Text></View><View style={[styles.worthIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="cash" size={26} color={colors.yellow} /></View></View>
+      <View style={styles.worthHeader}><View style={{ flex: 1 }}><Text style={[styles.worthKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text><Text style={[styles.worthTotal, { color: colors.text }]}>{formatUsd(collectionMarketValueUsd)}</Text><Text style={[styles.worthHint, { color: colors.muted }]}>Snapshot dos preços TCGplayer em USD</Text></View><View style={[styles.worthIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="cash" size={26} color={colors.yellow} /></View></View>
       <View style={[styles.worthDivider, { backgroundColor: colors.border }]} />
-      <View style={styles.worthBreakdown}><WorthMetric label="COLEÇÃO EM USD" valueText={formatUsd(collectionMarketValueUsd)} /><WorthMetric label="SALDO DO JOGO" valueText={`🪙 ${coins.toLocaleString('pt-BR')}`} /><WorthMetric label="CARD MAIS CARO" valueText={topCard?.pokemon_name ?? '—'} subtext={topCard?.market_price_usd != null ? formatUsd(Number(topCard.market_price_usd)) : 'Valor fixo indisponível'} /></View>
-      {topCard ? <Pressable style={[styles.topCardRow, { backgroundColor: colors.surfaceAlt }]} onPress={() => router.push(`/card/${topCard.id}`)}>{topCard.image_small ? <Image source={{ uri: topCard.image_small }} resizeMode="contain" style={styles.topCardImage} /> : <View style={styles.topCardImage} />}<View style={{ flex: 1 }}><Text style={[styles.topCardLabel, { color: colors.muted }]}>CARD DE MAIOR VALOR FIXO</Text><Text style={[styles.topCardName, { color: colors.text }]}>{topCard.pokemon_name}</Text><Text style={[styles.topCardMeta, { color: colors.muted }]}>{topCard.rarity ?? 'Sem raridade'}</Text></View><Text style={[styles.topCardValue, { color: colors.yellow }]}>{topCard.market_price_usd != null ? formatUsd(Number(topCard.market_price_usd)) : '—'}</Text><Ionicons name="chevron-forward" size={18} color={colors.muted} /></Pressable> : null}
+      <View style={styles.worthBreakdown}><WorthMetric label="COLEÇÃO EM USD" valueText={formatUsd(collectionMarketValueUsd)} /><WorthMetric label="SALDO DO JOGO" valueText={`🪙 ${coins.toLocaleString('pt-BR')}`} /><WorthMetric label="CARD MAIS CARO" valueText={topCard?.pokemon_name ?? '—'} subtext={topCard?.market_price_usd != null ? formatUsd(Number(topCard.market_price_usd)) : 'Preço indisponível'} /></View>
+      {topCard ? <Pressable style={[styles.topCardRow, { backgroundColor: colors.surfaceAlt }]} onPress={() => router.push(`/card/${topCard.id}`)}>{topCard.image_small ? <Image source={{ uri: topCard.image_small }} resizeMode="contain" style={styles.topCardImage} /> : <View style={styles.topCardImage} />}<View style={{ flex: 1 }}><Text style={[styles.topCardLabel, { color: colors.muted }]}>CARD DE MAIOR VALOR DE MERCADO</Text><Text style={[styles.topCardName, { color: colors.text }]}>{topCard.pokemon_name}</Text><Text style={[styles.topCardMeta, { color: colors.muted }]}>{topCard.rarity ?? 'Sem raridade'}</Text></View><Text style={[styles.topCardValue, { color: colors.yellow }]}>{topCard.market_price_usd != null ? formatUsd(Number(topCard.market_price_usd)) : '—'}</Text><Ionicons name="chevron-forward" size={18} color={colors.muted} /></Pressable> : null}
     </View>
 
     <View style={[styles.rankPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.rankPanelTop}><View><Text style={[styles.kicker, { color: colors.yellow }]}>RANK DE TREINADOR</Text><Text style={[styles.rankName, { color: colors.text }]}>{trainerRank.symbol} {trainerRank.displayName}</Text></View><Text style={[styles.rankPoints, { color: colors.yellow }]}>{profile?.battle_rating ?? 1000} ELO</Text></View><View style={[styles.track, { backgroundColor: colors.surfaceAlt }]}><View style={[styles.fill, { width: `${trainerRank.progress}%`, backgroundColor: colors.accent }]} /></View><Text style={[styles.progressHint, { color: colors.muted }]}>{trainerRank.nextAt ? `Faltam ${Math.max(0, trainerRank.nextAt - Number(profile?.battle_rating ?? 0))} pontos para a próxima divisão.` : 'Você alcançou a divisão máxima do Grand Trainer.'}</Text></View>
@@ -106,21 +97,7 @@ export default function ProfileScreen() {
     <View style={styles.statsGrid}><Stat icon="albums" value={stats?.totalCards ?? 0} label="Cards" /><Stat icon="paw" value={stats?.species ?? 0} label="Pokédex" /><Stat icon="cube" value={stats?.packsOpened ?? 0} label="Packs" /><Stat icon="swap-horizontal" value={stats?.completedTrades ?? 0} label="Trocas" /><Stat icon="trophy" value={profile?.battle_wins ?? 0} label="Vitórias" /><Stat icon="people" value={friendCount} label="Amigos" /></View>
 
     <View style={styles.featureGrid}>
-      <FeatureLink icon="mail-unread" color={colors.accent} title="Inbox" text={unread ? `${unread} mensagem(ns) não lida(s) • convites e avisos` : 'Mensagens, convites de batalha e notificações.'} onPress={() => router.push('/inbox')} badge={unread || undefined} />
-      <FeatureLink icon="ribbon" color="#D5A7FF" title="Conquistas e Títulos" text="Veja seu progresso, desbloqueie títulos e escolha qual exibir no perfil." onPress={() => router.push('/achievements')} />
-      <FeatureLink icon="game-controller" color="#FF9D4A" title="Battle Center" text={`ELO ${profile?.battle_rating ?? 1000} • ${profile?.battle_wins ?? 0} vitórias • ranking e revanche`} onPress={() => router.push('/battles')} />
-      <FeatureLink icon="podium" color={colors.yellow} title="Ranking de Coleções" text="Ranking global das contas pelo valor fixo das cartas em USD." onPress={() => router.push('/collection-ranking')} />
-      <FeatureLink icon="shield" color="#8B5CF6" title="Guildas Pokémon" text="Kanto, Johto, Hoenn e Sinnoh • missões, cargos e ranking coletivo." onPress={() => router.push('/guilds')} />
-      <FeatureLink icon="storefront" color="#63D6A8" title="Mercado de Treinadores" text="Crie sua loja, anuncie várias cartas e compre em tempo real com Coins." onPress={() => router.push('/marketplace')} />
-      <FeatureLink icon="ticket" color="#68D9FF" title="Resgatar Código" text="Use códigos de recompensa uma única vez por conta." onPress={() => router.push('/codes')} />
-      <FeatureLink icon="people" color={colors.blue} title="Amigos, Chat e Batalhas" text={friendCount + ' amigos' + (incomingCount ? ` • ${incomingCount} solicitação aguardando` : ' • converse e envie desafios')} onPress={() => router.push('/friends')} badge={incomingCount || undefined} />
-      <FeatureLink icon="albums" color="#9B7BFF" title="Meus Decks" text="Monte equipes e deixe um deck principal pronto para Mystery Battle." onPress={() => router.push('/decks')} />
-      <FeatureLink icon="gift" color="#65D894" title="Missões Diárias" text="Ganhe moedas e XP abrindo packs e participando de batalhas." onPress={() => router.push('/missions')} />
-      <FeatureLink icon="book" color={colors.yellow} title="Pokédex" text="Veja as 1.025 espécies e suas versões de cards descobertas." onPress={() => router.push('/pokedex')} />
-      <FeatureLink icon="layers" color="#65D894" title="Coleções por Set" text="Acompanhe cards faltantes e porcentagem de cada coleção." onPress={() => router.push('/sets')} />
-      <FeatureLink icon="time" color="#B26CFF" title="Histórico de Packs" text={`${stats?.packsOpened ?? 0} boosters abertos • reveja seus melhores pulls.`} onPress={() => router.push('/history')} />
       <FeatureLink icon="color-palette" color={colors.accent} title="Personalização" text="Modo claro/escuro, temas, push, som e vibração." onPress={() => router.push('/settings')} />
-      {isAdmin ? <FeatureLink icon="shield-checkmark" color="#FF5CCF" title="Admin Center" text="Economia, amigos, preços, métricas e status privado do sistema." onPress={() => router.push('/admin')} /> : null}
     </View>
 
     <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.progressTop}><Text style={[styles.progressTitle, { color: colors.text }]}>Progresso do nível</Text><Text style={[styles.progressValue, { color: colors.muted }]}>{levelXp} / 250 XP</Text></View><View style={[styles.track, { backgroundColor: colors.surfaceAlt }]}><View style={[styles.fill, { width: `${Math.min(100, levelXp / 2.5)}%`, backgroundColor: colors.yellow }]} /></View><Text style={[styles.progressHint, { color: colors.muted }]}>Packs dão XP; batalhas dão XP extra e avançam missões.</Text></View>

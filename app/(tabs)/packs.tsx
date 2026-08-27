@@ -4,20 +4,20 @@ import {
   FlatList,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PackContentsModal } from '@/components/PackContentsModal';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
 import { PremiumBackground } from '@/components/PremiumBackground';
-import { CurrencyBar } from '@/components/CurrencyBar';
+import { TrainerNavigation } from '@/components/TrainerNavigation';
 import {
   getFavoritePackIds,
   getLegendaryPackConfig,
@@ -220,6 +220,7 @@ export default function PacksScreen() {
 
   const header = (
     <View style={styles.headerStack}>
+      <TrainerNavigation />
       <View style={styles.headerTop}>
         <View style={styles.header}>
           <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
@@ -228,7 +229,6 @@ export default function PacksScreen() {
             Boosters físicos, favoritos e conteúdo do set sem carregar a loja inteira na memória.
           </Text>
         </View>
-        <CurrencyBar compact />
       </View>
 
       <View style={[styles.balanceRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>

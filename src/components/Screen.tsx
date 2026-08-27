@@ -1,27 +1,31 @@
 import { PropsWithChildren } from 'react';
-import { Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { useAppTheme } from '@/theme/ThemeProvider';
-import { CurrencyBar } from '@/components/CurrencyBar';
+import { TrainerNavigation } from '@/components/TrainerNavigation';
 
 export function Screen({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle?: string }>) {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, Platform.OS !== 'web' && styles.contentMobile]}
+        contentContainerStyle={[
+          styles.content,
+          Platform.OS !== 'web' && styles.contentMobile,
+          { paddingTop: Platform.OS === 'web' ? 12 : Math.max(insets.top, 10) },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.inner}>
-          <View style={styles.headerRow}>
-            <View style={styles.header}>
-              <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-              <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-              {subtitle ? <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text> : null}
-            </View>
-            <CurrencyBar compact />
+          <TrainerNavigation />
+          <View style={styles.header}>
+            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+            {subtitle ? <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text> : null}
           </View>
           {children}
         </View>
@@ -36,8 +40,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 118 },
   contentMobile: { paddingBottom: 28 },
   inner: { width: '100%', maxWidth: 1280, alignSelf: 'center', gap: 16 },
-  headerRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 4 },
-  header: { flex: 1, minWidth: 230, gap: 5 },
+  header: { width: '100%', gap: 5, marginBottom: 4 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { fontSize: 15, lineHeight: 21 },

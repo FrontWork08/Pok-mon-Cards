@@ -57,7 +57,7 @@ export default function PlayerShowcaseScreen() {
         </View>
 
         <View style={[styles.valuePanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
-          <View style={{ flex: 1 }}><Text style={[styles.valueKicker, { color: colors.yellow }]}>VALOR TOTAL DA CONTA</Text><Text style={[styles.value, { color: colors.text }]}>{formatUsd(collection.totalValueUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>Soma do valor fixo de todas as cópias da coleção</Text></View>
+          <View style={{ flex: 1 }}><Text style={[styles.valueKicker, { color: colors.yellow }]}>VALOR TOTAL DA CONTA</Text><Text style={[styles.value, { color: colors.text }]}>{formatUsd(collection.totalValueUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>Soma do preço TCGplayer de todas as cópias da coleção</Text></View>
           <View style={[styles.valueIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="diamond" size={27} color={colors.yellow} /></View>
         </View>
 
