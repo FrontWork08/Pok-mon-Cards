@@ -23,6 +23,16 @@ export type OpenedCard = {
   name: string;
   rarity: string | null;
   image: string | null;
+  imageLarge?: string | null;
+  imageSmall?: string | null;
+};
+
+export type PackCardPreview = {
+  id: string;
+  name: string;
+  rarity: string | null;
+  image: string | null;
+  market_price_usd: number | null;
 };
 
 export async function listPacks(): Promise<Pack[]> {
@@ -56,4 +66,67 @@ export async function openPack(packId: string) {
   if (error) throw await normalizeFunctionError(error, 'Não foi possível abrir este booster.');
   if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível abrir este booster.');
   return data as { openingId: string; cards: OpenedCard[] };
+}
+
+
+export async function getFavoritePackIds() {
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return [] as string[];
+
+  const { data, error } = await supabase
+    .from('player_favorite_packs')
+    .select('pack_id')
+    .eq('player_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map((row: any) => String(row.pack_id));
+}
+
+export async function setPackFavorite(packId: string, favorite: boolean) {
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) throw new Error('Sessão não encontrada.');
+
+  if (favorite) {
+    const { error } = await supabase
+      .from('player_favorite_packs')
+      .upsert({ player_id: userId, pack_id: packId }, { onConflict: 'player_id,pack_id' });
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase
+    .from('player_favorite_packs')
+    .delete()
+    .eq('player_id', userId)
+    .eq('pack_id', packId);
+
+  if (error) throw error;
+}
+
+export async function listPackCards(setId: string, page = 0, pageSize = 36) {
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await supabase
+    .from('cards')
+    .select('id,pokemon_name,rarity,image_small,image_large,market_price_usd', { count: 'exact' })
+    .eq('set_id', setId)
+    .order('card_number', { ascending: true })
+    .range(from, to);
+
+  if (error) throw error;
+
+  return {
+    total: count ?? 0,
+    cards: (data ?? []).map((card: any) => ({
+      id: card.id,
+      name: card.pokemon_name,
+      rarity: card.rarity,
+      image: card.image_small ?? card.image_large ?? null,
+      market_price_usd: card.market_price_usd == null ? null : Number(card.market_price_usd),
+    })) as PackCardPreview[],
+  };
 }
