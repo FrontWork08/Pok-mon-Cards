@@ -1,0 +1,2 @@
+-- Ensures a set is marked checked even when the upstream source has no pricing,
+-- so later sets can continue through the refresh queue. Applied in production.
