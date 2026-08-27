@@ -30,7 +30,7 @@ export async function getMyTrades() {
       receiver_confirmed,
       created_at,
       updated_at,
-      trade_cards(owner_id, card_id, quantity, cards(pokemon_name, image_small, rarity, game_value))
+      trade_cards(owner_id, card_id, quantity, cards(pokemon_name, image_small, rarity, game_value, market_price_usd, market_price_variant))
     `)
     .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
     .order('updated_at', { ascending: false });
@@ -51,7 +51,7 @@ export async function getTrade(tradeId: string) {
       receiver_confirmed,
       created_at,
       updated_at,
-      trade_cards(owner_id, card_id, quantity, cards(id, pokemon_name, image_small, image_large, rarity, set_name, game_value))
+      trade_cards(owner_id, card_id, quantity, cards(id, pokemon_name, image_small, image_large, rarity, set_name, game_value, market_price_usd, market_price_variant))
     `)
     .eq('id', tradeId)
     .single();
