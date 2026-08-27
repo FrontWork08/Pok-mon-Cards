@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { CardPickerModal } from '@/components/CardPickerModal';
@@ -30,6 +30,8 @@ export default function TradeBuilderScreen() {
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<'connecting' | 'live' | 'fallback'>('connecting');
+  const syncingRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -64,10 +66,19 @@ export default function TradeBuilderScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const refreshTrade = useCallback(async () => {
-    if (!id) return;
+    if (!id || syncingRef.current) return;
+    syncingRef.current = true;
     try {
       const tradeData = await getTrade(String(id));
-      setTrade(tradeData);
+      setTrade((current: any) => {
+        if (
+          current?.status !== 'completed' &&
+          tradeData.status === 'completed'
+        ) {
+          setNotice('Troca concluída! As Bags dos dois treinadores já foram atualizadas.');
+        }
+        return tradeData;
+      });
 
       const uid = userId || (await supabase.auth.getUser()).data.user?.id || '';
       if (uid) {
@@ -79,22 +90,33 @@ export default function TradeBuilderScreen() {
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível sincronizar a troca.');
+    } finally {
+      syncingRef.current = false;
     }
   }, [id, userId]);
 
   useEffect(() => {
     if (!id) return;
 
-    const unsubscribe = subscribeToTrade(String(id), () => {
-      refreshTrade();
-    });
+    const unsubscribe = subscribeToTrade(
+      String(id),
+      () => refreshTrade(),
+      setSyncStatus,
+    );
 
+    // Near-real-time fallback while the negotiation is open.
+    // This keeps both phones synced even if the websocket drops on mobile data.
     const timer = setInterval(() => {
       if (trade?.status === 'pending') refreshTrade();
-    }, 3000);
+    }, 900);
+
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshTrade();
+    });
 
     return () => {
       clearInterval(timer);
+      appStateSubscription.remove();
       unsubscribe();
     };
   }, [id, refreshTrade, trade?.status]);
@@ -128,6 +150,15 @@ export default function TradeBuilderScreen() {
       setPickerOpen(false);
       setNotice('Oferta salva e sincronizada. Se alguém já tinha confirmado, a confirmação foi reiniciada porque a oferta mudou.');
       await refreshTrade();
+      if (result?.status !== 'completed') {
+        // For a few seconds after confirming, check faster for the other side.
+        // It makes the completed state appear immediately even on unstable mobile networks.
+        const startedAt = Date.now();
+        const fastSync = setInterval(() => {
+          refreshTrade();
+          if (Date.now() - startedAt > 10000) clearInterval(fastSync);
+        }, 450);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível salvar a oferta.');
     } finally {
@@ -178,7 +209,16 @@ export default function TradeBuilderScreen() {
       <ScrollView contentContainerStyle={[styles.content, pending && styles.contentWithDock]} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.back()}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable>
-          <View style={styles.topInfo}><Text style={[styles.kicker, { color: colors.yellow }]}>NEGOCIAÇÃO SEGURA</Text><Text style={[styles.title, { color: colors.text }]}>Troca #{String(id).slice(0, 8)}</Text></View>
+          <View style={styles.topInfo}>
+            <Text style={[styles.kicker, { color: colors.yellow }]}>NEGOCIAÇÃO SEGURA</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Troca #{String(id).slice(0, 8)}</Text>
+            <View style={styles.liveRow}>
+              <View style={[styles.liveDot, { backgroundColor: syncStatus === 'live' ? '#65D894' : syncStatus === 'fallback' ? '#FFC857' : colors.muted }]} />
+              <Text style={[styles.liveText, { color: colors.muted }]}>
+                {syncStatus === 'live' ? 'SINCRONIZAÇÃO AO VIVO' : syncStatus === 'fallback' ? 'SINCRONIZAÇÃO AUTOMÁTICA' : 'CONECTANDO...'}
+              </Text>
+            </View>
+          </View>
           <View style={[styles.statusBadge, { backgroundColor: completed ? '#173C2C' : colors.surfaceAlt }]}><Text style={[styles.statusText, { color: completed ? '#70D69D' : colors.muted }]}>{completed ? 'CONCLUÍDA' : String(trade?.status ?? '').toUpperCase()}</Text></View>
         </View>
 
@@ -281,7 +321,7 @@ function OfferPanel({ title, cards, ownerEmpty }: { title: string; cards: any[];
 const styles = StyleSheet.create({
   safe: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { width: '100%', maxWidth: 1180, alignSelf: 'center', padding: 16, paddingBottom: 42, gap: 13 }, contentWithDock: { paddingBottom: 120 },
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 11 }, backButton: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, topInfo: { flex: 1 }, kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 }, title: { fontSize: 22, fontWeight: '900', marginTop: 2 }, statusBadge: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999 }, statusText: { fontSize: 9, fontWeight: '900' },
+  topBar: { flexDirection: 'row', alignItems: 'center', gap: 11 }, backButton: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, topInfo: { flex: 1 }, kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 }, title: { fontSize: 22, fontWeight: '900', marginTop: 2 }, liveRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }, liveDot: { width: 7, height: 7, borderRadius: 99 }, liveText: { fontSize: 7, fontWeight: '900', letterSpacing: .7 }, statusBadge: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999 }, statusText: { fontSize: 9, fontWeight: '900' },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, borderRadius: 15, borderWidth: 1 }, noticeText: { flex: 1, fontWeight: '700', fontSize: 11 },
   participants: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 14, borderRadius: 20, borderWidth: 1 }, participant: { flexGrow: 1, flexBasis: 240, flexDirection: 'row', alignItems: 'center', gap: 10 }, avatar: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, avatarText: { fontSize: 18, fontWeight: '900' }, participantLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 }, participantName: { fontSize: 14, fontWeight: '900', marginTop: 2 }, confirmState: { fontSize: 9, marginTop: 2, fontWeight: '700' }, swapCircle: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   editOffer: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 20, borderWidth: 1, padding: 14 }, editIcon: { width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, editTitle: { fontSize: 18, fontWeight: '900', marginTop: 2 }, editMeta: { fontSize: 10, marginTop: 3 },
