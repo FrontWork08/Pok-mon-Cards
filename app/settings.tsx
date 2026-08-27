@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -5,6 +6,8 @@ import { Screen } from '@/components/Screen';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import type { AppearanceMode, ThemeName } from '@/services/settings';
 import { registerPushNotifications } from '@/services/notifications';
+import { getMyProfile } from '@/services/player';
+import { setRatingVisibility } from '@/services/achievements';
 
 const themes: Array<{ id: ThemeName; name: string; icon: keyof typeof Ionicons.glyphMap; colors: string[] }> = [
   { id:'trainer', name:'Trainer', icon:'shield', colors:['#4D8DFF','#FFD54A'] },
@@ -19,9 +22,16 @@ const themes: Array<{ id: ThemeName; name: string; icon: keyof typeof Ionicons.g
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors, appearance, themeName, settings, updatePreferences } = useAppTheme();
+  const [showRating, setShowRating] = useState(true);
+  useEffect(() => { getMyProfile().then((profile) => setShowRating(profile.show_battle_rating)).catch(() => null); }, []);
   const modes: Array<{ id: AppearanceMode; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
     { id:'system', label:'Sistema', icon:'phone-portrait' }, { id:'dark', label:'Escuro', icon:'moon' }, { id:'light', label:'Claro', icon:'sunny' },
   ];
+
+  async function toggleRating(value:boolean){
+    const previous=showRating;setShowRating(value);
+    try{await setRatingVisibility(value);}catch{setShowRating(previous);}
+  }
 
   async function togglePush(value:boolean){
     await updatePreferences({push_notifications:value});
@@ -46,6 +56,7 @@ export default function SettingsScreen() {
         <Text style={[styles.kicker,{color:colors.yellow}]}>SOCIAL</Text><Text style={[styles.title,{color:colors.text}]}>Chat e batalhas</Text>
         <SettingToggle title="Notificações do chat" text="Avisar quando um amigo enviar mensagem." value={settings?.chat_notifications ?? true} onChange={(value)=>updatePreferences({chat_notifications:value})} colors={colors}/>
         <SettingToggle title="Push no celular" text="Receber mensagens, convites e resultados mesmo com o app fechado." value={settings?.push_notifications ?? true} onChange={togglePush} colors={colors}/>
+        <SettingToggle title="Exibir meu ELO" text="Mostrar pontos e símbolo do rank para outros treinadores no perfil e ranking." value={showRating} onChange={toggleRating} colors={colors}/>
         <SettingToggle title="Convites de batalha" text="Permitir que amigos enviem desafios pelo chat." value={settings?.battle_invites ?? true} onChange={(value)=>updatePreferences({battle_invites:value})} colors={colors}/>
         <SettingToggle title="Som nas batalhas" text="Usar efeitos sonoros nas revelações e resultados." value={settings?.battle_sounds ?? true} onChange={(value)=>updatePreferences({battle_sounds:value})} colors={colors}/>
         <SettingToggle title="Vibração nas batalhas" text="Vibrar ao travar, revelar e concluir uma partida." value={settings?.battle_vibration ?? true} onChange={(value)=>updatePreferences({battle_vibration:value})} colors={colors}/>
