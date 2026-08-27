@@ -20,6 +20,7 @@ import {
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMySocial, type SocialPlayer } from '@/services/social';
+import { getMyProfile } from '@/services/player';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const QUICK_AMOUNTS = [1000, 5000, 10000, 50000, 100000];
@@ -29,6 +30,7 @@ export default function AdminScreen() {
   const { colors } = useAppTheme();
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [friends, setFriends] = useState<SocialPlayer[]>([]);
+  const [selfId, setSelfId] = useState('');
   const [history, setHistory] = useState<CoinGrantHistory[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<SocialPlayer | null>(null);
   const [amount, setAmount] = useState('10000');
@@ -42,15 +44,18 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [status, social, grants] = await Promise.all([
+      const [status, social, grants, self] = await Promise.all([
         getAdminOverview(),
         getMySocial(),
         getCoinGrantHistory(),
+        getMyProfile(),
       ]);
+      const recipients: SocialPlayer[] = [{ id: self.id, username: self.username, level: self.level }, ...social.friends];
       setOverview(status);
-      setFriends(social.friends);
+      setFriends(recipients);
+      setSelfId(self.id);
       setHistory(grants);
-      setSelectedFriend((current) => current ?? social.friends[0] ?? null);
+      setSelectedFriend((current) => current && recipients.some((player) => player.id === current.id) ? current : recipients[0] ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
     } finally {
@@ -193,12 +198,12 @@ export default function AdminScreen() {
             </View>
           </View>
 
-          <SectionTitle title="Adicionar moedas a um amigo" />
+          <SectionTitle title="Adicionar moedas" />
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.fieldLabel, { color: colors.muted }]}>ESCOLHA O AMIGO</Text>
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>ESCOLHA O JOGADOR</Text>
             <View style={styles.friendChips}>
               {friends.length === 0 ? (
-                <Text style={[styles.emptyText, { color: colors.muted }]}>Você ainda não possui amigos adicionados.</Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>Nenhum jogador disponível.</Text>
               ) : friends.map((friend) => {
                 const active = selectedFriend?.id === friend.id;
                 return (
@@ -213,7 +218,7 @@ export default function AdminScreen() {
                       },
                     ]}
                   >
-                    <Text style={[styles.friendChipText, { color: colors.text }]}>@{friend.username}</Text>
+                    <Text style={[styles.friendChipText, { color: colors.text }]}>@{friend.username}{friend.id === selfId ? ' (você)' : ''}</Text>
                   </Pressable>
                 );
               })}
