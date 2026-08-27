@@ -5,8 +5,20 @@ import type { OwnedCardEntry } from '@/services/player';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
-type SortMode = 'value' | 'name' | 'quantity' | 'recent';
+type SortMode = 'value' | 'battle' | 'name' | 'quantity' | 'recent';
 type QuantityMap = Record<string, number>;
+
+export function getBattleCardPreview(card: OwnedCardEntry['cards']) {
+  const data = card?.tcg_data as any;
+  const parsedHp = Number(String(data?.hp ?? '').replace(/[^0-9]/g, ''));
+  const hp = Number.isFinite(parsedHp) && parsedHp > 0 ? parsedHp : 50;
+  const attacks = Array.isArray(data?.attacks) ? data.attacks : [];
+  const maxDamage = attacks.reduce((best: number, attack: any) => {
+    const match = String(attack?.damage ?? '').match(/[0-9]+/);
+    return Math.max(best, match ? Number(match[0]) : 0);
+  }, 0);
+  return { hp, maxDamage, score: hp + maxDamage };
+}
 
 type Props = {
   visible: boolean;
@@ -17,6 +29,7 @@ type Props = {
   selectedId?: string | null;
   selectedMap?: QuantityMap;
   maxPerCard?: number;
+  displayMode?: 'market' | 'battle';
   onSelectedIdChange?: (id: string | null) => void;
   onSelectedMapChange?: (value: QuantityMap) => void;
   onClose: () => void;
@@ -34,6 +47,7 @@ export function CardPickerModal({
   selectedId = null,
   selectedMap = {},
   maxPerCard,
+  displayMode = 'market',
   onSelectedIdChange,
   onSelectedMapChange,
   onClose,
@@ -45,7 +59,7 @@ export function CardPickerModal({
   const { width } = useWindowDimensions();
   const columns = width >= 1000 ? 4 : width >= 680 ? 3 : 2;
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortMode>('value');
+  const [sort, setSort] = useState<SortMode>(displayMode === 'battle' ? 'battle' : 'value');
 
   const visibleCards = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -59,6 +73,7 @@ export function CardPickerModal({
         || String(card.card_number ?? '').toLowerCase().includes(term);
     });
     return [...filtered].sort((a, b) => {
+      if (sort === 'battle') return getBattleCardPreview(b.cards).score - getBattleCardPreview(a.cards).score;
       if (sort === 'value') return Number(b.cards?.market_price_usd ?? -1) - Number(a.cards?.market_price_usd ?? -1);
       if (sort === 'name') return String(a.cards?.pokemon_name ?? '').localeCompare(String(b.cards?.pokemon_name ?? ''));
       if (sort === 'quantity') return Number(b.quantity ?? 0) - Number(a.quantity ?? 0);
@@ -68,12 +83,13 @@ export function CardPickerModal({
 
   const selectedCount = mode === 'single' ? (selectedId ? 1 : 0) : Object.values(selectedMap).reduce((sum, value) => sum + value, 0);
   const selectedValue = useMemo(() => {
+    if (displayMode === 'battle') return 0;
     if (mode === 'single') {
       const entry = bag.find((item) => item.cards?.id === selectedId);
       return Number(entry?.cards?.market_price_usd ?? 0);
     }
     return bag.reduce((sum, entry) => sum + Number(entry.cards?.market_price_usd ?? 0) * Number(selectedMap[entry.cards?.id ?? ''] ?? 0), 0);
-  }, [bag, mode, selectedId, selectedMap]);
+  }, [bag, displayMode, mode, selectedId, selectedMap]);
 
   function selectSingle(entry: OwnedCardEntry) {
     const id = entry.cards?.id;
@@ -119,7 +135,9 @@ export function CardPickerModal({
             {search ? <Pressable onPress={() => setSearch('')}><Ionicons name="close-circle" size={19} color={colors.muted} /></Pressable> : null}
           </View>
           <View style={styles.sortRow}>
-            <SortChip label="Mais caras" active={sort === 'value'} onPress={() => setSort('value')} />
+            {displayMode === 'battle'
+              ? <SortChip label="Atributos de combate" active={sort === 'battle'} onPress={() => setSort('battle')} />
+              : <SortChip label="Mais caras" active={sort === 'value'} onPress={() => setSort('value')} />}
             <SortChip label="A–Z" active={sort === 'name'} onPress={() => setSort('name')} />
             <SortChip label="Quantidade" active={sort === 'quantity'} onPress={() => setSort('quantity')} />
             <SortChip label="Recentes" active={sort === 'recent'} onPress={() => setSort('recent')} />
@@ -146,6 +164,7 @@ export function CardPickerModal({
               mode={mode}
               selected={mode === 'single' ? selectedId === item.cards?.id : Number(selectedMap[item.cards?.id ?? ''] ?? 0) > 0}
               quantity={Number(selectedMap[item.cards?.id ?? ''] ?? 0)}
+              displayMode={displayMode}
               onPress={() => selectSingle(item)}
               onMinus={() => changeQuantity(item, -1)}
               onPlus={() => changeQuantity(item, 1)}
@@ -157,7 +176,7 @@ export function CardPickerModal({
         <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <View style={styles.footerInfo}>
             <Text style={[styles.footerLabel, { color: colors.muted }]}>{mode === 'single' ? 'SELEÇÃO' : 'CARTAS SELECIONADAS'}</Text>
-            <Text style={[styles.footerValue, { color: colors.text }]}>{selectedCount} • {formatUsd(selectedValue)}</Text>
+            <Text style={[styles.footerValue, { color: colors.text }]}>{selectedCount} • {displayMode === 'battle' ? 'preço não conta' : formatUsd(selectedValue)}</Text>
           </View>
           <Pressable
             style={[styles.confirm, { backgroundColor: colors.yellow }, selectedCount === 0 && styles.disabled]}
@@ -173,11 +192,12 @@ export function CardPickerModal({
   );
 }
 
-const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, onPress, onMinus, onPlus }: {
+const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, displayMode, onPress, onMinus, onPlus }: {
   entry: OwnedCardEntry;
   mode: 'single' | 'quantity';
   selected: boolean;
   quantity: number;
+  displayMode: 'market' | 'battle';
   onPress: () => void;
   onMinus: () => void;
   onPlus: () => void;
@@ -185,6 +205,7 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, o
   const { colors } = useAppTheme();
   const card = entry.cards;
   if (!card) return null;
+  const combat = getBattleCardPreview(card);
   return (
     <Pressable
       style={[styles.card, { backgroundColor: colors.surface, borderColor: selected ? colors.yellow : colors.border }]}
@@ -192,11 +213,11 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, o
     >
       <View style={[styles.imageWrap, { backgroundColor: colors.surfaceAlt }]}>
         {card.image_small ? <Image source={{ uri: card.image_small }} style={styles.image} resizeMode="contain" /> : <Ionicons name="image-outline" size={30} color={colors.muted} />}
-        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
+        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{displayMode === 'battle' ? `HP ${combat.hp}` : card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
         {selected && mode === 'single' ? <View style={[styles.checkBadge, { backgroundColor: colors.yellow }]}><Ionicons name="checkmark" size={17} color="#07111F" /></View> : null}
       </View>
       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.pokemon_name}</Text>
-      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{card.rarity ?? 'Sem raridade'} • Bag ×{entry.quantity}</Text>
+      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `Dano máx. ${combat.maxDamage} • Bag ×${entry.quantity}` : `${card.rarity ?? 'Sem raridade'} • Bag ×${entry.quantity}`}</Text>
       {mode === 'quantity' ? (
         <View style={styles.qtyRow}>
           <Pressable style={[styles.qtyButton, { backgroundColor: colors.surfaceAlt }]} onPress={onMinus}><Text style={[styles.qtySign, { color: colors.text }]}>−</Text></Pressable>
