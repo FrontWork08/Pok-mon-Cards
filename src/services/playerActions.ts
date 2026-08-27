@@ -20,6 +20,9 @@ async function invokePlayerAction(body: Record<string, unknown>) {
     if (message.includes('CARD_NOT_OWNED')) throw new Error('Este card não está mais na sua Bag.');
     if (message.includes('CANNOT_FRIEND_SELF')) throw new Error('Você não pode adicionar a si mesmo.');
     if (message.includes('FRIEND_REQUEST_NOT_FOUND')) throw new Error('Essa solicitação de amizade não existe mais.');
+    if (message.includes('USERNAME_TAKEN')) throw new Error('Esse nickname já está sendo usado por outro treinador.');
+    if (message.includes('USERNAME_LENGTH')) throw new Error('O nickname precisa ter entre 3 e 24 caracteres.');
+    if (message.includes('USERNAME_INVALID')) throw new Error('Esse nickname contém caracteres inválidos.');
     throw new Error(message);
   }
 
@@ -48,4 +51,9 @@ export type DailyRewardResult = {
 
 export async function claimDailyReward() {
   return invokePlayerAction({ action: 'daily' }) as Promise<DailyRewardResult>;
+}
+
+
+export async function changeUsername(username: string) {
+  return invokePlayerAction({ action: 'change_username', username }) as Promise<{ username: string }>;
 }
