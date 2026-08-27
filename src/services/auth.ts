@@ -4,13 +4,28 @@ import { supabase } from '../lib/supabase';
 
 export const GOOGLE_OAUTH_REDIRECT = 'pokemoncards://auth/callback';
 
+function getAuthRedirectUrl() {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return `${window.location.origin}/`;
+  }
+  return GOOGLE_OAUTH_REDIRECT;
+}
+
 function authErrorMessage(message: string) {
-  if (message.includes('Unsupported provider') || message.includes('provider is not enabled')) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('unsupported provider') || normalized.includes('provider is not enabled')) {
     return 'O login com Google ainda não foi habilitado no Supabase.';
   }
-  if (message.includes('Email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
-  if (message.includes('Invalid login credentials')) return 'E-mail ou senha incorretos.';
-  if (message.includes('User already registered')) return 'Já existe uma conta com este e-mail.';
+  if (normalized.includes('email rate limit exceeded') || normalized.includes('over_email_send_rate_limit')) {
+    return 'O limite de confirmações por e-mail foi atingido. Use o Google ou tente novamente mais tarde.';
+  }
+  if (normalized.includes('email address not authorized')) {
+    return 'O envio de confirmação ainda não está liberado para este e-mail. Use o Google por enquanto.';
+  }
+  if (normalized.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  if (normalized.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (normalized.includes('user already registered')) return 'Já existe uma conta com este e-mail.';
   return message;
 }
 
@@ -65,6 +80,7 @@ export async function signUp(email: string, password: string, username: string) 
     email: email.trim().toLowerCase(),
     password,
     options: {
+      emailRedirectTo: getAuthRedirectUrl(),
       data: {
         username: normalizedUsername,
       },
@@ -86,13 +102,10 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signInWithGoogle() {
-  const webRedirect = Platform.OS === 'web' && typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
-  const redirectTo = webRedirect ?? GOOGLE_OAUTH_REDIRECT;
-
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo,
+      redirectTo: getAuthRedirectUrl(),
       skipBrowserRedirect: Platform.OS !== 'web',
       queryParams: {
         prompt: 'select_account',

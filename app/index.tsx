@@ -59,7 +59,7 @@ export default function AuthScreen() {
       router.replace('/(tabs)');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Não foi possível autenticar.';
-      Alert.alert('Erro ao entrar', message);
+      Alert.alert(mode === 'signup' ? 'Erro ao criar conta' : 'Erro ao entrar', message);
     } finally {
       setLoading(false);
     }
