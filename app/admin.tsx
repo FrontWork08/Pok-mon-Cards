@@ -22,9 +22,11 @@ import {
   createRedeemCode,
   setAdminRedeemCodeActive,
   publishGlobalAnnouncement,
+  moderatePlayer,
   startFreeBoosters,
   stopFreeBoosters,
   type AdminGameEvent,
+  type AdminModerationAction,
   type AdminOverview,
   type AdminPlayer,
   type CoinGrantHistory,
@@ -47,6 +49,8 @@ export default function AdminScreen() {
   const [history, setHistory] = useState<CoinGrantHistory[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [playerSearch, setPlayerSearch] = useState('');
+  const [moderationReason, setModerationReason] = useState('');
+  const [suspensionHours, setSuspensionHours] = useState('24');
   const [amount, setAmount] = useState('10000');
   const [diamondAmount, setDiamondAmount] = useState('25');
   const [note, setNote] = useState('');
@@ -176,6 +180,7 @@ export default function AdminScreen() {
     () => players.filter((player) => selectedPlayerIds.has(player.id)),
     [players, selectedPlayerIds],
   );
+  const moderationTarget = selectedPlayers.length === 1 ? selectedPlayers[0] : null;
 
   const selectedGuild = useMemo(
     () => guildHub?.guilds.find((guild) => guild.id === selectedGuildId) ?? null,
@@ -197,6 +202,54 @@ export default function AdminScreen() {
       ? String(minutes) + 'm ' + String(rest).padStart(2, '0') + 's'
       : String(rest) + 's';
   }, [activeEvent, clock]);
+
+  async function moderateSelected(action: AdminModerationAction) {
+    if (!moderationTarget || working) return;
+    const durationHours = action === 'suspend'
+      ? Math.max(1, Number(suspensionHours.replace(/[^0-9]/g, '')) || 24)
+      : null;
+
+    const execute = async () => {
+      try {
+        setWorking(true);
+        setError(null);
+        await moderatePlayer(
+          moderationTarget.id,
+          action,
+          moderationReason,
+          durationHours,
+        );
+        setNotice(
+          action === 'warn' ? `Aviso aplicado a @${moderationTarget.username}.` :
+          action === 'suspend' ? `@${moderationTarget.username} suspenso por ${durationHours}h.` :
+          action === 'ban' ? `@${moderationTarget.username} foi banido.` :
+          `A conta de @${moderationTarget.username} foi restaurada.`,
+        );
+        setModerationReason('');
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Não foi possível aplicar a moderação.');
+      } finally {
+        setWorking(false);
+      }
+    };
+
+    if (action === 'ban' || action === 'suspend') {
+      Alert.alert(
+        action === 'ban' ? 'Confirmar banimento' : 'Confirmar suspensão',
+        action === 'ban'
+          ? `Banir @${moderationTarget.username}?`
+          : `Suspender @${moderationTarget.username} por ${durationHours}h?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Confirmar', style: 'destructive', onPress: () => { void execute(); } },
+        ],
+      );
+      return;
+    }
+
+    await execute();
+  }
 
   async function sendCoins() {
     if (selectedPlayers.length < 1 || amountNumber < 1 || working) return;
@@ -756,6 +809,41 @@ export default function AdminScreen() {
               </Pressable>
             </View>
 
+            {moderationTarget ? (
+              <View style={[styles.moderationBox, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                <Text style={[styles.fieldLabel, { color: colors.muted }]}>MODERAÇÃO • @{moderationTarget.username}</Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>
+                  Status: {moderationTarget.account_status ?? 'active'} • avisos: {moderationTarget.warning_count ?? 0}
+                  {moderationTarget.suspended_until ? ` • até ${new Date(moderationTarget.suspended_until).toLocaleString('pt-BR')}` : ''}
+                </Text>
+                <TextInput
+                  value={moderationReason}
+                  onChangeText={setModerationReason}
+                  placeholder="Motivo da ação"
+                  placeholderTextColor={colors.muted}
+                  style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
+                />
+                <View style={styles.formSplit}>
+                  <TextInput
+                    value={suspensionHours}
+                    onChangeText={(value) => setSuspensionHours(value.replace(/[^0-9]/g, ''))}
+                    keyboardType="number-pad"
+                    placeholder="Horas"
+                    placeholderTextColor={colors.muted}
+                    style={[styles.input, styles.moderationHours, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
+                  />
+                  <View style={styles.quickRow}>
+                    <Pressable onPress={() => { void moderateSelected('warn'); }} style={[styles.quickChip, { borderColor: '#D9A441', backgroundColor: '#362B13' }]}><Text style={[styles.quickText, { color: '#FFD36B' }]}>AVISAR</Text></Pressable>
+                    <Pressable onPress={() => { void moderateSelected('suspend'); }} style={[styles.quickChip, { borderColor: '#D97732', backgroundColor: '#3B2313' }]}><Text style={[styles.quickText, { color: '#FFB16A' }]}>SUSPENDER</Text></Pressable>
+                    <Pressable onPress={() => { void moderateSelected('ban'); }} style={[styles.quickChip, { borderColor: '#A84250', backgroundColor: '#351A24' }]}><Text style={[styles.quickText, { color: '#FF8D9B' }]}>BANIR</Text></Pressable>
+                    <Pressable onPress={() => { void moderateSelected('restore'); }} style={[styles.quickChip, { borderColor: '#2F9E68', backgroundColor: '#153426' }]}><Text style={[styles.quickText, { color: '#6DDAA2' }]}>RESTAURAR</Text></Pressable>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <Text style={[styles.emptyText, { color: colors.muted }]}>Selecione exatamente um jogador para usar moderação.</Text>
+            )}
+
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>VALOR PARA CADA JOGADOR</Text>
             <View style={styles.quickRow}>
               {QUICK_AMOUNTS.map((quick) => (
@@ -957,6 +1045,8 @@ const styles = StyleSheet.create({
   friendChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   friendChipText: { fontSize: 10, fontWeight: '900' },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  moderationBox: { borderRadius: 16, borderWidth: 1, padding: 12, gap: 9 },
+  moderationHours: { flexGrow: 0, minWidth: 100, width: 110 },
   formSplit: { flexDirection:'row', flexWrap:'wrap', gap:8 },
   formField: { flexGrow:1, flexBasis:180, minWidth:160, gap:5 },
   formFieldSmall: { flexGrow:1, flexBasis:90, minWidth:85, gap:5 },
