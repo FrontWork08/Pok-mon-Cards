@@ -17,6 +17,15 @@ function cardValue(item: any) {
   return Number(card?.market_price_usd ?? 0) * Number(item?.quantity ?? 0);
 }
 
+function selectionFromTrade(trade: any, ownerId: string): SelectedMap {
+  const offer: SelectedMap = {};
+  if (!ownerId) return offer;
+  for (const item of trade?.trade_cards ?? []) {
+    if (item.owner_id === ownerId) offer[item.card_id] = Number(item.quantity ?? 0);
+  }
+  return offer;
+}
+
 export default function TradeBuilderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -32,6 +41,7 @@ export default function TradeBuilderScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'connecting' | 'live' | 'fallback'>('connecting');
   const syncingRef = useRef(false);
+  const pickerOpenRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -51,11 +61,7 @@ export default function TradeBuilderScreen() {
       const { data: players } = await supabase.from('players').select('id,username').in('id', participantIds);
       setNames(Object.fromEntries((players ?? []).map((player) => [player.id, player.username])));
 
-      const ownOffer: SelectedMap = {};
-      for (const item of tradeData.trade_cards ?? []) {
-        if (item.owner_id === uid) ownOffer[item.card_id] = Number(item.quantity ?? 0);
-      }
-      setSelected(ownOffer);
+      setSelected(selectionFromTrade(tradeData, uid));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível carregar a troca.');
     } finally {
@@ -81,12 +87,10 @@ export default function TradeBuilderScreen() {
       });
 
       const uid = userId || (await supabase.auth.getUser()).data.user?.id || '';
-      if (uid) {
-        const ownOffer: SelectedMap = {};
-        for (const item of tradeData.trade_cards ?? []) {
-          if (item.owner_id === uid) ownOffer[item.card_id] = Number(item.quantity ?? 0);
-        }
-        setSelected(ownOffer);
+      // Keep the saved offer synchronized only while the editor is closed.
+      // While it is open, the 900 ms live refresh must never overwrite the local draft.
+      if (uid && !pickerOpenRef.current) {
+        setSelected(selectionFromTrade(tradeData, uid));
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível sincronizar a troca.');
@@ -141,12 +145,25 @@ export default function TradeBuilderScreen() {
   const selectedCount = useMemo(() => Object.values(selected).reduce((sum, qty) => sum + Number(qty), 0), [selected]);
   const selectedValue = useMemo(() => bag.reduce((sum, entry) => sum + Number(entry.cards?.market_price_usd ?? 0) * Number(selected[entry.cards?.id ?? ''] ?? 0), 0), [bag, selected]);
 
+  function openPicker() {
+    setSelected(selectionFromTrade(trade, userId));
+    pickerOpenRef.current = true;
+    setPickerOpen(true);
+  }
+
+  function closePicker() {
+    pickerOpenRef.current = false;
+    setPickerOpen(false);
+    setSelected(selectionFromTrade(trade, userId));
+  }
+
   async function saveOffer() {
     if (!id) return;
     try {
       setSaving(true);
       setNotice(null);
       await setTradeCards(String(id), Object.entries(selected).map(([card_id, quantity]) => ({ card_id, quantity })));
+      pickerOpenRef.current = false;
       setPickerOpen(false);
       setNotice('Oferta salva e sincronizada. Se alguém já tinha confirmado, a confirmação foi reiniciada porque a oferta mudou.');
       await refreshTrade();
@@ -232,7 +249,7 @@ export default function TradeBuilderScreen() {
         </View>
 
         {pending ? (
-          <Pressable style={[styles.editOffer, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={() => setPickerOpen(true)}>
+          <Pressable style={[styles.editOffer, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={openPicker}>
             <View style={[styles.editIcon, { backgroundColor: colors.surface }]}><Ionicons name="albums" size={25} color={colors.accent} /></View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.kicker, { color: colors.yellow }]}>SUA OFERTA</Text>
@@ -266,7 +283,7 @@ export default function TradeBuilderScreen() {
 
       {pending ? (
         <View style={[styles.actionDock, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-          <Pressable style={[styles.editDockButton, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]} onPress={() => setPickerOpen(true)} disabled={saving}>
+          <Pressable style={[styles.editDockButton, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]} onPress={openPicker} disabled={saving}>
             <Ionicons name="albums-outline" size={20} color={colors.accent} />
             <View><Text style={[styles.dockSmall, { color: colors.muted }]}>OFERTA</Text><Text style={[styles.dockEditText, { color: colors.text }]}>EDITAR</Text></View>
           </Pressable>
@@ -286,7 +303,7 @@ export default function TradeBuilderScreen() {
         mode="quantity"
         selectedMap={selected}
         onSelectedMapChange={setSelected}
-        onClose={() => setPickerOpen(false)}
+        onClose={closePicker}
         onConfirm={saveOffer}
         confirmLabel="SALVAR OFERTA"
         working={saving}
