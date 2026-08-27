@@ -86,3 +86,58 @@ revoke all on function private.get_collection_value_leaderboard(integer)
 from public, anon, authenticated;
 grant execute on function private.get_collection_value_leaderboard(integer)
 to service_role;
+
+
+-- Keep the background worker diagnostics aligned with the real TCGplayer
+-- market-price pipeline instead of reporting the retired fixed-price mode.
+create or replace function public.server_background_tick()
+returns jsonb
+language plpgsql
+security definer
+set search_path = 'public'
+as $$
+declare
+  v_battles integer;
+  v_push integer;
+  v_catalog jsonb;
+  v_market_pending integer;
+begin
+  v_battles := public.server_process_expired_battles();
+  v_push := public.server_dispatch_push_notifications();
+
+  if exists(
+    select 1 from public.catalog_refresh_state
+    where job_name='full_tcg_refresh' and status='running'
+  ) then
+    begin
+      v_catalog := public.server_refresh_catalog_batch(2);
+    exception when others then
+      v_catalog := jsonb_build_object('error',sqlerrm);
+    end;
+  else
+    v_catalog := jsonb_build_object('status','idle');
+  end if;
+
+  select count(*)::integer
+  into v_market_pending
+  from private.market_price_sync_sets
+  where status in ('pending','running','retry');
+
+  return jsonb_build_object(
+    'battles', v_battles,
+    'pushes', v_push,
+    'catalog', v_catalog,
+    'marketPrices', jsonb_build_object(
+      'status', case when v_market_pending > 0 then 'syncing' else 'ready' end,
+      'pendingSets', v_market_pending,
+      'source', 'pokemontcg:tcgplayer_market_v3'
+    ),
+    'at', now()
+  );
+end;
+$$;
+
+revoke all on function public.server_background_tick()
+from public, anon, authenticated;
+grant execute on function public.server_background_tick()
+to service_role;
