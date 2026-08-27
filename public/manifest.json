@@ -1,0 +1,26 @@
+{
+  "name": "Pokémon Cards",
+  "short_name": "PokéCards",
+  "description": "Abra packs, colecione cartas Pokémon, troque e batalhe com seus amigos.",
+  "lang": "pt-BR",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07111F",
+  "theme_color": "#07111F",
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
