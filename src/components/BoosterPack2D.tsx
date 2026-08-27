@@ -149,14 +149,14 @@ export function BoosterPack2D({ pack, width = 224, tear, seamCharge, style }: Pr
             style={[
               styles.fallbackTearShard,
               styles.fallbackTearLeft,
-              { transform: [{ translateX: leftX }, { rotate: leftRotate }] },
+              { opacity: tearShardOpacity, transform: [{ translateX: leftX }, { rotate: leftRotate }] },
             ]}
           />
           <Animated.View
             style={[
               styles.fallbackTearShard,
               styles.fallbackTearRight,
-              { transform: [{ translateX: rightX }, { rotate: rightRotate }] },
+              { opacity: tearShardOpacity, transform: [{ translateX: rightX }, { rotate: rightRotate }] },
             ]}
           />
         </View>
