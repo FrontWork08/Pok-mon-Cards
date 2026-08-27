@@ -30,7 +30,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const insets = useSafeAreaInsets();
   const compact = width < 620 || height < 730;
   const maxPackWidthByScreen = Math.max(182, width - 132);
-  const maxPackWidthByHeight = Math.max(182, (height - insets.top - insets.bottom - 300) / 1.68);
+  const maxPackWidthByHeight = Math.max(182, (height - insets.top - insets.bottom - 300) / 1.72);
   const openingPackWidth = compact
     ? Math.min(214, maxPackWidthByScreen, maxPackWidthByHeight)
     : Math.min(235, maxPackWidthByHeight);
