@@ -9,7 +9,6 @@ import { getMySocial } from '@/services/social';
 import { getUnreadConversationCount } from '@/services/notifications';
 import { formatUsd, isCurrentUserAdmin } from '@/services/market';
 import { changeUsername } from '@/services/playerActions';
-import { equipAchievementTitle, getMyAchievements, refreshAchievements, type PlayerAchievement } from '@/services/achievements';
 import { getTrainerRank } from '@/services/ranks';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -21,8 +20,6 @@ export default function ProfileScreen() {
   const [incomingCount, setIncomingCount] = useState(0);
   const [unread, setUnread] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [achievements, setAchievements] = useState<PlayerAchievement[]>([]);
-  const [titleWorking, setTitleWorking] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nicknameOpen, setNicknameOpen] = useState(false);
@@ -33,14 +30,12 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     try {
       setLoading(true); setError(null);
-      await refreshAchievements().catch(() => null);
-      const [p, s, social, unreadCount, adminAccess, achievementRows] = await Promise.all([
+      const [p, s, social, unreadCount, adminAccess] = await Promise.all([
         getMyProfile(),
         getMyProfileStats(),
         getMySocial(),
         getUnreadConversationCount().catch(() => 0),
         isCurrentUserAdmin().catch(() => false),
-        getMyAchievements(),
       ]);
       setProfile(p);
       setStats(s);
@@ -48,7 +43,6 @@ export default function ProfileScreen() {
       setIncomingCount(social.incoming.length);
       setUnread(unreadCount);
       setIsAdmin(adminAccess);
-      setAchievements(achievementRows);
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível atualizar seu perfil.'); }
     finally { setLoading(false); }
   }, []);
@@ -84,15 +78,6 @@ export default function ProfileScreen() {
     }
   }
 
-  async function equipTitle(achievementId: string) {
-    try {
-      setTitleWorking(achievementId); setError(null);
-      await equipAchievementTitle(achievementId);
-      setProfile((current) => current ? { ...current, equipped_title_id: achievementId } : current);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível equipar o título.'); }
-    finally { setTitleWorking(null); }
-  }
-
   async function handleSignOut() { try { await signOut(); router.replace('/'); } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível sair.'); } }
   const xp = Number(profile?.xp ?? 0);
   const levelXp = xp % 250;
@@ -100,9 +85,7 @@ export default function ProfileScreen() {
   const coins = Number(profile?.coins ?? 0);
   const topCard = stats?.mostValuableMarketCard ?? stats?.mostValuableCard;
   const trainerRank = getTrainerRank(profile?.battle_rating);
-  const unlockedAchievements = achievements.filter((item) => item.unlocked_at);
-  const equippedAchievement = achievements.find((item) => item.achievement_id === profile?.equipped_title_id);
-  const equippedDefinition = equippedAchievement ? (Array.isArray(equippedAchievement.achievement) ? equippedAchievement.achievement[0] : equippedAchievement.achievement) : null;
+  const equippedDefinition = Array.isArray(profile?.equipped_title) ? profile?.equipped_title[0] : profile?.equipped_title;
 
   return <Screen title="Trainer Profile" subtitle="Sua identidade, valor de mercado da coleção, ranking global e progresso.">
     {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
@@ -121,13 +104,9 @@ export default function ProfileScreen() {
 
     <View style={styles.statsGrid}><Stat icon="albums" value={stats?.totalCards ?? 0} label="Cards" /><Stat icon="paw" value={stats?.species ?? 0} label="Pokédex" /><Stat icon="cube" value={stats?.packsOpened ?? 0} label="Packs" /><Stat icon="swap-horizontal" value={stats?.completedTrades ?? 0} label="Trocas" /><Stat icon="trophy" value={profile?.battle_wins ?? 0} label="Vitórias" /><Stat icon="people" value={friendCount} label="Amigos" /></View>
 
-    <View style={[styles.achievementsPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={styles.achievementsHeader}><View><Text style={[styles.kicker, { color: colors.yellow }]}>CONQUISTAS E TÍTULOS</Text><Text style={[styles.achievementsTitle, { color: colors.text }]}>{unlockedAchievements.length} de {achievements.length} desbloqueadas</Text></View><Ionicons name="ribbon" size={27} color={colors.yellow} /></View>
-      <Text style={[styles.helperText, { color: colors.muted }]}>Toque em um título desbloqueado para equipá-lo no seu perfil.</Text>
-      <View style={styles.achievementGrid}>{achievements.map((item) => { const def = Array.isArray(item.achievement) ? item.achievement[0] : item.achievement; if (!def) return null; const unlocked = Boolean(item.unlocked_at); const equipped = profile?.equipped_title_id === item.achievement_id; const progress = Math.min(100, Number(item.progress ?? 0) / Math.max(1, Number(def.target ?? 1)) * 100); return <Pressable key={item.achievement_id} onPress={() => unlocked && !equipped && equipTitle(item.achievement_id)} disabled={!unlocked || Boolean(titleWorking)} style={[styles.achievementCard, { backgroundColor: unlocked ? colors.surfaceAlt : colors.bg, borderColor: equipped ? colors.yellow : unlocked ? colors.accent : colors.border }, !unlocked && styles.lockedAchievement]}><View style={styles.achievementTop}><Text style={styles.achievementIcon}>{unlocked ? def.icon : '🔒'}</Text><Text style={[styles.achievementState, { color: equipped ? colors.yellow : colors.muted }]}>{equipped ? 'EQUIPADO' : unlocked ? titleWorking === item.achievement_id ? 'EQUIPANDO…' : 'EQUIPAR' : Math.min(item.progress, def.target) + '/' + def.target}</Text></View><Text style={[styles.achievementName, { color: colors.text }]}>{def.name}</Text><Text style={[styles.achievementTitleText, { color: unlocked ? colors.yellow : colors.muted }]}>{def.title}</Text><Text style={[styles.achievementDescription, { color: colors.muted }]}>{def.description}</Text><View style={[styles.miniTrack, { backgroundColor: colors.border }]}><View style={[styles.fill, { width: `${progress}%` as `${number}%`, backgroundColor: unlocked ? colors.yellow : colors.accent }]} /></View></Pressable>; })}</View>
-    </View>
     <View style={styles.featureGrid}>
       <FeatureLink icon="mail-unread" color={colors.accent} title="Inbox" text={unread ? `${unread} mensagem(ns) não lida(s) • convites e avisos` : 'Mensagens, convites de batalha e notificações.'} onPress={() => router.push('/inbox')} badge={unread || undefined} />
+      <FeatureLink icon="ribbon" color="#D5A7FF" title="Conquistas e Títulos" text="Veja seu progresso, desbloqueie títulos e escolha qual exibir no perfil." onPress={() => router.push('/achievements')} />
       <FeatureLink icon="game-controller" color="#FF9D4A" title="Battle Center" text={`ELO ${profile?.battle_rating ?? 1000} • ${profile?.battle_wins ?? 0} vitórias • ranking e revanche`} onPress={() => router.push('/battles')} />
       <FeatureLink icon="podium" color={colors.yellow} title="Ranking de Coleções" text="Ranking global das contas pelo valor fixo das cartas em USD." onPress={() => router.push('/collection-ranking')} />
       <FeatureLink icon="people" color={colors.blue} title="Amigos, Chat e Batalhas" text={friendCount + ' amigos' + (incomingCount ? ` • ${incomingCount} solicitação aguardando` : ' • converse e envie desafios')} onPress={() => router.push('/friends')} badge={incomingCount || undefined} />
@@ -191,7 +170,7 @@ function FeatureLink({ icon, color, title, text, onPress, badge }: { icon: keyof
 const styles = StyleSheet.create({
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 12, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' }, errorText: { flex: 1, color: '#FFD7DD', fontWeight: '700', fontSize: 12 },
   hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24, borderWidth: 1 }, avatar: { width: 70, height: 70, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, avatarText: { fontSize: 30, fontWeight: '900' }, heroInfo: { flex: 1, minWidth: 190 }, rankSymbol: { fontSize: 24, fontWeight: '900' }, equippedTitle: { fontSize: 11, fontWeight: '900', marginTop: 2 }, usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }, editNameButton: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 }, username: { flexShrink: 1, fontSize: 25, fontWeight: '900' }, meta: { fontSize: 12, marginTop: 4 }, coinBox: { minWidth: 130, padding: 12, borderRadius: 16 }, coinLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.1 }, coins: { fontSize: 18, fontWeight: '900', marginTop: 3 },
-  rankPanel: { padding: 15, borderRadius: 20, borderWidth: 1 }, rankPanelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, rankName: { fontSize: 20, fontWeight: '900', marginTop: 3 }, rankPoints: { fontSize: 15, fontWeight: '900' }, achievementsPanel: { padding: 15, borderRadius: 20, borderWidth: 1, gap: 11 }, achievementsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, achievementsTitle: { fontSize: 18, fontWeight: '900', marginTop: 3 }, helperText: { fontSize: 9, lineHeight: 14 }, achievementGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, achievementCard: { flexGrow: 1, flexBasis: 210, minWidth: 160, padding: 11, borderRadius: 15, borderWidth: 1 }, lockedAchievement: { opacity: .62 }, achievementTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, achievementIcon: { fontSize: 22 }, achievementState: { fontSize: 7, fontWeight: '900' }, achievementName: { fontSize: 12, fontWeight: '900', marginTop: 6 }, achievementTitleText: { fontSize: 10, fontWeight: '900', marginTop: 2 }, achievementDescription: { fontSize: 8, lineHeight: 12, marginTop: 4 }, miniTrack: { height: 5, borderRadius: 999, overflow: 'hidden', marginTop: 8 },
+  rankPanel: { padding: 15, borderRadius: 20, borderWidth: 1 }, rankPanelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, rankName: { fontSize: 20, fontWeight: '900', marginTop: 3 }, rankPoints: { fontSize: 15, fontWeight: '900' }
   worthPanel: { padding: 16, borderRadius: 22, borderWidth: 1, gap: 12 }, worthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, worthKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, worthTotal: { fontSize: 30, fontWeight: '900', marginTop: 3 }, worthHint: { fontSize: 9, marginTop: 2 }, worthIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, worthDivider: { height: 1 }, worthBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, worthMetric: { flexGrow: 1, flexBasis: 150, minWidth: 130 }, worthMetricLabel: { fontSize: 7, fontWeight: '900', letterSpacing: .9 }, worthMetricText: { fontSize: 14, fontWeight: '900', marginTop: 3 }, worthMetricValue: { fontSize: 9, fontWeight: '900', marginTop: 2 }, topCardRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 8 }, topCardImage: { width: 50, height: 67, borderRadius: 6 }, topCardLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 1 }, topCardName: { fontSize: 13, fontWeight: '900', marginTop: 2 }, topCardMeta: { fontSize: 8, marginTop: 1 }, topCardValue: { fontSize: 10, fontWeight: '900' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, stat: { flexGrow: 1, flexBasis: 145, minWidth: 135, padding: 14, borderRadius: 18, borderWidth: 1 }, statIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 9 }, statValue: { fontSize: 20, fontWeight: '900' }, statLabel: { fontSize: 10, fontWeight: '800', marginTop: 2 },
   featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, feature: { flexGrow: 1, flexBasis: 360, minWidth: 280, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, borderWidth: 1 }, featureIcon: { width: 45, height: 45, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, featureBody: { flex: 1 }, featureTitle: { fontSize: 15, fontWeight: '900' }, featureText: { fontSize: 10, lineHeight: 15, marginTop: 3 }, badge: { minWidth: 28, height: 28, borderRadius: 14, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D84B64' }, badgeText: { color: '#fff', fontWeight: '900', fontSize: 11 },
