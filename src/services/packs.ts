@@ -18,6 +18,7 @@ export type Pack = {
   booster_back_url: string | null;
   booster_logo_url: string | null;
   booster_art_source: string | null;
+  release_date: string | null;
   active: boolean;
   currency?: 'coins' | 'diamonds';
 };
@@ -44,7 +45,7 @@ export async function listPacks(): Promise<Pack[]> {
     supabase
       .from('packs')
       .select(
-        'id,name,set_id,price,cards_per_pack,image_url,art_url,booster_art_url,booster_art_urls,booster_back_url,booster_logo_url,booster_art_source,active',
+        'id,name,set_id,price,cards_per_pack,image_url,art_url,booster_art_url,booster_art_urls,booster_back_url,booster_logo_url,booster_art_source,release_date,active',
       )
       .eq('active', true)
       .order('price', { ascending: true }),
