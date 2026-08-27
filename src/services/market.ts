@@ -1,15 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { normalizeFunctionError } from '@/services/functionErrors';
-
-export type MarketPriceUpdate = {
-  id: string;
-  market_price_usd: number | null;
-  market_price_low_usd: number | null;
-  market_price_high_usd: number | null;
-  market_price_variant: string | null;
-  market_price_source: string | null;
-  market_price_updated_at: string | null;
-};
 
 export type CollectionRankEntry = {
   global_rank: number;
@@ -27,45 +16,6 @@ export function formatUsd(value: number | null | undefined) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
-}
-
-export async function refreshOwnedMarketPrices(cardIds: string[], force = false) {
-  const unique = [...new Set(cardIds.filter(Boolean))].slice(0, 60);
-  if (!unique.length) return [] as MarketPriceUpdate[];
-
-  const results: MarketPriceUpdate[] = [];
-  for (let index = 0; index < unique.length; index += 30) {
-    const chunk = unique.slice(index, index + 30);
-    const { data, error } = await supabase.functions.invoke('market-prices', {
-      body: { scope: 'owned', cardIds: chunk, force },
-    });
-
-    if (error) {
-      throw await normalizeFunctionError(error, 'Não foi possível atualizar os preços de mercado.');
-    }
-    if (data?.error) throw new Error(String(data.error));
-    results.push(...((data?.data?.results ?? []) as MarketPriceUpdate[]));
-  }
-  return results;
-}
-
-export async function refreshGlobalOwnedMarketPrices(force = false) {
-  const { data, error } = await supabase.functions.invoke('market-prices', {
-    body: { scope: 'global', force },
-  });
-
-  if (error) {
-    throw await normalizeFunctionError(error, 'Não foi possível atualizar os preços globais.');
-  }
-  if (data?.error) throw new Error(String(data.error));
-  return data?.data as {
-    results: MarketPriceUpdate[];
-    refreshed: number;
-    requested: number;
-    remainingStale: number;
-    noPrice?: number;
-    errors?: number;
-  };
 }
 
 export async function getCollectionValueLeaderboard(limit = 100) {
