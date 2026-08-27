@@ -24,6 +24,11 @@ function rarityTheme(rarity?: string | null): RarityTheme {
   if (value.includes('uncommon')) return { color: '#62D39C', soft: '#102A20', label: 'INCOMUM', tier: 2 };
   return { color: '#AAB3BF', soft: '#181B20', label: 'COMUM', tier: 1 };
 }
+function cardImageCandidates(card: OpenedCard) {
+  return [card.imageLarge, card.image, card.imageSmall]
+    .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
+}
+
 function rarityScore(card: OpenedCard) { return rarityTheme(card.rarity).tier; }
 function flashStrength(tier: number) { return tier >= 5 ? .98 : tier === 4 ? .9 : tier === 3 ? .74 : tier === 2 ? .55 : .4; }
 
@@ -42,7 +47,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const [faceUp, setFaceUp] = useState(false);
   const [frontUnlocked, setFrontUnlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const [imageFailureLevel, setImageFailureLevel] = useState<Record<string, number>>({});
 
   const packY = useRef(new Animated.Value(0)).current;
   const packRotate = useRef(new Animated.Value(0)).current;
@@ -79,7 +84,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
   useEffect(() => {
     if (!visible) return;
-    setStage('sealed'); setCards([]); setCardIndex(0); setFaceUp(false); setError(null); setFailedImages({}); resetOpening(); resetReveal(); cardEnter.setValue(0); rarityPulse.setValue(0);
+    setStage('sealed'); setCards([]); setCardIndex(0); setFaceUp(false); setError(null); setImageFailureLevel({}); resetOpening(); resetReveal(); cardEnter.setValue(0); rarityPulse.setValue(0);
     const floating = Animated.loop(Animated.sequence([
       Animated.timing(packY, { toValue: -9, duration: 1350, useNativeDriver: USE_NATIVE_DRIVER }),
       Animated.timing(packY, { toValue: 7, duration: 1350, useNativeDriver: USE_NATIVE_DRIVER }),
@@ -247,14 +252,42 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
           <Pressable style={styles.tapArea} onPress={!faceUp ? revealCurrent : undefined}>
             <Animated.View style={[styles.flipScene, compact && styles.flipSceneCompact, { opacity: cardEnter, transform: [{ translateY: cardTranslateY }, { scale: combinedCardScale }] }]}>
               <Animated.View style={[styles.cardFace, styles.cardBack, { opacity: backOpacity, borderColor: HIDDEN_COLOR, transform: [{ perspective: 900 }, { rotateY: backRotation }] }]}><View style={[styles.backGlow, { backgroundColor: HIDDEN_SOFT }]} /><View style={[styles.backRing, { borderColor: HIDDEN_COLOR }]}><Ionicons name="help" size={55} color={HIDDEN_COLOR} /></View><Text style={styles.hiddenTitle}>RECOMPENSA OCULTA</Text><Text style={[styles.hiddenHint, { color: HIDDEN_COLOR }]}>TOQUE PARA REVELAR</Text></Animated.View>
-              {frontUnlocked ? <Animated.View style={[styles.cardFace, styles.cardFront, { opacity: frontOpacity, borderColor: theme.color, transform: [{ perspective: 900 }, { rotateY: frontRotation }] }]}>{currentCard.image && !failedImages[currentCard.id] ? <Image source={{ uri: currentCard.image }} resizeMode="contain" style={styles.rewardImage} onError={() => setFailedImages((value) => ({ ...value, [currentCard.id]: true }))} /> : <View style={styles.imageFallback}><Ionicons name="image-outline" size={54} color="#666" /></View>}<View style={styles.rewardInfo}><Text style={styles.rewardName}>{currentCard.name}</Text><Text style={[styles.rewardRarity, { color: theme.color }]}>{currentCard.rarity ?? 'Comum'}</Text></View></Animated.View> : null}
+              {frontUnlocked ? <Animated.View style={[styles.cardFace, styles.cardFront, { opacity: frontOpacity, borderColor: theme.color, transform: [{ perspective: 900 }, { rotateY: frontRotation }] }]}>{(() => {
+                const candidates = cardImageCandidates(currentCard);
+                const level = imageFailureLevel[currentCard.id] ?? 0;
+                const uri = candidates[level] ?? null;
+                return uri ? (
+                  <Image
+                    source={{ uri }}
+                    resizeMode="contain"
+                    style={styles.rewardImage}
+                    onError={() => setImageFailureLevel((value) => ({ ...value, [currentCard.id]: level + 1 }))}
+                  />
+                ) : (
+                  <View style={styles.imageFallback}><Ionicons name="image-outline" size={54} color="#666" /></View>
+                );
+              })()}<View style={styles.rewardInfo}><Text style={styles.rewardName}>{currentCard.name}</Text><Text style={[styles.rewardRarity, { color: theme.color }]}>{currentCard.rarity ?? 'Comum'}</Text></View></Animated.View> : null}
             </Animated.View>
           </Pressable>
         </View>
         <Pressable style={[styles.nextButton, { borderColor: `${revealColor}90` }]} onPress={nextCard}><Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text><Ionicons name="arrow-forward" size={18} color="#F4F4F4" /></Pressable>
       </View> : null}
 
-      {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPull ? <Text style={styles.bestPull}>Melhor pull: {bestPull.name}</Text> : null}<Text style={styles.summarySubtitle}>Todos os cards foram enviados para sua Bag • +20 XP</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <View key={key} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>{card.image && !failedImages[key] ? <Image source={{ uri: card.image }} resizeMode="contain" style={styles.summaryImage} onError={() => setFailedImages((value) => ({ ...value, [key]: true }))} /> : <View style={styles.summaryFallback}><Ionicons name="image-outline" size={28} color="#555" /></View>}<Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text></View>; })}</View><Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable></ScrollView> : null}
+      {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPull ? <Text style={styles.bestPull}>Melhor pull: {bestPull.name}</Text> : null}<Text style={styles.summarySubtitle}>Todos os cards foram enviados para sua Bag • +20 XP</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <View key={key} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>{(() => {
+          const candidates = cardImageCandidates(card);
+          const level = imageFailureLevel[key] ?? 0;
+          const uri = candidates[level] ?? null;
+          return uri ? (
+            <Image
+              source={{ uri }}
+              resizeMode="contain"
+              style={styles.summaryImage}
+              onError={() => setImageFailureLevel((value) => ({ ...value, [key]: level + 1 }))}
+            />
+          ) : (
+            <View style={styles.summaryFallback}><Ionicons name="image-outline" size={28} color="#555" /></View>
+          );
+        })()}<Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text></View>; })}</View><Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable></ScrollView> : null}
 
       {stage === 'opening' ? <><Animated.View pointerEvents="none" style={[styles.openingColorWash, { opacity: openingColorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: openingFlash }]} /></> : null}
       {stage === 'cards' && currentCard ? <><Animated.View pointerEvents="none" style={[styles.colorWash, { backgroundColor: revealColor, opacity: colorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: screenFlash }]} /></> : null}
