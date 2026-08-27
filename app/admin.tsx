@@ -18,7 +18,7 @@ import {
   type AdminOverview,
   type CoinGrantHistory,
 } from '@/services/admin';
-import { formatUsd, refreshGlobalOwnedMarketPrices } from '@/services/market';
+import { formatUsd } from '@/services/market';
 import { getMySocial, type SocialPlayer } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -35,7 +35,6 @@ export default function AdminScreen() {
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
-  const [priceWorking, setPriceWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,22 +95,7 @@ export default function AdminScreen() {
     );
   }
 
-  async function refreshPrices() {
-    if (priceWorking) return;
-    try {
-      setPriceWorking(true);
-      setError(null);
-      const result = await refreshGlobalOwnedMarketPrices(false);
-      setNotice(
-        `${result.refreshed} preços atualizados neste lote • ${result.remainingStale} cards ainda aguardando precificação.`,
-      );
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Não foi possível atualizar os preços.');
-    } finally {
-      setPriceWorking(false);
-    }
-  }
+
 
   return (
     <Screen title="Admin Center" subtitle="Painel privado de economia, usuários, mercado e saúde do jogo.">
@@ -198,23 +182,15 @@ export default function AdminScreen() {
           <View style={[styles.marketPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.marketHeader}>
               <View style={[styles.marketIcon, { backgroundColor: colors.accentSoft }]}>
-                <Ionicons name="trending-up" size={22} color={colors.yellow} />
+                <Ionicons name="lock-closed" size={22} color={colors.yellow} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.marketTitle, { color: colors.text }]}>Preços de mercado</Text>
+                <Text style={[styles.marketTitle, { color: colors.text }]}>Tabela de valores fixa</Text>
                 <Text style={[styles.marketText, { color: colors.muted }]}>
-                  Atualiza os preços de mercado em USD dos cards que existem nas contas. O worker também continua a precificação automaticamente a cada minuto.
+                  {overview.catalog.cardsWithUsdPrice.toLocaleString('pt-BR')} de {overview.catalog.cards.toLocaleString('pt-BR')} cards possuem valor em USD. Não existe atualização online de preço durante o jogo.
                 </Text>
               </View>
             </View>
-            <Pressable
-              onPress={refreshPrices}
-              disabled={priceWorking}
-              style={[styles.marketButton, { backgroundColor: colors.yellow }]}
-            >
-              {priceWorking ? <ActivityIndicator size="small" color="#07111F" /> : <Ionicons name="cloud-download" size={18} color="#07111F" />}
-              <Text style={styles.marketButtonText}>{priceWorking ? 'ATUALIZANDO...' : 'ATUALIZAR PREÇOS GLOBAIS'}</Text>
-            </Pressable>
           </View>
 
           <SectionTitle title="Adicionar moedas a um amigo" />
