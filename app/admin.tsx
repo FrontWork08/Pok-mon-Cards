@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -81,6 +82,18 @@ export default function AdminScreen() {
     } finally {
       setWorking(false);
     }
+  }
+
+  function confirmSendCoins() {
+    if (!selectedFriend || amountNumber < 1 || working) return;
+    Alert.alert(
+      'Confirmar crédito',
+      `Adicionar 🪙 ${amountNumber.toLocaleString('pt-BR')} para @${selectedFriend.username}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Adicionar', onPress: () => { sendCoins(); } },
+      ],
+    );
   }
 
   async function refreshPrices() {
@@ -268,7 +281,7 @@ export default function AdminScreen() {
 
             <Pressable
               disabled={!selectedFriend || amountNumber < 1 || working}
-              onPress={sendCoins}
+              onPress={confirmSendCoins}
               style={[
                 styles.grantButton,
                 {
