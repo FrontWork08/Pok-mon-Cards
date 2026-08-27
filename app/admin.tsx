@@ -49,6 +49,8 @@ export default function AdminScreen() {
   const [history, setHistory] = useState<CoinGrantHistory[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [playerSearch, setPlayerSearch] = useState('');
+  const [moderationSearch, setModerationSearch] = useState('');
+  const [moderationTargetId, setModerationTargetId] = useState<string | null>(null);
   const [moderationReason, setModerationReason] = useState('');
   const [suspensionHours, setSuspensionHours] = useState('24');
   const [amount, setAmount] = useState('10000');
@@ -90,6 +92,10 @@ export default function AdminScreen() {
         if (initial) validIds.add(initial.id);
       }
       return validIds;
+    });
+    setModerationTargetId((current) => {
+      if (current && directory.some((player) => player.id === current)) return current;
+      return directory.find((player) => player.id !== self.id)?.id ?? directory[0]?.id ?? null;
     });
   }, []);
 
@@ -180,7 +186,17 @@ export default function AdminScreen() {
     () => players.filter((player) => selectedPlayerIds.has(player.id)),
     [players, selectedPlayerIds],
   );
-  const moderationTarget = selectedPlayers.length === 1 ? selectedPlayers[0] : null;
+
+  const visibleModerationPlayers = useMemo(() => {
+    const query = moderationSearch.trim().toLowerCase();
+    if (!query) return players;
+    return players.filter((player) => player.username.toLowerCase().includes(query));
+  }, [moderationSearch, players]);
+
+  const moderationTarget = useMemo(
+    () => players.find((player) => player.id === moderationTargetId) ?? null,
+    [moderationTargetId, players],
+  );
 
   const selectedGuild = useMemo(
     () => guildHub?.guilds.find((guild) => guild.id === selectedGuildId) ?? null,
@@ -748,6 +764,174 @@ export default function AdminScreen() {
             ) : null}
           </View>
 
+          <SectionTitle title="Moderação de usuários" />
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#A84250' }]}>
+            <View style={styles.moderationHeader}>
+              <View style={styles.moderationIcon}>
+                <Ionicons name="shield-checkmark" size={22} color="#FF8D9B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.moderationTitle, { color: colors.text }]}>Controle de contas</Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>
+                  Aplique advertência, suspensão temporária, banimento ou restaure uma conta.
+                </Text>
+              </View>
+            </View>
+
+            <TextInput
+              value={moderationSearch}
+              onChangeText={setModerationSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Buscar jogador para moderar"
+              placeholderTextColor={colors.muted}
+              style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+            />
+
+            <View style={styles.friendChips}>
+              {visibleModerationPlayers.slice(0, 20).map((player) => {
+                const active = moderationTargetId === player.id;
+                return (
+                  <Pressable
+                    key={`moderation-${player.id}`}
+                    onPress={() => setModerationTargetId(player.id)}
+                    style={[
+                      styles.friendChip,
+                      {
+                        backgroundColor: active ? '#351A24' : colors.surfaceAlt,
+                        borderColor: active ? '#FF6B81' : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.friendChipText, { color: active ? '#FFB2BD' : colors.text }]}>
+                      @{player.username}{player.id === selfId ? ' (você)' : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {moderationTarget ? (
+              <View style={[styles.moderationBox, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                <View style={styles.moderationStatusRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.moderationTargetName, { color: colors.text }]}>@{moderationTarget.username}</Text>
+                    <Text style={[styles.emptyText, { color: colors.muted }]}>
+                      Nível {moderationTarget.level} • {moderationTarget.warning_count ?? 0} aviso(s)
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.statusBadge,
+                    moderationTarget.account_status === 'banned'
+                      ? styles.statusBanned
+                      : moderationTarget.account_status === 'suspended'
+                        ? styles.statusSuspended
+                        : styles.statusActive,
+                  ]}>
+                    <Text style={styles.statusBadgeText}>
+                      {moderationTarget.account_status === 'banned'
+                        ? 'BANIDO'
+                        : moderationTarget.account_status === 'suspended'
+                          ? 'SUSPENSO'
+                          : 'ATIVO'}
+                    </Text>
+                  </View>
+                </View>
+
+                {moderationTarget.suspended_until ? (
+                  <Text style={[styles.emptyText, { color: '#FFB16A' }]}>
+                    Suspenso até {new Date(moderationTarget.suspended_until).toLocaleString('pt-BR')}
+                  </Text>
+                ) : null}
+                {moderationTarget.moderation_reason ? (
+                  <Text style={[styles.emptyText, { color: colors.muted }]}>
+                    Motivo atual: {moderationTarget.moderation_reason}
+                  </Text>
+                ) : null}
+
+                <TextInput
+                  value={moderationReason}
+                  onChangeText={setModerationReason}
+                  placeholder="Motivo da moderação"
+                  placeholderTextColor={colors.muted}
+                  maxLength={500}
+                  style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
+                />
+
+                <View style={styles.suspensionRow}>
+                  <TextInput
+                    value={suspensionHours}
+                    onChangeText={(value) => setSuspensionHours(value.replace(/[^0-9]/g, ''))}
+                    keyboardType="number-pad"
+                    placeholder="Horas"
+                    placeholderTextColor={colors.muted}
+                    style={[styles.input, styles.moderationHours, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
+                  />
+                  {[1, 6, 24, 72, 168].map((hours) => (
+                    <Pressable
+                      key={hours}
+                      onPress={() => setSuspensionHours(String(hours))}
+                      style={[
+                        styles.quickChip,
+                        {
+                          backgroundColor: Number(suspensionHours) === hours ? '#3B2313' : colors.surface,
+                          borderColor: Number(suspensionHours) === hours ? '#D97732' : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.quickText, { color: Number(suspensionHours) === hours ? '#FFB16A' : colors.text }]}>
+                        {hours}H
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <View style={styles.moderationActions}>
+                  <Pressable
+                    disabled={working || moderationTarget.id === selfId}
+                    onPress={() => { void moderateSelected('warn'); }}
+                    style={[styles.moderationAction, styles.warnAction, (working || moderationTarget.id === selfId) && styles.disabledAction]}
+                  >
+                    <Ionicons name="warning" size={18} color="#FFD36B" />
+                    <Text style={[styles.moderationActionText, { color: '#FFD36B' }]}>AVISAR</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={working || moderationTarget.id === selfId}
+                    onPress={() => { void moderateSelected('suspend'); }}
+                    style={[styles.moderationAction, styles.suspendAction, (working || moderationTarget.id === selfId) && styles.disabledAction]}
+                  >
+                    <Ionicons name="time" size={18} color="#FFB16A" />
+                    <Text style={[styles.moderationActionText, { color: '#FFB16A' }]}>SUSPENDER</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={working || moderationTarget.id === selfId}
+                    onPress={() => { void moderateSelected('ban'); }}
+                    style={[styles.moderationAction, styles.banAction, (working || moderationTarget.id === selfId) && styles.disabledAction]}
+                  >
+                    <Ionicons name="ban" size={18} color="#FF8D9B" />
+                    <Text style={[styles.moderationActionText, { color: '#FF8D9B' }]}>BANIR</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={working || moderationTarget.id === selfId}
+                    onPress={() => { void moderateSelected('restore'); }}
+                    style={[styles.moderationAction, styles.restoreAction, (working || moderationTarget.id === selfId) && styles.disabledAction]}
+                  >
+                    <Ionicons name="refresh-circle" size={18} color="#6DDAA2" />
+                    <Text style={[styles.moderationActionText, { color: '#6DDAA2' }]}>RESTAURAR</Text>
+                  </Pressable>
+                </View>
+
+                {moderationTarget.id === selfId ? (
+                  <Text style={[styles.emptyText, { color: '#FF9FAF' }]}>
+                    Ações de moderação na própria conta estão bloqueadas.
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <Text style={[styles.emptyText, { color: colors.muted }]}>Nenhum jogador selecionado.</Text>
+            )}
+          </View>
+
           <SectionTitle title="Adicionar moedas" />
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>
@@ -808,41 +992,6 @@ export default function AdminScreen() {
                 <Text style={[styles.quickText, { color: colors.text }]}>LIMPAR</Text>
               </Pressable>
             </View>
-
-            {moderationTarget ? (
-              <View style={[styles.moderationBox, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-                <Text style={[styles.fieldLabel, { color: colors.muted }]}>MODERAÇÃO • @{moderationTarget.username}</Text>
-                <Text style={[styles.emptyText, { color: colors.muted }]}>
-                  Status: {moderationTarget.account_status ?? 'active'} • avisos: {moderationTarget.warning_count ?? 0}
-                  {moderationTarget.suspended_until ? ` • até ${new Date(moderationTarget.suspended_until).toLocaleString('pt-BR')}` : ''}
-                </Text>
-                <TextInput
-                  value={moderationReason}
-                  onChangeText={setModerationReason}
-                  placeholder="Motivo da ação"
-                  placeholderTextColor={colors.muted}
-                  style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
-                />
-                <View style={styles.formSplit}>
-                  <TextInput
-                    value={suspensionHours}
-                    onChangeText={(value) => setSuspensionHours(value.replace(/[^0-9]/g, ''))}
-                    keyboardType="number-pad"
-                    placeholder="Horas"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.input, styles.moderationHours, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
-                  />
-                  <View style={styles.quickRow}>
-                    <Pressable onPress={() => { void moderateSelected('warn'); }} style={[styles.quickChip, { borderColor: '#D9A441', backgroundColor: '#362B13' }]}><Text style={[styles.quickText, { color: '#FFD36B' }]}>AVISAR</Text></Pressable>
-                    <Pressable onPress={() => { void moderateSelected('suspend'); }} style={[styles.quickChip, { borderColor: '#D97732', backgroundColor: '#3B2313' }]}><Text style={[styles.quickText, { color: '#FFB16A' }]}>SUSPENDER</Text></Pressable>
-                    <Pressable onPress={() => { void moderateSelected('ban'); }} style={[styles.quickChip, { borderColor: '#A84250', backgroundColor: '#351A24' }]}><Text style={[styles.quickText, { color: '#FF8D9B' }]}>BANIR</Text></Pressable>
-                    <Pressable onPress={() => { void moderateSelected('restore'); }} style={[styles.quickChip, { borderColor: '#2F9E68', backgroundColor: '#153426' }]}><Text style={[styles.quickText, { color: '#6DDAA2' }]}>RESTAURAR</Text></Pressable>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <Text style={[styles.emptyText, { color: colors.muted }]}>Selecione exatamente um jogador para usar moderação.</Text>
-            )}
 
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>VALOR PARA CADA JOGADOR</Text>
             <View style={styles.quickRow}>
@@ -1045,8 +1194,27 @@ const styles = StyleSheet.create({
   friendChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   friendChipText: { fontSize: 10, fontWeight: '900' },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  moderationHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  moderationIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#351A24', alignItems: 'center', justifyContent: 'center' },
+  moderationTitle: { fontSize: 15, fontWeight: '900', marginBottom: 2 },
   moderationBox: { borderRadius: 16, borderWidth: 1, padding: 12, gap: 9 },
-  moderationHours: { flexGrow: 0, minWidth: 100, width: 110 },
+  moderationStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  moderationTargetName: { fontSize: 16, fontWeight: '900' },
+  statusBadge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  statusActive: { backgroundColor: '#153426' },
+  statusSuspended: { backgroundColor: '#3B2313' },
+  statusBanned: { backgroundColor: '#351A24' },
+  statusBadgeText: { color: '#fff', fontSize: 8, fontWeight: '900', letterSpacing: .5 },
+  suspensionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 7 },
+  moderationHours: { flexGrow: 0, minWidth: 92, width: 100 },
+  moderationActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  moderationAction: { minHeight: 46, minWidth: 118, flexGrow: 1, borderRadius: 13, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  moderationActionText: { fontSize: 9, fontWeight: '900', letterSpacing: .35 },
+  warnAction: { backgroundColor: '#362B13', borderColor: '#D9A441' },
+  suspendAction: { backgroundColor: '#3B2313', borderColor: '#D97732' },
+  banAction: { backgroundColor: '#351A24', borderColor: '#A84250' },
+  restoreAction: { backgroundColor: '#153426', borderColor: '#2F9E68' },
+  disabledAction: { opacity: .45 },
   formSplit: { flexDirection:'row', flexWrap:'wrap', gap:8 },
   formField: { flexGrow:1, flexBasis:180, minWidth:160, gap:5 },
   formFieldSmall: { flexGrow:1, flexBasis:90, minWidth:85, gap:5 },
