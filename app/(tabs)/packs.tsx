@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
-import { listPacks, openPack, type OpenedCard, type Pack } from '@/services/packs';
+import { hydrateBoosterArtwork, listPacks, openPack, type OpenedCard, type Pack } from '@/services/packs';
 import { getMyProfile } from '@/services/player';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -22,6 +22,7 @@ export default function PacksScreen() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const artworkRequested = useRef(new Set<string>());
 
   const load = useCallback(async () => {
     try { setLoading(true); const [packRows, profile] = await Promise.all([listPacks(), getMyProfile()]); setPacks(packRows); setCoins(profile.coins); }
@@ -36,6 +37,61 @@ export default function PacksScreen() {
   const packWidth = isMobile ? '100%' : width >= 1100 ? '32.4%' : '49%';
   const artWidth = isMobile ? Math.min(218, Math.max(194, width - 142)) : width >= 1100 ? 162 : 174;
   const displayHeight = isMobile ? Math.round(artWidth * 1.82) : 315;
+  const visibleArtworkKey = visiblePacks
+    .map((pack) => `${pack.set_id}:${pack.booster_art_url ?? ''}:${pack.booster_art_source ?? ''}`)
+    .join('|');
+
+  useEffect(() => {
+    const targets = visiblePacks.filter((pack) => {
+      if (pack.booster_art_url) return false;
+      if (pack.booster_art_source === 'tcgdex:no_art' || pack.booster_art_source === 'tcgdex:no_match') return false;
+      return !artworkRequested.current.has(pack.set_id);
+    });
+
+    if (!targets.length) return;
+
+    targets.forEach((pack) => artworkRequested.current.add(pack.set_id));
+
+    hydrateBoosterArtwork(targets)
+      .then((results) => {
+        if (!results.length) return;
+        const bySet = new Map(results.map((result) => [result.set_id, result]));
+
+        setPacks((current) =>
+          current.map((pack) => {
+            const artwork = bySet.get(pack.set_id);
+            if (!artwork) return pack;
+            return {
+              ...pack,
+              booster_art_url: artwork.booster_art_url,
+              booster_art_urls: artwork.booster_art_urls,
+              booster_back_url: artwork.booster_back_url,
+              booster_logo_url: artwork.booster_logo_url,
+              booster_art_source: artwork.source,
+            };
+          }),
+        );
+
+        setSelectedPack((current) => {
+          if (!current) return current;
+          const artwork = bySet.get(current.set_id);
+          if (!artwork) return current;
+          return {
+            ...current,
+            booster_art_url: artwork.booster_art_url,
+            booster_art_urls: artwork.booster_art_urls,
+            booster_back_url: artwork.booster_back_url,
+            booster_logo_url: artwork.booster_logo_url,
+            booster_art_source: artwork.source,
+          };
+        });
+      })
+      .catch((error) => {
+        console.warn('Booster artwork hydration failed:', error);
+      });
+  // A compact key prevents re-fetch loops while still reacting as more packs become visible.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleArtworkKey]);
 
   function choosePack(pack: Pack) {
     if (coins < pack.price) { setNotice({ kind: 'error', text: `Moedas insuficientes: você tem 🪙 ${coins.toLocaleString('pt-BR')} e este booster custa 🪙 ${pack.price.toLocaleString('pt-BR')}.` }); return; }
