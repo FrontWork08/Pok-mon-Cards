@@ -63,7 +63,7 @@ export async function getMyBag(search?: string) {
 
   let query = supabase
     .from('player_cards')
-    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at)')
+    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at, tcg_data)')
     .eq('player_id', userData.user.id)
     .gt('quantity', 0)
     .order('first_obtained_at', { ascending: false });
