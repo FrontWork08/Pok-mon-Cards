@@ -13,6 +13,8 @@ type RarityTheme = { color: string; soft: string; label: string; tier: number };
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const RAYS = Array.from({ length: 18 }, (_, index) => index * 20);
 const SPARKS = Array.from({ length: 20 }, (_, index) => index * 18);
+const HIDDEN_COLOR = '#7B8794';
+const HIDDEN_SOFT = '#14181D';
 
 function rarityTheme(rarity?: string | null): RarityTheme {
   const value = (rarity ?? '').toLowerCase();
@@ -38,6 +40,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const [cards, setCards] = useState<OpenedCard[]>([]);
   const [cardIndex, setCardIndex] = useState(0);
   const [faceUp, setFaceUp] = useState(false);
+  const [frontUnlocked, setFrontUnlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
@@ -65,7 +68,14 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   function resetOpening() {
     packY.setValue(0); packRotate.setValue(0); packScale.setValue(1); packOpacity.setValue(1); seamCharge.setValue(0); tear.setValue(0); openingFlash.setValue(0); openingCore.setValue(0); openingShock.setValue(0); openingColor.setValue(0); floorPulse.setValue(0);
   }
-  function resetReveal() { flip.setValue(0); revealBurst.setValue(0); screenFlash.setValue(0); coreFlash.setValue(0); shockwave.setValue(0); cardImpact.setValue(0); }
+  function resetReveal() { setFrontUnlocked(false); flip.setValue(0); revealBurst.setValue(0); screenFlash.setValue(0); coreFlash.setValue(0); shockwave.setValue(0); cardImpact.setValue(0); }
+
+  useEffect(() => {
+    const listenerId = flip.addListener(({ value }) => {
+      if (value >= .55) setFrontUnlocked(true);
+    });
+    return () => flip.removeListener(listenerId);
+  }, [flip]);
 
   useEffect(() => {
     if (!visible) return;
@@ -164,6 +174,9 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   if (!pack) return null;
   const currentCard = cards[cardIndex];
   const theme = rarityTheme(currentCard?.rarity);
+  const revealColor = frontUnlocked ? theme.color : HIDDEN_COLOR;
+  const revealSoft = frontUnlocked ? theme.soft : HIDDEN_SOFT;
+  const revealLabel = frontUnlocked ? theme.label : 'CARTA OCULTA';
   const highTier = theme.tier >= 4;
 
   const packRotation = packRotate.interpolate({ inputRange: [-1, 1], outputRange: ['-5deg', '5deg'] });
@@ -221,20 +234,20 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
       </View> : null}
 
       {stage === 'cards' && currentCard ? <View style={styles.rewardStage}>
-        <View style={styles.rewardHeader}><Text style={styles.rewardCounter}>RECOMPENSA {cardIndex + 1} / {cards.length}</Text><View style={[styles.raritySignal, { borderColor: `${theme.color}80`, backgroundColor: theme.soft }]}><View style={[styles.signalDot, { backgroundColor: theme.color }]} /><Text style={[styles.signalText, { color: theme.color }]}>{theme.label}</Text></View></View>
+        <View style={styles.rewardHeader}><Text style={styles.rewardCounter}>RECOMPENSA {cardIndex + 1} / {cards.length}</Text><View style={[styles.raritySignal, { borderColor: `${revealColor}80`, backgroundColor: revealSoft }]}><View style={[styles.signalDot, { backgroundColor: revealColor }]} /><Text style={[styles.signalText, { color: revealColor }]}>{revealLabel}</Text></View></View>
         <View style={styles.revealArena}>
-          <Animated.View pointerEvents="none" style={[styles.rarityAura, { backgroundColor: theme.color, opacity: auraOpacity, transform: [{ scale: auraScale }] }]} />
+          <Animated.View pointerEvents="none" style={[styles.rarityAura, { backgroundColor: revealColor, opacity: frontUnlocked ? auraOpacity : .16, transform: [{ scale: auraScale }] }]} />
           <Animated.View pointerEvents="none" style={[styles.coreFlash, { opacity: coreOpacity, transform: [{ scale: coreScale }] }]} />
-          <Animated.View pointerEvents="none" style={[styles.revealFlash, { backgroundColor: theme.color, opacity: revealBurst, transform: [{ scale: revealScale }] }]} />
+          <Animated.View pointerEvents="none" style={[styles.revealFlash, { backgroundColor: revealColor, opacity: revealBurst, transform: [{ scale: revealScale }] }]} />
           <Animated.View pointerEvents="none" style={[styles.shockwave, { borderColor: '#fff', opacity: shockOpacity, transform: [{ scale: shockScale }] }]} />
-          <Animated.View pointerEvents="none" style={[styles.shockwaveTwo, { borderColor: theme.color, opacity: shockOpacityTwo, transform: [{ scale: shockScaleTwo }] }]} />
+          <Animated.View pointerEvents="none" style={[styles.shockwaveTwo, { borderColor: revealColor, opacity: shockOpacityTwo, transform: [{ scale: shockScaleTwo }] }]} />
           {RAYS.map((rotation) => <Animated.View pointerEvents="none" key={`rr-${rotation}`} style={[styles.ray, { backgroundColor: theme.color, opacity: revealBurst, transform: [{ rotate: `${rotation}deg` }, { translateY: highTier ? -195 : -170 }, { scaleY: rayScale }] }]} />)}
-          {theme.tier >= 3 ? SPARKS.map((rotation) => <Animated.View pointerEvents="none" key={`rs-${rotation}`} style={[styles.spark, { backgroundColor: rotation % 36 === 0 ? '#fff' : theme.color, opacity: sparkOpacity, transform: [{ rotate: `${rotation}deg` }, { translateY: sparkTravel }] }]} />) : null}
-          <View style={[styles.pedestal, { borderColor: theme.color }]} /><View style={styles.pedestalBase} />
+          {theme.tier >= 3 ? SPARKS.map((rotation) => <Animated.View pointerEvents="none" key={`rs-${rotation}`} style={[styles.spark, { backgroundColor: rotation % 36 === 0 ? '#fff' : revealColor, opacity: sparkOpacity, transform: [{ rotate: `${rotation}deg` }, { translateY: sparkTravel }] }]} />) : null}
+          <View style={[styles.pedestal, { borderColor: revealColor }]} /><View style={styles.pedestalBase} />
           <Pressable style={styles.tapArea} onPress={!faceUp ? revealCurrent : undefined}>
             <Animated.View style={[styles.flipScene, compact && styles.flipSceneCompact, { opacity: cardEnter, transform: [{ translateY: cardTranslateY }, { scale: combinedCardScale }] }]}>
-              <Animated.View style={[styles.cardFace, styles.cardBack, { opacity: backOpacity, borderColor: theme.color, transform: [{ perspective: 900 }, { rotateY: backRotation }] }]}><View style={[styles.backGlow, { backgroundColor: theme.soft }]} /><View style={[styles.backRing, { borderColor: theme.color }]}><Ionicons name="help" size={55} color={theme.color} /></View><Text style={styles.hiddenTitle}>RECOMPENSA OCULTA</Text><Text style={[styles.hiddenHint, { color: theme.color }]}>TOQUE PARA REVELAR</Text></Animated.View>
-              <Animated.View style={[styles.cardFace, styles.cardFront, { opacity: frontOpacity, borderColor: theme.color, transform: [{ perspective: 900 }, { rotateY: frontRotation }] }]}>{currentCard.image && !failedImages[currentCard.id] ? <Image source={{ uri: currentCard.image }} resizeMode="contain" style={styles.rewardImage} onError={() => setFailedImages((value) => ({ ...value, [currentCard.id]: true }))} /> : <View style={styles.imageFallback}><Ionicons name="image-outline" size={54} color="#666" /></View>}<View style={styles.rewardInfo}><Text style={styles.rewardName}>{currentCard.name}</Text><Text style={[styles.rewardRarity, { color: theme.color }]}>{currentCard.rarity ?? 'Comum'}</Text></View></Animated.View>
+              <Animated.View style={[styles.cardFace, styles.cardBack, { opacity: backOpacity, borderColor: HIDDEN_COLOR, transform: [{ perspective: 900 }, { rotateY: backRotation }] }]}><View style={[styles.backGlow, { backgroundColor: HIDDEN_SOFT }]} /><View style={[styles.backRing, { borderColor: HIDDEN_COLOR }]}><Ionicons name="help" size={55} color={HIDDEN_COLOR} /></View><Text style={styles.hiddenTitle}>RECOMPENSA OCULTA</Text><Text style={[styles.hiddenHint, { color: HIDDEN_COLOR }]}>TOQUE PARA REVELAR</Text></Animated.View>
+              {frontUnlocked ? <Animated.View style={[styles.cardFace, styles.cardFront, { opacity: frontOpacity, borderColor: theme.color, transform: [{ perspective: 900 }, { rotateY: frontRotation }] }]}>{currentCard.image && !failedImages[currentCard.id] ? <Image source={{ uri: currentCard.image }} resizeMode="contain" style={styles.rewardImage} onError={() => setFailedImages((value) => ({ ...value, [currentCard.id]: true }))} /> : <View style={styles.imageFallback}><Ionicons name="image-outline" size={54} color="#666" /></View>}<View style={styles.rewardInfo}><Text style={styles.rewardName}>{currentCard.name}</Text><Text style={[styles.rewardRarity, { color: theme.color }]}>{currentCard.rarity ?? 'Comum'}</Text></View></Animated.View> : null}
             </Animated.View>
           </Pressable>
         </View>
@@ -244,7 +257,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
       {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPull ? <Text style={styles.bestPull}>Melhor pull: {bestPull.name}</Text> : null}<Text style={styles.summarySubtitle}>Todos os cards foram enviados para sua Bag • +20 XP</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <View key={key} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>{card.image && !failedImages[key] ? <Image source={{ uri: card.image }} resizeMode="contain" style={styles.summaryImage} onError={() => setFailedImages((value) => ({ ...value, [key]: true }))} /> : <View style={styles.summaryFallback}><Ionicons name="image-outline" size={28} color="#555" /></View>}<Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text></View>; })}</View><Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable></ScrollView> : null}
 
       {stage === 'opening' ? <><Animated.View pointerEvents="none" style={[styles.openingColorWash, { opacity: openingColorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: openingFlash }]} /></> : null}
-      {stage === 'cards' && currentCard ? <><Animated.View pointerEvents="none" style={[styles.colorWash, { backgroundColor: theme.color, opacity: colorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: screenFlash }]} /></> : null}
+      {stage === 'cards' && currentCard ? <><Animated.View pointerEvents="none" style={[styles.colorWash, { backgroundColor: revealColor, opacity: colorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: screenFlash }]} /></> : null}
     </View>
   </Modal>;
 }
