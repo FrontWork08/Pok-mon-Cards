@@ -19,6 +19,7 @@ export type Pack = {
   booster_logo_url: string | null;
   booster_art_source: string | null;
   active: boolean;
+  currency?: 'coins' | 'diamonds';
 };
 
 export type OpenedCard = {
@@ -76,6 +77,29 @@ export async function openPack(packId: string) {
   if (error) throw await normalizeFunctionError(error, 'Não foi possível abrir este booster.');
   if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível abrir este booster.');
   return data as { openingId: string; cards: OpenedCard[] };
+}
+
+export async function getLegendaryPackConfig() {
+  const { data, error } = await supabase
+    .from('diamond_pack_config')
+    .select('cost_diamonds,min_value_usd,active')
+    .eq('id', 1)
+    .single();
+  if (error) throw error;
+  return {
+    costDiamonds: Number(data.cost_diamonds ?? 25),
+    minValueUsd: Number(data.min_value_usd ?? 25),
+    active: Boolean(data.active),
+  };
+}
+
+export async function openLegendaryDiamondPack() {
+  const { data, error } = await supabase.functions.invoke('open-pack', {
+    body: { kind: 'legendary_diamond' },
+  });
+  if (error) throw await normalizeFunctionError(error, 'Não foi possível abrir o pacote lendário.');
+  if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível abrir o pacote lendário.');
+  return data as { openingId: string; cards: OpenedCard[]; diamonds: number; pricePaid: number };
 }
 
 

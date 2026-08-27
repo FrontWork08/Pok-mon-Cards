@@ -1,7 +1,9 @@
 import { supabase } from '@/lib/supabase';
 
 export type AppearanceMode = 'system' | 'dark' | 'light';
-export type ThemeName = 'trainer' | 'midnight' | 'poke_red' | 'electric' | 'ghost' | 'fire' | 'water';
+export type ThemeName =
+  | 'trainer' | 'midnight' | 'poke_red' | 'electric' | 'ghost' | 'fire' | 'water'
+  | 'kanto' | 'johto' | 'hoenn' | 'sinnoh';
 
 export type PlayerSettings = {
   player_id: string;

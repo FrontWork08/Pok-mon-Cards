@@ -17,9 +17,12 @@ import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PackContentsModal } from '@/components/PackContentsModal';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
 import { PremiumBackground } from '@/components/PremiumBackground';
+import { CurrencyBar } from '@/components/CurrencyBar';
 import {
   getFavoritePackIds,
+  getLegendaryPackConfig,
   listPacks,
+  openLegendaryDiamondPack,
   openPack,
   setPackFavorite,
   type OpenedCard,
@@ -28,14 +31,25 @@ import {
 import { getMyProfile } from '@/services/player';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { useWallet } from '@/wallet/WalletProvider';
 
 type Notice = { kind: 'error' | 'success'; text: string } | null;
+
+const DIAMOND_PACK_BASE: Pack = {
+  id:'diamond-legendary',name:'Cofre Lendário',set_id:'legendary-vault',
+  price:25,base_price:25,free_until:null,cards_per_pack:1,image_url:null,art_url:null,
+  booster_art_url:null,booster_art_urls:[],booster_back_url:null,booster_logo_url:null,
+  booster_art_source:'trainer-vault',active:true,currency:'diamonds',
+};
 
 export default function PacksScreen() {
   const { width } = useWindowDimensions();
   const { colors, isLight } = useAppTheme();
+  const wallet = useWallet();
   const [packs, setPacks] = useState<Pack[]>([]);
   const [coins, setCoins] = useState(0);
+  const [diamonds, setDiamonds] = useState(0);
+  const [diamondCost, setDiamondCost] = useState(25);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,14 +69,17 @@ export default function PacksScreen() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [packRows, profile, favorites] = await Promise.all([
+      const [packRows, profile, favorites, legendaryConfig] = await Promise.all([
         listPacks(),
         getMyProfile(),
         getFavoritePackIds(),
+        getLegendaryPackConfig(),
       ]);
       setPacks(packRows);
       setSelectedPack((current) => current ? packRows.find((pack) => pack.id === current.id) ?? null : null);
       setCoins(profile.coins);
+      setDiamonds(profile.diamonds);
+      setDiamondCost(legendaryConfig.costDiamonds);
       setFavoriteIds(new Set(favorites));
     } catch {
       setNotice({ kind: 'error', text: 'Não foi possível atualizar a loja agora.' });
@@ -70,6 +87,11 @@ export default function PacksScreen() {
       setLoading(false);
     }
   }, []);
+
+  const diamondPack = useMemo(
+    () => ({ ...DIAMOND_PACK_BASE, price: diamondCost, base_price: diamondCost }),
+    [diamondCost],
+  );
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -156,6 +178,24 @@ export default function PacksScreen() {
   async function purchaseSelectedPack(): Promise<OpenedCard[]> {
     if (!selectedPack) throw new Error('Nenhum booster selecionado.');
 
+    if (selectedPack.id === DIAMOND_PACK_BASE.id) {
+      const before = await getMyProfile();
+      setDiamonds(before.diamonds);
+      if (before.diamonds < diamondCost) {
+        throw new Error(`Diamantes insuficientes. Seu saldo atual é 💎 ${before.diamonds.toLocaleString('pt-BR')}.`);
+      }
+      try {
+        const result = await openLegendaryDiamondPack();
+        setDiamonds(result.diamonds);
+        await wallet.refresh();
+        return result.cards;
+      } catch (error) {
+        const refreshed = await getMyProfile().catch(() => null);
+        if (refreshed) setDiamonds(refreshed.diamonds);
+        throw error;
+      }
+    }
+
     const [before, latestPacks] = await Promise.all([getMyProfile(), listPacks()]);
     const latestPack = latestPacks.find((pack) => pack.id === selectedPack.id);
     if (!latestPack) throw new Error('Este booster não está mais disponível.');
@@ -169,6 +209,7 @@ export default function PacksScreen() {
       const result = await openPack(latestPack.id);
       const after = await getMyProfile();
       setCoins(after.coins);
+      await wallet.refresh();
       return result.cards;
     } catch (error) {
       const refreshed = await getMyProfile().catch(() => null);
@@ -179,18 +220,21 @@ export default function PacksScreen() {
 
   const header = (
     <View style={styles.headerStack}>
-      <View style={styles.header}>
-        <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-        <Text style={[styles.title, { color: colors.text }]}>Pack Shop</Text>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>
-          Boosters físicos, favoritos e conteúdo do set sem carregar a loja inteira na memória.
-        </Text>
+      <View style={styles.headerTop}>
+        <View style={styles.header}>
+          <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Pack Shop</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>
+            Boosters físicos, favoritos e conteúdo do set sem carregar a loja inteira na memória.
+          </Text>
+        </View>
+        <CurrencyBar compact />
       </View>
 
       <View style={[styles.balanceRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View>
           <Text style={[styles.balanceLabel, { color: colors.muted }]}>SEU SALDO</Text>
-          <Text style={[styles.balanceValue, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text>
+          <Text style={[styles.balanceValue, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}  •  <Text style={{color:'#68D9FF'}}>💎 {diamonds.toLocaleString('pt-BR')}</Text></Text>
         </View>
         <View style={[styles.balanceBadge, { backgroundColor: colors.accentSoft }]}>
           <Ionicons name="wallet-outline" size={20} color={colors.yellow} />
@@ -229,6 +273,22 @@ export default function PacksScreen() {
           </Pressable>
         </View>
       ) : null}
+
+      <View style={[styles.diamondHero, { backgroundColor: isLight ? '#E9F9FF' : '#10283A', borderColor: '#68D9FF' }]}>
+        <View style={styles.diamondOrb}><Ionicons name="diamond" size={27} color="#68D9FF" /></View>
+        <View style={{ flex: 1, minWidth: 190 }}>
+          <Text style={styles.diamondKicker}>COFRE DE DIAMANTES</Text>
+          <Text style={[styles.diamondTitle, { color: colors.text }]}>1 carta lendária acima de US$ 25</Text>
+          <Text style={[styles.diamondText, { color: colors.muted }]}>Somente Pokémon lendários ou míticos. Uma carta por abertura, sem itens extras.</Text>
+        </View>
+        <Pressable
+          disabled={diamonds < diamondCost}
+          onPress={() => diamonds >= diamondCost ? setSelectedPack(diamondPack) : setNotice({kind:'error',text:`Você precisa de 💎 ${diamondCost} Diamantes para abrir o Cofre Lendário.`})}
+          style={[styles.diamondButton, { backgroundColor: diamonds >= diamondCost ? '#68D9FF' : colors.surfaceAlt }]}
+        >
+          <Text style={[styles.diamondButtonText, diamonds < diamondCost && { color: colors.muted }]}>💎 {diamondCost} • ABRIR</Text>
+        </Pressable>
+      </View>
 
       <View style={[styles.shopHero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
         <View style={[styles.shopHeroIcon, { backgroundColor: colors.surface }]}>
@@ -412,7 +472,9 @@ export default function PacksScreen() {
         onPurchase={purchaseSelectedPack}
         onFinished={() => setNotice({
           kind: 'success',
-          text: 'Booster aberto! Os cards já estão na sua Bag, você ganhou +20 XP e avançou suas missões.',
+          text: selectedPack?.currency === 'diamonds'
+            ? 'Cofre aberto! Sua carta lendária já está na Bag.'
+            : 'Booster aberto! Os cards já estão na sua Bag, você ganhou +20 XP e avançou suas missões.',
         })}
       />
     </SafeAreaView>
@@ -424,6 +486,7 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 10, paddingTop: 10, paddingBottom: 34 },
   columnWrap: { alignItems: 'stretch' },
   headerStack: { gap: 14, paddingHorizontal: 6, paddingBottom: 14 },
+  headerTop: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
   header: { gap: 5, marginBottom: 2 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
@@ -433,6 +496,13 @@ const styles = StyleSheet.create({
   balanceLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   balanceValue: { fontSize: 22, fontWeight: '900', marginTop: 2 },
   balanceBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  diamondHero: { flexDirection:'row', flexWrap:'wrap', alignItems:'center', gap:12, borderRadius:20, borderWidth:1, padding:14 },
+  diamondOrb: { width:52, height:52, borderRadius:18, backgroundColor:'#163C55', alignItems:'center', justifyContent:'center' },
+  diamondKicker: { color:'#68D9FF', fontSize:8, fontWeight:'900', letterSpacing:1.2 },
+  diamondTitle: { fontSize:17, fontWeight:'900', marginTop:2 },
+  diamondText: { fontSize:10, lineHeight:15, marginTop:3 },
+  diamondButton: { minHeight:45, borderRadius:13, paddingHorizontal:13, alignItems:'center', justifyContent:'center' },
+  diamondButtonText: { color:'#07111F', fontSize:9, fontWeight:'900' },
 
   notice: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
   noticeText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },

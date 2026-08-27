@@ -4,6 +4,8 @@ export type PlayerProfile = {
   id: string;
   username: string;
   coins: number;
+  diamonds: number;
+  profile_icon: string;
   level: number;
   xp: number;
   battle_rating: number;
@@ -51,12 +53,18 @@ export async function getMyProfile() {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id, username, coins, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), show_battle_rating, created_at, last_daily_claim_at')
+    .select('id, username, coins, diamonds, profile_icon, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), show_battle_rating, created_at, last_daily_claim_at')
     .eq('id', userData.user.id)
     .single();
 
   if (error) throw error;
   return data as PlayerProfile;
+}
+
+export async function setMyProfileIcon(profileIcon: string) {
+  const { data, error } = await supabase.rpc('set_profile_icon', { p_icon: profileIcon });
+  if (error) throw error;
+  return String(data);
 }
 
 export async function getMyBag(search?: string) {

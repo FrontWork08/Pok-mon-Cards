@@ -8,25 +8,29 @@ export type AppColors = {
   blue: string; blueDeep: string; yellow: string; red: string; green: string; accent: string; accentSoft: string;
 };
 
-const accents: Record<ThemeName, { accent: string; secondary: string; soft: string }> = {
-  trainer: { accent: '#4D8DFF', secondary: '#FFD54A', soft: '#111214' },
-  midnight: { accent: '#9B7BFF', secondary: '#5EDCFF', soft: '#241B4C' },
-  poke_red: { accent: '#FF5264', secondary: '#FFD54A', soft: '#451923' },
-  electric: { accent: '#FFD83D', secondary: '#4F9BFF', soft: '#3B3413' },
-  ghost: { accent: '#A970FF', secondary: '#E778D2', soft: '#2C1745' },
-  fire: { accent: '#FF7A3D', secondary: '#FFD04A', soft: '#452014' },
-  water: { accent: '#42B9FF', secondary: '#5EE4D2', soft: '#123448' },
+const accents: Record<ThemeName, { accent: string; secondary: string; soft: string; bg: string; surface: string; surfaceAlt: string; lightBg: string }> = {
+  trainer: { accent:'#4D8DFF',secondary:'#FFD54A',soft:'#172A48',bg:'#091423',surface:'#101F32',surfaceAlt:'#182B42',lightBg:'#EDF5FF' },
+  midnight: { accent:'#9B7BFF',secondary:'#5EDCFF',soft:'#2D2358',bg:'#100D24',surface:'#1B1635',surfaceAlt:'#282047',lightBg:'#F1EEFF' },
+  poke_red: { accent:'#FF5264',secondary:'#FFD54A',soft:'#4A2029',bg:'#1F0C12',surface:'#30131B',surfaceAlt:'#45202A',lightBg:'#FFF0F2' },
+  electric: { accent:'#FFD83D',secondary:'#4F9BFF',soft:'#4A4019',bg:'#191707',surface:'#29250B',surfaceAlt:'#3B3512',lightBg:'#FFFBE5' },
+  ghost: { accent:'#A970FF',secondary:'#E778D2',soft:'#352050',bg:'#160D22',surface:'#251438',surfaceAlt:'#35204B',lightBg:'#F7EEFF' },
+  fire: { accent:'#FF7A3D',secondary:'#FFD04A',soft:'#512513',bg:'#210D07',surface:'#33150C',surfaceAlt:'#492114',lightBg:'#FFF2E9' },
+  water: { accent:'#42B9FF',secondary:'#5EE4D2',soft:'#153E58',bg:'#061A29',surface:'#0D2A3D',surfaceAlt:'#143B52',lightBg:'#EAF8FF' },
+  kanto: { accent:'#F0525F',secondary:'#F5D34B',soft:'#44242A',bg:'#171116',surface:'#27191D',surfaceAlt:'#382428',lightBg:'#FFF1F0' },
+  johto: { accent:'#D4A62A',secondary:'#67C18A',soft:'#3E351D',bg:'#15160D',surface:'#252518',surfaceAlt:'#383621',lightBg:'#FFF9E7' },
+  hoenn: { accent:'#38A7D8',secondary:'#EF6A56',soft:'#173E51',bg:'#071924',surface:'#0F2936',surfaceAlt:'#163D4C',lightBg:'#EAF8FA' },
+  sinnoh: { accent:'#8C87E8',secondary:'#9EDDEA',soft:'#302E55',bg:'#111326',surface:'#1C2038',surfaceAlt:'#292E4B',lightBg:'#F1F3FF' },
 };
 
 function colorsFor(light: boolean, theme: ThemeName): AppColors {
   const a = accents[theme];
   if (light) return {
-    bg: '#F4F4F4', surface: '#FFFFFF', surfaceAlt: '#ECECEC', border: '#D2D2D2', text: '#111111', muted: '#686868',
+    bg: a.lightBg, surface: '#FFFFFF', surfaceAlt: `${a.accent}12`, border: `${a.accent}35`, text: '#161A20', muted: '#626B76',
     blue: a.accent, blueDeep: a.accent, yellow: a.secondary, red: '#D84454', green: '#249B68', accent: a.accent, accentSoft: `${a.accent}18`,
   };
   return {
-    bg: '#050505', surface: '#0B0B0C', surfaceAlt: '#141416', border: '#26262A', text: '#F7F7F7', muted: '#9A9A9F',
-    blue: a.accent, blueDeep: a.accent, yellow: a.secondary, red: '#FF5C68', green: '#53D69A', accent: a.accent, accentSoft: theme === 'trainer' ? '#111214' : a.soft,
+    bg: a.bg, surface: a.surface, surfaceAlt: a.surfaceAlt, border: `${a.accent}40`, text: '#F7F8FA', muted: '#A4ADBA',
+    blue: a.accent, blueDeep: a.accent, yellow: a.secondary, red: '#FF6978', green: '#5BDB9F', accent: a.accent, accentSoft: a.soft,
   };
 }
 

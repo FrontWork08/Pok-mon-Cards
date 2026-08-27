@@ -92,6 +92,19 @@ export type CoinGrantBatchResult = {
   recipients: CoinGrantResult[];
 };
 
+export type DiamondGrantBatchResult = CoinGrantBatchResult;
+
+export type AdminRedeemCode = {
+  id: string;
+  code: string;
+  reward: { coins?: number; diamonds?: number; cardId?: string; cardQuantity?: number };
+  active: boolean;
+  max_total_uses: number | null;
+  expires_at: string | null;
+  created_at: string;
+  code_redemptions?: Array<{ count: number }>;
+};
+
 export type CoinGrantHistory = {
   id: string;
   target_id: string;
@@ -152,6 +165,38 @@ export async function grantCoinsBatch(targetIds: string[], amount: number, note?
     amount,
     note: note?.trim() || null,
   }) as Promise<CoinGrantBatchResult>;
+}
+
+export async function grantDiamondsBatch(targetIds: string[], amount: number, note?: string) {
+  return invokeAdmin({
+    action: 'grant_diamonds_batch',
+    targetIds,
+    amount,
+    note: note?.trim() || null,
+  }) as Promise<DiamondGrantBatchResult>;
+}
+
+export async function createRedeemCode(input: {
+  code: string;
+  reward: AdminRedeemCode['reward'];
+  maxTotalUses?: number | null;
+  expiresHours?: number | null;
+}) {
+  return invokeAdmin({
+    action: 'create_redeem_code',
+    code: input.code,
+    reward: input.reward,
+    maxTotalUses: input.maxTotalUses ?? null,
+    expiresHours: input.expiresHours ?? null,
+  }) as Promise<AdminRedeemCode>;
+}
+
+export async function getAdminRedeemCodes() {
+  return invokeAdmin({ action: 'redeem_codes' }) as Promise<AdminRedeemCode[]>;
+}
+
+export async function setAdminRedeemCodeActive(codeId: string, active: boolean) {
+  return invokeAdmin({ action: 'set_redeem_code_active', codeId, active }) as Promise<AdminRedeemCode>;
 }
 
 export async function publishGlobalAnnouncement(

@@ -99,6 +99,69 @@ Deno.serve(async (req: Request) => {
       return json({ data });
     }
 
+    if (body.action === "grant_diamonds_batch") {
+      const rawTargetIds = Array.isArray(body.targetIds) ? body.targetIds : [];
+      const targetIds = [...new Set(rawTargetIds.filter((id): id is string => typeof id === "string" && id.length > 0))];
+      const amount = Number(body.amount);
+      const note = typeof body.note === "string" ? body.note : null;
+      if (targetIds.length < 1 || targetIds.length > 100 || !Number.isSafeInteger(amount) || amount < 1) {
+        return json({ error: "INVALID_AMOUNT_OR_TARGETS" }, 400);
+      }
+      const { data, error } = await admin.rpc("server_admin_grant_diamonds_batch", {
+        p_actor_id: user.id,
+        p_target_ids: targetIds,
+        p_amount: amount,
+        p_note: note,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "create_redeem_code") {
+      const code = typeof body.code === "string" ? body.code : "";
+      const reward = body.reward && typeof body.reward === "object" ? body.reward : {};
+      const maxTotalUses = body.maxTotalUses == null ? null : Number(body.maxTotalUses);
+      const expiresHours = body.expiresHours == null ? null : Number(body.expiresHours);
+      if (!code || (maxTotalUses != null && (!Number.isSafeInteger(maxTotalUses) || maxTotalUses < 1)) ||
+        (expiresHours != null && (!Number.isFinite(expiresHours) || expiresHours < 1 || expiresHours > 8760))) {
+        return json({ error: "INVALID_CODE_CONFIGURATION" }, 400);
+      }
+      const expiresAt = expiresHours == null ? null : new Date(Date.now() + expiresHours * 3600000).toISOString();
+      const { data, error } = await admin.rpc("server_admin_create_redeem_code", {
+        p_actor_id: user.id,
+        p_code: code,
+        p_reward: reward,
+        p_max_total_uses: maxTotalUses,
+        p_expires_at: expiresAt,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "redeem_codes") {
+      const { data, error } = await admin
+        .from("redeem_codes")
+        .select("id,code,reward,active,max_total_uses,expires_at,created_at,code_redemptions(count)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return json({ data: data ?? [] });
+    }
+
+    if (body.action === "set_redeem_code_active") {
+      const codeId = typeof body.codeId === "string" ? body.codeId : "";
+      const active = body.active === true;
+      if (!codeId) return json({ error: "INVALID_CODE" }, 400);
+      const { data, error } = await admin
+        .from("redeem_codes")
+        .update({ active })
+        .eq("id", codeId)
+        .select("id,code,reward,active,max_total_uses,expires_at,created_at")
+        .single();
+      if (error) throw error;
+      return json({ data });
+    }
+
     if (body.action === "players") {
       const { data, error } = await admin
         .from("players")

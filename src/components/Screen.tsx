@@ -2,6 +2,7 @@ import { PropsWithChildren } from 'react';
 import { Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { CurrencyBar } from '@/components/CurrencyBar';
 
 export function Screen({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle?: string }>) {
   const { colors } = useAppTheme();
@@ -14,10 +15,13 @@ export function Screen({ title, subtitle, children }: PropsWithChildren<{ title:
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.inner}>
-          <View style={styles.header}>
-            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-            {subtitle ? <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text> : null}
+          <View style={styles.headerRow}>
+            <View style={styles.header}>
+              <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
+              <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+              {subtitle ? <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text> : null}
+            </View>
+            <CurrencyBar compact />
           </View>
           {children}
         </View>
@@ -32,7 +36,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 118 },
   contentMobile: { paddingBottom: 28 },
   inner: { width: '100%', maxWidth: 1280, alignSelf: 'center', gap: 16 },
-  header: { gap: 5, marginBottom: 4 },
+  headerRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 4 },
+  header: { flex: 1, minWidth: 230, gap: 5 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { fontSize: 15, lineHeight: 21 },

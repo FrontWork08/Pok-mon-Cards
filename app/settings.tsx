@@ -6,8 +6,9 @@ import { Screen } from '@/components/Screen';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import type { AppearanceMode, ThemeName } from '@/services/settings';
 import { registerPushNotifications } from '@/services/notifications';
-import { getMyProfile } from '@/services/player';
+import { getMyProfile, setMyProfileIcon } from '@/services/player';
 import { setRatingVisibility } from '@/services/achievements';
+import { TrainerAvatar, type ProfileIcon } from '@/components/TrainerAvatar';
 
 const themes: Array<{ id: ThemeName; name: string; icon: keyof typeof Ionicons.glyphMap; colors: string[] }> = [
   { id:'trainer', name:'Trainer', icon:'shield', colors:['#4D8DFF','#FFD54A'] },
@@ -17,13 +18,29 @@ const themes: Array<{ id: ThemeName; name: string; icon: keyof typeof Ionicons.g
   { id:'ghost', name:'Ghost', icon:'skull', colors:['#A970FF','#E778D2'] },
   { id:'fire', name:'Fire', icon:'flame', colors:['#FF7A3D','#FFD04A'] },
   { id:'water', name:'Water', icon:'water', colors:['#42B9FF','#5EE4D2'] },
+  { id:'kanto', name:'Kanto Selvagem', icon:'paw', colors:['#F0525F','#F5D34B'] },
+  { id:'johto', name:'Johto Dourada', icon:'leaf', colors:['#D4A62A','#67C18A'] },
+  { id:'hoenn', name:'Hoenn Oceânica', icon:'water', colors:['#38A7D8','#EF6A56'] },
+  { id:'sinnoh', name:'Sinnoh Cósmica', icon:'sparkles', colors:['#8C87E8','#9EDDEA'] },
+];
+
+const profileIcons: Array<{ id: ProfileIcon; name: string }> = [
+  { id:'pokeball', name:'Captura' }, { id:'trainer', name:'Treinador' },
+  { id:'electric', name:'Elétrico' }, { id:'fire', name:'Fogo' },
+  { id:'water', name:'Água' }, { id:'leaf', name:'Planta' },
+  { id:'ghost', name:'Fantasma' }, { id:'dragon', name:'Dragão' },
+  { id:'diamond', name:'Diamante' },
 ];
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors, appearance, themeName, settings, updatePreferences } = useAppTheme();
   const [showRating, setShowRating] = useState(true);
-  useEffect(() => { getMyProfile().then((profile) => setShowRating(profile.show_battle_rating)).catch(() => null); }, []);
+  const [profileIcon, setProfileIcon] = useState<ProfileIcon>('pokeball');
+  useEffect(() => { getMyProfile().then((profile) => {
+    setShowRating(profile.show_battle_rating);
+    setProfileIcon((profile.profile_icon || 'pokeball') as ProfileIcon);
+  }).catch(() => null); }, []);
   const modes: Array<{ id: AppearanceMode; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
     { id:'system', label:'Sistema', icon:'phone-portrait' }, { id:'dark', label:'Escuro', icon:'moon' }, { id:'light', label:'Claro', icon:'sunny' },
   ];
@@ -38,6 +55,12 @@ export default function SettingsScreen() {
     if(value) await registerPushNotifications().catch(()=>null);
   }
 
+  async function chooseProfileIcon(value: ProfileIcon) {
+    const previous = profileIcon;
+    setProfileIcon(value);
+    try { await setMyProfileIcon(value); } catch { setProfileIcon(previous); }
+  }
+
   return (
     <Screen title="Personalização" subtitle="Escolha aparência, tema visual e preferências sociais da sua conta.">
       <Pressable style={styles.backRow} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
@@ -50,6 +73,13 @@ export default function SettingsScreen() {
       <View style={[styles.section,{backgroundColor:colors.surface,borderColor:colors.border}]}>
         <Text style={[styles.kicker,{color:colors.yellow}]}>TEMAS</Text><Text style={[styles.title,{color:colors.text}]}>Identidade do Trainer Hub</Text><Text style={[styles.helper,{color:colors.muted}]}>O tema altera destaques, navegação, glows e componentes compatíveis.</Text>
         <View style={styles.themeGrid}>{themes.map((theme)=><Pressable key={theme.id} onPress={()=>updatePreferences({theme:theme.id})} style={[styles.themeCard,{backgroundColor:colors.surfaceAlt,borderColor:themeName===theme.id?theme.colors[0]:colors.border}]}><View style={[styles.themeIcon,{backgroundColor:`${theme.colors[0]}22`}]}><Ionicons name={theme.icon} size={22} color={theme.colors[0]}/></View><Text style={[styles.themeName,{color:colors.text}]}>{theme.name}</Text><View style={styles.swatches}><View style={[styles.swatch,{backgroundColor:theme.colors[0]}]}/><View style={[styles.swatch,{backgroundColor:theme.colors[1]}]}/></View>{themeName===theme.id?<Ionicons name="checkmark-circle" size={18} color={theme.colors[0]}/>:null}</Pressable>)}</View>
+      </View>
+
+      <View style={[styles.section,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+        <Text style={[styles.kicker,{color:colors.yellow}]}>ÍCONE DO PERFIL</Text>
+        <Text style={[styles.title,{color:colors.text}]}>Seu símbolo de treinador</Text>
+        <Text style={[styles.helper,{color:colors.muted}]}>Aparece no perfil e nas áreas sociais sem enviar foto ou pesar o aplicativo.</Text>
+        <View style={styles.iconGrid}>{profileIcons.map((item)=><Pressable key={item.id} onPress={()=>{void chooseProfileIcon(item.id);}} style={[styles.iconChoice,{backgroundColor:colors.surfaceAlt,borderColor:profileIcon===item.id?colors.accent:colors.border}]}><TrainerAvatar icon={item.id} size={44} color={profileIcon===item.id?colors.yellow:colors.accent} backgroundColor={colors.surface}/><Text style={[styles.iconName,{color:colors.text}]}>{item.name}</Text>{profileIcon===item.id?<Ionicons name="checkmark-circle" size={16} color={colors.accent}/>:null}</Pressable>)}</View>
       </View>
 
       <View style={[styles.section,{backgroundColor:colors.surface,borderColor:colors.border}]}>
@@ -68,5 +98,5 @@ export default function SettingsScreen() {
 function SettingToggle({title,text,value,onChange,colors}:{title:string;text:string;value:boolean;onChange:(value:boolean)=>void|Promise<void>;colors:any}){return <View style={[styles.toggleRow,{borderTopColor:colors.border}]}><View style={{flex:1}}><Text style={[styles.toggleTitle,{color:colors.text}]}>{title}</Text><Text style={[styles.toggleText,{color:colors.muted}]}>{text}</Text></View><Switch value={value} onValueChange={onChange} trackColor={{false:colors.border,true:colors.accent}}/></View>}
 
 const styles=StyleSheet.create({
-  backRow:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:7},backText:{fontSize:12,fontWeight:'800'},section:{padding:16,borderRadius:20,borderWidth:1,gap:10},kicker:{fontSize:9,fontWeight:'900',letterSpacing:1.3},title:{fontSize:19,fontWeight:'900'},helper:{fontSize:10,lineHeight:15},modeRow:{flexDirection:'row',flexWrap:'wrap',gap:8},mode:{minWidth:130,flexGrow:1,flexDirection:'row',alignItems:'center',gap:7,padding:12,borderRadius:13,borderWidth:1},modeText:{flex:1,fontSize:11,fontWeight:'900'},themeGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},themeCard:{flexGrow:1,flexBasis:145,minWidth:135,padding:12,borderRadius:15,borderWidth:1,gap:8},themeIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},themeName:{fontSize:12,fontWeight:'900'},swatches:{flexDirection:'row',gap:5},swatch:{width:22,height:6,borderRadius:999},toggleRow:{flexDirection:'row',alignItems:'center',gap:12,paddingTop:12,borderTopWidth:1},toggleTitle:{fontSize:12,fontWeight:'900'},toggleText:{fontSize:9,lineHeight:14,marginTop:2},
+  backRow:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:7},backText:{fontSize:12,fontWeight:'800'},section:{padding:16,borderRadius:20,borderWidth:1,gap:10},kicker:{fontSize:9,fontWeight:'900',letterSpacing:1.3},title:{fontSize:19,fontWeight:'900'},helper:{fontSize:10,lineHeight:15},modeRow:{flexDirection:'row',flexWrap:'wrap',gap:8},mode:{minWidth:130,flexGrow:1,flexDirection:'row',alignItems:'center',gap:7,padding:12,borderRadius:13,borderWidth:1},modeText:{flex:1,fontSize:11,fontWeight:'900'},themeGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},themeCard:{flexGrow:1,flexBasis:145,minWidth:135,padding:12,borderRadius:15,borderWidth:1,gap:8},themeIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},themeName:{fontSize:12,fontWeight:'900'},swatches:{flexDirection:'row',gap:5},swatch:{width:22,height:6,borderRadius:999},iconGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},iconChoice:{flexGrow:1,flexBasis:125,minWidth:118,borderWidth:1,borderRadius:15,padding:10,alignItems:'center',gap:7},iconName:{fontSize:10,fontWeight:'900'},toggleRow:{flexDirection:'row',alignItems:'center',gap:12,paddingTop:12,borderTopWidth:1},toggleTitle:{fontSize:12,fontWeight:'900'},toggleText:{fontSize:9,lineHeight:14,marginTop:2},
 });

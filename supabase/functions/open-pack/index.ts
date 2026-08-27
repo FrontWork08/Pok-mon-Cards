@@ -47,6 +47,20 @@ Deno.serve(async (req: Request) => {
   if (userError || !user) return json({ error: "Unauthorized" }, 401);
 
   const body = await req.json().catch(() => ({}));
+  if (body.kind === "legendary_diamond") {
+    const { data, error } = await admin.rpc("server_open_legendary_diamond_pack", {
+      p_player_id: user.id,
+    });
+    if (error) {
+      const message = error.message ?? "Could not open legendary pack";
+      const status =
+        message.includes("NOT_ENOUGH_DIAMONDS") ? 409 :
+        message.includes("PACK_NOT_AVAILABLE") ? 404 :
+        message.includes("NO_ELIGIBLE_LEGENDARY_CARDS") ? 409 : 500;
+      return json({ error: message }, status);
+    }
+    return json(data);
+  }
   const packId = body.packId;
   if (!packId) return json({ error: "packId is required" }, 400);
 

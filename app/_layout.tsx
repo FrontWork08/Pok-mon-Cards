@@ -10,6 +10,7 @@ import { registerPushNotifications } from '@/services/notifications';
 import { playBattleSound } from '@/services/battleEffects';
 import { completeOAuthFromUrl, isOAuthCallbackUrl } from '@/services/auth';
 import { supabase } from '@/lib/supabase';
+import { WalletProvider } from '@/wallet/WalletProvider';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
@@ -111,5 +112,5 @@ function AppStack() {
 }
 
 export default function RootLayout() {
-  return <ThemeProvider><AppStack /></ThemeProvider>;
+  return <ThemeProvider><WalletProvider><AppStack /></WalletProvider></ThemeProvider>;
 }

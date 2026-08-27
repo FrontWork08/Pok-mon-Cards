@@ -16,7 +16,11 @@ import {
   getAdminPlayers,
   getCoinGrantHistory,
   getAdminEvents,
+  getAdminRedeemCodes,
   grantCoinsBatch,
+  grantDiamondsBatch,
+  createRedeemCode,
+  setAdminRedeemCodeActive,
   publishGlobalAnnouncement,
   startFreeBoosters,
   stopFreeBoosters,
@@ -24,6 +28,7 @@ import {
   type AdminOverview,
   type AdminPlayer,
   type CoinGrantHistory,
+  type AdminRedeemCode,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
@@ -43,7 +48,16 @@ export default function AdminScreen() {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [playerSearch, setPlayerSearch] = useState('');
   const [amount, setAmount] = useState('10000');
+  const [diamondAmount, setDiamondAmount] = useState('25');
   const [note, setNote] = useState('');
+  const [adminCodes, setAdminCodes] = useState<AdminRedeemCode[]>([]);
+  const [newCode, setNewCode] = useState('');
+  const [codeCoins, setCodeCoins] = useState('');
+  const [codeDiamonds, setCodeDiamonds] = useState('');
+  const [codeCardId, setCodeCardId] = useState('');
+  const [codeCardQuantity, setCodeCardQuantity] = useState('1');
+  const [codeMaxUses, setCodeMaxUses] = useState('');
+  const [codeExpiresHours, setCodeExpiresHours] = useState('');
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementBody, setAnnouncementBody] = useState('');
   const [announcementSeverity, setAnnouncementSeverity] = useState<'info' | 'warning' | 'critical'>('info');
@@ -79,17 +93,19 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [status, grants, events, guildState] = await Promise.all([
+      const [status, grants, events, guildState, codes] = await Promise.all([
         getAdminOverview(),
         getCoinGrantHistory(),
         getAdminEvents(),
         getGuildHub(),
+        getAdminRedeemCodes(),
         syncPlayers(),
       ]);
       setOverview(status);
       setHistory(grants);
       setActiveEvent(events.find((event) => event.event_type === 'free_boosters') ?? null);
       setGuildHub(guildState);
+      setAdminCodes(codes);
       setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
@@ -148,6 +164,7 @@ export default function AdminScreen() {
     const parsed = Number(amount.replace(/[^0-9]/g, ''));
     return Number.isSafeInteger(parsed) ? parsed : 0;
   }, [amount]);
+  const diamondAmountNumber = useMemo(() => Number(diamondAmount.replace(/[^0-9]/g, '')) || 0, [diamondAmount]);
 
   const visiblePlayers = useMemo(() => {
     const query = playerSearch.trim().toLowerCase();
@@ -218,6 +235,64 @@ export default function AdminScreen() {
         { text: 'Adicionar', onPress: () => { void sendCoins(); } },
       ],
     );
+  }
+
+  async function sendDiamonds() {
+    if (selectedPlayers.length < 1 || diamondAmountNumber < 1 || working) return;
+    try {
+      setWorking(true); setError(null);
+      const result = await grantDiamondsBatch(selectedPlayers.map((player) => player.id), diamondAmountNumber, note);
+      setNotice(`Adicionado 💎 ${result.amountEach.toLocaleString('pt-BR')} para ${result.recipientCount} jogador(es).`);
+      setNote('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível adicionar Diamantes.');
+    } finally { setWorking(false); }
+  }
+
+  function confirmSendDiamonds() {
+    Alert.alert(
+      'Confirmar Diamantes',
+      `Adicionar 💎 ${diamondAmountNumber.toLocaleString('pt-BR')} para cada um dos ${selectedPlayers.length} jogadores selecionados?`,
+      [{text:'Cancelar',style:'cancel'},{text:'Adicionar',onPress:()=>{void sendDiamonds();}}],
+    );
+  }
+
+  async function createCode() {
+    if (newCode.trim().length < 4 || working) return;
+    const reward: AdminRedeemCode['reward'] = {};
+    if (Number(codeCoins) > 0) reward.coins = Number(codeCoins);
+    if (Number(codeDiamonds) > 0) reward.diamonds = Number(codeDiamonds);
+    if (codeCardId.trim() && Number(codeCardQuantity) > 0) {
+      reward.cardId = codeCardId.trim();
+      reward.cardQuantity = Number(codeCardQuantity);
+    }
+    if (!reward.coins && !reward.diamonds && !reward.cardId) {
+      setError('Defina ao menos uma recompensa para o código.');
+      return;
+    }
+    try {
+      setWorking(true); setError(null);
+      const created = await createRedeemCode({
+        code:newCode,
+        reward,
+        maxTotalUses:Number(codeMaxUses)>0?Number(codeMaxUses):null,
+        expiresHours:Number(codeExpiresHours)>0?Number(codeExpiresHours):null,
+      });
+      setNotice(`Código ${created.code} criado e pronto para resgate.`);
+      setNewCode(''); setCodeCoins(''); setCodeDiamonds(''); setCodeCardId('');
+      setCodeCardQuantity('1'); setCodeMaxUses(''); setCodeExpiresHours('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível criar o código.');
+    } finally { setWorking(false); }
+  }
+
+  async function toggleCode(item: AdminRedeemCode) {
+    if (working) return;
+    try { setWorking(true); await setAdminRedeemCodeActive(item.id,!item.active); await load(); }
+    catch(e){setError(e instanceof Error?e.message:'Não foi possível atualizar o código.');}
+    finally{setWorking(false);}
   }
 
   async function sendAnnouncement() {
@@ -737,6 +812,41 @@ export default function AdminScreen() {
             </Pressable>
           </View>
 
+          <SectionTitle title="Adicionar Diamantes" />
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#68D9FF' }]}>
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>
+              MESMA SELEÇÃO MÚLTIPLA • {selectedPlayers.length} JOGADOR(ES)
+            </Text>
+            <TextInput value={playerSearch} onChangeText={setPlayerSearch} autoCapitalize="none" autoCorrect={false} placeholder="Buscar jogador pelo nome" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
+            <View style={styles.friendChips}>{visiblePlayers.map((player)=>{const active=selectedPlayerIds.has(player.id);return <Pressable key={`diamond-${player.id}`} onPress={()=>setSelectedPlayerIds((current)=>{const next=new Set(current);if(next.has(player.id))next.delete(player.id);else next.add(player.id);return next;})} style={[styles.friendChip,{backgroundColor:active?'#163C55':colors.surfaceAlt,borderColor:active?'#68D9FF':colors.border}]}><Text style={[styles.friendChipText,{color:colors.text}]}>@{player.username}{active?' • ✓':''}</Text></Pressable>;})}</View>
+            <View style={styles.quickRow}>{[1,5,10,25,50,100].map((quick)=><Pressable key={quick} onPress={()=>setDiamondAmount(String(quick))} style={[styles.quickChip,{backgroundColor:diamondAmountNumber===quick?'#68D9FF':colors.surfaceAlt,borderColor:diamondAmountNumber===quick?'#68D9FF':colors.border}]}><Text style={[styles.quickText,{color:diamondAmountNumber===quick?'#07111F':colors.text}]}>{quick}</Text></Pressable>)}</View>
+            <TextInput value={diamondAmount} onChangeText={(value)=>setDiamondAmount(value.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Quantidade de Diamantes" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
+            <Pressable disabled={selectedPlayers.length<1||diamondAmountNumber<1||working} onPress={confirmSendDiamonds} style={[styles.grantButton,{backgroundColor:selectedPlayers.length&&diamondAmountNumber?'#68D9FF':colors.surfaceAlt,opacity:working?.75:1}]}><Ionicons name="diamond" size={20} color="#07111F"/><Text style={styles.grantButtonText}>ADICIONAR DIAMANTES</Text></Pressable>
+          </View>
+
+          <SectionTitle title="Códigos de resgate" />
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.emptyText,{color:colors.muted}]}>Cada conta pode usar cada código uma única vez. A recompensa é aplicada e registrada pelo servidor.</Text>
+            <View style={styles.formSplit}>
+              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>CÓDIGO</Text><TextInput value={newCode} onChangeText={(value)=>setNewCode(value.toUpperCase().replace(/\s/g,''))} autoCapitalize="characters" maxLength={32} placeholder="LENDARIO-2026" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+              <Pressable onPress={()=>setNewCode(`TRAINER-${Math.random().toString(36).slice(2,8).toUpperCase()}`)} style={[styles.quickChip,{alignSelf:'flex-end',minHeight:48,justifyContent:'center',backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.quickText,{color:colors.text}]}>GERAR NOME</Text></Pressable>
+            </View>
+            <View style={styles.formSplit}>
+              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>COINS</Text><TextInput value={codeCoins} onChangeText={(v)=>setCodeCoins(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>DIAMANTES</Text><TextInput value={codeDiamonds} onChangeText={(v)=>setCodeDiamonds(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+            </View>
+            <View style={styles.formSplit}>
+              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>ID DA CARTA (OPCIONAL)</Text><TextInput value={codeCardId} onChangeText={setCodeCardId} autoCapitalize="none" placeholder="sv8-001" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+              <View style={styles.formFieldSmall}><Text style={[styles.fieldLabel,{color:colors.muted}]}>CÓPIAS</Text><TextInput value={codeCardQuantity} onChangeText={(v)=>setCodeCardQuantity(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+            </View>
+            <View style={styles.formSplit}>
+              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>LIMITE TOTAL (VAZIO = ILIMITADO)</Text><TextInput value={codeMaxUses} onChangeText={(v)=>setCodeMaxUses(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Sem limite" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>EXPIRA EM HORAS</Text><TextInput value={codeExpiresHours} onChangeText={(v)=>setCodeExpiresHours(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Nunca" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+            </View>
+            <Pressable disabled={newCode.length<4||working} onPress={()=>void createCode()} style={[styles.grantButton,{backgroundColor:newCode.length>=4?colors.yellow:colors.surfaceAlt}]}><Ionicons name="ticket" size={20} color="#07111F"/><Text style={styles.grantButtonText}>CRIAR CÓDIGO</Text></Pressable>
+            <View style={styles.historyList}>{adminCodes.map((item)=>{const used=Number(item.code_redemptions?.[0]?.count??0);return <View key={item.id} style={[styles.historyRow,{backgroundColor:colors.surfaceAlt,borderColor:item.active?'#65D894':colors.border}]}><View style={{flex:1}}><Text style={[styles.historyUser,{color:colors.text}]}>{item.code}</Text><Text style={[styles.historyMeta,{color:colors.muted}]}>{rewardSummary(item.reward)} • {used} resgate(s){item.max_total_uses?`/${item.max_total_uses}`:''}</Text></View><Pressable disabled={working} onPress={()=>void toggleCode(item)} style={[styles.quickChip,{backgroundColor:item.active?'#15392A':'#351A24',borderColor:item.active?'#65D894':'#683243'}]}><Text style={[styles.quickText,{color:item.active?'#AEF0CC':'#FF9FAF'}]}>{item.active?'ATIVO':'DESATIVADO'}</Text></Pressable></View>;})}</View>
+          </View>
+
           <SectionTitle title="Histórico administrativo" />
           <View style={styles.historyList}>
             {history.length === 0 ? (
@@ -772,6 +882,14 @@ export default function AdminScreen() {
 function SectionTitle({ title }: { title: string }) {
   const { colors } = useAppTheme();
   return <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>;
+}
+
+function rewardSummary(reward: AdminRedeemCode['reward']) {
+  const parts:string[]=[];
+  if(Number(reward.coins)>0)parts.push(`🪙 ${Number(reward.coins).toLocaleString('pt-BR')}`);
+  if(Number(reward.diamonds)>0)parts.push(`💎 ${Number(reward.diamonds).toLocaleString('pt-BR')}`);
+  if(reward.cardId)parts.push(`🃏 ${reward.cardQuantity??1}× ${reward.cardId}`);
+  return parts.join(' • ');
 }
 
 function Metric({
@@ -839,6 +957,9 @@ const styles = StyleSheet.create({
   friendChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   friendChipText: { fontSize: 10, fontWeight: '900' },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  formSplit: { flexDirection:'row', flexWrap:'wrap', gap:8 },
+  formField: { flexGrow:1, flexBasis:180, minWidth:160, gap:5 },
+  formFieldSmall: { flexGrow:1, flexBasis:90, minWidth:85, gap:5 },
   quickChip: { minWidth: 49, borderWidth: 1, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center' },
   quickText: { fontSize: 9, fontWeight: '900' },
   input: { minHeight: 48, borderRadius: 14, borderWidth: 1, paddingHorizontal: 13, fontSize: 13 },

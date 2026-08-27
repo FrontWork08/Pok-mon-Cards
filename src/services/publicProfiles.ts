@@ -16,6 +16,7 @@ export type PublicPlayerProfile = {
   player: {
     id: string;
     username: string;
+    profileIcon: string;
     level: number;
     battleWins: number;
     battleLosses: number;

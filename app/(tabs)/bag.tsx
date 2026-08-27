@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
+import { CurrencyBar } from '@/components/CurrencyBar';
 import {
   getMyBagOverview,
   getMyBagPage,
@@ -141,10 +142,13 @@ export default function BagScreen() {
 
   const header = (
     <View style={styles.headerContent}>
-      <View style={styles.pageHeader}>
-        <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-        <Text style={[styles.title, { color: colors.text }]}>Pokémon Bag</Text>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>Coleção rápida, paginada e com carregamento sob demanda.</Text>
+      <View style={styles.pageHeaderRow}>
+        <View style={styles.pageHeader}>
+          <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Pokémon Bag</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>Coleção rápida, paginada e com carregamento sob demanda.</Text>
+        </View>
+        <CurrencyBar compact />
       </View>
 
       <View style={[styles.summary, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
@@ -254,7 +258,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, overflow: 'hidden' },
   content: { width: '100%', maxWidth: 1280, alignSelf: 'center', paddingTop: 12, paddingBottom: 36 },
   headerContent: { gap: 16, marginBottom: 12 },
-  pageHeader: { gap: 5, marginBottom: 4 },
+  pageHeaderRow: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
+  pageHeader: { flex:1, minWidth:230, gap: 5, marginBottom: 4 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { fontSize: 15, lineHeight: 21 },

@@ -7,6 +7,7 @@ import { formatUsd } from '@/services/market';
 import { getPublicPlayerProfile, type PublicPlayerProfile } from '@/services/publicProfiles';
 import { getTrainerRank } from '@/services/ranks';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
 
 export default function PlayerShowcaseScreen() {
   const router = useRouter();
@@ -45,7 +46,7 @@ export default function PlayerShowcaseScreen() {
 
       {player && collection ? <>
         <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: player.guild?.color ?? colors.accent }]}>
-          <View style={[styles.avatar, { backgroundColor: colors.surfaceAlt, borderColor: player.guild?.color ?? colors.accent }]}><Text style={[styles.avatarText, { color: colors.text }]}>{player.username.slice(0, 1).toUpperCase()}</Text></View>
+          <TrainerAvatar icon={player.profileIcon} color={player.guild?.color ?? colors.accent} backgroundColor={colors.surfaceAlt} size={66} />
           <View style={styles.heroInfo}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER SHOWCASE</Text>
             <Text style={[styles.username, { color: colors.text }]}>@{player.username}</Text>
