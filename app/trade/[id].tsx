@@ -237,7 +237,7 @@ export default function TradeBuilderScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.kicker, { color: colors.yellow }]}>SUA OFERTA</Text>
               <Text style={[styles.editTitle, { color: colors.text }]}>{selectedCount ? `${selectedCount} carta(s) selecionada(s)` : 'Escolha suas cartas'}</Text>
-              <Text style={[styles.editMeta, { color: colors.muted }]}>Valor de mercado: {formatUsd(selectedValue)} • toque para editar</Text>
+              <Text style={[styles.editMeta, { color: colors.muted }]}>Valor fixo em USD: {formatUsd(selectedValue)} • toque para editar</Text>
             </View>
             <Ionicons name="chevron-forward" size={22} color={colors.accent} />
           </Pressable>
