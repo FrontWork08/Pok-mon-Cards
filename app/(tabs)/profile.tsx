@@ -40,7 +40,10 @@ export default function ProfileScreen() {
 
       getMyBag()
         .then((bag) => refreshOwnedMarketPrices(
-          bag.map((entry) => entry.cards?.id).filter((id): id is string => Boolean(id)),
+          bag
+            .filter((entry) => entry.cards?.market_price_usd == null)
+            .map((entry) => entry.cards?.id)
+            .filter((id): id is string => Boolean(id)),
           false,
         ))
         .then((updates) => updates.length ? getMyProfileStats().then(setStats) : null)
