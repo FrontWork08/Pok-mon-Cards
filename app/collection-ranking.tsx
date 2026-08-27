@@ -69,7 +69,7 @@ export default function CollectionRankingScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.infoTitle, { color: colors.text }]}>Preços TCGplayer</Text>
           <Text style={[styles.infoText, { color: colors.muted }]}>
-            O ranking usa o snapshot mais recente dos preços de mercado do TCGplayer e é recalculado com todas as cópias das coleções.
+            O ranking usa o snapshot mais recente do TCGplayer. Cada card único conta uma vez; duplicatas não aumentam o valor.
           </Text>
         </View>
       </View>
@@ -105,7 +105,7 @@ export default function CollectionRankingScreen() {
                     @{row.username}{mine ? ' • VOCÊ' : ''}
                   </Text>
                   <Text style={[styles.coverage, { color: colors.muted }]}>
-                    {row.total_card_copies.toLocaleString('pt-BR')} cards • mercado TCGplayer
+                    {row.total_card_copies.toLocaleString('pt-BR')} cards únicos • mercado TCGplayer
                   </Text>
                 </View>
 
