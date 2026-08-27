@@ -74,7 +74,13 @@ export type AdminPlayer = {
   username: string;
   level: number;
   created_at: string;
+  account_status: 'active' | 'suspended' | 'banned';
+  suspended_until: string | null;
+  moderation_reason: string | null;
+  warning_count: number;
 };
+
+export type AdminModerationAction = 'warn' | 'suspend' | 'ban' | 'restore';
 
 export type CoinGrantResult = {
   targetId: string;
@@ -143,6 +149,21 @@ export async function getAdminOverview() {
 
 export async function getAdminPlayers() {
   return invokeAdmin({ action: 'players' }) as Promise<AdminPlayer[]>;
+}
+
+export async function moderatePlayer(
+  targetId: string,
+  moderationAction: AdminModerationAction,
+  reason?: string,
+  durationHours?: number | null,
+) {
+  return invokeAdmin({
+    action: 'moderate',
+    targetId,
+    moderationAction,
+    reason: reason?.trim() || null,
+    durationHours: durationHours ?? null,
+  });
 }
 
 export async function grantCoins(targetId: string, amount: number, note?: string) {
