@@ -10,7 +10,7 @@ async function invoke(body: Record<string, unknown>) {
 export async function getMyDecks() {
   const { data, error } = await supabase
     .from('decks')
-    .select('id,name,is_default,created_at,updated_at,deck_cards(card_id,quantity,cards(id,pokemon_name,rarity,types,image_small,image_large,set_name))')
+    .select('id,name,is_default,created_at,updated_at,deck_cards(card_id,quantity,cards(id,pokemon_name,rarity,types,image_small,image_large,set_name,game_value,market_price_usd,market_price_variant))')
     .order('is_default', { ascending: false })
     .order('updated_at', { ascending: false });
   if (error) throw error;
