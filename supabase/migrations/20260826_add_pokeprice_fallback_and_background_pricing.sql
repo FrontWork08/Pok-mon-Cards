@@ -1,0 +1,3 @@
+-- Adds server_refresh_owned_market_prices_batch using public PokéPrice pages
+-- as a resilient USD market-price fallback for cards actually owned by players.
+-- Also extends server_background_tick to refresh owned card prices continuously.
