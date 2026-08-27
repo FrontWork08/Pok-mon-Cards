@@ -4,10 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { signOut } from '@/services/auth';
-import { getMyProfile, getMyProfileStats, type PlayerProfile } from '@/services/player';
+import { getMyBag, getMyProfile, getMyProfileStats, type PlayerProfile } from '@/services/player';
 import { getMySocial } from '@/services/social';
 import { getUnreadConversationCount } from '@/services/notifications';
-import { formatUsd, isCurrentUserAdmin } from '@/services/market';
+import { formatUsd, isCurrentUserAdmin, refreshOwnedMarketPrices } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function ProfileScreen() {
@@ -37,6 +37,14 @@ export default function ProfileScreen() {
       setIncomingCount(social.incoming.length);
       setUnread(unreadCount);
       setIsAdmin(adminAccess);
+
+      getMyBag()
+        .then((bag) => refreshOwnedMarketPrices(
+          bag.map((entry) => entry.cards?.id).filter((id): id is string => Boolean(id)),
+          false,
+        ))
+        .then((updates) => updates.length ? getMyProfileStats().then(setStats) : null)
+        .catch(() => null);
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível atualizar seu perfil.'); }
     finally { setLoading(false); }
   }, []);
