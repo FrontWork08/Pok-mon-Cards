@@ -150,15 +150,6 @@ export default function TradeBuilderScreen() {
       setPickerOpen(false);
       setNotice('Oferta salva e sincronizada. Se alguém já tinha confirmado, a confirmação foi reiniciada porque a oferta mudou.');
       await refreshTrade();
-      if (result?.status !== 'completed') {
-        // For a few seconds after confirming, check faster for the other side.
-        // It makes the completed state appear immediately even on unstable mobile networks.
-        const startedAt = Date.now();
-        const fastSync = setInterval(() => {
-          refreshTrade();
-          if (Date.now() - startedAt > 10000) clearInterval(fastSync);
-        }, 450);
-      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível salvar a oferta.');
     } finally {
@@ -181,6 +172,16 @@ export default function TradeBuilderScreen() {
       });
       setNotice(result?.status === 'completed' ? 'Troca concluída! As Bags dos dois treinadores já foram atualizadas.' : 'Sua confirmação foi registrada. Falta o outro treinador confirmar.');
       await refreshTrade();
+
+      if (result?.status !== 'completed') {
+        // For a few seconds after confirming, check faster for the other side.
+        // It makes the completed state appear immediately even on unstable mobile networks.
+        const startedAt = Date.now();
+        const fastSync = setInterval(() => {
+          refreshTrade();
+          if (Date.now() - startedAt > 10000) clearInterval(fastSync);
+        }, 450);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível confirmar a troca.');
       await load().catch(() => null);
