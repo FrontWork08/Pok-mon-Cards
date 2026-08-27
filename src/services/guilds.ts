@@ -102,12 +102,28 @@ export const kickGuildMember = (guildId: string, targetId: string) => guildActio
 export const setGuildMemberRole = (guildId: string, targetId: string, role: 'officer' | 'member') => guildAction({ action: 'set_role', guildId, targetId, role });
 export const adminSetGuildLeader = (guildId: string, targetId: string | null) => guildAction({ action: 'admin_set_leader', guildId, targetId });
 
+let guildChannelSequence = 0;
+
 export function subscribeToGuilds(onChange: () => void) {
-  const channel = supabase
-    .channel('guild-hub-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guilds' }, onChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_members' }, onChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_invites' }, onChange)
-    .subscribe();
-  return () => { void supabase.removeChannel(channel); };
+  guildChannelSequence += 1;
+  const channelName = `guild-hub-live-${guildChannelSequence}-${Date.now()}`;
+  let disposed = false;
+
+  const handleChange = () => {
+    if (!disposed) onChange();
+  };
+
+  const channel = supabase.channel(channelName);
+  channel
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guilds' }, handleChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_members' }, handleChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_invites' }, handleChange);
+
+  channel.subscribe();
+
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    void supabase.removeChannel(channel);
+  };
 }
