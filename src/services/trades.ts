@@ -77,20 +77,29 @@ export async function cancelTrade(tradeId: string) {
 }
 
 
-export function subscribeToTrade(tradeId: string, onChange: () => void) {
+export function subscribeToTrade(
+  tradeId: string,
+  onChange: () => void,
+  onStatus?: (status: 'connecting' | 'live' | 'fallback') => void,
+) {
+  onStatus?.('connecting');
+
   const channel = supabase
     .channel(`trade:${tradeId}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'trades', filter: `id=eq.${tradeId}` },
-      onChange,
+      () => onChange(),
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'trade_cards', filter: `trade_id=eq.${tradeId}` },
-      onChange,
+      () => onChange(),
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') onStatus?.('live');
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') onStatus?.('fallback');
+    });
 
   return () => {
     supabase.removeChannel(channel);
