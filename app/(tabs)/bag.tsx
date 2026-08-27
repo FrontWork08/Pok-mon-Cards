@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
-import { formatUsd, refreshOwnedMarketPrices, type MarketPriceUpdate } from '@/services/market';
+import { formatUsd } from '@/services/market';
 import { generationForNumber } from '@/services/pokedex';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -19,7 +19,6 @@ export default function BagScreen() {
   const [setQuery, setSetQuery] = useState('');
   const [cards, setCards] = useState<OwnedCardEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [priceUpdating, setPriceUpdating] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string | null>(null);
@@ -27,61 +26,16 @@ export default function BagScreen() {
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const mergePriceUpdates = useCallback((updates: MarketPriceUpdate[]) => {
-    if (!updates.length) return;
-    const byId = new Map(updates.map((update) => [update.id, update]));
-    setCards((currentCards) => currentCards.map((entry) => {
-      const card = entry.cards;
-      if (!card) return entry;
-      const update = byId.get(card.id);
-      if (!update) return entry;
-      return {
-        ...entry,
-        cards: {
-          ...card,
-          market_price_usd: update.market_price_usd,
-          market_price_low_usd: update.market_price_low_usd,
-          market_price_high_usd: update.market_price_high_usd,
-          market_price_variant: update.market_price_variant,
-          market_price_source: update.market_price_source,
-          market_price_updated_at: update.market_price_updated_at,
-        },
-      };
-    }));
-  }, []);
-
-  const refreshPrices = useCallback(async (entries: OwnedCardEntry[], force = false) => {
-    const ids = entries
-      .map((entry) => entry.cards?.id)
-      .filter((id): id is string => Boolean(id));
-    if (!ids.length) return;
-
-    try {
-      setPriceUpdating(true);
-      const updates = await refreshOwnedMarketPrices(ids, force);
-      mergePriceUpdates(updates);
-    } catch {
-      // Market metadata must never block access to the collection.
-    } finally {
-      setPriceUpdating(false);
-    }
-  }, [mergePriceUpdates]);
-
   const loadBag = useCallback(async () => {
     try {
       setLoading(true);
-      const entries = await getMyBag();
-      setCards(entries);
-      const missingPrices = entries.filter((entry) => entry.cards?.market_price_usd == null);
-      if (missingPrices.length) {
-        refreshPrices(missingPrices, false);
-      }
+      setCards(await getMyBag());
     } catch {
       setCards([]);
     } finally {
       setLoading(false);
     }
-  }, [refreshPrices]);
+  }, []);
   useFocusEffect(useCallback(() => { loadBag(); }, [loadBag]));
 
   const types = useMemo(() => Array.from(new Set(cards.flatMap((entry) => entry.cards?.types ?? []))).sort(), [cards]);
@@ -122,14 +76,14 @@ export default function BagScreen() {
   const cardWidth = columns === 4 ? '23.8%' : columns === 3 ? '32%' : '48.5%';
   function clearAdvanced() { setTypeFilter(null); setRarityFilter(null); setGeneration(null); setSetQuery(''); setSortMode('recent'); }
 
-  return <Screen title="Pokémon Bag" subtitle="Sua coleção com preço de mercado em dólar e filtros por valor.">
+  return <Screen title="Pokémon Bag" subtitle="Sua coleção com valores fixos em dólar e filtros por valor.">
     <View style={[styles.summary, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
-      <View style={styles.summaryMain}><Text style={[styles.summaryKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text><Text style={[styles.summaryValue, { color: colors.yellow }]}>{formatUsd(collectionMarketValueUsd)}</Text><Text style={[styles.summaryLabel, { color: colors.muted }]}>{totalCards.toLocaleString('pt-BR')} cards • {priceCoverage.toFixed(0)}% precificados</Text></View>
+      <View style={styles.summaryMain}><Text style={[styles.summaryKicker, { color: colors.yellow }]}>VALOR FIXO DA COLEÇÃO</Text><Text style={[styles.summaryValue, { color: colors.yellow }]}>{formatUsd(collectionMarketValueUsd)}</Text><Text style={[styles.summaryLabel, { color: colors.muted }]}>{totalCards.toLocaleString('pt-BR')} cards • tabela fixa do jogo</Text></View>
       <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
       <View style={styles.summarySide}><Text style={[styles.sideLabel, { color: colors.muted }]}>MAIS CARA</Text><Text numberOfLines={1} style={[styles.sideName, { color: colors.text }]}>{mostValuable?.cards?.pokemon_name ?? '—'}</Text><Text style={[styles.sideValue, { color: colors.yellow }]}>{mostValuable?.cards?.market_price_usd != null ? formatUsd(Number(mostValuable.cards.market_price_usd)) : '—'}</Text></View>
     </View>
 
-    <View style={styles.collectionActions}><Pressable style={[styles.actionButton, { backgroundColor: colors.accent }]} onPress={() => router.push('/decks')}><Ionicons name="albums" size={17} color="#fff" /><Text style={styles.actionText}>MEUS DECKS</Text></Pressable><Pressable style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => router.push('/sets')}><Ionicons name="layers" size={17} color={colors.accent} /><Text style={[styles.actionText, { color: colors.text }]}>SETS</Text></Pressable><Pressable style={[styles.actionButton, { backgroundColor: sortMode === 'value' ? colors.yellow : colors.surface, borderColor: sortMode === 'value' ? colors.yellow : colors.border, borderWidth: 1 }]} onPress={() => setSortMode('value')}><Ionicons name="cash" size={17} color={sortMode === 'value' ? '#07111F' : colors.yellow} /><Text style={[styles.actionText, { color: sortMode === 'value' ? '#07111F' : colors.text }]}>MAIS CARAS</Text></Pressable><Pressable disabled={priceUpdating} style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => refreshPrices(cards, true)}>{priceUpdating ? <ActivityIndicator size="small" color={colors.yellow} /> : <Ionicons name="refresh" size={17} color={colors.yellow} />}<Text style={[styles.actionText, { color: colors.text }]}>{priceUpdating ? 'PREÇOS...' : 'ATUALIZAR USD'}</Text></Pressable></View>
+    <View style={styles.collectionActions}><Pressable style={[styles.actionButton, { backgroundColor: colors.accent }]} onPress={() => router.push('/decks')}><Ionicons name="albums" size={17} color="#fff" /><Text style={styles.actionText}>MEUS DECKS</Text></Pressable><Pressable style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => router.push('/sets')}><Ionicons name="layers" size={17} color={colors.accent} /><Text style={[styles.actionText, { color: colors.text }]}>SETS</Text></Pressable><Pressable style={[styles.actionButton, { backgroundColor: sortMode === 'value' ? colors.yellow : colors.surface, borderColor: sortMode === 'value' ? colors.yellow : colors.border, borderWidth: 1 }]} onPress={() => setSortMode('value')}><Ionicons name="cash" size={17} color={sortMode === 'value' ? '#07111F' : colors.yellow} /><Text style={[styles.actionText, { color: sortMode === 'value' ? '#07111F' : colors.text }]}>MAIS CARAS</Text></Pressable></View>
 
     <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="search" size={20} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} placeholder="Buscar Pokémon, set ou número..." placeholderTextColor={colors.muted} style={[styles.search, { color: colors.text }]} />{search ? <Pressable onPress={() => setSearch('')}><Ionicons name="close-circle" size={20} color={colors.muted} /></Pressable> : null}</View>
     <View style={styles.filters}><FilterChip active={quickFilter === 'all'} label="Todos" icon="grid" onPress={() => setQuickFilter('all')} /><FilterChip active={quickFilter === 'favorites'} label="Favoritos" icon="heart" onPress={() => setQuickFilter('favorites')} /><FilterChip active={quickFilter === 'duplicates'} label="Duplicatas" icon="copy" onPress={() => setQuickFilter('duplicates')} /><FilterChip active={showAdvanced} label="Filtros" icon="options" onPress={() => setShowAdvanced((value) => !value)} /></View>
