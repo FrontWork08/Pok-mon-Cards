@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -26,6 +26,7 @@ import {
   type Pack,
 } from '@/services/packs';
 import { getMyProfile } from '@/services/player';
+import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 type Notice = { kind: 'error' | 'success'; text: string } | null;
@@ -42,6 +43,7 @@ export default function PacksScreen() {
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
   const [contentsPack, setContentsPack] = useState<Pack | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const [clock, setClock] = useState(Date.now());
 
   const isMobile = width < 560;
   const columns = isMobile ? 1 : width >= 1100 ? 3 : 2;
@@ -59,6 +61,7 @@ export default function PacksScreen() {
         getFavoritePackIds(),
       ]);
       setPacks(packRows);
+      setSelectedPack((current) => current ? packRows.find((pack) => pack.id === current.id) ?? null : null);
       setCoins(profile.coins);
       setFavoriteIds(new Set(favorites));
     } catch {
@@ -69,6 +72,43 @@ export default function PacksScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('free-booster-shop')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'admin_game_events' },
+        () => { void load(); },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [load]);
+
+  const freeUntil = packs.find((pack) => pack.free_until)?.free_until ?? null;
+
+  useEffect(() => {
+    if (!freeUntil) return;
+    const delay = Math.max(0, new Date(freeUntil).getTime() - Date.now()) + 250;
+    const expiryTimer = setTimeout(() => { void load(); }, delay);
+    const countdownTimer = setInterval(() => setClock(Date.now()), 1000);
+    return () => {
+      clearTimeout(expiryTimer);
+      clearInterval(countdownTimer);
+    };
+  }, [freeUntil, load]);
+
+  const freeRemaining = useMemo(() => {
+    if (!freeUntil) return '';
+    const seconds = Math.max(0, Math.ceil((new Date(freeUntil).getTime() - clock) / 1000));
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+    return minutes > 0 ? String(minutes) + 'm ' + String(rest).padStart(2, '0') + 's' : String(rest) + 's';
+  }, [clock, freeUntil]);
+
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -116,14 +156,17 @@ export default function PacksScreen() {
   async function purchaseSelectedPack(): Promise<OpenedCard[]> {
     if (!selectedPack) throw new Error('Nenhum booster selecionado.');
 
-    const before = await getMyProfile();
+    const [before, latestPacks] = await Promise.all([getMyProfile(), listPacks()]);
+    const latestPack = latestPacks.find((pack) => pack.id === selectedPack.id);
+    if (!latestPack) throw new Error('Este booster não está mais disponível.');
+    setSelectedPack(latestPack);
     setCoins(before.coins);
-    if (before.coins < selectedPack.price) {
+    if (before.coins < latestPack.price) {
       throw new Error(`Moedas insuficientes. Seu saldo atual é 🪙 ${before.coins.toLocaleString('pt-BR')}.`);
     }
 
     try {
-      const result = await openPack(selectedPack.id);
+      const result = await openPack(latestPack.id);
       const after = await getMyProfile();
       setCoins(after.coins);
       return result.cards;
@@ -153,6 +196,15 @@ export default function PacksScreen() {
           <Ionicons name="wallet-outline" size={20} color={colors.yellow} />
         </View>
       </View>
+
+      {freeUntil ? (
+        <View style={[styles.notice, { backgroundColor: isLight ? '#E3F8EB' : '#142C23', borderColor: '#4A9B70' }]}>
+          <Ionicons name="gift" size={21} color="#45B777" />
+          <Text style={[styles.noticeText, { color: colors.text }]}>
+            ADMIN ABUSE ATIVO: todos os boosters estão GRÁTIS por mais {freeRemaining}.
+          </Text>
+        </View>
+      ) : null}
 
       {notice ? (
         <View
@@ -323,7 +375,7 @@ export default function PacksScreen() {
                   </Pressable>
 
                   <Text style={[styles.price, { color: affordable ? colors.yellow : colors.muted }]}>
-                    🪙 {pack.price.toLocaleString('pt-BR')}
+                    {pack.price === 0 ? '🎁 GRÁTIS' : `🪙 ${pack.price.toLocaleString('pt-BR')}`}
                   </Text>
                 </View>
 
@@ -338,7 +390,7 @@ export default function PacksScreen() {
                   ]}
                 >
                   <Text style={[styles.openButtonText, { color: affordable ? '#07111F' : colors.muted }]}>
-                    {affordable ? 'ABRIR PACK' : 'SEM SALDO'}
+                    {affordable ? (pack.price === 0 ? 'ABRIR GRÁTIS' : 'ABRIR PACK') : 'SEM SALDO'}
                   </Text>
                 </Pressable>
               </View>

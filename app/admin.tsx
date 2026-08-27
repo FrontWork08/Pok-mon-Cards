@@ -15,7 +15,12 @@ import {
   getAdminOverview,
   getAdminPlayers,
   getCoinGrantHistory,
-  grantCoins,
+  getAdminEvents,
+  grantCoinsBatch,
+  publishGlobalAnnouncement,
+  startFreeBoosters,
+  stopFreeBoosters,
+  type AdminGameEvent,
   type AdminOverview,
   type AdminPlayer,
   type CoinGrantHistory,
@@ -34,10 +39,17 @@ export default function AdminScreen() {
   const [players, setPlayers] = useState<AdminPlayer[]>([]);
   const [selfId, setSelfId] = useState('');
   const [history, setHistory] = useState<CoinGrantHistory[]>([]);
-  const [selectedPlayer, setSelectedPlayer] = useState<AdminPlayer | null>(null);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [playerSearch, setPlayerSearch] = useState('');
   const [amount, setAmount] = useState('10000');
   const [note, setNote] = useState('');
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementBody, setAnnouncementBody] = useState('');
+  const [announcementSeverity, setAnnouncementSeverity] = useState<'info' | 'warning' | 'critical'>('info');
+  const [announcementHours, setAnnouncementHours] = useState('24');
+  const [freeBoosterMinutes, setFreeBoosterMinutes] = useState('1');
+  const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
+  const [clock, setClock] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -47,9 +59,15 @@ export default function AdminScreen() {
     const [directory, self] = await Promise.all([getAdminPlayers(), getMyProfile()]);
     setPlayers(directory);
     setSelfId(self.id);
-    setSelectedPlayer((current) => {
-      const preserved = current ? directory.find((player) => player.id === current.id) : null;
-      return preserved ?? directory.find((player) => player.id === self.id) ?? directory[0] ?? null;
+    setSelectedPlayerIds((current) => {
+      const validIds = new Set(
+        [...current].filter((id) => directory.some((player) => player.id === id)),
+      );
+      if (validIds.size === 0) {
+        const initial = directory.find((player) => player.id === self.id) ?? directory[0];
+        if (initial) validIds.add(initial.id);
+      }
+      return validIds;
     });
   }, []);
 
@@ -57,13 +75,15 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [status, grants] = await Promise.all([
+      const [status, grants, events] = await Promise.all([
         getAdminOverview(),
         getCoinGrantHistory(),
+        getAdminEvents(),
         syncPlayers(),
       ]);
       setOverview(status);
       setHistory(grants);
+      setActiveEvent(events.find((event) => event.event_type === 'free_boosters') ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
     } finally {
@@ -93,6 +113,30 @@ export default function AdminScreen() {
     };
   }, [syncPlayers]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-game-events')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'admin_game_events' },
+        () => { void load(); },
+      )
+      .subscribe();
+    const clockTimer = setInterval(() => setClock(Date.now()), 1000);
+
+    return () => {
+      clearInterval(clockTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [load]);
+
+  useEffect(() => {
+    if (!activeEvent) return;
+    const delay = Math.max(0, new Date(activeEvent.ends_at).getTime() - Date.now()) + 250;
+    const expiryTimer = setTimeout(() => { void load(); }, delay);
+    return () => clearTimeout(expiryTimer);
+  }, [activeEvent, load]);
+
   const amountNumber = useMemo(() => {
     const parsed = Number(amount.replace(/[^0-9]/g, ''));
     return Number.isSafeInteger(parsed) ? parsed : 0;
@@ -104,14 +148,35 @@ export default function AdminScreen() {
     return players.filter((player) => player.username.toLowerCase().includes(query));
   }, [playerSearch, players]);
 
+  const selectedPlayers = useMemo(
+    () => players.filter((player) => selectedPlayerIds.has(player.id)),
+    [players, selectedPlayerIds],
+  );
+
+  const activeEventRemaining = useMemo(() => {
+    if (!activeEvent) return '';
+    const seconds = Math.max(0, Math.ceil((new Date(activeEvent.ends_at).getTime() - clock) / 1000));
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+    return minutes > 0
+      ? String(minutes) + 'm ' + String(rest).padStart(2, '0') + 's'
+      : String(rest) + 's';
+  }, [activeEvent, clock]);
+
   async function sendCoins() {
-    if (!selectedPlayer || amountNumber < 1 || working) return;
+    if (selectedPlayers.length < 1 || amountNumber < 1 || working) return;
     try {
       setWorking(true);
       setError(null);
-      const result = await grantCoins(selectedPlayer.id, amountNumber, note);
+      const result = await grantCoinsBatch(
+        selectedPlayers.map((player) => player.id),
+        amountNumber,
+        note,
+      );
       setNotice(
-        `Adicionado 🪙 ${result.amount.toLocaleString('pt-BR')} para @${result.username}. Novo saldo: 🪙 ${result.balanceAfter.toLocaleString('pt-BR')}.`,
+        'Adicionado 🪙 ' + result.amountEach.toLocaleString('pt-BR') +
+        ' para ' + result.recipientCount.toLocaleString('pt-BR') +
+        ' jogador(es). Total distribuído: 🪙 ' + result.totalGranted.toLocaleString('pt-BR') + '.',
       );
       setNote('');
       await load();
@@ -123,17 +188,76 @@ export default function AdminScreen() {
   }
 
   function confirmSendCoins() {
-    if (!selectedPlayer || amountNumber < 1 || working) return;
+    if (selectedPlayers.length < 1 || amountNumber < 1 || working) return;
+    const total = amountNumber * selectedPlayers.length;
     Alert.alert(
-      'Confirmar crédito',
-      `Adicionar 🪙 ${amountNumber.toLocaleString('pt-BR')} para @${selectedPlayer.username}?`,
+      'Confirmar crédito em grupo',
+      'Adicionar 🪙 ' + amountNumber.toLocaleString('pt-BR') +
+      ' para cada um dos ' + selectedPlayers.length.toLocaleString('pt-BR') +
+      ' jogadores selecionados? Total: 🪙 ' + total.toLocaleString('pt-BR') + '.',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Adicionar', onPress: () => { sendCoins(); } },
+        { text: 'Adicionar', onPress: () => { void sendCoins(); } },
       ],
     );
   }
 
+  async function sendAnnouncement() {
+    const hours = Number(announcementHours);
+    if (!announcementTitle.trim() || !announcementBody.trim() || !Number.isInteger(hours) || hours < 1 || hours > 720 || working) return;
+    try {
+      setWorking(true);
+      setError(null);
+      await publishGlobalAnnouncement(
+        announcementTitle,
+        announcementBody,
+        announcementSeverity,
+        hours,
+      );
+      setAnnouncementTitle('');
+      setAnnouncementBody('');
+      setNotice('Anúncio global publicado em tempo real para todos os jogadores.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível publicar o anúncio.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function activateFreeBoosters() {
+    const minutes = Number(freeBoosterMinutes);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440 || working) return;
+    try {
+      setWorking(true);
+      setError(null);
+      const event = await startFreeBoosters(minutes);
+      setActiveEvent(event);
+      setClock(Date.now());
+      setNotice(
+        'Admin Abuse ativado: todos os boosters ficarão grátis por ' +
+        minutes.toLocaleString('pt-BR') + ' minuto(s).',
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível ativar os boosters grátis.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function deactivateFreeBoosters() {
+    if (working) return;
+    try {
+      setWorking(true);
+      setError(null);
+      await stopFreeBoosters();
+      setActiveEvent(null);
+      setNotice('Admin Abuse encerrado. Os preços normais já voltaram.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível encerrar a promoção.');
+    } finally {
+      setWorking(false);
+    }
+  }
 
 
   return (
@@ -232,10 +356,163 @@ export default function AdminScreen() {
             </View>
           </View>
 
+          <SectionTitle title="Anúncio global em tempo real" />
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>TÍTULO</Text>
+            <TextInput
+              value={announcementTitle}
+              onChangeText={setAnnouncementTitle}
+              placeholder="Ex.: Manutenção concluída"
+              placeholderTextColor={colors.muted}
+              maxLength={80}
+              style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+            />
+
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>MENSAGEM</Text>
+            <TextInput
+              value={announcementBody}
+              onChangeText={setAnnouncementBody}
+              placeholder="Mensagem que aparecerá para todos os jogadores"
+              placeholderTextColor={colors.muted}
+              multiline
+              maxLength={500}
+              textAlignVertical="top"
+              style={[styles.input, { minHeight: 96, paddingTop: 12, color: colors.text, backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+            />
+
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>IMPORTÂNCIA</Text>
+            <View style={styles.quickRow}>
+              {([
+                { id: 'info', label: 'INFORMAÇÃO' },
+                { id: 'warning', label: 'ATENÇÃO' },
+                { id: 'critical', label: 'URGENTE' },
+              ] as const).map((item) => (
+                <Pressable
+                  key={item.id}
+                  onPress={() => setAnnouncementSeverity(item.id)}
+                  style={[
+                    styles.quickChip,
+                    {
+                      backgroundColor: announcementSeverity === item.id ? colors.yellow : colors.surfaceAlt,
+                      borderColor: announcementSeverity === item.id ? colors.yellow : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.quickText, { color: announcementSeverity === item.id ? '#07111F' : colors.text }]}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>DURAÇÃO</Text>
+            <View style={styles.quickRow}>
+              {[1, 6, 24, 72].map((hours) => (
+                <Pressable
+                  key={hours}
+                  onPress={() => setAnnouncementHours(String(hours))}
+                  style={[
+                    styles.quickChip,
+                    {
+                      backgroundColor: Number(announcementHours) === hours ? colors.yellow : colors.surfaceAlt,
+                      borderColor: Number(announcementHours) === hours ? colors.yellow : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.quickText, { color: Number(announcementHours) === hours ? '#07111F' : colors.text }]}>
+                    {hours}H
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              disabled={!announcementTitle.trim() || !announcementBody.trim() || working}
+              onPress={() => { void sendAnnouncement(); }}
+              style={[
+                styles.grantButton,
+                {
+                  backgroundColor: announcementTitle.trim() && announcementBody.trim() ? colors.yellow : colors.surfaceAlt,
+                  opacity: working ? .75 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="megaphone" size={20} color="#07111F" />
+              <Text style={styles.grantButtonText}>PUBLICAR PARA TODOS</Text>
+            </Pressable>
+          </View>
+
+          <SectionTitle title="Admin Abuse" />
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {activeEvent ? (
+              <View style={[styles.notice, { backgroundColor: '#142C23', borderColor: '#4A9B70' }]}>
+                <Ionicons name="gift" size={20} color="#65D894" />
+                <Text style={[styles.noticeText, { color: colors.text }]}>
+                  BOOSTERS GRÁTIS ATIVOS • preços voltam em {activeEventRemaining}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.emptyText, { color: colors.muted }]}>
+                Ative um período em que todos os jogadores poderão abrir qualquer booster por 🪙 0.
+              </Text>
+            )}
+
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>DURAÇÃO DA PROMOÇÃO</Text>
+            <View style={styles.quickRow}>
+              {[1, 5, 10, 30, 60].map((minutes) => (
+                <Pressable
+                  key={minutes}
+                  onPress={() => setFreeBoosterMinutes(String(minutes))}
+                  style={[
+                    styles.quickChip,
+                    {
+                      backgroundColor: Number(freeBoosterMinutes) === minutes ? colors.yellow : colors.surfaceAlt,
+                      borderColor: Number(freeBoosterMinutes) === minutes ? colors.yellow : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.quickText, { color: Number(freeBoosterMinutes) === minutes ? '#07111F' : colors.text }]}>
+                    {minutes}MIN
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextInput
+              value={freeBoosterMinutes}
+              onChangeText={(value) => setFreeBoosterMinutes(value.replace(/[^0-9]/g, ''))}
+              keyboardType="number-pad"
+              placeholder="Duração em minutos"
+              placeholderTextColor={colors.muted}
+              style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+            />
+
+            <Pressable
+              disabled={working || Number(freeBoosterMinutes) < 1}
+              onPress={() => { void activateFreeBoosters(); }}
+              style={[styles.grantButton, { backgroundColor: colors.yellow, opacity: working ? .75 : 1 }]}
+            >
+              <Ionicons name="flash" size={20} color="#07111F" />
+              <Text style={styles.grantButtonText}>
+                {activeEvent ? 'REINICIAR TEMPO GRÁTIS' : 'ATIVAR BOOSTERS GRÁTIS'}
+              </Text>
+            </Pressable>
+
+            {activeEvent ? (
+              <Pressable
+                disabled={working}
+                onPress={() => { void deactivateFreeBoosters(); }}
+                style={[styles.grantButton, { backgroundColor: '#FF6B81', opacity: working ? .75 : 1 }]}
+              >
+                <Ionicons name="stop-circle" size={20} color="#07111F" />
+                <Text style={styles.grantButtonText}>ENCERRAR AGORA</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
           <SectionTitle title="Adicionar moedas" />
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>
-              ESCOLHA O JOGADOR • {players.length}
+              ESCOLHA UM OU MAIS JOGADORES • {selectedPlayers.length} DE {players.length}
             </Text>
             <TextInput
               value={playerSearch}
@@ -252,11 +529,16 @@ export default function AdminScreen() {
                   {players.length === 0 ? 'Nenhum jogador disponível.' : 'Nenhum jogador encontrado.'}
                 </Text>
               ) : visiblePlayers.map((player) => {
-                const active = selectedPlayer?.id === player.id;
+                const active = selectedPlayerIds.has(player.id);
                 return (
                   <Pressable
                     key={player.id}
-                    onPress={() => setSelectedPlayer(player)}
+                    onPress={() => setSelectedPlayerIds((current) => {
+                      const next = new Set(current);
+                      if (next.has(player.id)) next.delete(player.id);
+                      else next.add(player.id);
+                      return next;
+                    })}
                     style={[
                       styles.friendChip,
                       {
@@ -273,7 +555,22 @@ export default function AdminScreen() {
               })}
             </View>
 
-            <Text style={[styles.fieldLabel, { color: colors.muted }]}>VALOR</Text>
+            <View style={styles.quickRow}>
+              <Pressable
+                onPress={() => setSelectedPlayerIds(new Set(visiblePlayers.map((player) => player.id)))}
+                style={[styles.quickChip, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}
+              >
+                <Text style={[styles.quickText, { color: colors.text }]}>SELECIONAR VISÍVEIS</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setSelectedPlayerIds(new Set())}
+                style={[styles.quickChip, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+              >
+                <Text style={[styles.quickText, { color: colors.text }]}>LIMPAR</Text>
+              </Pressable>
+            </View>
+
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>VALOR PARA CADA JOGADOR</Text>
             <View style={styles.quickRow}>
               {QUICK_AMOUNTS.map((quick) => (
                 <Pressable
@@ -312,19 +609,19 @@ export default function AdminScreen() {
             />
 
             <Pressable
-              disabled={!selectedPlayer || amountNumber < 1 || working}
+              disabled={selectedPlayers.length < 1 || amountNumber < 1 || working}
               onPress={confirmSendCoins}
               style={[
                 styles.grantButton,
                 {
-                  backgroundColor: selectedPlayer && amountNumber > 0 ? colors.yellow : colors.surfaceAlt,
+                  backgroundColor: selectedPlayers.length > 0 && amountNumber > 0 ? colors.yellow : colors.surfaceAlt,
                   opacity: working ? .75 : 1,
                 },
               ]}
             >
               {working ? <ActivityIndicator size="small" color="#07111F" /> : <Ionicons name="add-circle" size={20} color="#07111F" />}
               <Text style={styles.grantButtonText}>
-                {working ? 'ADICIONANDO...' : `ADICIONAR 🪙 ${amountNumber.toLocaleString('pt-BR')}`}
+                {working ? 'ADICIONANDO...' : 'ADICIONAR PARA ' + selectedPlayers.length.toLocaleString('pt-BR') + ' JOGADOR(ES)'}
               </Text>
             </Pressable>
           </View>

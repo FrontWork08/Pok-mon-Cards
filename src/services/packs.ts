@@ -1,12 +1,15 @@
 import { supabase } from '@/lib/supabase';
 import { normalizeFunctionError } from '@/services/functionErrors';
 import { getPhysicalPackshots } from '@/data/physicalPackshots';
+import { getActiveFreeBoosterEvent } from '@/services/liveEvents';
 
 export type Pack = {
   id: string;
   name: string;
   set_id: string;
   price: number;
+  base_price: number;
+  free_until: string | null;
   cards_per_pack: number;
   image_url: string | null;
   art_url: string | null;
@@ -36,13 +39,16 @@ export type PackCardPreview = {
 };
 
 export async function listPacks(): Promise<Pack[]> {
-  const { data, error } = await supabase
-    .from('packs')
-    .select(
-      'id,name,set_id,price,cards_per_pack,image_url,art_url,booster_art_url,booster_art_urls,booster_back_url,booster_logo_url,booster_art_source,active',
-    )
-    .eq('active', true)
-    .order('price', { ascending: true });
+  const [{ data, error }, freeEvent] = await Promise.all([
+    supabase
+      .from('packs')
+      .select(
+        'id,name,set_id,price,cards_per_pack,image_url,art_url,booster_art_url,booster_art_urls,booster_back_url,booster_logo_url,booster_art_source,active',
+      )
+      .eq('active', true)
+      .order('price', { ascending: true }),
+    getActiveFreeBoosterEvent(),
+  ]);
 
   if (error) throw error;
 
@@ -50,9 +56,13 @@ export async function listPacks(): Promise<Pack[]> {
     const manifestArt = [...getPhysicalPackshots(pack.set_id)];
     const cachedArt = Array.isArray(pack.booster_art_urls) ? pack.booster_art_urls : [];
     const boosterArtUrls = cachedArt.length ? cachedArt : manifestArt;
+    const basePrice = Number(pack.price ?? 0);
 
     return {
       ...pack,
+      price: freeEvent ? 0 : basePrice,
+      base_price: basePrice,
+      free_until: freeEvent?.ends_at ?? null,
       booster_art_url: pack.booster_art_url ?? boosterArtUrls[0] ?? null,
       booster_art_urls: boosterArtUrls,
       booster_art_source:

@@ -4,6 +4,7 @@ import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { UpdatePrompt } from '@/components/UpdatePrompt';
+import { GlobalAnnouncementOverlay } from '@/components/GlobalAnnouncement';
 import { ThemeProvider, useAppTheme } from '@/theme/ThemeProvider';
 import { registerPushNotifications } from '@/services/notifications';
 import { playBattleSound } from '@/services/battleEffects';
@@ -104,6 +105,7 @@ function AppStack() {
       <StatusBar style={isLight ? 'dark' : 'light'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
       <UpdatePrompt />
+      <GlobalAnnouncementOverlay />
     </>
   );
 }

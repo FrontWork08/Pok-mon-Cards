@@ -77,6 +77,28 @@ Deno.serve(async (req: Request) => {
       return json({ data });
     }
 
+
+    if (body.action === "grant_coins_batch") {
+      const rawTargetIds = Array.isArray(body.targetIds) ? body.targetIds : [];
+      const targetIds = [...new Set(rawTargetIds.filter((id): id is string => typeof id === "string" && id.length > 0))];
+      const amount = Number(body.amount);
+      const note = typeof body.note === "string" ? body.note : null;
+
+      if (targetIds.length < 1 || targetIds.length > 100 || !Number.isSafeInteger(amount) || amount < 1) {
+        return json({ error: "INVALID_AMOUNT_OR_TARGETS" }, 400);
+      }
+
+      const { data, error } = await admin.rpc("server_admin_grant_coins_batch", {
+        p_actor_id: user.id,
+        p_target_ids: targetIds,
+        p_amount: amount,
+        p_note: note,
+      });
+      if (error) throw error;
+
+      return json({ data });
+    }
+
     if (body.action === "players") {
       const { data, error } = await admin
         .from("players")
@@ -120,6 +142,42 @@ Deno.serve(async (req: Request) => {
         p_body: announcementBody,
         p_severity: severity,
         p_duration_hours: durationHours,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+
+    if (body.action === "events") {
+      const { data, error } = await admin
+        .from("admin_game_events")
+        .select("id,event_type,title,active,starts_at,ends_at,created_at")
+        .eq("active", true)
+        .gt("ends_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      return json({ data: data ?? [] });
+    }
+
+    if (body.action === "start_free_boosters") {
+      const durationMinutes = Number(body.durationMinutes);
+      if (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) {
+        return json({ error: "INVALID_DURATION" }, 400);
+      }
+
+      const { data, error } = await admin.rpc("server_admin_start_free_boosters", {
+        p_actor_id: user.id,
+        p_duration_minutes: durationMinutes,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "stop_free_boosters") {
+      const { data, error } = await admin.rpc("server_admin_stop_free_boosters", {
+        p_actor_id: user.id,
       });
       if (error) throw error;
       return json({ data });
