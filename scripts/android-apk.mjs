@@ -7,12 +7,15 @@ const root = process.cwd();
 const outputDir = path.join(root, 'builds');
 
 function runEas(args, options = {}) {
-  const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  // .cmd executables cannot be spawned directly by Node on some Windows/Git
+  // Bash setups (spawnSync EINVAL). Running npx through the platform shell is
+  // compatible with Git Bash, PowerShell and Command Prompt.
+  const command = 'npx';
   const result = spawnSync(command, ['--yes', 'eas-cli', ...args], {
     cwd: root,
     encoding: 'utf8',
     stdio: options.capture ? ['inherit', 'pipe', 'inherit'] : 'inherit',
-    shell: false,
+    shell: process.platform === 'win32',
   });
 
   if (result.error) throw result.error;
