@@ -12,6 +12,7 @@ export type PlayerProfile = {
   battle_streak: number;
   best_battle_streak: number;
   equipped_title_id: string | null;
+  equipped_title: { id: string; title: string; icon: string } | Array<{ id: string; title: string; icon: string }> | null;
   show_battle_rating: boolean;
   created_at: string;
   last_daily_claim_at: string | null;
@@ -50,7 +51,7 @@ export async function getMyProfile() {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id, username, coins, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, show_battle_rating, created_at, last_daily_claim_at')
+    .select('id, username, coins, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), show_battle_rating, created_at, last_daily_claim_at')
     .eq('id', userData.user.id)
     .single();
 
