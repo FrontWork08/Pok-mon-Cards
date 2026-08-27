@@ -7,7 +7,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "apk": "node scripts/android-apk.mjs build",
+    "apk:download": "node scripts/android-apk.mjs download"
   },
   "dependencies": {
     "@expo/vector-icons": "14.1.0",
