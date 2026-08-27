@@ -102,7 +102,9 @@ export default function AdminScreen() {
       setPriceWorking(true);
       setError(null);
       const result = await refreshGlobalOwnedMarketPrices(false);
-      setNotice(`${result.refreshed} preços de cards possuídos foram atualizados.`);
+      setNotice(
+        `${result.refreshed} preços atualizados neste lote • ${result.remainingStale} cards ainda aguardando precificação.`,
+      );
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível atualizar os preços.');
@@ -201,7 +203,7 @@ export default function AdminScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.marketTitle, { color: colors.text }]}>Preços de mercado</Text>
                 <Text style={[styles.marketText, { color: colors.muted }]}>
-                  Atualiza preços TCGplayer/TCGdex dos cards que existem nas contas dos jogadores.
+                  Atualiza os preços de mercado em USD dos cards que existem nas contas. O worker também continua a precificação automaticamente a cada minuto.
                 </Text>
               </View>
             </View>
