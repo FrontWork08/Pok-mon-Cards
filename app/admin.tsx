@@ -27,6 +27,7 @@ import {
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
+import { adminSetGuildLeader, getGuildHub, type GuildHub } from '@/services/guilds';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -49,6 +50,9 @@ export default function AdminScreen() {
   const [announcementHours, setAnnouncementHours] = useState('24');
   const [freeBoosterMinutes, setFreeBoosterMinutes] = useState('1');
   const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
+  const [guildHub, setGuildHub] = useState<GuildHub | null>(null);
+  const [selectedGuildId, setSelectedGuildId] = useState<string | null>(null);
+  const [guildLeaderSearch, setGuildLeaderSearch] = useState('');
   const [clock, setClock] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -75,15 +79,18 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [status, grants, events] = await Promise.all([
+      const [status, grants, events, guildState] = await Promise.all([
         getAdminOverview(),
         getCoinGrantHistory(),
         getAdminEvents(),
+        getGuildHub(),
         syncPlayers(),
       ]);
       setOverview(status);
       setHistory(grants);
       setActiveEvent(events.find((event) => event.event_type === 'free_boosters') ?? null);
+      setGuildHub(guildState);
+      setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
     } finally {
@@ -152,6 +159,17 @@ export default function AdminScreen() {
     () => players.filter((player) => selectedPlayerIds.has(player.id)),
     [players, selectedPlayerIds],
   );
+
+  const selectedGuild = useMemo(
+    () => guildHub?.guilds.find((guild) => guild.id === selectedGuildId) ?? null,
+    [guildHub, selectedGuildId],
+  );
+
+  const visibleGuildLeaders = useMemo(() => {
+    const query = guildLeaderSearch.trim().toLowerCase();
+    if (!query) return players;
+    return players.filter((player) => player.username.toLowerCase().includes(query));
+  }, [guildLeaderSearch, players]);
 
   const activeEventRemaining = useMemo(() => {
     if (!activeEvent) return '';
@@ -244,6 +262,22 @@ export default function AdminScreen() {
     }
   }
 
+  async function chooseGuildLeader(targetId: string | null) {
+    if (!selectedGuild || working) return;
+    try {
+      setWorking(true);
+      setError(null);
+      await adminSetGuildLeader(selectedGuild.id, targetId);
+      setNotice(targetId ? `Chefe da ${selectedGuild.name} atualizado.` : `A ${selectedGuild.name} ficou sem chefe.`);
+      const next = await getGuildHub();
+      setGuildHub(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível atualizar o chefe da guilda.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function deactivateFreeBoosters() {
     if (working) return;
     try {
@@ -310,6 +344,83 @@ export default function AdminScreen() {
                 Toda alteração de moedas é feita no servidor e registrada no histórico administrativo.
               </Text>
             </View>
+          </View>
+
+          <SectionTitle title="Liderança das Guildas" />
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: selectedGuild?.color ?? colors.border }]}>
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>ESCOLHA UMA DAS 4 GUILDAS</Text>
+            <View style={styles.quickRow}>
+              {(guildHub?.guilds ?? []).map((guild) => (
+                <Pressable
+                  key={guild.id}
+                  onPress={() => setSelectedGuildId(guild.id)}
+                  style={[
+                    styles.quickChip,
+                    {
+                      backgroundColor: selectedGuildId === guild.id ? guild.color : colors.surfaceAlt,
+                      borderColor: guild.color,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.quickText, { color: selectedGuildId === guild.id ? '#fff' : colors.text }]}>
+                    {guild.name.replace('Guilda ', '').toUpperCase()}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {selectedGuild ? (
+              <View style={[styles.notice, { backgroundColor: selectedGuild.color + '18', borderColor: selectedGuild.color }]}>
+                <Ionicons name="shield" size={20} color={selectedGuild.color} />
+                <Text style={[styles.noticeText, { color: colors.text }]}>
+                  {selectedGuild.leaderUsername ? `Chefe atual: @${selectedGuild.leaderUsername}` : 'Nenhum chefe escolhido'}
+                </Text>
+              </View>
+            ) : null}
+
+            <TextInput
+              value={guildLeaderSearch}
+              onChangeText={setGuildLeaderSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Buscar jogador para nomear como chefe"
+              placeholderTextColor={colors.muted}
+              style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+            />
+
+            <View style={styles.friendChips}>
+              {visibleGuildLeaders.map((player) => {
+                const current = selectedGuild?.leaderId === player.id;
+                return (
+                  <Pressable
+                    key={player.id}
+                    disabled={working}
+                    onPress={() => { void chooseGuildLeader(player.id); }}
+                    style={[
+                      styles.friendChip,
+                      {
+                        backgroundColor: current ? (selectedGuild?.color ?? colors.accent) + '28' : colors.surfaceAlt,
+                        borderColor: current ? selectedGuild?.color ?? colors.accent : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.friendChipText, { color: colors.text }]}>
+                      @{player.username}{current ? ' • CHEFE' : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {selectedGuild?.leaderId ? (
+              <Pressable
+                disabled={working}
+                onPress={() => { void chooseGuildLeader(null); }}
+                style={[styles.quickChip, { alignSelf: 'flex-start', backgroundColor: '#351A24', borderColor: '#683243' }]}
+              >
+                <Text style={[styles.quickText, { color: '#FF9FAF' }]}>REMOVER CHEFE ATUAL</Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <SectionTitle title="Visão geral" />

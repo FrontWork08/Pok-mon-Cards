@@ -21,10 +21,13 @@ export type FreeBoosterEvent = {
 };
 
 export async function getActiveGlobalAnnouncement() {
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('global_announcements')
     .select('id,title,body,severity,starts_at,ends_at,created_at')
     .eq('active', true)
+    .lte('starts_at', now)
+    .or(`ends_at.is.null,ends_at.gt.${now}`)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

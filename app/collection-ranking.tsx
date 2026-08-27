@@ -83,8 +83,11 @@ export default function CollectionRankingScreen() {
             const mine = row.player_id === myId;
             const medal = row.global_rank === 1 ? '🥇' : row.global_rank === 2 ? '🥈' : row.global_rank === 3 ? '🥉' : null;
             return (
-              <View
+              <Pressable
                 key={row.player_id}
+                accessibilityRole="button"
+                accessibilityLabel={`Abrir perfil de @${row.username}`}
+                onPress={() => router.push(`/player/${row.player_id}`)}
                 style={[
                   styles.row,
                   {
@@ -107,7 +110,8 @@ export default function CollectionRankingScreen() {
                 </View>
 
                 <Text style={[styles.value, { color: colors.yellow }]}>{formatUsd(row.collection_value_usd)}</Text>
-              </View>
+                <Ionicons name="chevron-forward" size={17} color={colors.muted} />
+              </Pressable>
             );
           })}
         </View>

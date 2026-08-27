@@ -109,6 +109,7 @@ export default function ProfileScreen() {
       <FeatureLink icon="ribbon" color="#D5A7FF" title="Conquistas e Títulos" text="Veja seu progresso, desbloqueie títulos e escolha qual exibir no perfil." onPress={() => router.push('/achievements')} />
       <FeatureLink icon="game-controller" color="#FF9D4A" title="Battle Center" text={`ELO ${profile?.battle_rating ?? 1000} • ${profile?.battle_wins ?? 0} vitórias • ranking e revanche`} onPress={() => router.push('/battles')} />
       <FeatureLink icon="podium" color={colors.yellow} title="Ranking de Coleções" text="Ranking global das contas pelo valor fixo das cartas em USD." onPress={() => router.push('/collection-ranking')} />
+      <FeatureLink icon="shield" color="#8B5CF6" title="Guildas Pokémon" text="Kanto, Johto, Hoenn e Sinnoh • missões, cargos e ranking coletivo." onPress={() => router.push('/guilds')} />
       <FeatureLink icon="people" color={colors.blue} title="Amigos, Chat e Batalhas" text={friendCount + ' amigos' + (incomingCount ? ` • ${incomingCount} solicitação aguardando` : ' • converse e envie desafios')} onPress={() => router.push('/friends')} badge={incomingCount || undefined} />
       <FeatureLink icon="albums" color="#9B7BFF" title="Meus Decks" text="Monte equipes e deixe um deck principal pronto para Mystery Battle." onPress={() => router.push('/decks')} />
       <FeatureLink icon="gift" color="#65D894" title="Missões Diárias" text="Ganhe moedas e XP abrindo packs e participando de batalhas." onPress={() => router.push('/missions')} />
