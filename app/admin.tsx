@@ -88,7 +88,7 @@ export default function AdminScreen() {
     try {
       setPriceWorking(true);
       setError(null);
-      const result = await refreshGlobalOwnedMarketPrices(true);
+      const result = await refreshGlobalOwnedMarketPrices(false);
       setNotice(`${result.refreshed} preços de cards possuídos foram atualizados.`);
       await load();
     } catch (e) {
