@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CardPickerModal } from '@/components/CardPickerModal';
 import { Screen } from '@/components/Screen';
-import { createBattle, getBattleLeaderboard, getMyBattleHistory, rematchBattle, type BattleMode, type BattleStakeType } from '@/services/battles';
+import { createBattle, getBattleLeaderboard, getMyBattleHistory, rematchBattle, respondToBattle, type BattleMode, type BattleStakeType } from '@/services/battles';
 import { getMyBag, getMyProfile, type OwnedCardEntry } from '@/services/player';
 import { getTrainerRank } from '@/services/ranks';
 import { getMySocial, type SocialPlayer } from '@/services/social';
@@ -58,6 +58,10 @@ export default function BattlesHubScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   const completed = useMemo(() => history.filter((item) => item.status === 'completed'), [history]);
+  const incomingInvites = useMemo(
+    () => history.filter((item) => item.status === 'invited' && item.opponent_id === profile?.id),
+    [history, profile?.id],
+  );
   const myRank = getTrainerRank(profile?.battle_rating);
   const wins = completed.filter((item) => item.winner_id === profile?.id).length;
   const losses = completed.length - wins;
@@ -95,6 +99,19 @@ export default function BattlesHubScreen() {
     }
   }
 
+  async function respondInvite(id: string, accept: boolean) {
+    try {
+      setWorking(id);
+      await respondToBattle(id, accept);
+      await load();
+      if (accept) router.push(`/battle/${id}`);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Não foi possível responder ao convite.');
+    } finally {
+      setWorking(null);
+    }
+  }
+
   async function rematch(id: string) {
     try {
       setWorking(id);
@@ -110,6 +127,39 @@ export default function BattlesHubScreen() {
   return <Screen title="Batalhas" subtitle="Desafie amigos, acompanhe seu ELO e dispute o ranking.">
     {notice ? <Pressable style={styles.notice} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={18} color={colors.yellow}/><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
     {loading ? <ActivityIndicator size="large" color={colors.yellow}/> : null}
+
+    {incomingInvites.length ? (
+      <View style={[styles.invitePanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
+        <View style={styles.sectionHead}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Convites recebidos</Text>
+          <Text style={[styles.sectionMeta, { color: colors.yellow }]}>{incomingInvites.length}</Text>
+        </View>
+        <View style={styles.list}>
+          {incomingInvites.map((item) => {
+            const challenger = Array.isArray(item.challenger) ? item.challenger[0] : item.challenger;
+            const cardStake = item.stake_type === 'card';
+            return (
+              <View key={item.id} style={[styles.inviteRow, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]}>
+                <Pressable style={styles.grow} onPress={() => router.push(`/battle/${item.id}`)}>
+                  <Text style={[styles.name, { color: colors.text }]}>@{challenger?.username ?? 'Treinador'} desafiou você</Text>
+                  <Text style={[styles.sub, { color: colors.muted }]}>
+                    {item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {cardStake ? '🎴 valendo carta' : item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : 'Casual'}
+                  </Text>
+                </Pressable>
+                <View style={styles.inviteActions}>
+                  <Pressable disabled={working === item.id} onPress={() => { void respondInvite(item.id, false); }} style={[styles.inviteButton, { borderColor: '#69313A' }]}><Text style={{ color: '#FF8290', fontWeight: '900', fontSize: 9 }}>RECUSAR</Text></Pressable>
+                  {cardStake ? (
+                    <Pressable onPress={() => router.push(`/battle/${item.id}`)} style={[styles.inviteButton, { borderColor: colors.accent }]}><Text style={{ color: colors.accent, fontWeight: '900', fontSize: 9 }}>ABRIR</Text></Pressable>
+                  ) : (
+                    <Pressable disabled={working === item.id} onPress={() => { void respondInvite(item.id, true); }} style={[styles.inviteButton, { borderColor: colors.yellow, backgroundColor: colors.yellow }]}><Text style={{ color: '#07111F', fontWeight: '900', fontSize: 9 }}>ACEITAR</Text></Pressable>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    ) : null}
 
     <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
       <View><Text style={[styles.kicker, { color: colors.yellow }]}>RANKED RATING</Text><Text style={[styles.rating, { color: colors.text }]}>{profile?.battle_rating ?? 1000}</Text><Text style={[styles.rankLabel, { color: colors.muted }]}>{myRank.symbol} {myRank.displayName}</Text></View>
@@ -155,5 +205,9 @@ const styles = StyleSheet.create({
   list: { gap: 8 }, rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, borderWidth: 1 }, position: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, positionText: { fontWeight: '900' }, grow: { flex: 1, minWidth: 0 }, name: { fontSize: 12, fontWeight: '900' }, sub: { fontSize: 9, marginTop: 3 }, elo: { fontSize: 16, fontWeight: '900' },
   battleRow: { borderRadius: 17, borderWidth: 1, overflow: 'hidden' }, battleBody: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11 }, resultIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, rematch: { alignSelf: 'flex-end', marginRight: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1 }, rematchText: { fontSize: 8, fontWeight: '900' },
   empty: { padding: 24, borderRadius: 18, borderWidth: 1, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 15, fontWeight: '900' }, emptyText: { fontSize: 10, textAlign: 'center' }, findFriends: { marginTop: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  invitePanel: { borderRadius: 20, borderWidth: 1, padding: 13, gap: 10 },
+  inviteRow: { minHeight: 68, borderRadius: 14, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  inviteActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  inviteButton: { minHeight: 36, minWidth: 70, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,.76)', justifyContent: 'center', padding: 14 }, modalCard: { width: '100%', maxWidth: 600, maxHeight: '92%', alignSelf: 'center', borderRadius: 24, borderWidth: 1, padding: 16, gap: 12 }, modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 11 }, modalTitle: { fontSize: 18, fontWeight: '900' }, modalSubtitle: { fontSize: 9, marginTop: 2 }, optionLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2, marginTop: 2 }, optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, option: { flexGrow: 1, flexBasis: 100, borderRadius: 13, borderWidth: 1, padding: 10 }, stake: { flexGrow: 1, flexBasis: 90, borderRadius: 13, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 7 }, optionTitle: { fontSize: 10, fontWeight: '900' }, optionDetail: { fontSize: 8, marginTop: 2 }, wagers: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, wager: { borderRadius: 11, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 }, wagerText: { fontSize: 9, fontWeight: '900' }, cardChoice: { minHeight: 59, borderRadius: 14, borderWidth: 1, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 9 }, send: { minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }, sendText: { color: '#07111F', fontSize: 10, fontWeight: '900' },
 });
