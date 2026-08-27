@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { OwnedCardEntry } from '@/services/player';
+import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 type SortMode = 'value' | 'name' | 'quantity' | 'recent';
@@ -58,7 +59,7 @@ export function CardPickerModal({
         || String(card.card_number ?? '').toLowerCase().includes(term);
     });
     return [...filtered].sort((a, b) => {
-      if (sort === 'value') return Number(b.cards?.game_value ?? 0) - Number(a.cards?.game_value ?? 0);
+      if (sort === 'value') return Number(b.cards?.market_price_usd ?? -1) - Number(a.cards?.market_price_usd ?? -1);
       if (sort === 'name') return String(a.cards?.pokemon_name ?? '').localeCompare(String(b.cards?.pokemon_name ?? ''));
       if (sort === 'quantity') return Number(b.quantity ?? 0) - Number(a.quantity ?? 0);
       return new Date(b.first_obtained_at).getTime() - new Date(a.first_obtained_at).getTime();
@@ -69,9 +70,9 @@ export function CardPickerModal({
   const selectedValue = useMemo(() => {
     if (mode === 'single') {
       const entry = bag.find((item) => item.cards?.id === selectedId);
-      return Number(entry?.cards?.game_value ?? 0);
+      return Number(entry?.cards?.market_price_usd ?? 0);
     }
-    return bag.reduce((sum, entry) => sum + Number(entry.cards?.game_value ?? 0) * Number(selectedMap[entry.cards?.id ?? ''] ?? 0), 0);
+    return bag.reduce((sum, entry) => sum + Number(entry.cards?.market_price_usd ?? 0) * Number(selectedMap[entry.cards?.id ?? ''] ?? 0), 0);
   }, [bag, mode, selectedId, selectedMap]);
 
   function selectSingle(entry: OwnedCardEntry) {
@@ -156,7 +157,7 @@ export function CardPickerModal({
         <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <View style={styles.footerInfo}>
             <Text style={[styles.footerLabel, { color: colors.muted }]}>{mode === 'single' ? 'SELEÇÃO' : 'CARTAS SELECIONADAS'}</Text>
-            <Text style={[styles.footerValue, { color: colors.text }]}>{selectedCount} • 🪙 {selectedValue.toLocaleString('pt-BR')}</Text>
+            <Text style={[styles.footerValue, { color: colors.text }]}>{selectedCount} • {formatUsd(selectedValue)}</Text>
           </View>
           <Pressable
             style={[styles.confirm, { backgroundColor: colors.yellow }, selectedCount === 0 && styles.disabled]}
@@ -191,7 +192,7 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, o
     >
       <View style={[styles.imageWrap, { backgroundColor: colors.surfaceAlt }]}>
         {card.image_small ? <Image source={{ uri: card.image_small }} style={styles.image} resizeMode="contain" /> : <Ionicons name="image-outline" size={30} color={colors.muted} />}
-        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>🪙 {Number(card.game_value ?? 0).toLocaleString('pt-BR')}</Text></View>
+        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
         {selected && mode === 'single' ? <View style={[styles.checkBadge, { backgroundColor: colors.yellow }]}><Ionicons name="checkmark" size={17} color="#07111F" /></View> : null}
       </View>
       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.pokemon_name}</Text>
