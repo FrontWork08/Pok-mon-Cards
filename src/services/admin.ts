@@ -21,6 +21,9 @@ export type AdminOverview = {
     cards: number;
     cardsWithUsdPrice: number;
     ownedUniqueRows: number;
+    ownedUniqueCards: number;
+    ownedCardsWithUsdPrice: number;
+    ownedPriceCoveragePct: number;
     ownedCardCopies: number;
     ownedMarketValueUsd: number;
   };
