@@ -1,13 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
-import { getMyBag, getMyProfile } from '@/services/player';
+import { getMyProfile } from '@/services/player';
 import {
   formatUsd,
   getCollectionValueLeaderboard,
-  refreshOwnedMarketPrices,
   type CollectionRankEntry,
 } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -18,51 +17,36 @@ export default function CollectionRankingScreen() {
   const [rows, setRows] = useState<CollectionRankEntry[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (refresh = false) => {
+  const load = useCallback(async (manual = false) => {
     try {
       setError(null);
-      if (refresh) setUpdating(true);
+      if (manual) setRefreshing(true);
       else setLoading(true);
 
-      const [profile, bag] = await Promise.all([getMyProfile(), getMyBag()]);
+      const [profile, leaderboard] = await Promise.all([
+        getMyProfile(),
+        getCollectionValueLeaderboard(100),
+      ]);
+
       setMyId(profile.id);
-
-      if (refresh || bag.some((entry) => !entry.cards?.market_price_updated_at)) {
-        await refreshOwnedMarketPrices(
-          bag.map((entry) => entry.cards?.id).filter((id): id is string => Boolean(id)),
-          refresh,
-        ).catch(() => []);
-      }
-
-      setRows(await getCollectionValueLeaderboard(100));
+      setRows(leaderboard);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível carregar o ranking.');
     } finally {
       setLoading(false);
-      setUpdating(false);
+      setRefreshing(false);
     }
   }, []);
 
   useFocusEffect(useCallback(() => { load(false); }, [load]));
 
-  const coverage = useMemo(() => {
-    const totals = rows.reduce(
-      (acc, row) => ({
-        priced: acc.priced + row.priced_card_copies,
-        total: acc.total + row.total_card_copies,
-      }),
-      { priced: 0, total: 0 },
-    );
-    return totals.total > 0 ? (totals.priced / totals.total) * 100 : 0;
-  }, [rows]);
-
   return (
     <Screen
       title="Ranking de Coleções"
-      subtitle="Ranking global pelo valor de mercado conhecido das cartas em dólar."
+      subtitle="Ranking global pelo valor fixo em USD das cartas de cada treinador."
     >
       <View style={styles.topRow}>
         <Pressable style={[styles.back, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.back()}>
@@ -73,37 +57,22 @@ export default function CollectionRankingScreen() {
         <Pressable
           style={[styles.refresh, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}
           onPress={() => load(true)}
-          disabled={updating}
+          disabled={refreshing}
         >
-          {updating ? <ActivityIndicator size="small" color={colors.yellow} /> : <Ionicons name="refresh" size={17} color={colors.yellow} />}
-          <Text style={[styles.refreshText, { color: colors.yellow }]}>{updating ? 'ATUALIZANDO' : 'ATUALIZAR PREÇOS'}</Text>
+          {refreshing ? <ActivityIndicator size="small" color={colors.yellow} /> : <Ionicons name="refresh" size={17} color={colors.yellow} />}
+          <Text style={[styles.refreshText, { color: colors.yellow }]}>{refreshing ? 'ATUALIZANDO' : 'ATUALIZAR RANKING'}</Text>
         </Pressable>
       </View>
 
       <View style={[styles.info, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Ionicons name="cash-outline" size={23} color={colors.yellow} />
+        <Ionicons name="diamond-outline" size={23} color={colors.yellow} />
         <View style={{ flex: 1 }}>
-          <Text style={[styles.infoTitle, { color: colors.text }]}>Valor de mercado em USD</Text>
+          <Text style={[styles.infoTitle, { color: colors.text }]}>Tabela fixa de valores</Text>
           <Text style={[styles.infoText, { color: colors.muted }]}>
-            O ranking usa preços de mercado em USD armazenados no servidor. A precificação continua automaticamente em segundo plano e a cobertura aumenta sem precisar manter esta tela aberta.
+            Todas as cartas do catálogo atual já possuem um valor fixo em USD. O ranking não depende de API de preço e só muda quando as coleções dos jogadores mudam.
           </Text>
         </View>
       </View>
-
-      {!loading ? (
-        <View style={[styles.progress, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.progressTop}>
-            <Text style={[styles.progressTitle, { color: colors.text }]}>Precificação global</Text>
-            <Text style={[styles.progressValue, { color: colors.yellow }]}>{coverage.toFixed(0)}%</Text>
-          </View>
-          <View style={[styles.progressTrack, { backgroundColor: colors.surfaceAlt }]}>
-            <View style={[styles.progressFill, { width: `${Math.min(100, coverage)}%`, backgroundColor: colors.yellow }]} />
-          </View>
-          <Text style={[styles.progressHint, { color: colors.muted }]}>
-            O ranking já funciona com os preços disponíveis; ele fica mais preciso conforme a cobertura se aproxima de 100%.
-          </Text>
-        </View>
-      ) : null}
 
       {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text></View> : null}
       {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
@@ -133,7 +102,7 @@ export default function CollectionRankingScreen() {
                     @{row.username}{mine ? ' • VOCÊ' : ''}
                   </Text>
                   <Text style={[styles.coverage, { color: colors.muted }]}>
-                    {row.total_card_copies.toLocaleString('pt-BR')} cards • {row.price_coverage_pct.toFixed(0)}% precificados
+                    {row.total_card_copies.toLocaleString('pt-BR')} cards • tabela fixa
                   </Text>
                 </View>
 
@@ -156,13 +125,6 @@ const styles = StyleSheet.create({
   info: { borderRadius: 18, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
   infoTitle: { fontSize: 14, fontWeight: '900' },
   infoText: { fontSize: 10, lineHeight: 15, marginTop: 3 },
-  progress: { borderRadius: 18, borderWidth: 1, padding: 14 },
-  progressTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  progressTitle: { fontSize: 12, fontWeight: '900' },
-  progressValue: { fontSize: 15, fontWeight: '900' },
-  progressTrack: { height: 8, borderRadius: 999, overflow: 'hidden', marginTop: 9 },
-  progressFill: { height: '100%', borderRadius: 999 },
-  progressHint: { fontSize: 9, lineHeight: 14, marginTop: 8 },
   error: { backgroundColor: '#351A24', borderRadius: 14, borderWidth: 1, borderColor: '#683243', padding: 12 },
   errorText: { color: '#FFD7DD', fontSize: 11, fontWeight: '700' },
   list: { gap: 8 },
