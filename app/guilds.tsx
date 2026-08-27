@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -47,8 +47,25 @@ export default function GuildsScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
-  useEffect(() => subscribeToGuilds(() => { void load(true); }), [load]);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    void load();
+    const unsubscribe = subscribeToGuilds(() => {
+      if (!active) return;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        if (active) void load(true);
+      }, 120);
+    });
+
+    return () => {
+      active = false;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      unsubscribe();
+    };
+  }, [load]));
 
   const selected = useMemo(() => hub?.guilds.find((guild) => guild.id === selectedId) ?? null, [hub, selectedId]);
   const myMembership = hub?.myMembership ?? null;
