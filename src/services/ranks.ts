@@ -33,8 +33,10 @@ export function getTrainerRank(value: number | null | undefined): TrainerRank {
     };
   }
 
-  let tierIndex = TIERS.findLastIndex((tier) => rating >= tier.minimum);
-  if (tierIndex < 0) tierIndex = 0;
+  let tierIndex = 0;
+  for (let index = 0; index < TIERS.length; index += 1) {
+    if (rating >= TIERS[index].minimum) tierIndex = index;
+  }
   const tier = TIERS[tierIndex];
   const divisionIndex = Math.min(4, Math.floor((rating - tier.minimum) / 100));
   const division = DIVISIONS[divisionIndex];
