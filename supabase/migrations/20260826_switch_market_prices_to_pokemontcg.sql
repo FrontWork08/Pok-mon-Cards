@@ -1,0 +1,3 @@
+-- Market pricing refresh by set using the Pokémon TCG API.
+-- Applied in production on 2026-08-26. The canonical function definition
+-- lives in Supabase migration history; later fixes are recorded below.
