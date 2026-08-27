@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { CardPickerModal } from '@/components/CardPickerModal';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
-import { cancelTrade, confirmTrade, getTrade, setTradeCards } from '@/services/trades';
+import { cancelTrade, confirmTrade, getTrade, setTradeCards, subscribeToTrade } from '@/services/trades';
 import { supabase } from '@/lib/supabase';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -63,6 +63,42 @@ export default function TradeBuilderScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const refreshTrade = useCallback(async () => {
+    if (!id) return;
+    try {
+      const tradeData = await getTrade(String(id));
+      setTrade(tradeData);
+
+      const uid = userId || (await supabase.auth.getUser()).data.user?.id || '';
+      if (uid) {
+        const ownOffer: SelectedMap = {};
+        for (const item of tradeData.trade_cards ?? []) {
+          if (item.owner_id === uid) ownOffer[item.card_id] = Number(item.quantity ?? 0);
+        }
+        setSelected(ownOffer);
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível sincronizar a troca.');
+    }
+  }, [id, userId]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const unsubscribe = subscribeToTrade(String(id), () => {
+      refreshTrade();
+    });
+
+    const timer = setInterval(() => {
+      if (trade?.status === 'pending') refreshTrade();
+    }, 3000);
+
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+    };
+  }, [id, refreshTrade, trade?.status]);
+
   const myConfirmed = useMemo(() => {
     if (!trade || !userId) return false;
     return userId === trade.sender_id ? trade.sender_confirmed : trade.receiver_confirmed;
@@ -90,8 +126,8 @@ export default function TradeBuilderScreen() {
       setNotice(null);
       await setTradeCards(String(id), Object.entries(selected).map(([card_id, quantity]) => ({ card_id, quantity })));
       setPickerOpen(false);
-      setNotice('Oferta salva. Se alguém já tinha confirmado, a confirmação foi reiniciada porque a oferta mudou.');
-      await load();
+      setNotice('Oferta salva e sincronizada. Se alguém já tinha confirmado, a confirmação foi reiniciada porque a oferta mudou.');
+      await refreshTrade();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível salvar a oferta.');
     } finally {
@@ -105,8 +141,15 @@ export default function TradeBuilderScreen() {
       setSaving(true);
       setNotice(null);
       const result = await confirmTrade(String(id));
-      await load();
+      setTrade((current: any) => {
+        if (!current) return current;
+        if (result?.status === 'completed') return { ...current, status: 'completed', sender_confirmed: true, receiver_confirmed: true };
+        return userId === current.sender_id
+          ? { ...current, sender_confirmed: true }
+          : { ...current, receiver_confirmed: true };
+      });
       setNotice(result?.status === 'completed' ? 'Troca concluída! As Bags dos dois treinadores já foram atualizadas.' : 'Sua confirmação foi registrada. Falta o outro treinador confirmar.');
+      await refreshTrade();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível confirmar a troca.');
       await load().catch(() => null);
@@ -173,7 +216,7 @@ export default function TradeBuilderScreen() {
         {pending ? (
           <View style={[styles.review, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="shield-checkmark-outline" size={24} color={colors.accent} />
-            <View style={{ flex: 1 }}><Text style={[styles.reviewTitle, { color: colors.text }]}>Revise os dois lados</Text><Text style={[styles.reviewText, { color: colors.muted }]}>A confirmação final fica fixa na tela. Quando os dois confirmarem, a transferência acontece de forma atômica no servidor.</Text></View>
+            <View style={{ flex: 1 }}><Text style={[styles.reviewTitle, { color: colors.text }]}>Revise os dois lados</Text><Text style={[styles.reviewText, { color: colors.muted }]}>A tela sincroniza automaticamente entre os dois celulares. Se qualquer lado alterar a oferta, as confirmações são zeradas por segurança. Quando os dois confirmarem, a transferência acontece de forma atômica no servidor.</Text></View>
           </View>
         ) : null}
 
