@@ -11,6 +11,8 @@ export type PlayerProfile = {
   battle_losses: number;
   battle_streak: number;
   best_battle_streak: number;
+  equipped_title_id: string | null;
+  show_battle_rating: boolean;
   created_at: string;
   last_daily_claim_at: string | null;
 };
@@ -48,7 +50,7 @@ export async function getMyProfile() {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id, username, coins, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, created_at, last_daily_claim_at')
+    .select('id, username, coins, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, show_battle_rating, created_at, last_daily_claim_at')
     .eq('id', userData.user.id)
     .single();
 
@@ -91,7 +93,7 @@ export async function findPlayers(username: string) {
   if (term.length < 2) return [];
   const { data: userData } = await supabase.auth.getUser();
   const myId = userData.user?.id;
-  let query = supabase.from('players').select('id, username, level, battle_rating').ilike('username', `%${term}%`).limit(20);
+  let query = supabase.from('players').select('id, username, level, battle_rating, show_battle_rating, equipped_title_id').ilike('username', `%${term}%`).limit(20);
   if (myId) query = query.neq('id', myId);
   const { data, error } = await query;
   if (error) throw error;
