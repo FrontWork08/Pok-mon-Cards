@@ -37,7 +37,7 @@ Deno.serve(async (req: Request) => {
     await admin.rpc("server_send_message", {
       p_actor_id: user.id,
       p_conversation_id: conversationId,
-      p_body: `${rematchOf ? "Revanche" : "Desafio"} ${mode === "mystery" ? "Mystery Battle" : "Quick Battle"}${label}.`,
+      p_body: `${rematchOf ? "Revanche" : "Desafio"} ${mode === "draft3" ? "Draft 3" : mode === "mystery" ? "Mystery Battle" : "Quick Battle"}${label}.`,
       p_kind: "battle_invite",
       p_metadata: { battleId, mode, stakeType, wagerCoins, rematchOf: rematchOf ?? null },
     });
@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (body.action === "create") {
-      const mode = body.mode === "mystery" ? "mystery" : "quick";
+      const mode = body.mode === "draft3" ? "draft3" : body.mode === "mystery" ? "mystery" : "quick";
       const stakeType = body.stakeType === "coins" ? "coins" : body.stakeType === "card" ? "card" : "none";
       const wagerCoins = stakeType === "coins" ? Number(body.wagerCoins ?? 0) : 0;
       const { data: battleId, error } = await admin.rpc("server_create_battle_v2", {
@@ -77,6 +77,16 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await admin.rpc("server_cancel_battle", { p_actor_id: user.id, p_battle_id: body.battleId });
       if (error) throw error;
       return json({ data: { status: data } });
+    }
+
+    if (body.action === "draft_pick") {
+      const { data, error } = await admin.rpc("server_pick_battle_draft_card", {
+        p_actor_id: user.id,
+        p_battle_id: body.battleId,
+        p_card_id: body.cardId,
+      });
+      if (error) throw error;
+      return json({ data });
     }
 
     if (body.action === "lock") {
