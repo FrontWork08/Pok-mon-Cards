@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getOwnedCard, type OwnedCardEntry } from '@/services/player';
 import { setCardFavorite } from '@/services/playerActions';
-import { formatUsd, refreshOwnedMarketPrices } from '@/services/market';
+import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function CardDetailScreen() {
@@ -21,33 +21,7 @@ export default function CardDetailScreen() {
     try {
       setLoading(true);
       setError(null);
-      const owned = await getOwnedCard(String(id));
-      setEntry(owned);
-
-      const card = owned.cards;
-      const stale = card?.market_price_usd == null ||
-        !card?.market_price_updated_at ||
-        Date.now() - new Date(card.market_price_updated_at).getTime() > 24 * 60 * 60 * 1000 ||
-        String(card.market_price_source ?? '').includes('error') ||
-        String(card.market_price_source ?? '').includes('http_');
-
-      if (card && stale) {
-        const [price] = await refreshOwnedMarketPrices([card.id]).catch(() => []);
-        if (price) {
-          setEntry({
-            ...owned,
-            cards: {
-              ...card,
-              market_price_usd: price.market_price_usd,
-              market_price_low_usd: price.market_price_low_usd,
-              market_price_high_usd: price.market_price_high_usd,
-              market_price_variant: price.market_price_variant,
-              market_price_source: price.market_price_source,
-              market_price_updated_at: price.market_price_updated_at,
-            },
-          });
-        }
-      }
+      setEntry(await getOwnedCard(String(id)));
     }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível carregar este card.'); }
     finally { setLoading(false); }
@@ -85,7 +59,7 @@ export default function CardDetailScreen() {
             <Text style={[styles.name, { color: colors.text }]}>{card.pokemon_name}</Text>
             <Text style={[styles.rarity, { color: colors.muted }]}>{card.rarity ?? 'Sem raridade informada'}</Text>
 
-            <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>PREÇO DE MERCADO</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? 'Preço de mercado ainda não disponível para esta carta. O servidor continua tentando em segundo plano.' : `Mercado em USD • ${card.market_price_variant ?? 'preço disponível'}`}</Text></View></View>
+            <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR FIXO EM USD</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? 'Valor fixo indisponível para esta carta.' : 'Tabela fixa do jogo • sem atualização online'}</Text></View></View>
 
             <View style={styles.badges}>{(card.types ?? []).map((type) => <View key={type} style={[styles.badge, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Text style={[styles.badgeText, { color: colors.text }]}>{type}</Text></View>)}</View>
             <View style={styles.statsGrid}><Info label="SET" value={card.set_name} /><Info label="NÚMERO" value={card.card_number ?? '—'} /><Info label="QUANTIDADE" value={`×${entry.quantity}`} /><Info label="VALOR TOTAL EM USD" value={totalMarketValueUsd == null ? '—' : formatUsd(totalMarketValueUsd)} /><Info label="VALOR NO JOGO" value={`🪙 ${unitValue.toLocaleString('pt-BR')}`} /><Info label="OBTIDO" value={new Date(entry.first_obtained_at).toLocaleDateString('pt-BR')} /></View>
