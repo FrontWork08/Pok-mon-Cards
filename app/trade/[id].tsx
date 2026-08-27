@@ -6,6 +6,7 @@ import { CardPickerModal } from '@/components/CardPickerModal';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
 import { cancelTrade, confirmTrade, getTrade, setTradeCards } from '@/services/trades';
 import { supabase } from '@/lib/supabase';
+import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 type SelectedMap = Record<string, number>;
@@ -13,7 +14,7 @@ type SelectedMap = Record<string, number>;
 function cardValue(item: any) {
   const relation = item?.cards;
   const card = Array.isArray(relation) ? relation[0] : relation;
-  return Number(card?.game_value ?? 0) * Number(item?.quantity ?? 0);
+  return Number(card?.market_price_usd ?? 0) * Number(item?.quantity ?? 0);
 }
 
 export default function TradeBuilderScreen() {
@@ -80,7 +81,7 @@ export default function TradeBuilderScreen() {
   const ownSavedValue = useMemo(() => ownSavedCards.reduce((sum: number, item: any) => sum + cardValue(item), 0), [ownSavedCards]);
   const otherValue = useMemo(() => otherCards.reduce((sum: number, item: any) => sum + cardValue(item), 0), [otherCards]);
   const selectedCount = useMemo(() => Object.values(selected).reduce((sum, qty) => sum + Number(qty), 0), [selected]);
-  const selectedValue = useMemo(() => bag.reduce((sum, entry) => sum + Number(entry.cards?.game_value ?? 0) * Number(selected[entry.cards?.id ?? ''] ?? 0), 0), [bag, selected]);
+  const selectedValue = useMemo(() => bag.reduce((sum, entry) => sum + Number(entry.cards?.market_price_usd ?? 0) * Number(selected[entry.cards?.id ?? ''] ?? 0), 0), [bag, selected]);
 
   async function saveOffer() {
     if (!id) return;
@@ -152,7 +153,7 @@ export default function TradeBuilderScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.kicker, { color: colors.yellow }]}>SUA OFERTA</Text>
               <Text style={[styles.editTitle, { color: colors.text }]}>{selectedCount ? `${selectedCount} carta(s) selecionada(s)` : 'Escolha suas cartas'}</Text>
-              <Text style={[styles.editMeta, { color: colors.muted }]}>Valor selecionado: 🪙 {selectedValue.toLocaleString('pt-BR')} • toque para editar</Text>
+              <Text style={[styles.editMeta, { color: colors.muted }]}>Valor de mercado: {formatUsd(selectedValue)} • toque para editar</Text>
             </View>
             <Ionicons name="chevron-forward" size={22} color={colors.accent} />
           </Pressable>
@@ -187,7 +188,7 @@ export default function TradeBuilderScreen() {
           </Pressable>
           <Pressable style={[styles.confirmButton, { backgroundColor: myConfirmed ? '#28563F' : colors.yellow }, (saving || myConfirmed || ownSavedCards.length === 0) && styles.disabled]} onPress={confirm} disabled={saving || myConfirmed || ownSavedCards.length === 0}>
             <Ionicons name={myConfirmed ? 'checkmark-circle' : 'shield-checkmark'} size={20} color={myConfirmed ? '#B9F4D2' : '#07111F'} />
-            <View><Text style={[styles.dockSmall, { color: myConfirmed ? '#9FD8B8' : '#4D4312' }]}>{myConfirmed ? 'CONFIRMADA' : `🪙 ${ownSavedValue.toLocaleString('pt-BR')}`}</Text><Text style={[styles.confirmButtonText, { color: myConfirmed ? '#D9FFE9' : '#07111F' }]}>{myConfirmed ? 'AGUARDANDO O OUTRO' : 'CONFIRMAR TROCA'}</Text></View>
+            <View><Text style={[styles.dockSmall, { color: myConfirmed ? '#9FD8B8' : '#4D4312' }]}>{myConfirmed ? 'CONFIRMADA' : formatUsd(ownSavedValue)}</Text><Text style={[styles.confirmButtonText, { color: myConfirmed ? '#D9FFE9' : '#07111F' }]}>{myConfirmed ? 'AGUARDANDO O OUTRO' : 'CONFIRMAR TROCA'}</Text></View>
           </Pressable>
           <Pressable style={styles.cancelDock} onPress={cancel} disabled={saving}><Ionicons name="close" size={20} color="#FF858F" /></Pressable>
         </View>
@@ -217,7 +218,7 @@ function Participant({ label, name, confirmed }: { label: string; name: string; 
 
 function ValueCard({ label, value, count, accent }: { label: string; value: number; count: number; accent: string }) {
   const { colors } = useAppTheme();
-  return <View style={styles.valueCard}><Text style={[styles.valueLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.valueAmount, { color: accent }]}>🪙 {value.toLocaleString('pt-BR')}</Text><Text style={[styles.valueCount, { color: colors.muted }]}>{count} carta(s)</Text></View>;
+  return <View style={styles.valueCard}><Text style={[styles.valueLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.valueAmount, { color: accent }]}>{formatUsd(value)}</Text><Text style={[styles.valueCount, { color: colors.muted }]}>{count} carta(s)</Text></View>;
 }
 
 function OfferPanel({ title, cards, ownerEmpty }: { title: string; cards: any[]; ownerEmpty: string }) {
@@ -228,7 +229,7 @@ function OfferPanel({ title, cards, ownerEmpty }: { title: string; cards: any[];
       {cards.length === 0 ? <Text style={[styles.offerEmpty, { color: colors.muted }]}>{ownerEmpty}</Text> : cards.map((item) => {
         const relation = item.cards;
         const card = Array.isArray(relation) ? relation[0] : relation;
-        return <View key={`${item.owner_id}-${item.card_id}`} style={[styles.offerItem, { backgroundColor: colors.surfaceAlt }]}>{card?.image_small ? <Image source={{ uri: card.image_small }} style={styles.offerThumb} resizeMode="contain" /> : <View style={styles.offerThumb} />}<View style={{ flex: 1 }}><Text style={[styles.offerName, { color: colors.text }]}>{card?.pokemon_name ?? item.card_id}</Text><Text style={[styles.offerMeta, { color: colors.muted }]}>{card?.rarity ?? 'Sem raridade'} • ×{item.quantity}</Text></View><Text style={[styles.offerValue, { color: colors.yellow }]}>🪙 {(Number(card?.game_value ?? 0) * Number(item.quantity ?? 0)).toLocaleString('pt-BR')}</Text></View>;
+        return <View key={`${item.owner_id}-${item.card_id}`} style={[styles.offerItem, { backgroundColor: colors.surfaceAlt }]}>{card?.image_small ? <Image source={{ uri: card.image_small }} style={styles.offerThumb} resizeMode="contain" /> : <View style={styles.offerThumb} />}<View style={{ flex: 1 }}><Text style={[styles.offerName, { color: colors.text }]}>{card?.pokemon_name ?? item.card_id}</Text><Text style={[styles.offerMeta, { color: colors.muted }]}>{card?.rarity ?? 'Sem raridade'} • ×{item.quantity}</Text></View><Text style={[styles.offerValue, { color: colors.yellow }]}>{card?.market_price_usd != null ? formatUsd(Number(card.market_price_usd) * Number(item.quantity ?? 0)) : 'US$ —'}</Text></View>;
       })}
     </View>
   );
