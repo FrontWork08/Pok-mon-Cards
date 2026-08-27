@@ -69,6 +69,13 @@ export type AdminOverview = {
   catalogRefresh?: Record<string, unknown>;
 };
 
+export type AdminPlayer = {
+  id: string;
+  username: string;
+  level: number;
+  created_at: string;
+};
+
 export type CoinGrantResult = {
   targetId: string;
   username: string;
@@ -90,6 +97,10 @@ export type CoinGrantHistory = {
 
 export async function getAdminOverview() {
   return invokeAdmin({ action: 'overview' }) as Promise<AdminOverview>;
+}
+
+export async function getAdminPlayers() {
+  return invokeAdmin({ action: 'players' }) as Promise<AdminPlayer[]>;
 }
 
 export async function grantCoins(targetId: string, amount: number, note?: string) {

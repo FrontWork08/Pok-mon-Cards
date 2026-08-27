@@ -77,6 +77,16 @@ Deno.serve(async (req: Request) => {
       return json({ data });
     }
 
+    if (body.action === "players") {
+      const { data, error } = await admin
+        .from("players")
+        .select("id,username,level,created_at")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return json({ data: data ?? [] });
+    }
+
     if (body.action === "coin_history") {
       const { data, error } = await admin
         .from("admin_coin_adjustments")

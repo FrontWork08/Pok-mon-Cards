@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,14 +13,16 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import {
   getAdminOverview,
+  getAdminPlayers,
   getCoinGrantHistory,
   grantCoins,
   type AdminOverview,
+  type AdminPlayer,
   type CoinGrantHistory,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
-import { getMySocial, type SocialPlayer } from '@/services/social';
 import { getMyProfile } from '@/services/player';
+import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const QUICK_AMOUNTS = [1000, 5000, 10000, 50000, 100000];
@@ -29,10 +31,11 @@ export default function AdminScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
   const [overview, setOverview] = useState<AdminOverview | null>(null);
-  const [friends, setFriends] = useState<SocialPlayer[]>([]);
+  const [players, setPlayers] = useState<AdminPlayer[]>([]);
   const [selfId, setSelfId] = useState('');
   const [history, setHistory] = useState<CoinGrantHistory[]>([]);
-  const [selectedFriend, setSelectedFriend] = useState<SocialPlayer | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<AdminPlayer | null>(null);
+  const [playerSearch, setPlayerSearch] = useState('');
   const [amount, setAmount] = useState('10000');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
@@ -40,42 +43,73 @@ export default function AdminScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const syncPlayers = useCallback(async () => {
+    const [directory, self] = await Promise.all([getAdminPlayers(), getMyProfile()]);
+    setPlayers(directory);
+    setSelfId(self.id);
+    setSelectedPlayer((current) => {
+      const preserved = current ? directory.find((player) => player.id === current.id) : null;
+      return preserved ?? directory.find((player) => player.id === self.id) ?? directory[0] ?? null;
+    });
+  }, []);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const [status, social, grants, self] = await Promise.all([
+      const [status, grants] = await Promise.all([
         getAdminOverview(),
-        getMySocial(),
         getCoinGrantHistory(),
-        getMyProfile(),
+        syncPlayers(),
       ]);
-      const recipients: SocialPlayer[] = [{ id: self.id, username: self.username, level: self.level }, ...social.friends];
       setOverview(status);
-      setFriends(recipients);
-      setSelfId(self.id);
       setHistory(grants);
-      setSelectedFriend((current) => current && recipients.some((player) => player.id === current.id) ? current : recipients[0] ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncPlayers]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useEffect(() => {
+    const refreshDirectory = () => {
+      void syncPlayers().catch(() => {});
+    };
+    const channel = supabase
+      .channel('admin-player-directory')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'players' },
+        refreshDirectory,
+      )
+      .subscribe();
+    const fallbackTimer = setInterval(refreshDirectory, 15000);
+
+    return () => {
+      clearInterval(fallbackTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [syncPlayers]);
 
   const amountNumber = useMemo(() => {
     const parsed = Number(amount.replace(/[^0-9]/g, ''));
     return Number.isSafeInteger(parsed) ? parsed : 0;
   }, [amount]);
 
+  const visiblePlayers = useMemo(() => {
+    const query = playerSearch.trim().toLowerCase();
+    if (!query) return players;
+    return players.filter((player) => player.username.toLowerCase().includes(query));
+  }, [playerSearch, players]);
+
   async function sendCoins() {
-    if (!selectedFriend || amountNumber < 1 || working) return;
+    if (!selectedPlayer || amountNumber < 1 || working) return;
     try {
       setWorking(true);
       setError(null);
-      const result = await grantCoins(selectedFriend.id, amountNumber, note);
+      const result = await grantCoins(selectedPlayer.id, amountNumber, note);
       setNotice(
         `Adicionado 🪙 ${result.amount.toLocaleString('pt-BR')} para @${result.username}. Novo saldo: 🪙 ${result.balanceAfter.toLocaleString('pt-BR')}.`,
       );
@@ -89,10 +123,10 @@ export default function AdminScreen() {
   }
 
   function confirmSendCoins() {
-    if (!selectedFriend || amountNumber < 1 || working) return;
+    if (!selectedPlayer || amountNumber < 1 || working) return;
     Alert.alert(
       'Confirmar crédito',
-      `Adicionar 🪙 ${amountNumber.toLocaleString('pt-BR')} para @${selectedFriend.username}?`,
+      `Adicionar 🪙 ${amountNumber.toLocaleString('pt-BR')} para @${selectedPlayer.username}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Adicionar', onPress: () => { sendCoins(); } },
@@ -200,16 +234,29 @@ export default function AdminScreen() {
 
           <SectionTitle title="Adicionar moedas" />
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.fieldLabel, { color: colors.muted }]}>ESCOLHA O JOGADOR</Text>
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>
+              ESCOLHA O JOGADOR • {players.length}
+            </Text>
+            <TextInput
+              value={playerSearch}
+              onChangeText={setPlayerSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Buscar jogador pelo nome"
+              placeholderTextColor={colors.muted}
+              style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+            />
             <View style={styles.friendChips}>
-              {friends.length === 0 ? (
-                <Text style={[styles.emptyText, { color: colors.muted }]}>Nenhum jogador disponível.</Text>
-              ) : friends.map((friend) => {
-                const active = selectedFriend?.id === friend.id;
+              {visiblePlayers.length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.muted }]}>
+                  {players.length === 0 ? 'Nenhum jogador disponível.' : 'Nenhum jogador encontrado.'}
+                </Text>
+              ) : visiblePlayers.map((player) => {
+                const active = selectedPlayer?.id === player.id;
                 return (
                   <Pressable
-                    key={friend.id}
-                    onPress={() => setSelectedFriend(friend)}
+                    key={player.id}
+                    onPress={() => setSelectedPlayer(player)}
                     style={[
                       styles.friendChip,
                       {
@@ -218,7 +265,9 @@ export default function AdminScreen() {
                       },
                     ]}
                   >
-                    <Text style={[styles.friendChipText, { color: colors.text }]}>@{friend.username}{friend.id === selfId ? ' (você)' : ''}</Text>
+                    <Text style={[styles.friendChipText, { color: colors.text }]}>
+                      @{player.username}{player.id === selfId ? ' (você)' : ''}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -263,12 +312,12 @@ export default function AdminScreen() {
             />
 
             <Pressable
-              disabled={!selectedFriend || amountNumber < 1 || working}
+              disabled={!selectedPlayer || amountNumber < 1 || working}
               onPress={confirmSendCoins}
               style={[
                 styles.grantButton,
                 {
-                  backgroundColor: selectedFriend && amountNumber > 0 ? colors.yellow : colors.surfaceAlt,
+                  backgroundColor: selectedPlayer && amountNumber > 0 ? colors.yellow : colors.surfaceAlt,
                   opacity: working ? .75 : 1,
                 },
               ]}
