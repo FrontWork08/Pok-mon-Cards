@@ -30,18 +30,23 @@ export function formatUsd(value: number | null | undefined) {
 }
 
 export async function refreshOwnedMarketPrices(cardIds: string[], force = false) {
-  const unique = [...new Set(cardIds.filter(Boolean))].slice(0, 80);
+  const unique = [...new Set(cardIds.filter(Boolean))];
   if (!unique.length) return [] as MarketPriceUpdate[];
 
-  const { data, error } = await supabase.functions.invoke('market-prices', {
-    body: { scope: 'owned', cardIds: unique, force },
-  });
+  const results: MarketPriceUpdate[] = [];
+  for (let index = 0; index < unique.length; index += 80) {
+    const chunk = unique.slice(index, index + 80);
+    const { data, error } = await supabase.functions.invoke('market-prices', {
+      body: { scope: 'owned', cardIds: chunk, force },
+    });
 
-  if (error) {
-    throw await normalizeFunctionError(error, 'Não foi possível atualizar os preços de mercado.');
+    if (error) {
+      throw await normalizeFunctionError(error, 'Não foi possível atualizar os preços de mercado.');
+    }
+    if (data?.error) throw new Error(String(data.error));
+    results.push(...((data?.data?.results ?? []) as MarketPriceUpdate[]));
   }
-  if (data?.error) throw new Error(String(data.error));
-  return (data?.data?.results ?? []) as MarketPriceUpdate[];
+  return results;
 }
 
 export async function refreshGlobalOwnedMarketPrices(force = false) {
