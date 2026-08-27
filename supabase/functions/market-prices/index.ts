@@ -51,8 +51,8 @@ function pickTcgPlayerVariant(tcgplayer: Record<string, any> | null, rarity: str
   ];
 
   for (const [variant, price] of ordered) {
-    const market = numeric(price?.market) ?? numeric(price?.mid) ?? numeric(price?.low);
-    if (market !== null) {
+    const market = numeric(price?.market);
+    if (market !== null && market > 0) {
       return {
         variant,
         market,
@@ -243,7 +243,7 @@ Deno.serve(async (req: Request) => {
           market_price_low_usd: picked?.low ?? null,
           market_price_high_usd: picked?.high ?? null,
           market_price_variant: picked?.variant ?? null,
-          market_price_source: picked ? "pokemontcg:tcgplayer" : "pokemontcg:no_tcgplayer_price",
+          market_price_source: picked ? "pokemontcg:tcgplayer_market_v3" : "pokemontcg:no_tcgplayer_market",
           market_price_data: tcgplayer ?? { setId },
           market_price_updated_at: now,
         });
