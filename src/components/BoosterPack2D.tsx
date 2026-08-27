@@ -35,6 +35,7 @@ export function BoosterPack2D({ pack, width = 224, tear, seamCharge, style }: Pr
   const rightRotate = safeTear.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '25deg'] });
   const seamOpacity = safeCharge.interpolate({ inputRange: [0, .2, 1], outputRange: [0, .35, 1] });
   const mouthOpacity = safeTear.interpolate({ inputRange: [0, .1, 1], outputRange: [0, .96, 1] });
+  const tearShardOpacity = safeTear.interpolate({ inputRange: [0, .08, .24, 1], outputRange: [0, 0, .72, .92] });
 
   const realArtwork = pack.booster_art_url;
 
@@ -78,6 +79,7 @@ export function BoosterPack2D({ pack, width = 224, tear, seamCharge, style }: Pr
               styles.realTearLeft,
               {
                 backgroundColor: deep,
+                opacity: tearShardOpacity,
                 transform: [{ translateX: leftX }, { rotate: leftRotate }],
               },
             ]}
@@ -90,12 +92,13 @@ export function BoosterPack2D({ pack, width = 224, tear, seamCharge, style }: Pr
               styles.realTearRight,
               {
                 backgroundColor: deep,
+                opacity: tearShardOpacity,
                 transform: [{ translateX: rightX }, { rotate: rightRotate }],
               },
             ]}
           />
 
-          <View pointerEvents="none" style={styles.realSpecular} />
+          {tear ? <View pointerEvents="none" style={styles.realSpecular} /> : null}
         </View>
       ) : (
         <View style={[styles.fallbackPack, { backgroundColor: deep, borderColor: `${highlight}A6` }]}>
@@ -208,7 +211,6 @@ const styles = StyleSheet.create({
     width: '39%',
     height: 18,
     borderRadius: 4,
-    opacity: .88,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,.2)',
     zIndex: 7,
