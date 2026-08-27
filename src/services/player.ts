@@ -31,6 +31,12 @@ export type OwnedCardEntry = {
     image_small: string | null;
     image_large: string | null;
     game_value: number;
+    market_price_usd: number | null;
+    market_price_low_usd: number | null;
+    market_price_high_usd: number | null;
+    market_price_variant: string | null;
+    market_price_source: string | null;
+    market_price_updated_at: string | null;
     tcg_data?: Record<string, unknown>;
   } | null;
 };
@@ -57,7 +63,7 @@ export async function getMyBag(search?: string) {
 
   let query = supabase
     .from('player_cards')
-    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value)')
+    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at)')
     .eq('player_id', userData.user.id)
     .gt('quantity', 0)
     .order('first_obtained_at', { ascending: false });
@@ -74,7 +80,7 @@ export async function getOwnedCard(cardId: string): Promise<OwnedCardEntry> {
   if (!userData.user) throw new Error('Usuário não autenticado.');
   const { data, error } = await supabase
     .from('player_cards')
-    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, tcg_data)')
+    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at, tcg_data)')
     .eq('player_id', userData.user.id).eq('card_id', cardId).gt('quantity', 0).single();
   if (error) throw error;
   return data as unknown as OwnedCardEntry;
@@ -107,9 +113,18 @@ export async function getMyProfileStats() {
   const favorites = bag.filter((item) => item.favorite).length;
   const species = new Set(bag.map((item) => item.cards?.pokedex_numbers?.[0]).filter((value): value is number => typeof value === 'number')).size;
   const collectionValue = bag.reduce((sum, item) => sum + Number(item.cards?.game_value ?? 0) * Number(item.quantity ?? 0), 0);
+  const collectionMarketValueUsd = bag.reduce((sum, item) => sum + Number(item.cards?.market_price_usd ?? 0) * Number(item.quantity ?? 0), 0);
+  const totalCardCopies = bag.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0);
+  const pricedCardCopies = bag.reduce((sum, item) => item.cards?.market_price_usd == null ? sum : sum + Number(item.quantity ?? 0), 0);
+  const priceCoveragePct = totalCardCopies > 0 ? (pricedCardCopies / totalCardCopies) * 100 : 0;
   const mostValuable = bag.reduce<OwnedCardEntry | null>((best, item) => {
     if (!item.cards) return best;
     if (!best?.cards || Number(item.cards.game_value ?? 0) > Number(best.cards.game_value ?? 0)) return item;
+    return best;
+  }, null);
+  const mostValuableMarket = bag.reduce<OwnedCardEntry | null>((best, item) => {
+    if (!item.cards?.market_price_usd) return best;
+    if (!best?.cards || Number(item.cards.market_price_usd ?? 0) > Number(best.cards.market_price_usd ?? 0)) return item;
     return best;
   }, null);
   return {
@@ -118,7 +133,12 @@ export async function getMyProfileStats() {
     favorites,
     species,
     collectionValue,
+    collectionMarketValueUsd,
+    pricedCardCopies,
+    totalCardCopies,
+    priceCoveragePct,
     mostValuableCard: mostValuable?.cards ?? null,
+    mostValuableMarketCard: mostValuableMarket?.cards ?? null,
     packsOpened: openings.count ?? 0,
     completedTrades: trades.count ?? 0,
   };
