@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getOwnedCard, type OwnedCardEntry } from '@/services/player';
 import { setCardFavorite } from '@/services/playerActions';
+import { formatUsd, refreshOwnedMarketPrices } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function CardDetailScreen() {
@@ -17,7 +18,34 @@ export default function CardDetailScreen() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    try { setLoading(true); setError(null); setEntry(await getOwnedCard(String(id))); }
+    try {
+      setLoading(true);
+      setError(null);
+      const owned = await getOwnedCard(String(id));
+      setEntry(owned);
+
+      const card = owned.cards;
+      const stale = !card?.market_price_updated_at ||
+        Date.now() - new Date(card.market_price_updated_at).getTime() > 12 * 60 * 60 * 1000;
+
+      if (card && stale) {
+        const [price] = await refreshOwnedMarketPrices([card.id]).catch(() => []);
+        if (price) {
+          setEntry({
+            ...owned,
+            cards: {
+              ...card,
+              market_price_usd: price.market_price_usd,
+              market_price_low_usd: price.market_price_low_usd,
+              market_price_high_usd: price.market_price_high_usd,
+              market_price_variant: price.market_price_variant,
+              market_price_source: price.market_price_source,
+              market_price_updated_at: price.market_price_updated_at,
+            },
+          });
+        }
+      }
+    }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível carregar este card.'); }
     finally { setLoading(false); }
   }, [id]);
@@ -33,7 +61,8 @@ export default function CardDetailScreen() {
 
   const card = entry?.cards;
   const unitValue = Number(card?.game_value ?? 0);
-  const totalValue = unitValue * Number(entry?.quantity ?? 0);
+  const marketPriceUsd = card?.market_price_usd == null ? null : Number(card.market_price_usd);
+  const totalMarketValueUsd = marketPriceUsd == null ? null : marketPriceUsd * Number(entry?.quantity ?? 0);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
@@ -53,10 +82,10 @@ export default function CardDetailScreen() {
             <Text style={[styles.name, { color: colors.text }]}>{card.pokemon_name}</Text>
             <Text style={[styles.rarity, { color: colors.muted }]}>{card.rarity ?? 'Sem raridade informada'}</Text>
 
-            <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="diamond" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR INTERNO DA CARTA</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>🪙 {unitValue.toLocaleString('pt-BR')}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>Valor usado no jogo para coleção, filtros e comparação de trocas.</Text></View></View>
+            <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>PREÇO DE MERCADO</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? 'Preço TCGplayer ainda não disponível para esta carta.' : `TCGplayer • ${card.market_price_variant ?? 'variante disponível'} • preço em USD`}</Text></View></View>
 
             <View style={styles.badges}>{(card.types ?? []).map((type) => <View key={type} style={[styles.badge, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Text style={[styles.badgeText, { color: colors.text }]}>{type}</Text></View>)}</View>
-            <View style={styles.statsGrid}><Info label="SET" value={card.set_name} /><Info label="NÚMERO" value={card.card_number ?? '—'} /><Info label="QUANTIDADE" value={`×${entry.quantity}`} /><Info label="VALOR TOTAL" value={`🪙 ${totalValue.toLocaleString('pt-BR')}`} /><Info label="OBTIDO" value={new Date(entry.first_obtained_at).toLocaleDateString('pt-BR')} /></View>
+            <View style={styles.statsGrid}><Info label="SET" value={card.set_name} /><Info label="NÚMERO" value={card.card_number ?? '—'} /><Info label="QUANTIDADE" value={`×${entry.quantity}`} /><Info label="VALOR TOTAL EM USD" value={totalMarketValueUsd == null ? '—' : formatUsd(totalMarketValueUsd)} /><Info label="VALOR NO JOGO" value={`🪙 ${unitValue.toLocaleString('pt-BR')}`} /><Info label="OBTIDO" value={new Date(entry.first_obtained_at).toLocaleDateString('pt-BR')} /></View>
             <Pressable style={[styles.favoriteButton, { backgroundColor: entry.favorite ? '#B73C59' : colors.yellow }]} onPress={toggleFavorite} disabled={saving}><Ionicons name={entry.favorite ? 'heart' : 'heart-outline'} size={19} color={entry.favorite ? '#fff' : '#07111F'} /><Text style={[styles.favoriteButtonText, entry.favorite && { color: '#fff' }]}>{saving ? 'SALVANDO...' : entry.favorite ? 'REMOVER DOS FAVORITOS' : 'ADICIONAR AOS FAVORITOS'}</Text></Pressable>
           </View>
         </View> : null}
