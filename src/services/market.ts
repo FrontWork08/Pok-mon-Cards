@@ -30,12 +30,12 @@ export function formatUsd(value: number | null | undefined) {
 }
 
 export async function refreshOwnedMarketPrices(cardIds: string[], force = false) {
-  const unique = [...new Set(cardIds.filter(Boolean))];
+  const unique = [...new Set(cardIds.filter(Boolean))].slice(0, 60);
   if (!unique.length) return [] as MarketPriceUpdate[];
 
   const results: MarketPriceUpdate[] = [];
-  for (let index = 0; index < unique.length; index += 80) {
-    const chunk = unique.slice(index, index + 80);
+  for (let index = 0; index < unique.length; index += 30) {
+    const chunk = unique.slice(index, index + 30);
     const { data, error } = await supabase.functions.invoke('market-prices', {
       body: { scope: 'owned', cardIds: chunk, force },
     });
@@ -63,6 +63,8 @@ export async function refreshGlobalOwnedMarketPrices(force = false) {
     refreshed: number;
     requested: number;
     remainingStale: number;
+    noPrice?: number;
+    errors?: number;
   };
 }
 
