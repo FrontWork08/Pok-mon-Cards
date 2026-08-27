@@ -80,11 +80,49 @@ Deno.serve(async (req: Request) => {
     if (body.action === "players") {
       const { data, error } = await admin
         .from("players")
-        .select("id,username,level,created_at")
+        .select("id,username,level,created_at,account_status,suspended_until,moderation_reason,warning_count")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return json({ data: data ?? [] });
+    }
+
+    if (body.action === "moderate") {
+      const targetId = typeof body.targetId === "string" ? body.targetId : "";
+      const moderationAction = typeof body.moderationAction === "string" ? body.moderationAction : "";
+      const reason = typeof body.reason === "string" ? body.reason : null;
+      const durationHours = body.durationHours == null ? null : Number(body.durationHours);
+
+      if (!targetId || !["warn", "suspend", "ban", "restore"].includes(moderationAction)) {
+        return json({ error: "INVALID_MODERATION_ACTION" }, 400);
+      }
+
+      const { data, error } = await admin.rpc("server_admin_moderate", {
+        p_actor_id: user.id,
+        p_target_id: targetId,
+        p_action: moderationAction,
+        p_reason: reason,
+        p_duration_hours: Number.isFinite(durationHours) ? durationHours : null,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "announce") {
+      const title = typeof body.title === "string" ? body.title : "";
+      const announcementBody = typeof body.body === "string" ? body.body : "";
+      const severity = typeof body.severity === "string" ? body.severity : "info";
+      const durationHours = Number(body.durationHours ?? 24);
+
+      const { data, error } = await admin.rpc("server_admin_announce", {
+        p_actor_id: user.id,
+        p_title: title,
+        p_body: announcementBody,
+        p_severity: severity,
+        p_duration_hours: durationHours,
+      });
+      if (error) throw error;
+      return json({ data });
     }
 
     if (body.action === "coin_history") {
