@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { createDeck, deleteDeck, getMyDecks, setDefaultDeck } from '@/services/decks';
+import { formatUsd } from '@/services/market';
 import { gameTheme } from '@/theme/gameTheme';
 
 export default function DecksScreen() {
@@ -56,10 +57,11 @@ export default function DecksScreen() {
       <View style={styles.list}>
         {decks.map((deck) => {
           const total = (deck.deck_cards ?? []).reduce((sum: number, item: any) => sum + Number(item.quantity ?? 0), 0);
+          const marketValue = (deck.deck_cards ?? []).reduce((sum: number, item: any) => sum + Number(item.cards?.market_price_usd ?? 0) * Number(item.quantity ?? 0), 0);
           return <View key={deck.id} style={[styles.deck, deck.is_default && styles.defaultDeck]}>
             <Pressable style={styles.deckMain} onPress={() => router.push(`/deck/${deck.id}`)}>
               <View style={styles.preview}>{(deck.deck_cards ?? []).slice(0, 3).map((item: any, index: number) => item.cards?.image_small ? <Image key={`${item.card_id}-${index}`} source={{ uri: item.cards.image_small }} style={[styles.previewCard, { marginLeft: index ? -25 : 0 }]} /> : null)}{total === 0 ? <Ionicons name="albums-outline" size={34} color="#617A9C" /> : null}</View>
-              <View style={styles.deckInfo}><View style={styles.nameRow}><Text style={styles.deckName}>{deck.name}</Text>{deck.is_default ? <View style={styles.defaultBadge}><Ionicons name="star" size={11} color="#07111F" /><Text style={styles.defaultText}>PRINCIPAL</Text></View> : null}</View><Text style={styles.deckMeta}>{total} cartas • toque para editar</Text></View>
+              <View style={styles.deckInfo}><View style={styles.nameRow}><Text style={styles.deckName}>{deck.name}</Text>{deck.is_default ? <View style={styles.defaultBadge}><Ionicons name="star" size={11} color="#07111F" /><Text style={styles.defaultText}>PRINCIPAL</Text></View> : null}</View><Text style={styles.deckMeta}>{total} cartas • {formatUsd(marketValue)} • toque para editar</Text></View>
               <Ionicons name="chevron-forward" size={20} color="#607894" />
             </Pressable>
             <View style={styles.deckActions}>{!deck.is_default ? <Pressable style={styles.secondary} onPress={() => makeDefault(deck.id)} disabled={working}><Ionicons name="star-outline" size={15} color="#C8D8EC" /><Text style={styles.secondaryText}>TORNAR PRINCIPAL</Text></Pressable> : <View />}{!deck.is_default ? <Pressable style={styles.deleteButton} onPress={() => remove(deck.id)} disabled={working}><Ionicons name="trash-outline" size={16} color="#FF98A8" /></Pressable> : null}</View>
