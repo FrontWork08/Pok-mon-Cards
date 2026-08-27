@@ -7,8 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const json = (data: unknown, status = 200) =>
-  Response.json(data, { status, headers: corsHeaders });
+const json = (body: unknown, status = 200) =>
+  Response.json(body, { status, headers: corsHeaders });
 
 function getSecretKey() {
   const modern = Deno.env.get("SUPABASE_SECRET_KEYS");
@@ -29,71 +29,81 @@ Deno.serve(async (req: Request) => {
   if (!token) return json({ error: "Unauthorized" }, 401);
 
   const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const key = getSecretKey();
-  if (!url || !key) return json({ error: "Server configuration error" }, 500);
+  const secret = getSecretKey();
+  if (!url || !secret) return json({ error: "Server configuration error" }, 500);
 
-  const admin = createClient(url, key, { auth: { persistSession: false } });
-  const { data: userData, error: userError } = await admin.auth.getUser(token);
-  const user = userData.user;
-  if (userError || !user) return json({ error: "Unauthorized" }, 401);
+  const admin = createClient(url, secret, { auth: { persistSession: false } });
+  const { data: authData, error: authError } = await admin.auth.getUser(token);
+  const user = authData.user;
+  if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
   const body = await req.json().catch(() => ({}));
   const scope = body?.scope === "global" ? "global" : "owned";
-  const force = body?.force === true;
   const requestedIds = Array.isArray(body?.cardIds)
-    ? [...new Set(body.cardIds.filter((id: unknown) => typeof id === "string"))].slice(0, 120)
+    ? [...new Set(body.cardIds.filter((id: unknown) => typeof id === "string"))].slice(0, 1000)
     : [];
 
-  if (scope === "owned" && !requestedIds.length) {
-    return json({ data: { results: [], refreshed: 0, requested: 0, remainingStale: 0 } });
-  }
-
-  const { data: refreshData, error: refreshError } = await admin.rpc(
-    "server_refresh_owned_market_prices",
-    {
-      p_actor_id: user.id,
-      p_card_ids: scope === "owned" ? requestedIds : null,
-      p_global: scope === "global",
-      p_limit: scope === "global" ? 20 : 16,
-      p_force: force,
-    },
-  );
-
-  if (refreshError) {
-    const status = refreshError.message.includes("FORBIDDEN") ? 403 : 409;
-    return json({ error: refreshError.message }, status);
-  }
-
   if (scope === "global") {
+    const { data: adminRow } = await admin
+      .from("admin_members")
+      .select("player_id")
+      .eq("player_id", user.id)
+      .maybeSingle();
+
+    if (!adminRow) return json({ error: "FORBIDDEN" }, 403);
+
+    const { count: pricedCount } = await admin
+      .from("cards")
+      .select("id", { count: "exact", head: true })
+      .not("market_price_usd", "is", null);
+
+    const { count: totalCount } = await admin
+      .from("cards")
+      .select("id", { count: "exact", head: true });
+
     return json({
       data: {
         results: [],
-        refreshed: Number(refreshData?.priced ?? 0),
-        requested: Number(refreshData?.processed ?? 0),
-        remainingStale: Number(refreshData?.remaining ?? 0),
-        noPrice: Number(refreshData?.noPrice ?? 0),
-        errors: Number(refreshData?.errors ?? 0),
+        refreshed: 0,
+        requested: totalCount ?? 0,
+        remainingStale: 0,
+        priced: pricedCount ?? 0,
+        mode: "fixed",
       },
     });
   }
 
-  const { data: rows, error: rowsError } = await admin
-    .from("cards")
-    .select(
-      "id,market_price_usd,market_price_low_usd,market_price_high_usd,market_price_variant,market_price_source,market_price_updated_at",
-    )
-    .in("id", requestedIds);
+  if (!requestedIds.length) {
+    return json({ data: { results: [], refreshed: 0, mode: "fixed" } });
+  }
 
-  if (rowsError) return json({ error: rowsError.message }, 500);
+  const { data: ownedRows, error: ownedError } = await admin
+    .from("player_cards")
+    .select("card_id")
+    .eq("player_id", user.id)
+    .gt("quantity", 0)
+    .in("card_id", requestedIds);
+
+  if (ownedError) return json({ error: ownedError.message }, 500);
+  const allowedIds = (ownedRows ?? []).map((row: any) => row.card_id);
+  if (!allowedIds.length) {
+    return json({ data: { results: [], refreshed: 0, mode: "fixed" } });
+  }
+
+  const { data: cards, error: cardError } = await admin
+    .from("cards")
+    .select("id,market_price_usd,market_price_low_usd,market_price_high_usd,market_price_variant,market_price_source,market_price_updated_at")
+    .in("id", allowedIds);
+
+  if (cardError) return json({ error: cardError.message }, 500);
 
   return json({
     data: {
-      results: rows ?? [],
-      refreshed: Number(refreshData?.priced ?? 0),
-      requested: requestedIds.length,
-      remainingStale: Number(refreshData?.remaining ?? 0),
-      noPrice: Number(refreshData?.noPrice ?? 0),
-      errors: Number(refreshData?.errors ?? 0),
+      results: cards ?? [],
+      refreshed: 0,
+      requested: allowedIds.length,
+      remainingStale: 0,
+      mode: "fixed",
     },
   });
 });
