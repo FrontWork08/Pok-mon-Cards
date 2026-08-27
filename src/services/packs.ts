@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { normalizeFunctionError } from '@/services/functionErrors';
+import { getPhysicalPackshots } from '@/data/physicalPackshots';
 
 export type Pack = {
   id: string;
@@ -35,10 +36,19 @@ export async function listPacks(): Promise<Pack[]> {
 
   if (error) throw error;
 
-  return (data ?? []).map((pack: any) => ({
-    ...pack,
-    booster_art_urls: Array.isArray(pack.booster_art_urls) ? pack.booster_art_urls : [],
-  }));
+  return (data ?? []).map((pack: any) => {
+    const manifestArt = [...getPhysicalPackshots(pack.set_id)];
+    const cachedArt = Array.isArray(pack.booster_art_urls) ? pack.booster_art_urls : [];
+    const boosterArtUrls = cachedArt.length ? cachedArt : manifestArt;
+
+    return {
+      ...pack,
+      booster_art_url: pack.booster_art_url ?? boosterArtUrls[0] ?? null,
+      booster_art_urls: boosterArtUrls,
+      booster_art_source:
+        pack.booster_art_source ?? (manifestArt.length ? 'ptcg-assets' : null),
+    };
+  });
 }
 
 export async function openPack(packId: string) {
