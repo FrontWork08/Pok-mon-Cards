@@ -3,8 +3,9 @@
     "name": "Pokémon Cards",
     "slug": "pokemon-cards",
     "owner": "frontwork",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "pokemoncards",
     "userInterfaceStyle": "automatic",
     "runtimeVersion": {
@@ -21,7 +22,12 @@
     ],
     "android": {
       "package": "com.frontwork.pokemoncards",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "icon": "./assets/icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "extra": {
       "eas": {
