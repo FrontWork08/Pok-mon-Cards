@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { normalizeFunctionError } from '@/services/functionErrors';
 
 export type BattleStakeType = 'none' | 'coins' | 'card';
-export type BattleMode = 'quick' | 'mystery';
+export type BattleMode = 'quick' | 'mystery' | 'draft3';
 
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('battle-action', { body });
@@ -25,6 +25,10 @@ export async function rematchBattle(battleId: string) {
   return data.battleId as string;
 }
 
+export async function pickBattleDraftCard(battleId: string, cardId: string) {
+  return invoke({ action: 'draft_pick', battleId, cardId });
+}
+
 export async function lockBattleCard(battleId: string, cardId: string) {
   return invoke({ action: 'lock', battleId, cardId });
 }
@@ -40,11 +44,21 @@ export async function cancelBattle(battleId: string) {
 export async function getBattle(battleId: string) {
   const { data, error } = await supabase
     .from('battles')
-    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,rounds_to_win,active_round,selection_seconds,selection_deadline,challenger_score,opponent_score,winner_id,reward_eligible,rematch_of,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,created_at,updated_at,completed_at')
+    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,rounds_to_win,active_round,selection_seconds,selection_deadline,draft_turn_id,draft_pick_count,draft_seconds,challenger_score,opponent_score,winner_id,reward_eligible,rematch_of,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,created_at,updated_at,completed_at')
     .eq('id', battleId)
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function getBattleDraftCards(battleId: string) {
+  const { data, error } = await supabase
+    .from('battle_draft_cards')
+    .select('battle_id,player_id,card_id,pick_no,global_pick_no,picked_at,cards(id,pokemon_name,image_small,image_large,rarity,types,game_value,market_price_usd,market_price_variant,tcg_data)')
+    .eq('battle_id', battleId)
+    .order('global_pick_no', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function getBattleCardStakes(battleId: string) {
@@ -83,7 +97,7 @@ export async function getMyBattleHistory(limit = 50) {
   if (!id) throw new Error('Usuário não autenticado.');
   const { data, error } = await supabase
     .from('battles')
-    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,challenger_score,opponent_score,winner_id,reward_eligible,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,created_at,completed_at,challenger:players!battles_challenger_id_fkey(id,username,battle_rating),opponent:players!battles_opponent_id_fkey(id,username,battle_rating)')
+    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,challenger_score,opponent_score,winner_id,reward_eligible,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,created_at,completed_at,challenger:players!battles_challenger_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id),opponent:players!battles_opponent_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id)')
     .or(`challenger_id.eq.${id},opponent_id.eq.${id}`)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -94,7 +108,7 @@ export async function getMyBattleHistory(limit = 50) {
 export async function getBattleLeaderboard(limit = 50) {
   const { data, error } = await supabase
     .from('players')
-    .select('id,username,level,battle_rating,battle_wins,battle_losses,battle_streak,best_battle_streak')
+    .select('id,username,level,battle_rating,battle_wins,battle_losses,battle_streak,best_battle_streak,show_battle_rating,equipped_title_id')
     .order('battle_rating', { ascending: false })
     .order('battle_wins', { ascending: false })
     .limit(limit);
