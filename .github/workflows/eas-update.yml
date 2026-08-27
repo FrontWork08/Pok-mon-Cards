@@ -1,0 +1,59 @@
+name: Publish Expo Update
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - app/**
+      - src/**
+      - assets/**
+      - .github/workflows/eas-update.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eas-update-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN is not configured in this repository."
+            exit 1
+          fi
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Publish Android update to preview
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas update --channel preview --platform android --environment preview --message "GitHub ${GITHUB_SHA:0:7}" --non-interactive
