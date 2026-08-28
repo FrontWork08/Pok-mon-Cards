@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import type { AppearanceMode, ThemeName } from '@/services/settings';
@@ -59,7 +60,7 @@ export default function SettingsScreen() {
 
   return (
     <Screen title="Personalização" subtitle="Escolha aparência, tema visual e preferências sociais da sua conta.">
-      <Pressable style={styles.backRow} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
+      <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
 
       <View style={[styles.section,{backgroundColor:colors.surface,borderColor:colors.border}]}>
         <Text style={[styles.kicker,{color:colors.yellow}]}>APARÊNCIA</Text><Text style={[styles.title,{color:colors.text}]}>Modo da interface</Text>
