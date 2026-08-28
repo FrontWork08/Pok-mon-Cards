@@ -131,7 +131,7 @@ export default function AdminScreen() {
       void syncPlayers().catch(() => {});
     };
     const channel = supabase
-      .channel('admin-player-directory')
+      .channel(`admin-player-directory-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'players' },
@@ -148,7 +148,7 @@ export default function AdminScreen() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('admin-game-events')
+      .channel(`admin-game-events-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'admin_game_events' },
