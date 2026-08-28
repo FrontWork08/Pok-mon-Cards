@@ -71,6 +71,43 @@ function normalizeTcgdexTcgplayer(pricing: any) {
   return Object.keys(prices).length ? { prices, updatedAt: tcg.updated ?? null } : null;
 }
 
+async function fetchEurUsdRate() {
+  try {
+    const response = await fetch("https://api.frankfurter.dev/v2/rate/EUR/USD", {
+      headers: { "User-Agent":"Pokemon-Cards-FX/1.0" },
+      signal:AbortSignal.timeout(6_000),
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return numeric(payload?.rate);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeCardmarketUsd(cardmarket: any, eurUsd: number | null) {
+  if (!cardmarket || !eurUsd) return null;
+  const prices = cardmarket?.prices ?? {};
+  const trend = numeric(prices.trendPrice);
+  const average = numeric(prices.averageSellPrice);
+  const low = numeric(prices.lowPrice);
+  const base = trend ?? average ?? low;
+  if (!base) return null;
+  const market = Number((base * eurUsd).toFixed(4));
+  return {
+    prices: {
+      normal: {
+        market,
+        mid: average ? Number((average * eurUsd).toFixed(4)) : market,
+        low: low ? Number((low * eurUsd).toFixed(4)) : null,
+        high: null,
+      },
+    },
+    cardmarket,
+    fx: { base:"EUR", quote:"USD", rate:eurUsd },
+  };
+}
+
 async function fetchTcgdexFallback(cardId: string) {
   try {
     const response = await fetch(
@@ -126,7 +163,7 @@ async function fetchSet(setId: string) {
   do {
     const q = encodeURIComponent(`set.id:${setId}`);
     const response = await fetch(
-      `https://api.pokemontcg.io/v2/cards?q=${q}&page=${page}&pageSize=250&select=id,rarity,tcgplayer`,
+      `https://api.pokemontcg.io/v2/cards?q=${q}&page=${page}&pageSize=250&select=id,rarity,tcgplayer,cardmarket`,
       { headers: { "User-Agent": "Pokemon-Cards-Private-Project" } },
     );
 
@@ -257,6 +294,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const results: any[] = [];
+  const eurUsd = await fetchEurUsdRate();
   const setEntries = [...bySet.entries()];
 
   for (let index = 0; index < setEntries.length; index += 3) {
@@ -308,9 +346,18 @@ Deno.serve(async (req: Request) => {
         const apiCard: any = fetchedById.get(card.id);
         const primary = apiCard?.tcgplayer ?? null;
         const fallback = fallbackById.get(card.id) ?? null;
-        const tcgplayer = hasUsableTcgplayer(primary) ? primary : fallback;
-        const source = hasUsableTcgplayer(primary) ? "pokemontcg" : fallback ? "tcgdex" : "pokemontcg";
-        const picked = pickTcgPlayerVariant(tcgplayer, card.rarity);
+        const cardmarketUsd = normalizeCardmarketUsd(apiCard?.cardmarket, eurUsd);
+        const normalized = hasUsableTcgplayer(primary)
+          ? primary
+          : fallback ?? cardmarketUsd;
+        const source = hasUsableTcgplayer(primary)
+          ? "pokemontcg"
+          : fallback
+            ? "tcgdex"
+            : cardmarketUsd
+              ? "cardmarket"
+              : "pokemontcg";
+        const picked = pickTcgPlayerVariant(normalized, card.rarity);
 
         results.push({
           id: card.id,
@@ -318,8 +365,12 @@ Deno.serve(async (req: Request) => {
           market_price_low_usd: picked?.low ?? null,
           market_price_high_usd: picked?.high ?? null,
           market_price_variant: picked?.variant ?? null,
-          market_price_source: picked ? `${source}:tcgplayer_${picked.kind}` : `${source}:no_tcgplayer_price`,
-          market_price_data: tcgplayer ?? { setId },
+          market_price_source: picked
+            ? source === "cardmarket"
+              ? `cardmarket:eur_to_usd_${picked.kind}`
+              : `${source}:tcgplayer_${picked.kind}`
+            : `${source}:no_market_price`,
+          market_price_data: normalized ?? { setId },
           market_price_updated_at: now,
         });
       }
