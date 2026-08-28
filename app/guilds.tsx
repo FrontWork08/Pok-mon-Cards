@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
+import { GuildChatPanel } from '@/components/GuildChatPanel';
 import type { Pack, OpenedCard } from '@/services/packs';
 import {
   getGuildHub,
@@ -195,6 +196,14 @@ export default function GuildsScreen() {
         onKick={confirmKick}
         onSetRole={(member, role) => void run(`role:${member.id}`, () => setGuildMemberRole(selected.id, member.id, role), 'Cargo atualizado.')}
       /> : null}
+
+      {selected && myMembership?.guildId === selected.id ? (
+        <GuildChatPanel
+          guildId={selected.id}
+          guildColor={selected.color}
+          onOpenPlayer={(playerId) => router.push(`/player/${playerId}`)}
+        />
+      ) : null}
 
       {selected && myMembership?.guildId === selected.id ? <View style={[styles.collectivePanel, { backgroundColor: colors.surface, borderColor: hub?.collectiveBooster.status === 'ready' ? colors.yellow : selected.color }]}>
         <View style={styles.collectiveHead}>
