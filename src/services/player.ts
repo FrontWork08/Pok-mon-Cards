@@ -15,6 +15,10 @@ export type PlayerProfile = {
   best_battle_streak: number;
   equipped_title_id: string | null;
   equipped_title: { id: string; title: string; icon: string } | Array<{ id: string; title: string; icon: string }> | null;
+  equipped_frame_id: string | null;
+  equipped_background_id: string | null;
+  equipped_frame: { id:string; name:string; primary_color:string; secondary_color:string } | Array<{ id:string; name:string; primary_color:string; secondary_color:string }> | null;
+  equipped_background: { id:string; name:string; primary_color:string; secondary_color:string } | Array<{ id:string; name:string; primary_color:string; secondary_color:string }> | null;
   show_battle_rating: boolean;
   created_at: string;
   last_daily_claim_at: string | null;
