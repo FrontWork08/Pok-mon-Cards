@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type { OwnedCardEntry } from '@/services/player';
 
 export type BagQuickFilter = 'all' | 'favorites' | 'duplicates';
-export type BagSortMode = 'recent' | 'value' | 'name' | 'quantity';
+export type BagSortMode = 'recent' | 'value' | 'name' | 'quantity' | 'damage' | 'hp';
 
 export type BagOverview = {
   uniqueCards: number;
