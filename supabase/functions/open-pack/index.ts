@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
 
   if (error) {
     const message = error.message ?? "Could not open pack";
-    const status = message.includes("NOT_ENOUGH_COINS")
+    const status = message.includes("NOT_ENOUGH_COINS") || message.includes("NOT_ENOUGH_DIAMONDS")
       ? 409
       : message.includes("PACK_NOT_FOUND")
         ? 404
