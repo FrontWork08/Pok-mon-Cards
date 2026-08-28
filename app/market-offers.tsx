@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import {
   cancelMarketOffer,
@@ -69,7 +70,7 @@ export default function MarketOffersScreen() {
 
   return (
     <Screen title="Central de Ofertas" subtitle="Negocie abaixo ou acima do preço anunciado sem tirar a carta da custódia do mercado.">
-      <Pressable style={styles.back} onPress={() => router.back()}>
+      <Pressable style={styles.back} onPress={() => goBackOrHome(router)}>
         <Ionicons name="arrow-back" size={18} color={colors.muted} />
         <Text style={[styles.backText, { color: colors.muted }]}>Voltar ao mercado</Text>
       </Pressable>
