@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { equipAchievementTitle, getMyAchievements, refreshAchievements, type PlayerAchievement } from '@/services/achievements';
 import { getMyProfile, type PlayerProfile } from '@/services/player';
@@ -48,7 +49,7 @@ export default function AchievementsScreen() {
   }
 
   return <Screen title="Conquistas e Títulos" subtitle="Acompanhe desafios concluídos e escolha o título exibido no seu perfil.">
-    <Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText, { color: colors.muted }]}>Voltar ao perfil</Text></Pressable>
+    <Pressable style={styles.back} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText, { color: colors.muted }]}>Voltar ao perfil</Text></Pressable>
     {notice ? <Pressable style={styles.notice} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={18} color={colors.yellow} /><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
     {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
 
