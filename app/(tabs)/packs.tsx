@@ -253,7 +253,7 @@ export default function PacksScreen() {
           <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
           <Text style={[styles.title, { color: colors.text }]}>Pack Shop</Text>
           <Text style={[styles.subtitle, { color: colors.muted }]}>
-            Boosters físicos, favoritos e conteúdo do set sem carregar a loja inteira na memória.
+            Preços balanceados pelo valor da carta mais valiosa do set; packs com 5+ anos usam Diamantes.
           </Text>
         </View>
       </View>
@@ -323,7 +323,7 @@ export default function PacksScreen() {
           <Text style={[styles.shopHeroKicker, { color: colors.yellow }]}>BOOSTER WALL</Text>
           <Text style={[styles.shopHeroTitle, { color: colors.text }]}>{packs.length || 173} packs para colecionar</Text>
           <Text style={[styles.shopHeroText, { color: colors.muted }]}>
-            A lista agora é virtualizada: só os boosters próximos da tela ficam renderizados.
+            Packs recentes partem de 🪙500. Os mais valiosos sobem de forma moderada; vintages chegam no máximo a 💎100.
           </Text>
         </View>
       </View>
