@@ -16,7 +16,15 @@ export type MatchmakingState = {
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('battle-action', { body });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível atualizar o matchmaking.');
-  if (data?.error) throw new Error(String(data.error));
+  if (data?.error) {
+    const value = data.error;
+    const message = typeof value === 'string'
+      ? value
+      : typeof value?.message === 'string'
+        ? value.message
+        : 'Não foi possível atualizar o matchmaking.';
+    throw new Error(message);
+  }
   return data?.data;
 }
 
