@@ -44,6 +44,7 @@ export type OwnedCardEntry = {
     image_small: string | null;
     image_large: string | null;
     game_value: number;
+    battle_damage?: number;
     market_price_usd: number | null;
     market_price_low_usd: number | null;
     market_price_high_usd: number | null;
