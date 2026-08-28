@@ -45,6 +45,13 @@ export type CoinGrantHistory = { id: string; target_id: string; amount: number; 
 export type AdminCurrencyAdjustmentHistory = CoinGrantHistory & { currency: 'coins' | 'diamonds' };
 export type AdminGameEvent = { id: string; event_type: 'free_boosters' | 'double_xp' | 'rare_boost' | 'featured_set'; title: string; payload?: Record<string, unknown>; active: boolean; starts_at: string; ends_at: string; created_at: string };
 export type GlobalAnnouncement = { id: string; title: string; body: string; severity: 'info' | 'warning' | 'critical'; starts_at: string; ends_at: string | null; created_at: string };
+export type TesterTitleFriend = { id: string; username: string; level: number; hasTitle: boolean; grantedAt: string | null };
+export type TesterTitleHub = {
+  isOwner: boolean;
+  title: { id: string; name: string; title: string; description: string; icon: string } | null;
+  friends: TesterTitleFriend[];
+};
+export type TesterTitleGrantResult = { targetId: string; username: string; achievementId: string; title: string; icon?: string };
 
 export async function getAdminOverview() { return invokeAdmin({ action: 'overview' }) as Promise<AdminOverview>; }
 export async function getAdminPlayers() { return invokeAdmin({ action: 'players' }) as Promise<AdminPlayer[]>; }
@@ -71,3 +78,7 @@ export async function stopGameEvent(eventId: string) { return invokeAdmin({ acti
 export async function startFreeBoosters(durationMinutes: number) { return invokeAdmin({ action: 'start_free_boosters', durationMinutes }) as Promise<AdminGameEvent>; }
 export async function stopFreeBoosters() { return invokeAdmin({ action: 'stop_free_boosters' }) as Promise<AdminGameEvent | null>; }
 export async function setMaintenanceMode(enabled: boolean, message: string) { return invokeAdmin({ action: 'set_maintenance', enabled, message: message.trim() }) as Promise<AppRuntimeStatus>; }
+
+export async function getTesterTitleHub() { return invokeAdmin({ action: 'tester_title_hub' }) as Promise<TesterTitleHub>; }
+export async function grantTesterTitle(targetId: string, note?: string) { return invokeAdmin({ action: 'grant_tester_title', targetId, note: note?.trim() || null }) as Promise<TesterTitleGrantResult>; }
+export async function revokeTesterTitle(targetId: string) { return invokeAdmin({ action: 'revoke_tester_title', targetId }) as Promise<TesterTitleGrantResult>; }
