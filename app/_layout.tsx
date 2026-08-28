@@ -38,48 +38,9 @@ function AppStack() {
 
   useEffect(() => {
     if (!userId) return;
-
-    let disposed = false;
-    let publisher: ReturnType<typeof publishMyOnlinePresence> | null = null;
-
-    const applyVisibility = (visible: boolean) => {
-      if (disposed) return;
-      if (!publisher) publisher = publishMyOnlinePresence(userId, visible);
-      else void publisher.setVisible(visible).catch(() => null);
-    };
-
-    const loadVisibility = async () => {
-      const { data, error } = await supabase
-        .from('players')
-        .select('show_online_status')
-        .eq('id', userId)
-        .single();
-      if (disposed || error) return;
-      applyVisibility(data?.show_online_status !== false);
-    };
-
-    void loadVisibility();
-
-    const channel = supabase
-      .channel(`online-visibility-${userId}-${Date.now()}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${userId}` },
-        (payload) => {
-          const next = payload.new as { show_online_status?: boolean };
-          if (typeof next.show_online_status === 'boolean') {
-            applyVisibility(next.show_online_status);
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      disposed = true;
-      publisher?.stop();
-      void supabase.removeChannel(channel);
-    };
-  }, [userId]);
+    const publisher = publishMyOnlinePresence(userId, settings?.show_online_status ?? true);
+    return () => publisher.stop();
+  }, [userId, settings?.show_online_status]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
