@@ -8,6 +8,32 @@ const corsHeaders = {
 };
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: corsHeaders });
 
+function readableError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const item = error as Record<string, unknown>;
+    for (const key of ["message", "error", "details", "hint", "code"]) {
+      const value = item[key];
+      if (typeof value === "string" && value.trim()) return value;
+      if (value && typeof value === "object") {
+        const nested = readableError(value);
+        if (nested && nested !== "[object Object]") return nested;
+      }
+    }
+    try {
+      const encoded = JSON.stringify(error);
+      if (encoded && encoded !== "{}") return encoded;
+    } catch {}
+  }
+  return "BATTLE_ACTION_FAILED";
+}
+
+function appErrorCode(message: string) {
+  const match = message.toUpperCase().match(/\b[A-Z][A-Z0-9_]{2,}\b/);
+  return match?.[0] ?? null;
+}
+
 function secretKey() {
   const modern = Deno.env.get("SUPABASE_SECRET_KEYS");
   if (modern) try { const parsed = JSON.parse(modern); if (parsed.default) return parsed.default as string; } catch {}
@@ -160,8 +186,9 @@ Deno.serve(async (req: Request) => {
 
     return json({ error: "Invalid action" }, 400);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = readableError(error);
+    const code = appErrorCode(message);
     const status = message.includes("FORBIDDEN") ? 403 : message.includes("NOT_FOUND") ? 404 : 409;
-    return json({ error: message }, status);
+    return json({ error: message, code }, status);
   }
 });
