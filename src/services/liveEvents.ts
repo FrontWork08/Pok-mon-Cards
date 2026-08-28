@@ -20,6 +20,13 @@ export type FreeBoosterEvent = {
   created_at: string;
 };
 
+export async function getUnseenGlobalAnnouncement() {
+  const { data, error } = await supabase.rpc('get_my_unseen_global_announcement');
+
+  if (error) throw error;
+  return (data ?? null) as GlobalAnnouncement | null;
+}
+
 export async function getActiveGlobalAnnouncement() {
   const now = new Date().toISOString();
   const { data, error } = await supabase
