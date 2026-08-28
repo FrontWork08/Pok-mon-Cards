@@ -196,3 +196,64 @@ from chosen
 where c.id=chosen.id;
 
 select private.start_market_price_review(true);
+
+
+-- Always process currently unpriced sets before routine refresh work.
+create or replace function public.claim_market_price_sync_sets(
+  p_token text,
+  p_limit integer default 2
+)
+returns table(set_id text)
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_set_id text;
+  v_limit integer := greatest(1,least(coalesce(p_limit,2),3));
+  v_job_id bigint;
+begin
+  perform private.assert_market_price_sync_token(p_token);
+
+  update private.market_price_sync_sets
+  set status='retry',next_attempt_at=now(),last_error='STALE_EDGE_WORKER',updated_at=now()
+  where status='running' and last_started_at<now()-interval '10 minutes';
+
+  for v_set_id in
+    select q.set_id
+    from private.market_price_sync_sets q
+    where q.status in ('pending','retry')
+      and q.next_attempt_at<=now()
+    order by
+      exists(
+        select 1 from public.cards c
+        where c.set_id=q.set_id and (c.market_price_usd is null or c.market_price_usd<=0)
+      ) desc,
+      (q.owned_card_count>0) desc,
+      q.max_game_value desc,
+      q.owned_card_count desc,
+      q.set_id
+    limit v_limit
+    for update skip locked
+  loop
+    update private.market_price_sync_sets q
+    set status='running',attempts=attempts+1,last_started_at=now(),last_error=null,updated_at=now()
+    where q.set_id=v_set_id;
+
+    set_id:=v_set_id;
+    return next;
+  end loop;
+
+  if not exists(
+    select 1 from private.market_price_sync_sets where status in ('pending','running','retry')
+  ) then
+    for v_job_id in select jobid from cron.job where jobname='pokemon-cards-price-review-edge'
+    loop perform cron.unschedule(v_job_id); end loop;
+  end if;
+end;
+$$;
+
+revoke all on function public.claim_market_price_sync_sets(text,integer)
+from public,anon,authenticated;
+grant execute on function public.claim_market_price_sync_sets(text,integer)
+to service_role;
