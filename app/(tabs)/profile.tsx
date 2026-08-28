@@ -100,6 +100,8 @@ export default function ProfileScreen() {
       <FeatureLink icon="flame" color={colors.yellow} title="Temporada & Jornada" text="Streak, ranque, eventos e recompensas da coleção." onPress={() => router.push('/season')} />
       <FeatureLink icon="sparkles" color={colors.yellow} title="Minha Vitrine" text="Escolha as 6 cartas que aparecem no seu perfil público." onPress={() => router.push('/showcase')} />
       <FeatureLink icon="star" color={colors.accent} title="Card Chase" text="Wishlist e alertas quando suas cartas desejadas aparecem." onPress={() => router.push('/wishlist')} />
+      <FeatureLink icon="trophy" color={colors.yellow} title="Copa Trainer" text="Entre no torneio de 8 jogadores e acompanhe o bracket." onPress={() => router.push('/tournaments')} />
+      <FeatureLink icon="color-wand" color={colors.accent} title="Cosméticos" text="Equipe molduras e backgrounds conquistados pelo seu progresso." onPress={() => router.push('/cosmetics')} />
       <FeatureLink icon="color-palette" color={colors.accent} title="Personalização" text="Modo claro/escuro, temas, push, som e vibração." onPress={() => router.push('/settings')} />
     </View>
 
