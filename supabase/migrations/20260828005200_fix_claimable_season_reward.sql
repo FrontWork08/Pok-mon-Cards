@@ -68,7 +68,7 @@ begin
     'diamonds',v_diamonds
   );
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.claim_season_reward()
