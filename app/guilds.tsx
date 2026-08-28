@@ -142,7 +142,7 @@ export default function GuildsScreen() {
           const mine = myMembership?.guildId === guild.id;
           return <Pressable key={guild.id} onPress={() => setSelectedId(guild.id)} style={[styles.guildCard, { backgroundColor: active ? guild.color + '20' : colors.surface, borderColor: active || mine ? guild.color : colors.border }]}>
             <View style={[styles.rankBubble, { backgroundColor: guild.color }]}><Text style={styles.rankText}>#{guild.rank}</Text></View>
-            <View style={{ flex: 1 }}><Text style={[styles.guildName, { color: colors.text }]}>{guild.name}{mine ? ' • SUA' : ''}</Text><Text numberOfLines={1} style={[styles.motto, { color: colors.muted }]}>{guild.motto}</Text></View>
+            <View style={{ flex: 1 }}><Text style={[styles.guildName, { color: colors.text }]}>{guild.name}{mine ? ' • SUA' : ''}</Text><Text numberOfLines={1} style={[styles.motto, { color: colors.muted }]}>{guild.motto}</Text><Text style={[styles.guildLevel, { color: guild.color }]}>NÍVEL {guild.level} • {guild.xp.toLocaleString('pt-BR')} XP</Text></View>
             <View style={styles.guildValue}><Text style={[styles.value, { color: guild.color }]}>{formatUsd(guild.collectionValueUsd)}</Text><Text style={[styles.membersCount, { color: colors.muted }]}>{guild.memberCount} membro(s)</Text></View>
           </Pressable>;
         })}
@@ -186,7 +186,7 @@ function GuildDetail({
   const mine = myGuildId === guild.id;
   const leader = mine && myRole === 'leader';
   return <View style={[styles.detail, { backgroundColor: colors.surface, borderColor: guild.color }]}>
-    <View style={styles.detailHeader}><View style={[styles.shield, { backgroundColor: guild.color }]}><Ionicons name="shield" size={27} color="#fff" /></View><View style={{ flex: 1 }}><Text style={[styles.detailName, { color: colors.text }]}>{guild.name}</Text><Text style={[styles.detailMotto, { color: colors.muted }]}>{guild.motto}</Text><Text style={[styles.leader, { color: guild.color }]}>{guild.leaderUsername ? `Chefe: @${guild.leaderUsername}` : 'Chefe ainda não escolhido pelo dono'}</Text></View>{!myGuildId ? <Pressable disabled={working === 'join'} onPress={onJoin} style={[styles.join, { backgroundColor: guild.color }]}><Text style={styles.joinText}>{working === 'join' ? 'ENTRANDO...' : 'ENTRAR LIVREMENTE'}</Text></Pressable> : mine && !leader ? <Pressable onPress={onLeave} style={[styles.leave, { borderColor: '#C64E5A' }]}><Text style={styles.leaveText}>SAIR</Text></Pressable> : null}</View>
+    <View style={styles.detailHeader}><View style={[styles.shield, { backgroundColor: guild.color }]}><Ionicons name="shield" size={27} color="#fff" /></View><View style={{ flex: 1 }}><Text style={[styles.detailName, { color: colors.text }]}>{guild.name}</Text><Text style={[styles.detailMotto, { color: colors.muted }]}>{guild.motto}</Text><Text style={[styles.leader, { color: guild.color }]}>{guild.leaderUsername ? `Chefe: @${guild.leaderUsername}` : 'Chefe ainda não escolhido pelo dono'}</Text><Text style={[styles.guildLevel, { color: guild.color }]}>Nível {guild.level} • {guild.xp.toLocaleString('pt-BR')} XP coletiva</Text><View style={[styles.guildXpTrack, { backgroundColor: colors.surfaceAlt }]}><View style={[styles.guildXpFill, { width: `${Math.min(100, (guild.xp % 500) / 5)}%`, backgroundColor: guild.color }]} /></View></View>{!myGuildId ? <Pressable disabled={working === 'join'} onPress={onJoin} style={[styles.join, { backgroundColor: guild.color }]}><Text style={styles.joinText}>{working === 'join' ? 'ENTRANDO...' : 'ENTRAR LIVREMENTE'}</Text></Pressable> : mine && !leader ? <Pressable onPress={onLeave} style={[styles.leave, { borderColor: '#C64E5A' }]}><Text style={styles.leaveText}>SAIR</Text></Pressable> : null}</View>
 
     <View style={styles.subHeader}><Text style={[styles.subTitle, { color: colors.text }]}>Missões da guilda</Text><Text style={[styles.subMeta, { color: colors.muted }]}>reiniciam semanalmente</Text></View>
     <View style={styles.missions}>{guild.missions.map((mission) => {
@@ -226,6 +226,9 @@ const styles = StyleSheet.create({
   rankText: { color: '#fff', fontSize: 14, fontWeight: '900' },
   guildName: { fontSize: 14, fontWeight: '900' },
   motto: { fontSize: 8, marginTop: 3 },
+  guildLevel: { fontSize: 8, fontWeight: '900', marginTop: 4, letterSpacing: .4 },
+  guildXpTrack: { height: 6, borderRadius: 999, overflow: 'hidden', marginTop: 7 },
+  guildXpFill: { height: '100%', borderRadius: 999 },
   guildValue: { alignItems: 'flex-end' },
   value: { fontSize: 12, fontWeight: '900' },
   membersCount: { fontSize: 8, marginTop: 3 },
