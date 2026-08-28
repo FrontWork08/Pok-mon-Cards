@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { getOwnedCard, type OwnedCardEntry } from '@/services/player';
 import { setCardFavorite } from '@/services/playerActions';
 import { formatUsd } from '@/services/market';
@@ -76,7 +77,7 @@ export default function CardDetailScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <Pressable style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.text} /></Pressable>
+          <Pressable style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={22} color={colors.text} /></Pressable>
           <Text style={[styles.topTitle, { color: colors.muted }]}>DETALHES DO CARD</Text>
           <Pressable style={[styles.iconButton, { backgroundColor: entry?.favorite ? '#B73C59' : colors.surface, borderColor: entry?.favorite ? '#E8657F' : colors.border }]} onPress={toggleFavorite} disabled={!card || saving}><Ionicons name={entry?.favorite ? 'heart' : 'heart-outline'} size={22} color={entry?.favorite ? '#fff' : colors.yellow} /></Pressable>
         </View>
