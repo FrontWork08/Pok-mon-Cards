@@ -25,6 +25,8 @@ export type PublicPlayerProfile = {
     showBattleRating: boolean;
     equippedTitle: { id: string; title: string; icon: string } | null;
     guild: { id: string; name: string; color: string; role: 'leader' | 'officer' | 'member'; level: number; xp: number } | null;
+    frame: { id:string; name:string; primaryColor:string; secondaryColor:string; icon:string } | null;
+    background: { id:string; name:string; primaryColor:string; secondaryColor:string; icon:string } | null;
   };
   collection: {
     uniqueCards: number;
@@ -63,6 +65,8 @@ export async function getPublicPlayerProfile(playerId: string): Promise<PublicPl
         level: Number(value.player.guild.level ?? 1),
         xp: Number(value.player.guild.xp ?? 0),
       } : null,
+      frame: value.player?.frame ?? null,
+      background: value.player?.background ?? null,
     },
     collection: {
       uniqueCards: Number(value.collection?.uniqueCards ?? 0),
