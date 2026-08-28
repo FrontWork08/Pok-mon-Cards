@@ -18,25 +18,17 @@ function collectOnlineIds(channel: ReturnType<typeof supabase.channel>) {
 }
 
 export function subscribeOnlinePlayers(onChange: (onlineIds: Set<string>) => void) {
-  const channel = supabase.channel(`online-players-view-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const channel = supabase.channel('players-online');
+  const emit = () => onChange(collectOnlineIds(channel));
 
   channel
-    .on('presence', { event: 'sync' }, () => onChange(collectOnlineIds(channel)))
-    .on('presence', { event: 'join' }, () => onChange(collectOnlineIds(channel)))
-    .on('presence', { event: 'leave' }, () => onChange(collectOnlineIds(channel)));
-
-  // Presence only works between subscribers to the exact same topic.
-  // Realtime strips the client-side suffix after creating this dedicated topic below.
-  const shared = supabase.channel('players-online');
-  shared
-    .on('presence', { event: 'sync' }, () => onChange(collectOnlineIds(shared)))
-    .on('presence', { event: 'join' }, () => onChange(collectOnlineIds(shared)))
-    .on('presence', { event: 'leave' }, () => onChange(collectOnlineIds(shared)))
+    .on('presence', { event: 'sync' }, emit)
+    .on('presence', { event: 'join' }, emit)
+    .on('presence', { event: 'leave' }, emit)
     .subscribe();
 
   return () => {
     void supabase.removeChannel(channel);
-    void supabase.removeChannel(shared);
   };
 }
 
