@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import {
   getMyOwnedSetCounts,
@@ -123,7 +124,7 @@ export default function SetsScreen() {
         </Text>
       </View>
 
-      <Pressable style={styles.backRow} onPress={() => router.back()}>
+      <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}>
         <Ionicons name="arrow-back" size={18} color="#B8B8B8" />
         <Text style={styles.backText}>Voltar</Text>
       </Pressable>
