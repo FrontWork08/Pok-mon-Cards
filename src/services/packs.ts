@@ -77,12 +77,18 @@ export async function listPacks(): Promise<Pack[]> {
     const cachedArt = Array.isArray(pack.booster_art_urls) ? pack.booster_art_urls : [];
     const boosterArtUrls = cachedArt.length ? cachedArt : manifestArt;
     const basePrice = Number(pack.price ?? 0);
+    const currency = pack.currency === 'diamonds' ? 'diamonds' : 'coins';
+    const eventPrice = !freeEvent
+      ? basePrice
+      : currency === 'diamonds'
+        ? Math.ceil(basePrice / 2)
+        : 0;
 
     return {
       ...pack,
-      price: freeEvent ? 0 : basePrice,
+      price: eventPrice,
       base_price: basePrice,
-      currency: pack.currency === 'diamonds' ? 'diamonds' : 'coins',
+      currency,
       free_until: freeEvent?.ends_at ?? null,
       generation: pack.generation == null ? null : Number(pack.generation),
       rarity_score: Number(pack.rarity_score ?? 0),
