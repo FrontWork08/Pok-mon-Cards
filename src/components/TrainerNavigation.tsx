@@ -7,6 +7,7 @@ import { CurrencyBar } from '@/components/CurrencyBar';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { isCurrentUserAdmin } from '@/services/market';
 import { getUnreadConversationCount } from '@/services/notifications';
+import { getMyRankSnapshot, type RankSnapshot } from '@/services/rankStatus';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 
@@ -19,6 +20,7 @@ type MenuItem = {
 };
 
 const MENU_ITEMS: MenuItem[] = [
+  { label: 'Início', description: 'Voltar direto para o hub principal', href: '/(tabs)', icon: 'home' },
   { label: 'Inbox', description: 'Mensagens, convites e avisos', href: '/inbox', icon: 'mail-unread' },
   { label: 'Temporada & Jornada', description: 'Ranque, streak, eventos e recompensas', href: '/season', icon: 'flame' },
   { label: 'Card Chase', description: 'Wishlist e alertas de cartas desejadas', href: '/wishlist', icon: 'star' },
@@ -48,15 +50,18 @@ export function TrainerNavigation() {
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [rankSnapshot, setRankSnapshot] = useState<RankSnapshot | null>(null);
 
   useEffect(() => {
     if (!userId) return;
     Promise.all([
       isCurrentUserAdmin().catch(() => false),
       getUnreadConversationCount().catch(() => 0),
-    ]).then(([admin, count]) => {
+      getMyRankSnapshot().catch(() => null),
+    ]).then(([admin, count, snapshot]) => {
       setIsAdmin(admin);
       setUnread(count);
+      setRankSnapshot(snapshot);
     });
   }, [userId, open]);
 
@@ -64,12 +69,13 @@ export function TrainerNavigation() {
 
   function navigate(href: string) {
     setOpen(false);
-    requestAnimationFrame(() => router.push(href as never));
+    requestAnimationFrame(() => router.replace(href as never));
   }
 
   return (
     <>
       <View style={styles.row}>
+        <Pressable accessibilityLabel="Ir para o início" onPress={() => router.replace('/(tabs)')} style={[styles.homeButton,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="home" size={20} color={colors.yellow}/></Pressable>
         <Pressable
           accessibilityLabel="Abrir menu"
           onPress={() => setOpen(true)}
@@ -79,10 +85,14 @@ export function TrainerNavigation() {
           {unread > 0 ? <View style={styles.unreadDot} /> : null}
         </Pressable>
         <View style={styles.currency}><CurrencyBar compact /></View>
-        <Pressable accessibilityLabel="Abrir perfil" onPress={() => router.push('/(tabs)/profile')}>
+        <Pressable accessibilityLabel="Abrir perfil" onPress={() => router.replace('/(tabs)/profile')}>
           <TrainerAvatar icon={profileIcon} color={colors.accent} backgroundColor={colors.surface} size={40} />
         </Pressable>
       </View>
+      {rankSnapshot ? <View style={styles.rankStrip}>
+        <Pressable onPress={() => router.replace('/(tabs)/battles')} style={[styles.rankPill,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="trophy" size={14} color={colors.yellow}/><Text style={[styles.rankPillText,{color:colors.text}]}>RANQUEADA #{rankSnapshot.battle.rank}</Text><Text style={[styles.rankPillSub,{color:colors.muted}]}>ELO {rankSnapshot.battle.rating}</Text></Pressable>
+        <Pressable onPress={() => router.replace('/collection-ranking')} style={[styles.rankPill,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="diamond" size={14} color="#68D9FF"/><Text style={[styles.rankPillText,{color:colors.text}]}>COLEÇÃO #{rankSnapshot.collection.rank}</Text><Text style={[styles.rankPillSub,{color:colors.muted}]}>TOP {rankSnapshot.collection.total ? Math.max(1,Math.ceil(rankSnapshot.collection.rank/rankSnapshot.collection.total*100)) : 0}%</Text></Pressable>
+      </View> : null}
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <View style={styles.backdrop}>
@@ -126,6 +136,11 @@ export function TrainerNavigation() {
 
 const styles = StyleSheet.create({
   row: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  homeButton:{width:40,height:40,borderRadius:13,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  rankStrip:{width:'100%',flexDirection:'row',gap:6,marginTop:6},
+  rankPill:{flex:1,minHeight:34,borderRadius:11,borderWidth:1,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:5},
+  rankPillText:{fontSize:7,fontWeight:'900'},
+  rankPillSub:{fontSize:7,fontWeight:'700',marginLeft:'auto'},
   menuButton: { width: 40, height: 40, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { position: 'absolute', right: 5, top: 5, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF5D73', borderWidth: 1, borderColor: '#fff' },
   currency: { flex: 1, alignItems: 'flex-end' },
