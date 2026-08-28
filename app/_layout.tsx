@@ -203,7 +203,7 @@ function AppStack() {
       const userId = data.user?.id;
       if (!userId || disposed) return;
       channel = supabase
-        .channel(`battle-sounds:${userId}`)
+        .channel(`battle-sounds:${userId}:${Date.now()}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'battle_events' }, (change) => {
           const event = change.new as any;
           const payload = event?.payload ?? {};
