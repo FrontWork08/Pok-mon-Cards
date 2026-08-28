@@ -30,6 +30,15 @@ export type SeasonInfo = {
 
 export type RetentionHub = {
   season: SeasonInfo | null;
+  claimableSeason: {
+    id: string;
+    name: string;
+    endedAt: string;
+    points: number;
+    wins: number;
+    matches: number;
+    rewardConfig: Record<string, { points: number; coins: number; diamonds: number }>;
+  } | null;
   login: {
     currentStreak: number;
     bestStreak: number;
@@ -40,7 +49,7 @@ export type RetentionHub = {
   wishlistCount: number;
   milestoneClaims: Array<{ kind: string; key: string; claimedAt: string }>;
   guild: { id: string; name: string; level: number; xp: number; color: string } | null;
-  activeEvents: Array<{ id: string; type: string; startsAt: string; endsAt: string; payload: Record<string, unknown> }>;
+  activeEvents: Array<{ id: string; type: string; title?: string; startsAt: string; endsAt: string; payload: Record<string, unknown> }>;
 };
 
 export function seasonDivision(points = 0) {
@@ -58,6 +67,12 @@ export async function getRetentionHub(): Promise<RetentionHub> {
   const raw = data ?? {};
   return {
     season: raw.season ?? null,
+    claimableSeason: raw.claimableSeason ? {
+      ...raw.claimableSeason,
+      points: Number(raw.claimableSeason.points ?? 0),
+      wins: Number(raw.claimableSeason.wins ?? 0),
+      matches: Number(raw.claimableSeason.matches ?? 0),
+    } : null,
     login: {
       currentStreak: Number(raw.login?.currentStreak ?? 0),
       bestStreak: Number(raw.login?.bestStreak ?? 0),
