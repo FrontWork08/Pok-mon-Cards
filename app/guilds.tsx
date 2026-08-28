@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import {
   getGuildHub,
+  claimGuildWeeklyReward,
   inviteToGuild,
   joinGuild,
   kickGuildMember,
@@ -15,6 +16,7 @@ import {
   type Guild,
   type GuildMember,
   type GuildHub,
+  type GuildWeeklyReward,
 } from '@/services/guilds';
 import { findPlayers } from '@/services/player';
 import { formatUsd } from '@/services/market';
@@ -106,6 +108,21 @@ export default function GuildsScreen() {
     ]);
   }
 
+  async function collectWeeklyReward() {
+    if (working) return;
+    try {
+      setWorking('weekly-reward');
+      setError(null);
+      const reward = await claimGuildWeeklyReward();
+      setNotice(`Recompensa semanal: 🪙 ${reward.coins.toLocaleString('pt-BR')}${reward.diamonds ? ` + 💎 ${reward.diamonds}` : ''} por ${reward.completedMissions} missão(ões) coletiva(s).`);
+      await load(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível coletar a recompensa semanal.');
+    } finally {
+      setWorking(null);
+    }
+  }
+
   function confirmKick(member: GuildMember) {
     if (!selected) return;
     Alert.alert('Expulsar membro?', `@${member.username} será removido da guilda.`, [
@@ -153,6 +170,8 @@ export default function GuildsScreen() {
         myGuildId={myMembership?.guildId ?? null}
         myRole={myMembership?.role ?? null}
         working={working}
+        weeklyReward={myMembership?.guildId === selected.id ? hub?.weeklyReward ?? null : null}
+        onClaimWeeklyReward={() => { void collectWeeklyReward(); }}
         onJoin={() => void run('join', () => joinGuild(selected.id), `Você entrou na ${selected.name}!`)}
         onLeave={confirmLeave}
         onOpenPlayer={(id) => router.push(`/player/${id}`)}
@@ -170,12 +189,14 @@ export default function GuildsScreen() {
 }
 
 function GuildDetail({
-  guild, myGuildId, myRole, working, onJoin, onLeave, onOpenPlayer, onKick, onSetRole,
+  guild, myGuildId, myRole, working, weeklyReward, onClaimWeeklyReward, onJoin, onLeave, onOpenPlayer, onKick, onSetRole,
 }: {
   guild: Guild;
   myGuildId: string | null;
   myRole: 'leader' | 'officer' | 'member' | null;
   working: string | null;
+  weeklyReward: GuildWeeklyReward | null;
+  onClaimWeeklyReward: () => void;
   onJoin: () => void;
   onLeave: () => void;
   onOpenPlayer: (id: string) => void;
@@ -193,6 +214,32 @@ function GuildDetail({
       const percent = Math.min(100, mission.target ? mission.progress / mission.target * 100 : 0);
       return <View key={mission.id} style={[styles.mission, { backgroundColor: colors.surfaceAlt, borderColor: mission.completed ? guild.color : colors.border }]}><View style={styles.missionTop}><Ionicons name={(mission.icon || 'flag') as keyof typeof Ionicons.glyphMap} size={19} color={mission.completed ? guild.color : colors.muted} /><View style={{ flex: 1 }}><Text style={[styles.missionTitle, { color: colors.text }]}>{mission.title}</Text><Text style={[styles.missionText, { color: colors.muted }]}>{mission.description}</Text></View><Text style={[styles.progressText, { color: mission.completed ? guild.color : colors.text }]}>{Math.floor(mission.progress).toLocaleString('pt-BR')} / {mission.target.toLocaleString('pt-BR')}</Text></View><View style={[styles.track, { backgroundColor: colors.surface }]}><View style={[styles.fill, { backgroundColor: guild.color, width: `${percent}%` }]} /></View></View>;
     })}</View>
+
+    {mine && weeklyReward ? <View style={[styles.weeklyReward, { backgroundColor: colors.surfaceAlt, borderColor: weeklyReward.claimable ? guild.color : colors.border }]}>
+      <View style={styles.weeklyRewardTop}>
+        <View style={[styles.weeklyRewardIcon, { backgroundColor: guild.color + '25' }]}><Ionicons name="gift" size={22} color={guild.color} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.weeklyRewardTitle, { color: colors.text }]}>Recompensa semanal da Guilda</Text>
+          <Text style={[styles.weeklyRewardText, { color: colors.muted }]}>
+            {weeklyReward.completedMissions}/3 objetivos concluídos • prêmio atual: 🪙 {weeklyReward.coins.toLocaleString('pt-BR')}{weeklyReward.diamonds ? ` + 💎 ${weeklyReward.diamonds}` : ''}
+          </Text>
+        </View>
+      </View>
+      <Pressable
+        disabled={!weeklyReward.claimable || working === 'weekly-reward'}
+        onPress={onClaimWeeklyReward}
+        style={[
+          styles.weeklyRewardButton,
+          { backgroundColor: weeklyReward.claimable ? guild.color : colors.surface },
+          (!weeklyReward.claimable || working === 'weekly-reward') && { opacity: .55 },
+        ]}
+      >
+        {working === 'weekly-reward' ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name={weeklyReward.claimed ? 'checkmark-circle' : 'gift'} size={17} color="#fff" />}
+        <Text style={styles.weeklyRewardButtonText}>
+          {weeklyReward.claimed ? 'RECOMPENSA JÁ COLETADA' : weeklyReward.claimable ? 'COLETAR RECOMPENSA' : 'CONCLUA UMA MISSÃO'}
+        </Text>
+      </Pressable>
+    </View> : null}
 
     <View style={styles.subHeader}><Text style={[styles.subTitle, { color: colors.text }]}>Membros</Text><Text style={[styles.subMeta, { color: colors.muted }]}>{guild.members.length}</Text></View>
     <View style={styles.memberList}>{guild.members.length === 0 ? <Text style={[styles.noMembers, { color: colors.muted }]}>Nenhum membro ainda. Seja o primeiro a entrar.</Text> : guild.members.map((member) => <View key={member.id} style={[styles.memberRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Pressable style={styles.memberIdentity} onPress={() => onOpenPlayer(member.id)}><View style={[styles.memberAvatar, { backgroundColor: guild.color + '25' }]}><Text style={[styles.memberAvatarText, { color: guild.color }]}>{member.username.slice(0, 1).toUpperCase()}</Text></View><View style={{ flex: 1 }}><Text style={[styles.memberName, { color: colors.text }]}>@{member.username}</Text><Text style={[styles.memberMeta, { color: colors.muted }]}>Nível {member.level} • {member.role === 'leader' ? 'Chefe' : member.role === 'officer' ? 'Oficial' : 'Membro'}</Text></View></Pressable>{leader && member.role !== 'leader' ? <View style={styles.memberActions}><Pressable disabled={working === `role:${member.id}`} onPress={() => onSetRole(member, member.role === 'officer' ? 'member' : 'officer')} style={[styles.roleButton, { borderColor: guild.color }]}><Text style={[styles.roleText, { color: guild.color }]}>{member.role === 'officer' ? 'MEMBRO' : 'OFICIAL'}</Text></Pressable><Pressable disabled={working === `kick:${member.id}`} onPress={() => onKick(member)} style={styles.kick}><Ionicons name="person-remove" size={16} color="#FF9FAF" /></Pressable></View> : <Ionicons name="chevron-forward" size={17} color={colors.muted} />}</View>)}</View>
@@ -246,6 +293,13 @@ const styles = StyleSheet.create({
   subTitle: { fontSize: 16, fontWeight: '900' },
   subMeta: { fontSize: 8, fontWeight: '800' },
   missions: { gap: 7 },
+  weeklyReward: { borderRadius: 16, borderWidth: 1, padding: 12, gap: 10 },
+  weeklyRewardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  weeklyRewardIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  weeklyRewardTitle: { fontSize: 12, fontWeight: '900' },
+  weeklyRewardText: { fontSize: 8, lineHeight: 12, marginTop: 3 },
+  weeklyRewardButton: { minHeight: 43, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  weeklyRewardButtonText: { color: '#fff', fontSize: 8, fontWeight: '900' },
   mission: { borderRadius: 15, borderWidth: 1, padding: 11 },
   missionTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   missionTitle: { fontSize: 11, fontWeight: '900' },
