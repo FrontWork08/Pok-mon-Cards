@@ -132,7 +132,7 @@ export const buyListing = (listingId:string) =>
   action({action:'buy',listingId});
 
 export function subscribeMarketplace(onChange:()=>void) {
-  const channel = supabase.channel('marketplace-live')
+  const channel = supabase.channel(`marketplace-live-${Date.now()}`)
     .on('postgres_changes',{event:'*',schema:'public',table:'market_listings'},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'player_shops'},onChange)
     .subscribe();
