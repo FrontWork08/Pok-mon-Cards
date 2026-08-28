@@ -19,7 +19,7 @@ on public.guild_weekly_reward_claims for select to authenticated
 using ((select auth.uid())=player_id);
 
 
-do $
+do $realtime$
 begin
   if not exists(
     select 1 from pg_publication_tables
@@ -29,7 +29,7 @@ begin
   ) then
     alter publication supabase_realtime add table public.guild_weekly_reward_claims;
   end if;
-end $;
+end $realtime$;
 
 insert into public.achievement_definitions(id,name,description,category,target,title,icon,sort_order,active)
 values
