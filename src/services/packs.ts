@@ -39,6 +39,16 @@ export type OpenedCard = {
   imageFallbackLarge?: string | null;
 };
 
+const LEGENDARY_POKEDEX_NUMBERS = [
+  144,145,146,150,151,243,244,245,249,250,251,
+  377,378,379,380,381,382,383,384,385,386,
+  480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,
+  638,639,640,641,642,643,644,645,646,647,648,649,
+  716,717,718,719,720,721,772,773,785,786,787,788,789,790,791,792,
+  800,801,802,807,808,809,888,889,890,891,892,893,894,895,896,897,
+  898,905,1001,1002,1003,1004,1007,1008,1014,1015,1016,1017,1024,1025,
+];
+
 export type PackCardPreview = {
   id: string;
   name: string;
@@ -155,16 +165,28 @@ export async function setPackFavorite(packId: string, favorite: boolean) {
 export async function listPackCards(setId: string, page = 0, pageSize = 36, search = '', sort: 'number'|'price-high' = 'number') {
   const from = page * pageSize;
   const to = from + pageSize - 1;
+
   let query = supabase
     .from('cards')
-    .select('id,pokemon_name,rarity,image_small,image_large,market_price_usd,set_id,card_number', { count: 'exact' })
-    .eq('set_id', setId);
+    .select('id,pokemon_name,rarity,image_small,image_large,market_price_usd,set_id,card_number', { count: 'exact' });
+
+  if (setId === 'legendary-vault') {
+    const config = await getLegendaryPackConfig();
+    query = query
+      .gt('market_price_usd', config.minValueUsd)
+      .overlaps('pokedex_numbers', LEGENDARY_POKEDEX_NUMBERS);
+  } else {
+    query = query.eq('set_id', setId);
+  }
+
   if (search.trim()) query = query.ilike('pokemon_name', `%${search.trim()}%`);
   query = sort === 'price-high'
     ? query.order('market_price_usd', { ascending: false, nullsFirst: false })
-    : query.order('card_number', { ascending: true });
-  const { data, error, count } = await query.range(from, to);
+    : setId === 'legendary-vault'
+      ? query.order('pokemon_name', { ascending: true })
+      : query.order('card_number', { ascending: true });
 
+  const { data, error, count } = await query.range(from, to);
   if (error) throw error;
 
   return {
