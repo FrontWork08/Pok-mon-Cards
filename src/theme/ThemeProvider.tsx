@@ -48,9 +48,45 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    refresh();
-    const { data } = supabase.auth.onAuthStateChange(() => { setTimeout(() => refresh(), 0); });
-    return () => data.subscription.unsubscribe();
+    let disposed = false;
+    let settingsChannel: ReturnType<typeof supabase.channel> | null = null;
+
+    const clearSettingsChannel = () => {
+      if (!settingsChannel) return;
+      void supabase.removeChannel(settingsChannel);
+      settingsChannel = null;
+    };
+
+    const attachSettingsRealtime = async (userId?: string | null) => {
+      clearSettingsChannel();
+      if (!userId || disposed) return;
+      settingsChannel = supabase
+        .channel(`player-settings-${userId}-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'player_settings', filter: `player_id=eq.${userId}` },
+          () => { void refresh(); },
+        )
+        .subscribe();
+    };
+
+    void refresh();
+    supabase.auth.getUser().then(({ data }) => {
+      void attachSettingsRealtime(data.user?.id ?? null);
+    }).catch(() => null);
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setTimeout(() => {
+        void refresh();
+        void attachSettingsRealtime(session?.user?.id ?? null);
+      }, 0);
+    });
+
+    return () => {
+      disposed = true;
+      clearSettingsChannel();
+      data.subscription.unsubscribe();
+    };
   }, [refresh]);
 
   const updatePreferences = useCallback(async (patch: SettingsPatch) => {
