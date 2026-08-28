@@ -9,7 +9,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "apk": "node scripts/android-apk.mjs build",
-    "apk:download": "node scripts/android-apk.mjs download"
+    "apk:download": "node scripts/android-apk.mjs download",
+    "audit:project": "node scripts/project-audit.mjs",
+    "verify": "npx tsc --noEmit && node scripts/project-audit.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "14.1.0",
