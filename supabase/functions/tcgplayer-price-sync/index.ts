@@ -16,6 +16,91 @@ class UpstreamError extends Error {
   constructor(message: string, readonly status: number | null = null) { super(message); }
 }
 
+function numeric(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function hasUsableTcgplayer(tcgplayer: any) {
+  const prices = tcgplayer?.prices ?? {};
+  return Object.values(prices).some((variant: any) =>
+    numeric(variant?.market) !== null ||
+    numeric(variant?.mid) !== null ||
+    numeric(variant?.low) !== null
+  );
+}
+
+function normalizeTcgdexTcgplayer(pricing: any) {
+  const tcg = pricing?.tcgplayer;
+  if (!tcg || typeof tcg !== "object") return null;
+
+  const mapping: Record<string, string> = {
+    normal: "normal",
+    holofoil: "holofoil",
+    reverse: "reverseHolofoil",
+    "reverse-holofoil": "reverseHolofoil",
+    "1st-edition": "1stEditionNormal",
+    "1st-edition-holofoil": "1stEditionHolofoil",
+    unlimited: "normal",
+    "unlimited-holofoil": "holofoil",
+  };
+
+  const prices: Record<string, any> = {};
+  for (const [sourceKey, value] of Object.entries(tcg)) {
+    if (!value || typeof value !== "object") continue;
+    const targetKey = mapping[sourceKey];
+    if (!targetKey) continue;
+    const item = value as Record<string, unknown>;
+    const normalized = {
+      low: numeric(item.lowPrice),
+      mid: numeric(item.midPrice),
+      high: numeric(item.highPrice),
+      market: numeric(item.marketPrice),
+      directLow: numeric(item.directLowPrice),
+    };
+    if (normalized.market || normalized.mid || normalized.low) {
+      if (!prices[targetKey] || normalized.market) prices[targetKey] = normalized;
+    }
+  }
+  return Object.keys(prices).length ? { prices, updatedAt: tcg.updated ?? null } : null;
+}
+
+async function fetchTcgdexFallback(cardId: string) {
+  try {
+    const response = await fetch(
+      `https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(cardId)}`,
+      { headers: { "User-Agent": "Pokemon-Cards-Price-Fallback/1.0" }, signal: AbortSignal.timeout(8_000) },
+    );
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return normalizeTcgdexTcgplayer(payload?.pricing);
+  } catch {
+    return null;
+  }
+}
+
+async function enrichWithTcgdexFallback(cards: any[]) {
+  const enriched = cards.map((card) => ({ ...card, pricing_source: "pokemontcg" }));
+  const targets = enriched.filter((card) => !hasUsableTcgplayer(card?.tcgplayer));
+
+  for (let index = 0; index < targets.length; index += 12) {
+    const chunk = targets.slice(index, index + 12);
+    const values = await Promise.all(chunk.map(async (card) => ({
+      id: String(card.id ?? ""),
+      tcgplayer: await fetchTcgdexFallback(String(card.id ?? "")),
+    })));
+    const byId = new Map(values.filter((item) => item.tcgplayer).map((item) => [item.id, item.tcgplayer]));
+    for (const card of enriched) {
+      const fallback = byId.get(String(card.id ?? ""));
+      if (fallback) {
+        card.tcgplayer = fallback;
+        card.pricing_source = "tcgdex";
+      }
+    }
+  }
+  return enriched;
+}
+
 async function fetchPage(setId: string, page: number) {
   const query = encodeURIComponent(`set.id:${setId}`);
   const apiKey = Deno.env.get("POKEMON_TCG_API_KEY");
@@ -76,10 +161,11 @@ Deno.serve(async (request: Request) => {
     const setId = String(job.set_id ?? "");
     try {
       const cards = await fetchSet(setId);
+      const enrichedCards = await enrichWithTcgdexFallback(cards);
       const { data, error } = await admin.rpc("apply_market_price_sync_set", {
         p_token: syncToken,
         p_set_id: setId,
-        p_cards: cards,
+        p_cards: enrichedCards,
       });
       if (error) throw new UpstreamError(error.message);
       results.push({ ok: true, ...data });
