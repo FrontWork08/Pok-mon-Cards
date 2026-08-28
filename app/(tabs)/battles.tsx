@@ -43,6 +43,7 @@ export default function BattlesHubScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [rankedMode, setRankedMode] = useState<BattleMode>('draft3');
   const [queueState, setQueueState] = useState<MatchmakingState | null>(null);
+  const [showBattleRules, setShowBattleRules] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -236,6 +237,69 @@ export default function BattlesHubScreen() {
       <Pressable onPress={()=>router.push('/season')} style={styles.seasonLink}><Ionicons name="trophy" size={15} color={colors.accent}/><Text style={[styles.seasonLinkText,{color:colors.accent}]}>VER TEMPORADA E RECOMPENSAS</Text></Pressable>
     </View>
 
+    <View style={[styles.rulesPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showBattleRules }}
+        onPress={() => setShowBattleRules((value) => !value)}
+        style={styles.rulesHeader}
+      >
+        <View style={[styles.rulesIcon, { backgroundColor: colors.accentSoft }]}>
+          <Ionicons name="book-outline" size={22} color={colors.accent}/>
+        </View>
+        <View style={styles.grow}>
+          <Text style={[styles.rulesTitle, { color: colors.text }]}>Como funcionam as batalhas</Text>
+          <Text style={[styles.rulesSubtitle, { color: colors.muted }]}>Regra v4 • veja o que faz um Pokémon vencer outro</Text>
+        </View>
+        <Ionicons name={showBattleRules ? 'chevron-up' : 'chevron-down'} size={21} color={colors.muted}/>
+      </Pressable>
+
+      {showBattleRules ? (
+        <View style={styles.rulesBody}>
+          <View style={[styles.rulesHero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+            <View style={styles.grow}>
+              <Text style={[styles.rulesKicker, { color: colors.yellow }]}>OBJETIVO DA RODADA</Text>
+              <Text style={[styles.rulesHeroTitle, { color: colors.text }]}>Nocauteie o rival no menor número de turnos</Text>
+              <Text style={[styles.rulesText, { color: colors.muted }]}>O servidor escolhe o ataque mais eficiente de cada carta para aquele confronto. Preço, raridade e valor em Coins não aumentam a força de batalha.</Text>
+            </View>
+            <Ionicons name="flash" size={30} color={colors.yellow}/>
+          </View>
+
+          <View style={styles.rulesStats}>
+            <RuleStat icon="heart" label="HP" text="Vida da carta. Quanto maior, mais dano aguenta." />
+            <RuleStat icon="flame" label="ATAQUE" text="Maior dano base disponível nos ataques impressos." />
+            <RuleStat icon="flash" label="ENERGIA" text="Quanto tempo o ataque leva para ficar disponível." />
+            <RuleStat icon="speedometer" label="EFICIÊNCIA" text="Dano causado em relação ao custo de energia." />
+            <RuleStat icon="walk" label="VELOCIDADE" text="Ataque inicial e custo de recuo da carta." />
+            <RuleStat icon="construct" label="TÉCNICA" text="Efeitos, habilidades, ataques extras e resistências." />
+            <RuleStat icon="shield-checkmark" label="PWR" text="Nota geral de combate de 1 a 1000." />
+          </View>
+
+          <View style={[styles.rulesOrder, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+            <Text style={[styles.rulesOrderTitle, { color: colors.text }]}>Como o vencedor é decidido</Text>
+            <RuleStep number="1" title="Menos turnos para nocautear" text="Quem consegue derrubar o rival primeiro vence a rodada." />
+            <RuleStep number="2" title="Melhor confronto" text="Em empate, entram dano efetivo, HP, eficiência, velocidade, técnica e recoil." />
+            <RuleStep number="3" title="PWR geral" text="Se o confronto continuar empatado, vence a carta com maior Poder de Batalha." />
+            <RuleStep number="4" title="HP" text="Persistindo o empate, a carta com mais HP leva vantagem." />
+            <RuleStep number="5" title="Sorte apenas no empate total" text="Cara ou coroa só é usado quando todas as estatísticas também empatam." />
+          </View>
+
+          <View style={styles.matchupRow}>
+            <View style={[styles.matchupCard, { backgroundColor: '#173728', borderColor: '#2F7451' }]}>
+              <Ionicons name="trending-up" size={20} color="#65D894"/>
+              <View style={styles.grow}><Text style={styles.superEffective}>SUPER EFETIVO</Text><Text style={styles.matchupText}>Fraqueza pode multiplicar ou aumentar o dano.</Text></View>
+            </View>
+            <View style={[styles.matchupCard, { backgroundColor: '#382414', borderColor: '#7A4B24' }]}>
+              <Ionicons name="shield" size={20} color="#FFB16A"/>
+              <View style={styles.grow}><Text style={styles.resisted}>RESISTIDO</Text><Text style={styles.matchupText}>Resistência reduz o dano recebido.</Text></View>
+            </View>
+          </View>
+
+          <Text style={[styles.rulesFootnote, { color: colors.muted }]}>Exemplo: um ataque de 50 contra fraqueza ×2 causa 100 de dano efetivo. Se o rival tiver resistência −30, esse valor é reduzido quando o tipo do atacante corresponder.</Text>
+        </View>
+      ) : null}
+    </View>
+
     <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
       <View><Text style={[styles.kicker, { color: colors.yellow }]}>RANKED RATING</Text><Text style={[styles.rating, { color: colors.text }]}>{profile?.battle_rating ?? 1000}</Text><Text style={[styles.rankLabel, { color: colors.muted }]}>{myRank.symbol} {myRank.displayName}</Text></View>
       <View style={styles.heroStats}><Mini value={profile?.battle_wins ?? wins} label="Vitórias"/><Mini value={profile?.battle_losses ?? losses} label="Derrotas"/><Mini value={`${winRate}%`} label="Win rate"/><Mini value={profile?.best_battle_streak ?? 0} label="Melhor streak"/></View>
@@ -270,10 +334,42 @@ export default function BattlesHubScreen() {
   </Screen>;
 }
 
+function RuleStat({ icon, label, text }: { icon: keyof typeof Ionicons.glyphMap; label: string; text: string }) { const { colors } = useAppTheme(); return <View style={[styles.ruleStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><View style={[styles.ruleStatIcon,{backgroundColor:colors.surface}]}><Ionicons name={icon} size={17} color={colors.accent}/></View><View style={styles.grow}><Text style={[styles.ruleStatLabel,{color:colors.text}]}>{label}</Text><Text style={[styles.ruleStatText,{color:colors.muted}]}>{text}</Text></View></View>; }
+
+function RuleStep({ number, title, text }: { number: string; title: string; text: string }) { const { colors } = useAppTheme(); return <View style={styles.ruleStep}><View style={[styles.ruleNumber,{backgroundColor:colors.yellow}]}><Text style={styles.ruleNumberText}>{number}</Text></View><View style={styles.grow}><Text style={[styles.ruleStepTitle,{color:colors.text}]}>{title}</Text><Text style={[styles.ruleStepText,{color:colors.muted}]}>{text}</Text></View></View>; }
+
 function Mini({ value, label }: { value: number | string; label: string }) { const { colors } = useAppTheme(); return <View><Text style={[styles.miniValue, { color: colors.text }]}>{value}</Text><Text style={[styles.miniLabel, { color: colors.muted }]}>{label}</Text></View>; }
 
 const styles = StyleSheet.create({
   notice: { flexDirection: 'row', gap: 8, padding: 11, borderRadius: 14, backgroundColor: '#2B2818', borderWidth: 1, borderColor: '#5A5125' },
+  rulesPanel: { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  rulesHeader: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13 },
+  rulesIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  rulesTitle: { fontSize: 16, fontWeight: '900' },
+  rulesSubtitle: { fontSize: 9, marginTop: 2 },
+  rulesBody: { paddingHorizontal: 13, paddingBottom: 13, gap: 11 },
+  rulesHero: { borderRadius: 16, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rulesKicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  rulesHeroTitle: { fontSize: 14, fontWeight: '900', marginTop: 3 },
+  rulesText: { fontSize: 9, lineHeight: 14, marginTop: 4 },
+  rulesStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  ruleStat: { flexGrow: 1, flexBasis: 210, minHeight: 66, borderRadius: 14, borderWidth: 1, padding: 9, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ruleStatIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  ruleStatLabel: { fontSize: 9, fontWeight: '900' },
+  ruleStatText: { fontSize: 8, lineHeight: 12, marginTop: 2 },
+  rulesOrder: { borderRadius: 16, borderWidth: 1, padding: 11, gap: 9 },
+  rulesOrderTitle: { fontSize: 12, fontWeight: '900', marginBottom: 2 },
+  ruleStep: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+  ruleNumber: { width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  ruleNumberText: { color: '#07111F', fontSize: 9, fontWeight: '900' },
+  ruleStepTitle: { fontSize: 9, fontWeight: '900' },
+  ruleStepText: { fontSize: 8, lineHeight: 12, marginTop: 2 },
+  matchupRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  matchupCard: { flexGrow: 1, flexBasis: 210, borderRadius: 14, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  superEffective: { color: '#65D894', fontSize: 8, fontWeight: '900' },
+  resisted: { color: '#FFB16A', fontSize: 8, fontWeight: '900' },
+  matchupText: { color: '#D5D8DE', fontSize: 8, lineHeight: 12, marginTop: 2 },
+  rulesFootnote: { fontSize: 8, lineHeight: 13, fontWeight: '700' },
   rankedPanel: { borderRadius:22, borderWidth:1, padding:15, gap:12 },
   rankedHead: { flexDirection:'row', alignItems:'center', gap:10 },
   rankedIcon: { width:46, height:46, borderRadius:15, alignItems:'center', justifyContent:'center' },
