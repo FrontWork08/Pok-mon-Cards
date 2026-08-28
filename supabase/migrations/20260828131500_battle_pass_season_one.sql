@@ -130,26 +130,26 @@ on conflict(id) do update set name=excluded.name,starts_at=excluded.starts_at,en
 
 insert into public.battle_pass_reward_definitions(season_id,level,track,label,reward)
 select 'season_2026_01',lvl,'free',
-  case when lvl % 10 = 0
-    then format('🪙 %s + 💎 %s',(5000+lvl*1000)::text,(case lvl when 10 then 1 when 20 then 1 when 30 then 2 when 40 then 2 when 50 then 4 else 0 end)::text)
-    else format('🪙 %s',(5000+lvl*1000)::text)
+  case when lvl in (25,50)
+    then format('🪙 %s + 💎 %s',(300+lvl*20)::text,(case when lvl=25 then 1 else 2 end)::text)
+    else format('🪙 %s',(300+lvl*20)::text)
   end,
   jsonb_strip_nulls(jsonb_build_object(
-    'coins',5000+lvl*1000,
-    'diamonds',case lvl when 10 then 1 when 20 then 1 when 30 then 2 when 40 then 2 when 50 then 4 else null end
+    'coins',300+lvl*20,
+    'diamonds',case when lvl=25 then 1 when lvl=50 then 2 else null end
   ))
 from generate_series(1,50) lvl
 on conflict(season_id,level,track) do update set label=excluded.label,reward=excluded.reward;
 
 insert into public.battle_pass_reward_definitions(season_id,level,track,label,reward)
 select 'season_2026_01',lvl,'vip',
-  case when lvl % 5 = 0
-    then format('🪙 %s + 💎 %s',(8000+lvl*1500)::text,(case when lvl=50 then 5 else 2 end)::text)
-    else format('🪙 %s',(8000+lvl*1500)::text)
+  case when lvl in (10,20,30,40,50)
+    then format('🪙 %s + 💎 %s',(500+lvl*30)::text,(case when lvl=50 then 3 else 1 end)::text)
+    else format('🪙 %s',(500+lvl*30)::text)
   end,
   jsonb_strip_nulls(jsonb_build_object(
-    'coins',8000+lvl*1500,
-    'diamonds',case when lvl % 5=0 then case when lvl=50 then 5 else 2 end else null end
+    'coins',500+lvl*30,
+    'diamonds',case when lvl in (10,20,30,40) then 1 when lvl=50 then 3 else null end
   ))
 from generate_series(1,50) lvl
 on conflict(season_id,level,track) do update set label=excluded.label,reward=excluded.reward;
