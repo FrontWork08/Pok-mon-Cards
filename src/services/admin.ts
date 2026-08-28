@@ -25,7 +25,7 @@ export type AdminOverview = {
 };
 
 export type AdminPlayer = {
-  id: string; username: string; level: number; created_at: string;
+  id: string; username: string; level: number; coins: number; diamonds: number; created_at: string;
   account_status: 'active' | 'suspended' | 'banned';
   suspended_until: string | null; moderation_reason: string | null; warning_count: number;
 };
