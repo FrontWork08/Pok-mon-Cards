@@ -125,6 +125,15 @@ Deno.serve(async (req: Request) => {
       return json({ data });
     }
 
+    if (body.action === "forfeit") {
+      const { data, error } = await admin.rpc("server_forfeit_battle", {
+        p_actor_id: user.id,
+        p_battle_id: body.battleId,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
     if (body.action === "cancel") {
       const { data, error } = await admin.rpc("server_cancel_battle", { p_actor_id: user.id, p_battle_id: body.battleId });
       if (error) throw error;
