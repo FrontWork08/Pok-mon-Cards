@@ -4,23 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { OwnedCardEntry } from '@/services/player';
 import { formatUsd } from '@/services/market';
+import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 type SortMode = 'value' | 'battle' | 'name' | 'quantity' | 'recent';
 type QuantityMap = Record<string, number>;
 
-export function getBattleCardPreview(card: OwnedCardEntry['cards']) {
-  const data = card?.tcg_data as any;
-  const parsedHp = Number(String(data?.hp ?? '').replace(/[^0-9]/g, ''));
-  const hp = Number.isFinite(parsedHp) && parsedHp > 0 ? parsedHp : 50;
-  const attacks = Array.isArray(data?.attacks) ? data.attacks : [];
-  const maxDamage = attacks.reduce((best: number, attack: any) => {
-    const match = String(attack?.damage ?? '').match(/[0-9]+/);
-    return Math.max(best, match ? Number(match[0]) : 0);
-  }, 0);
-  return { hp, maxDamage, score: hp + maxDamage };
-}
-
+export { getBattleCardPreview } from '@/services/battleStats';
 type Props = {
   visible: boolean;
   title: string;
@@ -214,11 +204,12 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
     >
       <View style={[styles.imageWrap, { backgroundColor: colors.surfaceAlt }]}>
         {card.image_small ? <Image source={{ uri: card.image_small }} style={styles.image} resizeMode="contain" /> : <Ionicons name="image-outline" size={30} color={colors.muted} />}
-        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{displayMode === 'battle' ? `HP ${combat.hp}` : card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
+        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{displayMode === 'battle' ? `PWR ${combat.battleRating}` : card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
         {selected && mode === 'single' ? <View style={[styles.checkBadge, { backgroundColor: colors.yellow }]}><Ionicons name="checkmark" size={17} color="#07111F" /></View> : null}
       </View>
       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.pokemon_name}</Text>
-      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `Dano máx. ${combat.maxDamage} • Bag ×${entry.quantity}` : `${card.rarity ?? 'Sem raridade'} • Bag ×${entry.quantity}`}</Text>
+      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `HP ${combat.hp} • ATQ ${combat.maxDamage} • ⚡ ${combat.bestEnergy}` : `${card.rarity ?? 'Sem raridade'} • Bag ×${entry.quantity}`}</Text>
+      {displayMode === 'battle' ? <Text numberOfLines={1} style={[styles.battleMeta, { color: colors.muted }]}>EF {combat.efficiencyScore} • VEL {combat.speedScore} • TEC {combat.techniqueScore}</Text> : null}
       {mode === 'quantity' ? (
         <View style={styles.qtyRow}>
           <Pressable style={[styles.qtyButton, { backgroundColor: colors.surfaceAlt }]} onPress={onMinus}><Text style={[styles.qtySign, { color: colors.text }]}>−</Text></Pressable>
@@ -259,6 +250,7 @@ const styles = StyleSheet.create({
   checkBadge: { position: 'absolute', right: 6, top: 6, width: 29, height: 29, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   cardName: { fontSize: 11, fontWeight: '900', marginTop: 7 },
   cardMeta: { fontSize: 8, marginTop: 2 },
+  battleMeta: { fontSize: 7, marginTop: 3, fontWeight: '800' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
   qtyButton: { width: 31, height: 31, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   qtySign: { fontSize: 18, fontWeight: '900' },
