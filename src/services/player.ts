@@ -45,6 +45,21 @@ export type OwnedCardEntry = {
     image_large: string | null;
     game_value: number;
     battle_damage?: number;
+    battle_profile?: {
+      hp: number;
+      maxDamage: number;
+      minEnergy: number;
+      bestEnergy: number;
+      retreatCost: number;
+      attackCount: number;
+      abilityCount: number;
+      effectAttackCount: number;
+      damagePerEnergy: number;
+      efficiencyScore: number;
+      speedScore: number;
+      techniqueScore: number;
+      battleRating: number;
+    };
     market_price_usd: number | null;
     market_price_low_usd: number | null;
     market_price_high_usd: number | null;
