@@ -88,7 +88,7 @@ begin
     'coins',v_coins,'diamonds',v_diamonds,'claimed',true
   );
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.get_guild_weekly_reward_status()
@@ -172,7 +172,7 @@ begin
     'wins',v_wins
   );
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.get_retention_hub()
@@ -252,7 +252,7 @@ begin
   ) into v_result;
   return v_result;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.claim_guild_weekly_reward()
@@ -427,7 +427,7 @@ begin
     update public.players set equipped_title_id='creator_owner' where id=p_player_id;
   end if;
 end;
-$function$
+$function$;
 
 
 
