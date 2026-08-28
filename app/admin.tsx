@@ -1534,7 +1534,7 @@ export default function AdminScreen() {
                   ))}
                 </View>
                 <TextInput value={removeCoinAmount} onChangeText={(value)=>setRemoveCoinAmount(value.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Quantidade de Coins" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surface,borderColor:colors.border}]}/>
-                <Pressable disabled={selectedPlayers.length<1||removeCoinAmountNumber<1||working} onPress={()=>confirmRemoveCurrency('coins')} style={[styles.destructiveGrantButton,{opacity:selectedPlayers.length<1||removeCoinAmountNumber<1||working?.45:1}]}>
+                <Pressable disabled={selectedPlayers.length<1||removeCoinAmountNumber<1||working} onPress={()=>confirmRemoveCurrency('coins')} style={[styles.destructiveGrantButton,{opacity:selectedPlayers.length<1||removeCoinAmountNumber<1||working ? .45 : 1}]}>
                   <Ionicons name="remove-circle" size={19} color="#FFD7DD"/>
                   <Text style={styles.destructiveGrantText}>RETIRAR COINS</Text>
                 </Pressable>
@@ -1550,7 +1550,7 @@ export default function AdminScreen() {
                   ))}
                 </View>
                 <TextInput value={removeDiamondAmount} onChangeText={(value)=>setRemoveDiamondAmount(value.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Quantidade de Diamantes" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surface,borderColor:colors.border}]}/>
-                <Pressable disabled={selectedPlayers.length<1||removeDiamondAmountNumber<1||working} onPress={()=>confirmRemoveCurrency('diamonds')} style={[styles.destructiveGrantButton,{opacity:selectedPlayers.length<1||removeDiamondAmountNumber<1||working?.45:1}]}>
+                <Pressable disabled={selectedPlayers.length<1||removeDiamondAmountNumber<1||working} onPress={()=>confirmRemoveCurrency('diamonds')} style={[styles.destructiveGrantButton,{opacity:selectedPlayers.length<1||removeDiamondAmountNumber<1||working ? .45 : 1}]}>
                   <Ionicons name="diamond" size={18} color="#FFD7DD"/>
                   <Text style={styles.destructiveGrantText}>RETIRAR DIAMANTES</Text>
                 </Pressable>
