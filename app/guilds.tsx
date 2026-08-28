@@ -3,9 +3,12 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View 
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
+import { PackOpeningModal } from '@/components/PackOpeningModal';
+import type { Pack, OpenedCard } from '@/services/packs';
 import {
   getGuildHub,
   claimGuildWeeklyReward,
+  claimGuildCollectiveBooster,
   inviteToGuild,
   joinGuild,
   kickGuildMember,
@@ -34,6 +37,7 @@ export default function GuildsScreen() {
   const [search, setSearch] = useState('');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<any[]>([]);
+  const [collectiveOpen, setCollectiveOpen] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -123,6 +127,18 @@ export default function GuildsScreen() {
     }
   }
 
+  async function openCollectivePack(): Promise<OpenedCard[]> {
+    try {
+      const result = await claimGuildCollectiveBooster();
+      setNotice('Booster Coletivo coletado! As 5 cartas foram adicionadas à sua Bag.');
+      await load(true);
+      return result.cards as OpenedCard[];
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível coletar o Booster Coletivo.');
+      throw e;
+    }
+  }
+
   function confirmKick(member: GuildMember) {
     if (!selected) return;
     Alert.alert('Expulsar membro?', `@${member.username} será removido da guilda.`, [
@@ -179,11 +195,52 @@ export default function GuildsScreen() {
         onSetRole={(member, role) => void run(`role:${member.id}`, () => setGuildMemberRole(selected.id, member.id, role), 'Cargo atualizado.')}
       /> : null}
 
+      {selected && myMembership?.guildId === selected.id ? <View style={[styles.collectivePanel, { backgroundColor: colors.surface, borderColor: hub?.collectiveBooster.status === 'ready' ? colors.yellow : selected.color }]}>
+        <View style={styles.collectiveHead}>
+          <View style={[styles.collectiveIcon, { backgroundColor: selected.color + '25' }]}><Ionicons name="cube" size={24} color={selected.color} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.collectiveTitle, { color: colors.text }]}>Booster Coletivo</Text>
+            <Text style={[styles.collectiveText, { color: colors.muted }]}>Cada booster aberto por um membro soma +1. Ao atingir {hub?.collectiveBooster.target ?? 40}, cada membro pode abrir 1 booster especial com 5 cartas e 1 tier alto garantido.</Text>
+          </View>
+        </View>
+        <View style={styles.collectiveStats}><Text style={[styles.collectiveProgress, { color: colors.yellow }]}>{hub?.collectiveBooster.progress ?? 0} / {hub?.collectiveBooster.target ?? 40}</Text><Text style={[styles.collectiveState, { color: colors.muted }]}>{hub?.collectiveBooster.claimed ? 'COLETADO' : hub?.collectiveBooster.status === 'ready' ? 'PRONTO' : 'CARREGANDO'}</Text></View>
+        <View style={[styles.collectiveTrack, { backgroundColor: colors.surfaceAlt }]}><View style={[styles.collectiveFill, { width: `${Math.min(100, ((hub?.collectiveBooster.progress ?? 0) / Math.max(1, hub?.collectiveBooster.target ?? 40)) * 100)}%`, backgroundColor: selected.color }]} /></View>
+        <View style={styles.collectiveActions}>
+          <Pressable onPress={() => router.push('/guild-wars')} style={[styles.guildWarsButton, { borderColor: selected.color }]}><Ionicons name="flash" size={17} color={selected.color} /><Text style={[styles.guildWarsText, { color: selected.color }]}>GUILD WARS</Text></Pressable>
+          <Pressable disabled={!hub?.collectiveBooster.claimable} onPress={() => setCollectiveOpen(true)} style={[styles.collectiveButton, { backgroundColor: hub?.collectiveBooster.claimable ? colors.yellow : colors.surfaceAlt }]}><Ionicons name={hub?.collectiveBooster.claimed ? 'checkmark-circle' : 'gift'} size={18} color={hub?.collectiveBooster.claimable ? '#07111F' : colors.muted} /><Text style={[styles.collectiveButtonText, { color: hub?.collectiveBooster.claimable ? '#07111F' : colors.muted }]}>{hub?.collectiveBooster.claimed ? 'JÁ COLETADO' : hub?.collectiveBooster.claimable ? 'ABRIR BOOSTER' : 'AINDA NÃO PRONTO'}</Text></Pressable>
+        </View>
+      </View> : null}
+
       {isLeader ? <View style={[styles.managePanel, { backgroundColor: colors.surface, borderColor: selected?.color ?? colors.border }]}>
         <View style={styles.manageHeader}><View style={[styles.manageIcon, { backgroundColor: selected!.color + '22' }]}><Ionicons name="person-add" size={20} color={selected!.color} /></View><View style={{ flex: 1 }}><Text style={[styles.manageTitle, { color: colors.text }]}>Convidar treinador</Text><Text style={[styles.manageText, { color: colors.muted }]}>Somente você, como chefe, pode convidar e administrar membros.</Text></View></View>
         <View style={[styles.searchBox, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Ionicons name="search" size={18} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} onSubmitEditing={searchPlayers} placeholder="Buscar por nickname..." placeholderTextColor={colors.muted} autoCapitalize="none" style={[styles.searchInput, { color: colors.text }]} /><Pressable onPress={() => void searchPlayers()} style={[styles.searchButton, { backgroundColor: selected!.color }]}><Text style={styles.searchText}>{searching ? '...' : 'BUSCAR'}</Text></Pressable></View>
         {results.map((player) => <View key={player.id} style={[styles.searchResult, { borderColor: colors.border }]}><Pressable style={{ flex: 1 }} onPress={() => router.push(`/player/${player.id}`)}><Text style={[styles.memberName, { color: colors.text }]}>@{player.username}</Text><Text style={[styles.memberMeta, { color: colors.muted }]}>Nível {player.level}</Text></Pressable><Pressable disabled={working === `invite:${player.id}`} onPress={() => void run(`invite:${player.id}`, () => inviteToGuild(selected!.id, player.id), 'Convite enviado.')} style={[styles.inviteButton, { backgroundColor: selected!.color }]}><Ionicons name="send" size={14} color="#fff" /><Text style={styles.inviteButtonText}>CONVIDAR</Text></Pressable></View>)}
       </View> : null}
+      <PackOpeningModal
+        visible={collectiveOpen}
+        pack={collectiveOpen ? ({
+          id: 'guild-collective',
+          name: 'Guild Collective Booster',
+          set_id: 'guild',
+          price: 0,
+          base_price: 0,
+          free_until: null,
+          cards_per_pack: 5,
+          image_url: null,
+          art_url: null,
+          booster_art_url: null,
+          booster_art_urls: [],
+          booster_back_url: null,
+          booster_logo_url: null,
+          booster_art_source: null,
+          release_date: null,
+          active: true,
+          currency: 'coins',
+        } as Pack) : null}
+        onClose={() => setCollectiveOpen(false)}
+        onPurchase={openCollectivePack}
+        onFinished={() => { void load(true); }}
+      />
     </Screen>
   );
 }
@@ -319,6 +376,21 @@ const styles = StyleSheet.create({
   roleText: { fontSize: 7, fontWeight: '900' },
   kick: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#351A24', alignItems: 'center', justifyContent: 'center' },
   noMembers: { textAlign: 'center', paddingVertical: 14, fontSize: 10 },
+  collectivePanel: { borderRadius: 21, borderWidth: 1, padding: 14, gap: 11 },
+  collectiveHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  collectiveIcon: { width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  collectiveTitle: { fontSize: 16, fontWeight: '900' },
+  collectiveText: { fontSize: 8, lineHeight: 13, marginTop: 3 },
+  collectiveStats: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  collectiveProgress: { fontSize: 15, fontWeight: '900' },
+  collectiveState: { fontSize: 8, fontWeight: '900' },
+  collectiveTrack: { height: 8, borderRadius: 999, overflow: 'hidden' },
+  collectiveFill: { height: '100%', borderRadius: 999 },
+  collectiveActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  guildWarsButton: { minHeight: 44, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  guildWarsText: { fontSize: 8, fontWeight: '900' },
+  collectiveButton: { minHeight: 44, borderRadius: 12, paddingHorizontal: 12, flexGrow: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  collectiveButtonText: { fontSize: 8, fontWeight: '900' },
   managePanel: { borderRadius: 21, borderWidth: 1, padding: 14, gap: 10 },
   manageHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   manageIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
