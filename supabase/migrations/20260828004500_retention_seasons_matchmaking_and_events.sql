@@ -227,7 +227,7 @@ begin
   where g.id=(select gm.guild_id from public.guild_members gm where gm.player_id=new.player_id limit 1);
   return new;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.apply_ranked_battle_progress()
@@ -285,7 +285,7 @@ begin
 
   return new;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.calculate_mission_progress(p_player_id uuid, p_event_type text, p_period_start timestamp with time zone, p_period_end timestamp with time zone)
@@ -332,7 +332,7 @@ begin
   end case;
   return least(v_progress,2147483647)::integer;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.claim_collection_milestone(p_kind text, p_key text)
@@ -398,7 +398,7 @@ begin
 
   return jsonb_build_object('kind',p_kind,'key',p_key,'progress',v_progress,'target',v_target,'coins',v_coins,'diamonds',v_diamonds);
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.claim_daily_login()
@@ -466,7 +466,7 @@ begin
     'cycleDay',v_day,'coins',v_coins,'diamonds',v_diamonds,'nextClaimDate',current_date+1
   );
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.claim_season_reward()
@@ -513,7 +513,7 @@ begin
 
   return jsonb_build_object('seasonId',v_season.id,'tier',v_tier,'coins',v_coins,'diamonds',v_diamonds);
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.current_season_id()
@@ -526,7 +526,7 @@ AS $function$
   where active and starts_at <= now() and ends_at > now()
   order by starts_at desc
   limit 1
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.ensure_active_season()
@@ -583,7 +583,7 @@ begin
 
   return v_id;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.get_guild_hub()
@@ -672,7 +672,7 @@ begin
   ) into v_result;
   return v_result;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.get_public_player_profile(p_player_id uuid)
@@ -729,7 +729,7 @@ begin
   if v_result is null then raise exception 'PLAYER_NOT_FOUND'; end if;
   return v_result;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.get_retention_hub()
@@ -801,7 +801,7 @@ begin
 
   return v_result;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.notify_wishlist_market_listing()
@@ -829,7 +829,7 @@ begin
   end loop;
   return new;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.claim_collection_milestone(p_kind text, p_key text)
@@ -886,7 +886,7 @@ begin
 
   return jsonb_build_object('id',v_id,'event_type',p_event_type,'title',left(btrim(p_title),100),'active',true,'starts_at',now(),'ends_at',v_end,'payload',coalesce(p_payload,'{}'::jsonb));
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.server_admin_stop_game_event(p_actor_id uuid, p_event_id uuid)
@@ -905,7 +905,7 @@ begin
   if v_row.id is null then raise exception 'EVENT_NOT_FOUND'; end if;
   return to_jsonb(v_row);
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.server_background_tick()
@@ -958,7 +958,7 @@ begin
     'at',now()
   );
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.server_matchmaking_cancel(p_player_id uuid)
@@ -973,7 +973,7 @@ begin
   where player_id=p_player_id and status='waiting';
   return 'cancelled';
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.server_matchmaking_join(p_player_id uuid, p_mode text)
@@ -1095,7 +1095,7 @@ begin
 
   return jsonb_build_object('status','matched','battleId',v_battle,'mode',v_mode,'seasonId',v_season);
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.server_open_pack(p_player_id uuid, p_pack_id uuid)
@@ -1301,7 +1301,7 @@ begin
     'rareMultiplier',v_rare_multiplier
   );
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.server_refresh_player_achievements(p_player_id uuid)
@@ -1400,7 +1400,7 @@ begin
     update public.players set equipped_title_id='creator_owner' where id=p_player_id;
   end if;
 end;
-$function$
+$function$;
 
 
 
