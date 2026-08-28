@@ -3,7 +3,6 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
-import { TrainerNavigation } from '@/components/TrainerNavigation';
 import {
   getTournamentHub,
   joinTournament,
@@ -67,7 +66,6 @@ export default function TournamentsScreen() {
 
   return (
     <Screen title="Copa Trainer" subtitle="Torneio de 8 jogadores com bracket automático e batalhas Mystery BO3.">
-      <TrainerNavigation />
       <Pressable style={styles.back} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={18} color={colors.muted} />
         <Text style={[styles.backText, { color: colors.muted }]}>Voltar</Text>
