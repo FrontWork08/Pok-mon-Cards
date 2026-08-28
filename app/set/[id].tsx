@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import {
   getMyOwnedCardIdsForSet,
   getSetCards,
@@ -102,7 +103,7 @@ export default function SetDetailScreen() {
   const header = (
     <View style={styles.header}>
       <View style={styles.topBar}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
+        <Pressable style={styles.backButton} onPress={() => goBackOrHome(router)}>
           <Ionicons name="arrow-back" size={21} color="#fff" />
         </Pressable>
         <View style={{ flex: 1 }}>
