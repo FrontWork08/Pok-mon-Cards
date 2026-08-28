@@ -7,7 +7,7 @@ export type BattlePassReward = {
   level: number;
   track: BattlePassTrack;
   label: string;
-  reward: { coins?: number; diamonds?: number };
+  reward: { coins?: number; diamonds?: number; titleId?: string; titleName?: string };
   claimed: boolean;
 };
 
@@ -81,8 +81,10 @@ export async function claimBattlePassReward(level: number, track: BattlePassTrac
   return data as {
     level: number;
     track: BattlePassTrack;
-    reward: { coins?: number; diamonds?: number };
+    reward: { coins?: number; diamonds?: number; titleId?: string; titleName?: string };
     coins: number;
     diamonds: number;
+    titleId?: string | null;
+    titleName?: string | null;
   };
 }
