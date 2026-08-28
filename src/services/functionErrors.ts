@@ -1,5 +1,6 @@
 const messages: Record<string, string> = {
   UNAUTHORIZED: 'Sua sessão expirou. Entre novamente para continuar.',
+  APP_MAINTENANCE: 'O jogo está pausado para uma atualização. Tente novamente em alguns minutos.',
   FORBIDDEN: 'Você não tem permissão para executar esta ação.',
   BATTLE_NOT_FOUND: 'Esta batalha não existe mais.',
   INVALID_STATUS: 'A batalha mudou de estado ou a rodada já foi resolvida. Atualizando…',

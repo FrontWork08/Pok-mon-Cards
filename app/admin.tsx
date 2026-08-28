@@ -27,6 +27,7 @@ import {
   stopFreeBoosters,
   startGameEvent,
   stopGameEvent,
+  setMaintenanceMode,
   type AdminGameEvent,
   type AdminModerationAction,
   type AdminOverview,
@@ -36,6 +37,7 @@ import {
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
+import { getMaintenanceStatus, type AppRuntimeStatus } from '@/services/maintenance';
 import { adminSetGuildLeader, getGuildHub, type GuildHub } from '@/services/guilds';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -72,6 +74,8 @@ export default function AdminScreen() {
   const [announcementHours, setAnnouncementHours] = useState('24');
   const [freeBoosterMinutes, setFreeBoosterMinutes] = useState('1');
   const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
+  const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('Estamos aplicando uma atualização importante. O jogo voltará em breve.');
   const [gameEvents, setGameEvents] = useState<AdminGameEvent[]>([]);
   const [eventType, setEventType] = useState<'double_xp'|'rare_boost'|'featured_set'>('double_xp');
   const [eventTitle, setEventTitle] = useState('Double XP');
@@ -111,12 +115,13 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [status, grants, events, guildState, codes] = await Promise.all([
+      const [status, grants, events, guildState, codes, runtime] = await Promise.all([
         getAdminOverview(),
         getCoinGrantHistory(),
         getAdminEvents(),
         getGuildHub(),
         getAdminRedeemCodes(),
+        getMaintenanceStatus(),
         syncPlayers(),
       ]);
       setOverview(status);
@@ -125,6 +130,8 @@ export default function AdminScreen() {
       setGameEvents(events.filter((event) => event.event_type !== 'free_boosters'));
       setGuildHub(guildState);
       setAdminCodes(codes);
+      setMaintenanceStatus(runtime);
+      setMaintenanceMessage(runtime.maintenance_message);
       setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
@@ -439,6 +446,46 @@ export default function AdminScreen() {
     }
   }
 
+  async function applyMaintenanceMode(enabled: boolean) {
+    if (working) return;
+    const message = maintenanceMessage.trim();
+    if (enabled && !message) {
+      setError('Digite a mensagem que será mostrada durante a manutenção.');
+      return;
+    }
+    try {
+      setWorking(true);
+      setError(null);
+      const next = await setMaintenanceMode(enabled, message);
+      setMaintenanceStatus(next);
+      setMaintenanceMessage(next.maintenance_message);
+      setNotice(
+        enabled
+          ? 'Modo manutenção ativado. As atividades dos jogadores foram pausadas.'
+          : 'Modo manutenção encerrado. O jogo foi liberado para todos.',
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível alterar o modo manutenção.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmMaintenanceMode() {
+    Alert.alert(
+      'Pausar o aplicativo?',
+      'Jogadores comuns serão bloqueados imediatamente. Packs, batalhas, trocas, chat, mercado e outras atividades também serão recusadas no servidor.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'ATIVAR MANUTENÇÃO',
+          style: 'destructive',
+          onPress: () => { void applyMaintenanceMode(true); },
+        },
+      ],
+    );
+  }
+
   async function activateFreeBoosters() {
     const minutes = Number(freeBoosterMinutes);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440 || working) return;
@@ -541,6 +588,111 @@ export default function AdminScreen() {
                 Toda alteração de moedas é feita no servidor e registrada no histórico administrativo.
               </Text>
             </View>
+          </View>
+
+          <SectionTitle title="Modo Manutenção" />
+          <View
+            style={[
+              styles.grantPanel,
+              {
+                backgroundColor: colors.surface,
+                borderColor: maintenanceStatus?.maintenance_enabled ? '#FF6475' : '#2F9E68',
+              },
+            ]}
+          >
+            <View style={styles.moderationHeader}>
+              <View
+                style={[
+                  styles.moderationIcon,
+                  { backgroundColor: maintenanceStatus?.maintenance_enabled ? '#351A24' : '#153426' },
+                ]}
+              >
+                <Ionicons
+                  name={maintenanceStatus?.maintenance_enabled ? 'warning' : 'shield-checkmark'}
+                  size={23}
+                  color={maintenanceStatus?.maintenance_enabled ? '#FF8290' : '#65D894'}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.moderationTitle, { color: colors.text }]}>
+                  {maintenanceStatus?.maintenance_enabled ? 'APLICATIVO PAUSADO' : 'JOGO FUNCIONANDO'}
+                </Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>
+                  {maintenanceStatus?.maintenance_enabled
+                    ? 'Somente administradores continuam com acesso para corrigir e liberar o jogo.'
+                    : 'Use este botão de emergência ao descobrir um bug grave ou iniciar uma atualização.'}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.statusBadge,
+                  maintenanceStatus?.maintenance_enabled ? styles.statusBanned : styles.statusActive,
+                ]}
+              >
+                <Text style={styles.statusBadgeText}>
+                  {maintenanceStatus?.maintenance_enabled ? 'PAUSADO' : 'ONLINE'}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>MENSAGEM PARA OS JOGADORES</Text>
+            <TextInput
+              value={maintenanceMessage}
+              onChangeText={setMaintenanceMessage}
+              placeholder="Explique que o jogo está sendo atualizado"
+              placeholderTextColor={colors.muted}
+              multiline
+              maxLength={500}
+              textAlignVertical="top"
+              style={[
+                styles.input,
+                {
+                  minHeight: 88,
+                  paddingTop: 12,
+                  color: colors.text,
+                  backgroundColor: colors.surfaceAlt,
+                  borderColor: colors.border,
+                },
+              ]}
+            />
+
+            {maintenanceStatus?.enabled_at ? (
+              <Text style={[styles.emptyText, { color: colors.muted }]}>
+                Pausado desde {new Date(maintenanceStatus.enabled_at).toLocaleString('pt-BR')}.
+              </Text>
+            ) : null}
+
+            <Pressable
+              disabled={working || (!maintenanceStatus?.maintenance_enabled && !maintenanceMessage.trim())}
+              onPress={() => {
+                if (maintenanceStatus?.maintenance_enabled) {
+                  void applyMaintenanceMode(false);
+                } else {
+                  confirmMaintenanceMode();
+                }
+              }}
+              style={[
+                styles.grantButton,
+                {
+                  backgroundColor: maintenanceStatus?.maintenance_enabled ? '#C74658' : '#FFD447',
+                  opacity: working ? 0.55 : 1,
+                },
+              ]}
+            >
+              <Ionicons
+                name={maintenanceStatus?.maintenance_enabled ? 'play' : 'pause'}
+                size={20}
+                color={maintenanceStatus?.maintenance_enabled ? '#FFFFFF' : '#07111F'}
+              />
+              <Text
+                style={[
+                  styles.grantButtonText,
+                  { color: maintenanceStatus?.maintenance_enabled ? '#FFFFFF' : '#07111F' },
+                ]}
+              >
+                {maintenanceStatus?.maintenance_enabled ? 'LIBERAR APLICATIVO' : 'PAUSAR PARA ATUALIZAÇÃO'}
+              </Text>
+            </Pressable>
           </View>
 
           <SectionTitle title="Liderança das Guildas" />

@@ -28,6 +28,14 @@ Deno.serve(async (req: Request) => {
   const user = userData.user;
   if (userError || !user) return json({ error: "Unauthorized" }, 401);
 
+  const { error: maintenanceError } = await admin.rpc("server_assert_app_active", {
+    p_player_id: user.id,
+  });
+  if (maintenanceError) {
+    const message = maintenanceError.message ?? "APP_MAINTENANCE";
+    return json({ error: message }, message.includes("APP_MAINTENANCE") ? 503 : 500);
+  }
+
   const body = await req.json().catch(() => ({}));
 
   async function sendInviteMessage(opponentId: string, battleId: string, mode: string, stakeType: string, wagerCoins: number, rematchOf?: string | null) {

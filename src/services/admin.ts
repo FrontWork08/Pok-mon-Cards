@@ -1,3 +1,4 @@
+import type { AppRuntimeStatus } from '@/services/maintenance';
 import { supabase } from '@/lib/supabase';
 import { normalizeFunctionError } from '@/services/functionErrors';
 
@@ -270,3 +271,11 @@ export async function stopFreeBoosters() {
   return invokeAdmin({ action: 'stop_free_boosters' }) as Promise<AdminGameEvent | null>;
 }
 
+
+export async function setMaintenanceMode(enabled: boolean, message: string) {
+  return invokeAdmin({
+    action: 'set_maintenance',
+    enabled,
+    message: message.trim(),
+  }) as Promise<AppRuntimeStatus>;
+}

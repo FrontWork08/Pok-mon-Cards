@@ -49,6 +49,30 @@ Deno.serve(async (req: Request) => {
   const body = await req.json().catch(() => ({}));
 
   try {
+    if (body.action === "set_maintenance") {
+      const enabled = body.enabled === true;
+      const message = typeof body.message === "string" ? body.message.trim() : "";
+      if (enabled && (message.length < 1 || message.length > 500)) {
+        return json({ error: "INVALID_MAINTENANCE_MESSAGE" }, 400);
+      }
+
+      const payload = {
+        maintenance_enabled: enabled,
+        maintenance_message: message || "Estamos aplicando uma atualização importante. O jogo voltará em breve.",
+        enabled_at: enabled ? new Date().toISOString() : null,
+        enabled_by: enabled ? user.id : null,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await admin
+        .from("app_runtime_status")
+        .update(payload)
+        .eq("id", 1)
+        .select("id,maintenance_enabled,maintenance_message,enabled_at,enabled_by,updated_at")
+        .single();
+      if (error) throw error;
+      return json({ data });
+    }
+
     if (body.action === "overview") {
       const { data, error } = await admin.rpc("server_admin_overview", {
         p_actor_id: user.id,

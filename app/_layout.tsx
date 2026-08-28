@@ -17,6 +17,8 @@ import { cancelMatchmaking, getMyMatchmakingState, subscribeMyMatchmaking, type 
 import { claimDailyLogin } from '@/services/retention';
 import { TrainerNavigation } from '@/components/TrainerNavigation';
 import { useWallet } from '@/wallet/WalletProvider';
+import { isCurrentUserAdmin } from '@/services/market';
+import { getMaintenanceStatus, type AppRuntimeStatus } from '@/services/maintenance';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
@@ -27,6 +29,9 @@ function AppStack() {
   const [liveNotification, setLiveNotification] = useState<any>(null);
   const [accountRestriction, setAccountRestriction] = useState<PlayerProfile | null>(null);
   const [matchmaking, setMatchmaking] = useState<MatchmakingState | null>(null);
+  const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
+  const [maintenanceAdmin, setMaintenanceAdmin] = useState(false);
+  const [maintenanceRefreshVersion, setMaintenanceRefreshVersion] = useState(0);
   const liveNotificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastOpenedMatch = useRef<string | null>(null);
 
@@ -326,7 +331,49 @@ function AppStack() {
     };
   }, [settings?.battle_sounds]);
 
-  const showChrome = Boolean(userId) && !accountRestriction && !pathname.startsWith('/battle/');
+  useEffect(() => {
+    if (!userId) {
+      setMaintenanceStatus(null);
+      setMaintenanceAdmin(false);
+      return;
+    }
+
+    let disposed = false;
+    const refresh = async () => {
+      const [runtime, admin] = await Promise.all([
+        getMaintenanceStatus(),
+        isCurrentUserAdmin().catch(() => false),
+      ]);
+      if (!disposed) {
+        setMaintenanceStatus(runtime);
+        setMaintenanceAdmin(admin);
+      }
+    };
+
+    void refresh().catch(() => null);
+    const channel = supabase
+      .channel('maintenance-runtime-' + userId + '-' + Date.now())
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'app_runtime_status', filter: 'id=eq.1' },
+        () => { void refresh().catch(() => null); },
+      )
+      .subscribe();
+    const fallbackTimer = setInterval(() => {
+      void refresh().catch(() => null);
+    }, 15000);
+
+    return () => {
+      disposed = true;
+      clearInterval(fallbackTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, maintenanceRefreshVersion]);
+
+  const maintenanceBlocked = Boolean(
+    userId && maintenanceStatus?.maintenance_enabled && !maintenanceAdmin,
+  );
+  const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/');
   return (
     <View style={[styles.appShell,{backgroundColor:colors.bg}]}>
       <StatusBar style={isLight ? 'dark' : 'light'} />
@@ -334,6 +381,36 @@ function AppStack() {
       <View style={styles.stackHost}><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} /></View>
       <UpdatePrompt />
       <GlobalAnnouncementOverlay />
+      {maintenanceBlocked ? (
+        <View style={styles.maintenanceBlocker}>
+          <View style={[styles.maintenanceCard, { backgroundColor: colors.surface, borderColor: '#FF6475' }]}>
+            <View style={styles.maintenanceIcon}>
+              <Text style={styles.maintenanceEmoji}>🛠️</Text>
+            </View>
+            <Text style={[styles.maintenanceTitle, { color: colors.text }]}>Atualização em andamento</Text>
+            <Text style={[styles.maintenanceText, { color: colors.muted }]}>
+              {maintenanceStatus?.maintenance_message}
+            </Text>
+            <View style={[styles.maintenanceNotice, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+              <Text style={[styles.maintenanceNoticeText, { color: colors.text }]}>
+                Packs, batalhas, trocas, chat e mercado estão temporariamente pausados para proteger sua conta.
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setMaintenanceRefreshVersion((value) => value + 1)}
+              style={[styles.maintenanceRefresh, { backgroundColor: colors.yellow }]}
+            >
+              <Text style={styles.maintenanceRefreshText}>VERIFICAR SE JÁ VOLTOU</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { void supabase.auth.signOut(); }}
+              style={[styles.maintenanceSignOut, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.maintenanceSignOutText, { color: colors.muted }]}>SAIR DA CONTA</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
       {accountRestriction ? (
         <View style={styles.accountBlocker}>
           <View style={[styles.accountBlockerCard, { backgroundColor: colors.surface, borderColor: accountRestriction.account_status === 'banned' ? '#A84250' : '#D97732' }]}>
@@ -420,6 +497,40 @@ const styles = StyleSheet.create({
   appShell:{flex:1},
   stackHost:{flex:1,minHeight:0},
   appChrome:{zIndex:1500,paddingHorizontal:12,paddingBottom:7,borderBottomWidth:1},
+  maintenanceBlocker: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 7000,
+    backgroundColor: 'rgba(3,7,14,.94)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+  },
+  maintenanceCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 26,
+    borderWidth: 1,
+    padding: 23,
+    alignItems: 'center',
+  },
+  maintenanceIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#351A24',
+    marginBottom: 15,
+  },
+  maintenanceEmoji: { fontSize: 34 },
+  maintenanceTitle: { fontSize: 25, fontWeight: '900', textAlign: 'center' },
+  maintenanceText: { fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8 },
+  maintenanceNotice: { width: '100%', borderRadius: 15, borderWidth: 1, padding: 13, marginTop: 17 },
+  maintenanceNoticeText: { fontSize: 10, lineHeight: 15, textAlign: 'center', fontWeight: '700' },
+  maintenanceRefresh: { minHeight: 50, width: '100%', borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 15 },
+  maintenanceRefreshText: { color: '#07111F', fontSize: 10, fontWeight: '900', letterSpacing: .45 },
+  maintenanceSignOut: { minHeight: 44, minWidth: 160, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 9, paddingHorizontal: 14 },
+  maintenanceSignOutText: { fontSize: 9, fontWeight: '900' },
   accountBlocker: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 5000,
