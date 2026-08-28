@@ -7,6 +7,7 @@ import { getOwnedCard, type OwnedCardEntry } from '@/services/player';
 import { setCardFavorite } from '@/services/playerActions';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { isCardWishlisted, setCardWishlist } from '@/services/retention';
 
 export default function CardDetailScreen() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function CardDetailScreen() {
   const [entry, setEntry] = useState<OwnedCardEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [wishlistSaving, setWishlistSaving] = useState(false);
+  const [wishlisted, setWishlisted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -22,7 +25,12 @@ export default function CardDetailScreen() {
     try {
       setLoading(true);
       setError(null);
-      setEntry(await getOwnedCard(String(id)));
+      const [owned, wanted] = await Promise.all([
+        getOwnedCard(String(id)),
+        isCardWishlisted(String(id)),
+      ]);
+      setEntry(owned);
+      setWishlisted(wanted);
     }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível carregar este card.'); }
     finally { setLoading(false); }
@@ -35,6 +43,20 @@ export default function CardDetailScreen() {
     try { setSaving(true); await setCardFavorite(entry.cards.id, next); setEntry((current) => current ? { ...current, favorite: next } : current); }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível atualizar o favorito.'); }
     finally { setSaving(false); }
+  }
+
+  async function toggleWishlist() {
+    if (!entry?.cards || wishlistSaving) return;
+    const next = !wishlisted;
+    try {
+      setWishlistSaving(true);
+      await setCardWishlist(entry.cards.id, next);
+      setWishlisted(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar o Card Chase.');
+    } finally {
+      setWishlistSaving(false);
+    }
   }
 
   const card = entry?.cards;
@@ -64,7 +86,10 @@ export default function CardDetailScreen() {
 
             <View style={styles.badges}>{(card.types ?? []).map((type) => <View key={type} style={[styles.badge, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Text style={[styles.badgeText, { color: colors.text }]}>{type}</Text></View>)}</View>
             <View style={styles.statsGrid}><Info label="SET" value={card.set_name} /><Info label="NÚMERO" value={card.card_number ?? '—'} /><Info label="QUANTIDADE" value={`×${entry.quantity}`} /><Info label="VALOR TOTAL EM USD" value={totalMarketValueUsd == null ? '—' : formatUsd(totalMarketValueUsd)} /><Info label="VALOR NO JOGO" value={`🪙 ${unitValue.toLocaleString('pt-BR')}`} /><Info label="OBTIDO" value={new Date(entry.first_obtained_at).toLocaleDateString('pt-BR')} /></View>
-            <Pressable style={[styles.favoriteButton, { backgroundColor: entry.favorite ? '#B73C59' : colors.yellow }]} onPress={toggleFavorite} disabled={saving}><Ionicons name={entry.favorite ? 'heart' : 'heart-outline'} size={19} color={entry.favorite ? '#fff' : '#07111F'} /><Text style={[styles.favoriteButtonText, entry.favorite && { color: '#fff' }]}>{saving ? 'SALVANDO...' : entry.favorite ? 'REMOVER DOS FAVORITOS' : 'ADICIONAR AOS FAVORITOS'}</Text></Pressable>
+            <View style={styles.cardActions}>
+              <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: entry.favorite ? '#B73C59' : colors.yellow }]} onPress={toggleFavorite} disabled={saving}><Ionicons name={entry.favorite ? 'heart' : 'heart-outline'} size={19} color={entry.favorite ? '#fff' : '#07111F'} /><Text style={[styles.favoriteButtonText, entry.favorite && { color: '#fff' }]}>{saving ? 'SALVANDO...' : entry.favorite ? 'REMOVER FAVORITO' : 'FAVORITAR'}</Text></Pressable>
+              <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: wishlisted ? '#FFD447' : colors.accentSoft, borderWidth: 1, borderColor: wishlisted ? '#FFD447' : colors.accent }]} onPress={toggleWishlist} disabled={wishlistSaving}><Ionicons name={wishlisted ? 'star' : 'star-outline'} size={19} color={wishlisted ? '#07111F' : colors.accent} /><Text style={[styles.favoriteButtonText, { color: wishlisted ? '#07111F' : colors.text }]}>{wishlistSaving ? 'SALVANDO...' : wishlisted ? 'NO CARD CHASE' : 'QUERO ESTA CARTA'}</Text></Pressable>
+            </View>
           </View>
         </View> : null}
       </ScrollView>
@@ -77,5 +102,7 @@ function Info({ label, value }: { label: string; value: string }) { const { colo
 const styles = StyleSheet.create({
   safe: { flex: 1 }, content: { width: '100%', maxWidth: 1180, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 44, gap: 18 }, topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, topTitle: { fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }, iconButton: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, errorBox: { flexDirection: 'row', gap: 9, alignItems: 'center', borderRadius: 16, padding: 13, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' }, errorText: { color: '#FFD7D7', fontWeight: '700', flex: 1 },
   layout: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start', justifyContent: 'center' }, imagePanel: { flexGrow: 1, flexBasis: 330, maxWidth: 480, minHeight: 470, borderRadius: 26, padding: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, image: { width: '100%', height: 570, maxHeight: 570 }, imagePlaceholder: { width: '100%', height: 480, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, infoPanel: { flexGrow: 1, flexBasis: 320, maxWidth: 560, borderRadius: 26, padding: 22, borderWidth: 1 }, kicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }, name: { fontSize: 34, lineHeight: 40, fontWeight: '900', marginTop: 5 }, rarity: { fontSize: 14, fontWeight: '700', marginTop: 4 },
+  cardActions: { flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:20 },
+  flexAction: { flexGrow:1, minWidth:190, marginTop:0 },
   valueHero: { marginTop: 16, borderRadius: 18, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11 }, valueIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, valueLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 }, valueNumber: { fontSize: 24, fontWeight: '900', marginTop: 2 }, valueHint: { fontSize: 8, lineHeight: 12, marginTop: 2 }, badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }, badge: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999, borderWidth: 1 }, badgeText: { fontSize: 11, fontWeight: '900' }, statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }, infoCard: { width: '48%', minHeight: 82, borderRadius: 16, padding: 13, borderWidth: 1 }, infoLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, infoValue: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 5 }, favoriteButton: { marginTop: 20, minHeight: 52, borderRadius: 16, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 }, favoriteButtonText: { color: '#07111F', fontSize: 11, fontWeight: '900', letterSpacing: .4 },
 });
