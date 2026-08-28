@@ -32,6 +32,7 @@ begin
   if auth.role() <> 'service_role' then raise exception 'FORBIDDEN'; end if;
   if not exists(select 1 from public.admin_members where player_id=p_actor_id) then raise exception 'FORBIDDEN'; end if;
   if p_amount is null or p_amount < 1 or p_amount > 100000000 then raise exception 'INVALID_AMOUNT'; end if;
+  if length(trim(coalesce(p_note,''))) < 3 then raise exception 'INVALID_NOTE'; end if;
 
   select array_agg(distinct target_id order by target_id)
   into v_targets
@@ -97,6 +98,7 @@ begin
   if auth.role() <> 'service_role' then raise exception 'FORBIDDEN'; end if;
   if not exists(select 1 from public.admin_members where player_id=p_actor_id) then raise exception 'FORBIDDEN'; end if;
   if p_amount is null or p_amount < 1 or p_amount > 1000000 then raise exception 'INVALID_AMOUNT'; end if;
+  if length(trim(coalesce(p_note,''))) < 3 then raise exception 'INVALID_NOTE'; end if;
 
   select array_agg(distinct target_id order by target_id)
   into v_targets
