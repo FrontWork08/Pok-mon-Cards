@@ -103,9 +103,16 @@ export default function PacksScreen() {
     }
   }, []);
 
+  const activeAdminAbuseUntil = packs.find((pack) => pack.free_until)?.free_until ?? null;
+
   const diamondPack = useMemo(
-    () => ({ ...DIAMOND_PACK_BASE, price: diamondCost, base_price: diamondCost }),
-    [diamondCost],
+    () => ({
+      ...DIAMOND_PACK_BASE,
+      price: activeAdminAbuseUntil ? Math.ceil(diamondCost / 2) : diamondCost,
+      base_price: diamondCost,
+      free_until: activeAdminAbuseUntil,
+    }),
+    [activeAdminAbuseUntil, diamondCost],
   );
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -125,7 +132,7 @@ export default function PacksScreen() {
     };
   }, [load]);
 
-  const freeUntil = packs.find((pack) => pack.free_until)?.free_until ?? null;
+  const freeUntil = activeAdminAbuseUntil;
 
   useEffect(() => {
     if (!freeUntil) return;
@@ -222,8 +229,9 @@ export default function PacksScreen() {
     if (selectedPack.id === DIAMOND_PACK_BASE.id) {
       const before = await getMyProfile();
       setDiamonds(before.diamonds);
-      if (before.diamonds < diamondCost) {
-        throw new Error(`Diamantes insuficientes. Seu saldo atual é 💎 ${before.diamonds.toLocaleString('pt-BR')}.`);
+      const currentLegendaryPrice = freeUntil ? Math.ceil(diamondCost / 2) : diamondCost;
+      if (before.diamonds < currentLegendaryPrice) {
+        throw new Error(`Diamantes insuficientes. Seu saldo atual é 💎 ${before.diamonds.toLocaleString('pt-BR')} e o Cofre custa 💎 ${currentLegendaryPrice.toLocaleString('pt-BR')}.`);
       }
       try {
         const result = await openLegendaryDiamondPack();
@@ -284,7 +292,7 @@ export default function PacksScreen() {
         <View style={[styles.notice, { backgroundColor: isLight ? '#E3F8EB' : '#142C23', borderColor: '#4A9B70' }]}>
           <Ionicons name="gift" size={21} color="#45B777" />
           <Text style={[styles.noticeText, { color: colors.text }]}>
-            ADMIN ABUSE ATIVO: todos os boosters estão GRÁTIS por mais {freeRemaining}.
+            ADMIN ABUSE ATIVO: boosters de 🪙 Coins estão GRÁTIS e boosters de 💎 Diamantes estão com 50% OFF por mais {freeRemaining}.
           </Text>
         </View>
       ) : null}
@@ -329,11 +337,13 @@ export default function PacksScreen() {
             <Text style={[styles.diamondPreviewText,{color:colors.text}]}>VER CARTAS</Text>
           </Pressable>
           <Pressable
-            disabled={diamonds < diamondCost}
-            onPress={() => diamonds >= diamondCost ? setSelectedPack(diamondPack) : setNotice({kind:'error',text:`Você precisa de 💎 ${diamondCost} Diamantes para abrir o Cofre Lendário.`})}
-            style={[styles.diamondButton, { backgroundColor: diamonds >= diamondCost ? '#68D9FF' : colors.surfaceAlt }]}
+            disabled={diamonds < diamondPack.price}
+            onPress={() => diamonds >= diamondPack.price ? setSelectedPack(diamondPack) : setNotice({kind:'error',text:`Você precisa de 💎 ${diamondPack.price} Diamantes para abrir o Cofre Lendário.`})}
+            style={[styles.diamondButton, { backgroundColor: diamonds >= diamondPack.price ? '#68D9FF' : colors.surfaceAlt }]}
           >
-            <Text style={[styles.diamondButtonText, diamonds < diamondCost && { color: colors.muted }]}>💎 {diamondCost} • ABRIR</Text>
+            <Text style={[styles.diamondButtonText, diamonds < diamondPack.price && { color: colors.muted }]}>
+              💎 {diamondPack.price} {freeUntil ? '• 50% OFF' : '• ABRIR'}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -543,7 +553,9 @@ export default function PacksScreen() {
                   </Pressable>
 
                   <Text style={[styles.price, { color: affordable ? colors.yellow : colors.muted }]}>
-                    {pack.price === 0 ? '🎁 GRÁTIS' : `${pack.currency === 'diamonds' ? '💎' : '🪙'} ${pack.price.toLocaleString('pt-BR')}`}
+                    {pack.price === 0
+                      ? '🎁 GRÁTIS'
+                      : `${pack.currency === 'diamonds' ? '💎' : '🪙'} ${pack.price.toLocaleString('pt-BR')}${pack.free_until && pack.currency === 'diamonds' ? ' • 50% OFF' : ''}`}
                   </Text>
                 </View>
 
@@ -558,7 +570,7 @@ export default function PacksScreen() {
                   ]}
                 >
                   <Text style={[styles.openButtonText, { color: affordable ? '#07111F' : colors.muted }]}>
-                    {affordable ? (pack.price === 0 ? 'ABRIR GRÁTIS' : 'ABRIR PACK') : 'SEM SALDO'}
+                    {affordable ? (pack.price === 0 ? 'ABRIR GRÁTIS' : pack.free_until && pack.currency === 'diamonds' ? 'ABRIR • 50% OFF' : 'ABRIR PACK') : 'SEM SALDO'}
                   </Text>
                 </Pressable>
               </View>
