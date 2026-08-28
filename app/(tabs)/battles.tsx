@@ -4,12 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CardPickerModal } from '@/components/CardPickerModal';
 import { Screen } from '@/components/Screen';
-import { createBattle, getBattleLeaderboard, getMyBattleHistory, rematchBattle, respondToBattle, type BattleMode, type BattleStakeType } from '@/services/battles';
+import { createBattle, getBattleLeaderboard, getMyActiveBattle, getMyBattleHistory, rematchBattle, respondToBattle, type BattleMode, type BattleStakeType } from '@/services/battles';
 import { getMyBag, getMyProfile, type OwnedCardEntry } from '@/services/player';
 import { getTrainerRank } from '@/services/ranks';
 import { getMySocial, type SocialPlayer } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { cancelMatchmaking, getMyMatchmakingState, joinMatchmaking, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
+import { isFunctionErrorCode } from '@/services/functionErrors';
 
 const MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
   { id: 'quick', label: 'Quick', detail: '1 carta' },
@@ -85,6 +86,14 @@ export default function BattlesHubScreen() {
     if (working) return;
     try {
       setWorking('matchmaking');
+
+      const currentBattle = await getMyActiveBattle().catch(() => null);
+      if (currentBattle?.id) {
+        setNotice('Você já tem uma batalha ativa. Abrindo a partida...');
+        router.push(`/battle/${currentBattle.id}`);
+        return;
+      }
+
       const result = await joinMatchmaking(rankedMode);
       if (result.status === 'matched' && result.battleId) {
         router.push(`/battle/${result.battleId}`);
@@ -93,6 +102,14 @@ export default function BattlesHubScreen() {
       setQueueState(await getMyMatchmakingState());
       setNotice('Busca iniciada. Você pode continuar navegando pelo jogo.');
     } catch (e) {
+      if (isFunctionErrorCode(e, 'ACTIVE_BATTLE_EXISTS')) {
+        const currentBattle = await getMyActiveBattle().catch(() => null);
+        if (currentBattle?.id) {
+          setNotice('Você já tem uma batalha ativa. Abrindo a partida...');
+          router.push(`/battle/${currentBattle.id}`);
+          return;
+        }
+      }
       setNotice(e instanceof Error ? e.message : 'Não foi possível entrar no matchmaking.');
     } finally {
       setWorking(null);
