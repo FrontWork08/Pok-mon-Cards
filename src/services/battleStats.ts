@@ -89,9 +89,10 @@ export function getBattleCardPreview(card: OwnedCardEntry['cards']): BattleCardP
   if(minEnergy===10)minEnergy=1;
 
   const abilities=Array.isArray(data?.abilities)?data.abilities:[];
-  const retreatRaw=Number(String(data?.convertedRetreatCost??'').replace(/[^0-9]/g,''));
+  const retreatText=String(data?.convertedRetreatCost??'').replace(/[^0-9]/g,'');
+  const retreatRaw=retreatText ? Number(retreatText) : Number.NaN;
   const retreatCost=clamp(
-    Number.isFinite(retreatRaw)&&retreatRaw>=0
+    Number.isFinite(retreatRaw)
       ? retreatRaw
       : Array.isArray(data?.retreatCost)
         ? data.retreatCost.length
