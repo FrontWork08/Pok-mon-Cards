@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { formatUsd } from '@/services/market';
 import { getPublicPlayerProfile, type PublicPlayerProfile } from '@/services/publicProfiles';
@@ -42,7 +43,7 @@ export default function PlayerShowcaseScreen() {
 
   return (
     <Screen title="Perfil de Exibição" subtitle="Cartas mais raras, valor da conta, guilda e desempenho do treinador.">
-      <Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText, { color: colors.muted }]}>Voltar ao ranking</Text></Pressable>
+      <Pressable style={styles.back} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText, { color: colors.muted }]}>Voltar ao ranking</Text></Pressable>
       {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
       {error ? <Pressable style={styles.error} onPress={() => void load()}><Ionicons name="alert-circle" size={19} color="#FF9FAF" /><Text style={styles.errorText}>{error} Toque para tentar novamente.</Text></Pressable> : null}
 
