@@ -20,6 +20,7 @@ export type PlayerProfile = {
   equipped_frame: { id:string; name:string; primary_color:string; secondary_color:string } | Array<{ id:string; name:string; primary_color:string; secondary_color:string }> | null;
   equipped_background: { id:string; name:string; primary_color:string; secondary_color:string } | Array<{ id:string; name:string; primary_color:string; secondary_color:string }> | null;
   show_battle_rating: boolean;
+  show_online_status: boolean;
   created_at: string;
   last_daily_claim_at: string | null;
   account_status: 'active' | 'suspended' | 'banned';
@@ -61,7 +62,7 @@ export async function getMyProfile() {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id, username, coins, diamonds, profile_icon, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), equipped_frame_id, equipped_background_id, equipped_frame:cosmetic_definitions!players_equipped_frame_id_fkey(id,name,primary_color,secondary_color), equipped_background:cosmetic_definitions!players_equipped_background_id_fkey(id,name,primary_color,secondary_color), show_battle_rating, created_at, last_daily_claim_at, account_status, suspended_until, moderation_reason, warning_count')
+    .select('id, username, coins, diamonds, profile_icon, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), equipped_frame_id, equipped_background_id, equipped_frame:cosmetic_definitions!players_equipped_frame_id_fkey(id,name,primary_color,secondary_color), equipped_background:cosmetic_definitions!players_equipped_background_id_fkey(id,name,primary_color,secondary_color), show_battle_rating, show_online_status, created_at, last_daily_claim_at, account_status, suspended_until, moderation_reason, warning_count')
     .eq('id', userData.user.id)
     .single();
 
@@ -161,4 +162,11 @@ export async function getMyProfileStats() {
     packsOpened: openings.count ?? 0,
     completedTrades: trades.count ?? 0,
   };
+}
+
+
+export async function setMyOnlineVisibility(visible: boolean) {
+  const { data, error } = await supabase.rpc('set_my_online_visibility', { p_visible: visible });
+  if (error) throw error;
+  return Boolean(data);
 }
