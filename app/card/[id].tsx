@@ -7,6 +7,7 @@ import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { getOwnedCard, type OwnedCardEntry } from '@/services/player';
 import { setCardFavorite } from '@/services/playerActions';
 import { formatUsd } from '@/services/market';
+import { getBattleCardPreview } from '@/services/battleStats';
 import { getCardPriceHistory, type CardPricePoint } from '@/services/marketplace';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { isCardWishlisted, setCardWishlist } from '@/services/retention';
@@ -65,6 +66,7 @@ export default function CardDetailScreen() {
   }
 
   const card = entry?.cards;
+  const combat = getBattleCardPreview(card ?? null);
   const unitValue = Number(card?.game_value ?? 0);
   const marketPriceUsd = card?.market_price_usd == null ? null : Number(card.market_price_usd);
   const totalMarketValueUsd = marketPriceUsd == null ? null : marketPriceUsd * Number(entry?.quantity ?? 0);
@@ -93,6 +95,27 @@ export default function CardDetailScreen() {
 
             <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR DE MERCADO EM USD</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? 'Preço TCGplayer indisponível para esta carta.' : 'Snapshot de mercado TCGplayer'}</Text></View></View>
 
+            <View style={[styles.battlePanel,{backgroundColor:colors.surfaceAlt,borderColor:colors.accent}]}>
+              <View style={styles.battlePanelHead}>
+                <View>
+                  <Text style={[styles.valueLabel,{color:colors.muted}]}>ESTATÍSTICAS DE BATALHA • REGRA V4</Text>
+                  <Text style={[styles.battlePower,{color:colors.yellow}]}>⚔ PWR {combat.battleRating} / 1000</Text>
+                </View>
+                <Ionicons name="flash" size={24} color={colors.accent}/>
+              </View>
+              <View style={styles.battleStatsGrid}>
+                <BattleStat label="HP" value={combat.hp} />
+                <BattleStat label="ATAQUE" value={combat.maxDamage} />
+                <BattleStat label="ENERGIA" value={combat.bestEnergy} />
+                <BattleStat label="EFICIÊNCIA" value={combat.efficiencyScore} suffix="/100" />
+                <BattleStat label="VELOCIDADE" value={combat.speedScore} suffix="/100" />
+                <BattleStat label="TÉCNICA" value={combat.techniqueScore} suffix="/100" />
+              </View>
+              <Text style={[styles.battleHint,{color:colors.muted}]}>
+                O PWR compara a força geral da carta. Na batalha real, fraqueza, resistência e o tempo para nocautear o oponente podem mudar completamente o resultado.
+              </Text>
+            </View>
+
             {priceHistory.length ? <View style={[styles.historyPanel, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
               <View style={styles.historyHead}>
                 <View><Text style={[styles.valueLabel, { color: colors.muted }]}>HISTÓRICO DE PREÇO</Text><Text style={[styles.historyValue, { color: colors.text }]}>{formatUsd(priceHistory[priceHistory.length - 1].priceUsd)}</Text></View>
@@ -120,6 +143,8 @@ export default function CardDetailScreen() {
   );
 }
 
+function BattleStat({ label, value, suffix = '' }: { label: string; value: number; suffix?: string }) { const { colors } = useAppTheme(); return <View style={[styles.battleStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.battleStatLabel,{color:colors.muted}]}>{label}</Text><Text style={[styles.battleStatValue,{color:colors.text}]}>{Number(value).toLocaleString('pt-BR')}{suffix}</Text></View>; }
+
 function Info({ label, value }: { label: string; value: string }) { const { colors } = useAppTheme(); return <View style={[styles.infoCard, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Text style={[styles.infoLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.infoValue, { color: colors.text }]} numberOfLines={2}>{value}</Text></View>; }
 
 const styles = StyleSheet.create({
@@ -127,6 +152,14 @@ const styles = StyleSheet.create({
   layout: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start', justifyContent: 'center' }, imagePanel: { flexGrow: 1, flexBasis: 330, maxWidth: 480, minHeight: 470, borderRadius: 26, padding: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, image: { width: '100%', height: 570, maxHeight: 570 }, imagePlaceholder: { width: '100%', height: 480, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, infoPanel: { flexGrow: 1, flexBasis: 320, maxWidth: 560, borderRadius: 26, padding: 22, borderWidth: 1 }, kicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }, name: { fontSize: 34, lineHeight: 40, fontWeight: '900', marginTop: 5 }, rarity: { fontSize: 14, fontWeight: '700', marginTop: 4 },
   cardActions: { flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:20 },
   flexAction: { flexGrow:1, minWidth:190, marginTop:0 },
+  battlePanel:{marginTop:12,borderRadius:18,borderWidth:1,padding:13,gap:10},
+  battlePanelHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
+  battlePower:{fontSize:21,fontWeight:'900',marginTop:3},
+  battleStatsGrid:{flexDirection:'row',flexWrap:'wrap',gap:7},
+  battleStat:{flexGrow:1,flexBasis:110,minWidth:100,borderRadius:13,borderWidth:1,padding:9},
+  battleStatLabel:{fontSize:7,fontWeight:'900',letterSpacing:.7},
+  battleStatValue:{fontSize:14,fontWeight:'900',marginTop:3},
+  battleHint:{fontSize:8,lineHeight:13,fontWeight:'700'},
   historyPanel: { marginTop: 12, borderRadius: 18, borderWidth: 1, padding: 12 },
   historyHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10 },
   historyValue: { fontSize: 18, fontWeight: '900', marginTop: 2 },
