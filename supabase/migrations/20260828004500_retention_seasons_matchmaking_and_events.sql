@@ -1451,3 +1451,13 @@ for each row execute function private.apply_pack_guild_xp();
 drop trigger if exists trg_wishlist_market_listing on public.market_listings;
 create trigger trg_wishlist_market_listing after insert on public.market_listings
 for each row execute function private.notify_wishlist_market_listing();
+
+
+create index if not exists matchmaking_queue_season_idx
+  on public.matchmaking_queue(season_id);
+create index if not exists matchmaking_queue_battle_idx
+  on public.matchmaking_queue(matched_battle_id);
+create index if not exists player_seasons_player_idx
+  on public.player_seasons(player_id);
+create index if not exists profile_showcase_card_idx
+  on public.profile_showcase(card_id);
