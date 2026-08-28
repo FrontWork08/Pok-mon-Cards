@@ -524,3 +524,12 @@ begin
   return v_result;
 end;
 $$;
+
+
+update public.app_update_logs
+set changes = case
+  when 'Sistema de batalha v4 com PWR, HP, ataque, eficiência, velocidade e técnica, usando fraqueza/resistência no confronto' = any(changes)
+    then changes
+  else array_append(changes, 'Sistema de batalha v4 com PWR, HP, ataque, eficiência, velocidade e técnica, usando fraqueza/resistência no confronto')
+end
+where version='0.1.1 • OTA 28/08';
