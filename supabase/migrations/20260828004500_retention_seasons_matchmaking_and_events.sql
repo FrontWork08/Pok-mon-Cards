@@ -836,28 +836,28 @@ CREATE OR REPLACE FUNCTION public.claim_collection_milestone(p_kind text, p_key 
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ select private.claim_collection_milestone(p_kind,p_key); $function$
+AS $function$ select private.claim_collection_milestone(p_kind,p_key); $function$;
 
 
 CREATE OR REPLACE FUNCTION public.claim_daily_login()
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ select private.claim_daily_login(); $function$
+AS $function$ select private.claim_daily_login(); $function$;
 
 
 CREATE OR REPLACE FUNCTION public.claim_season_reward()
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ select private.claim_season_reward(); $function$
+AS $function$ select private.claim_season_reward(); $function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_retention_hub()
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ select private.get_retention_hub(); $function$
+AS $function$ select private.get_retention_hub(); $function$;
 
 
 CREATE OR REPLACE FUNCTION public.server_admin_start_game_event(p_actor_id uuid, p_event_type text, p_title text, p_duration_minutes integer, p_payload jsonb DEFAULT '{}'::jsonb)
