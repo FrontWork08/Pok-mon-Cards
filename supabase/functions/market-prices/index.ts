@@ -30,7 +30,57 @@ type CardRow = {
 
 function numeric(value: unknown): number | null {
   const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function hasUsableTcgplayer(tcgplayer: any) {
+  const prices = tcgplayer?.prices ?? {};
+  return Object.values(prices).some((variant: any) =>
+    numeric(variant?.market) !== null ||
+    numeric(variant?.mid) !== null ||
+    numeric(variant?.low) !== null
+  );
+}
+
+function normalizeTcgdexTcgplayer(pricing: any) {
+  const tcg = pricing?.tcgplayer;
+  if (!tcg || typeof tcg !== "object") return null;
+  const mapping: Record<string,string> = {
+    normal:"normal",holofoil:"holofoil",reverse:"reverseHolofoil",
+    "reverse-holofoil":"reverseHolofoil","1st-edition":"1stEditionNormal",
+    "1st-edition-holofoil":"1stEditionHolofoil",unlimited:"normal",
+    "unlimited-holofoil":"holofoil",
+  };
+  const prices: Record<string,any> = {};
+  for (const [sourceKey,value] of Object.entries(tcg)) {
+    if (!value || typeof value !== "object") continue;
+    const targetKey = mapping[sourceKey];
+    if (!targetKey) continue;
+    const item = value as Record<string,unknown>;
+    const normalized = {
+      low:numeric(item.lowPrice), mid:numeric(item.midPrice),
+      high:numeric(item.highPrice), market:numeric(item.marketPrice),
+      directLow:numeric(item.directLowPrice),
+    };
+    if (normalized.market || normalized.mid || normalized.low) {
+      if (!prices[targetKey] || normalized.market) prices[targetKey]=normalized;
+    }
+  }
+  return Object.keys(prices).length ? { prices, updatedAt: tcg.updated ?? null } : null;
+}
+
+async function fetchTcgdexFallback(cardId: string) {
+  try {
+    const response = await fetch(
+      `https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(cardId)}`,
+      { headers: { "User-Agent":"Pokemon-Cards-Price-Fallback/1.0" }, signal:AbortSignal.timeout(8_000) },
+    );
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return normalizeTcgdexTcgplayer(payload?.pricing);
+  } catch {
+    return null;
+  }
 }
 
 function pickTcgPlayerVariant(tcgplayer: Record<string, any> | null, rarity: string | null) {
@@ -51,13 +101,14 @@ function pickTcgPlayerVariant(tcgplayer: Record<string, any> | null, rarity: str
   ];
 
   for (const [variant, price] of ordered) {
-    const market = numeric(price?.market);
-    if (market !== null && market > 0) {
+    const market = numeric(price?.market) ?? numeric(price?.mid) ?? numeric(price?.low);
+    if (market !== null) {
       return {
         variant,
         market,
         low: numeric(price?.low),
         high: numeric(price?.high),
+        kind: numeric(price?.market) !== null ? "market" : numeric(price?.mid) !== null ? "mid" : "low",
       };
     }
   }
@@ -231,10 +282,27 @@ Deno.serve(async (req: Request) => {
       }
 
       const fetchedById = new Map(fetched.cards.map((card: any) => [card.id, card]));
+      const fallbackById = new Map<string, any>();
+      const fallbackTargets = targetCards.filter((card) => {
+        const apiCard: any = fetchedById.get(card.id);
+        return !hasUsableTcgplayer(apiCard?.tcgplayer);
+      });
+
+      for (let i = 0; i < fallbackTargets.length; i += 12) {
+        const chunk = fallbackTargets.slice(i, i + 12);
+        const values = await Promise.all(chunk.map(async (card) => ({
+          id: card.id,
+          tcgplayer: await fetchTcgdexFallback(card.id),
+        })));
+        for (const item of values) if (item.tcgplayer) fallbackById.set(item.id, item.tcgplayer);
+      }
 
       for (const card of targetCards) {
-        const apiCard = fetchedById.get(card.id);
-        const tcgplayer = apiCard?.tcgplayer ?? null;
+        const apiCard: any = fetchedById.get(card.id);
+        const primary = apiCard?.tcgplayer ?? null;
+        const fallback = fallbackById.get(card.id) ?? null;
+        const tcgplayer = hasUsableTcgplayer(primary) ? primary : fallback;
+        const source = hasUsableTcgplayer(primary) ? "pokemontcg" : fallback ? "tcgdex" : "pokemontcg";
         const picked = pickTcgPlayerVariant(tcgplayer, card.rarity);
 
         results.push({
@@ -243,7 +311,7 @@ Deno.serve(async (req: Request) => {
           market_price_low_usd: picked?.low ?? null,
           market_price_high_usd: picked?.high ?? null,
           market_price_variant: picked?.variant ?? null,
-          market_price_source: picked ? "pokemontcg:tcgplayer_market_v3" : "pokemontcg:no_tcgplayer_market",
+          market_price_source: picked ? `${source}:tcgplayer_${picked.kind}` : `${source}:no_tcgplayer_price`,
           market_price_data: tcgplayer ?? { setId },
           market_price_updated_at: now,
         });
