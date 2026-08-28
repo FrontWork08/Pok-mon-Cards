@@ -214,7 +214,7 @@ Deno.serve(async (req: Request) => {
     if (body.action === "events") {
       const { data, error } = await admin
         .from("admin_game_events")
-        .select("id,event_type,title,active,starts_at,ends_at,created_at")
+        .select("id,event_type,title,active,starts_at,ends_at,created_at,payload")
         .eq("active", true)
         .gt("ends_at", new Date().toISOString())
         .order("created_at", { ascending: false })
@@ -222,6 +222,34 @@ Deno.serve(async (req: Request) => {
 
       if (error) throw error;
       return json({ data: data ?? [] });
+    }
+
+    if (body.action === "start_game_event") {
+      const eventType = typeof body.eventType === "string" ? body.eventType : "";
+      const title = typeof body.title === "string" ? body.title : "";
+      const durationMinutes = Number(body.durationMinutes);
+      const payload = body.payload && typeof body.payload === "object" ? body.payload : {};
+
+      const { data, error } = await admin.rpc("server_admin_start_game_event", {
+        p_actor_id: user.id,
+        p_event_type: eventType,
+        p_title: title,
+        p_duration_minutes: durationMinutes,
+        p_payload: payload,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "stop_game_event") {
+      const eventId = typeof body.eventId === "string" ? body.eventId : "";
+      if (!eventId) return json({ error: "INVALID_EVENT_ID" }, 400);
+      const { data, error } = await admin.rpc("server_admin_stop_game_event", {
+        p_actor_id: user.id,
+        p_event_id: eventId,
+      });
+      if (error) throw error;
+      return json({ data });
     }
 
     if (body.action === "start_free_boosters") {
