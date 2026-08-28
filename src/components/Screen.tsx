@@ -3,7 +3,6 @@ import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { useAppTheme } from '@/theme/ThemeProvider';
-import { TrainerNavigation } from '@/components/TrainerNavigation';
 
 export function Screen({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle?: string }>) {
   const { colors } = useAppTheme();
@@ -16,12 +15,11 @@ export function Screen({ title, subtitle, children }: PropsWithChildren<{ title:
         contentContainerStyle={[
           styles.content,
           Platform.OS !== 'web' && styles.contentMobile,
-          { paddingTop: Platform.OS === 'web' ? 12 : Math.max(insets.top, 10) },
+          { paddingTop: 12 },
         ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.inner}>
-          <TrainerNavigation />
           <View style={styles.header}>
             <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
             <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
