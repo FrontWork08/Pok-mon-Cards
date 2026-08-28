@@ -15,8 +15,9 @@ const assert = (condition, message) => {
   if (!condition) failures.push(message);
 };
 
-const plugins = [...(app.expo?.plugins ?? [])].map(String).sort();
-const baselinePlugins = [...(baseline.plugins ?? [])].map(String).sort();
+const pluginName = (plugin) => Array.isArray(plugin) ? String(plugin[0]) : String(plugin);
+const plugins = [...(app.expo?.plugins ?? [])].map(pluginName).sort();
+const baselinePlugins = [...(baseline.plugins ?? [])].map(pluginName).sort();
 
 assert(app.expo?.version === baseline.appVersion, 'app.json version mudou: isso exige novo runtime/APK ou atualização intencional do baseline.');
 assert(app.expo?.runtimeVersion?.policy === baseline.runtimeVersionPolicy, 'runtimeVersion deixou de usar a política appVersion.');
