@@ -51,6 +51,8 @@ export default function BagScreen() {
   const [reloadTick, setReloadTick] = useState(0);
   const requestId = useRef(0);
   const loadingMoreRef = useRef(false);
+  const listRef = useRef<FlatList<OwnedCardEntry> | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const filters = useMemo(() => ({
     search,
@@ -207,6 +209,7 @@ export default function BagScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
+        ref={listRef}
         key={`bag-${columns}`}
         data={cards}
         numColumns={columns}
@@ -227,7 +230,22 @@ export default function BagScreen() {
         windowSize={5}
         removeClippedSubviews={Platform.OS === 'android'}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={32}
+        onScroll={(event) => {
+          const visible = event.nativeEvent.contentOffset.y > 850;
+          setShowScrollTop((current) => current === visible ? current : visible);
+        }}
       />
+      {showScrollTop ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Voltar ao topo da Bag"
+          onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
+          style={[styles.scrollTopButton,{backgroundColor:colors.accent,borderColor:colors.yellow}]}
+        >
+          <Ionicons name="arrow-up" size={25} color="#fff"/>
+        </Pressable>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -266,6 +284,7 @@ function FilterChip({ active, label, icon, onPress }: { active: boolean; label: 
 
 const styles = StyleSheet.create({
   safe: { flex: 1, overflow: 'hidden' },
+  scrollTopButton:{position:'absolute',right:18,bottom:18,width:52,height:52,borderRadius:26,borderWidth:1.5,alignItems:'center',justifyContent:'center',elevation:12,shadowColor:'#000',shadowOpacity:.28,shadowRadius:10,shadowOffset:{width:0,height:5}},
   content: { width: '100%', maxWidth: 1280, alignSelf: 'center', paddingTop: 12, paddingBottom: 36 },
   headerContent: { gap: 16, marginBottom: 12 },
   pageHeaderRow: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
