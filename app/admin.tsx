@@ -25,6 +25,8 @@ import {
   moderatePlayer,
   startFreeBoosters,
   stopFreeBoosters,
+  startGameEvent,
+  stopGameEvent,
   type AdminGameEvent,
   type AdminModerationAction,
   type AdminOverview,
@@ -70,6 +72,12 @@ export default function AdminScreen() {
   const [announcementHours, setAnnouncementHours] = useState('24');
   const [freeBoosterMinutes, setFreeBoosterMinutes] = useState('1');
   const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
+  const [gameEvents, setGameEvents] = useState<AdminGameEvent[]>([]);
+  const [eventType, setEventType] = useState<'double_xp'|'rare_boost'|'featured_set'>('double_xp');
+  const [eventTitle, setEventTitle] = useState('Double XP');
+  const [eventMinutes, setEventMinutes] = useState('60');
+  const [eventSetId, setEventSetId] = useState('');
+  const [eventMultiplier, setEventMultiplier] = useState('1.5');
   const [guildHub, setGuildHub] = useState<GuildHub | null>(null);
   const [selectedGuildId, setSelectedGuildId] = useState<string | null>(null);
   const [guildLeaderSearch, setGuildLeaderSearch] = useState('');
@@ -114,6 +122,7 @@ export default function AdminScreen() {
       setOverview(status);
       setHistory(grants);
       setActiveEvent(events.find((event) => event.event_type === 'free_boosters') ?? null);
+      setGameEvents(events.filter((event) => event.event_type !== 'free_boosters'));
       setGuildHub(guildState);
       setAdminCodes(codes);
       setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
@@ -218,6 +227,50 @@ export default function AdminScreen() {
       ? String(minutes) + 'm ' + String(rest).padStart(2, '0') + 's'
       : String(rest) + 's';
   }, [activeEvent, clock]);
+
+  async function activateGameEvent() {
+    if (working) return;
+    const minutes = Math.max(1, Math.min(10080, Number(eventMinutes.replace(/[^0-9]/g,'')) || 60));
+    const multiplier = Math.max(1, Math.min(3, Number(eventMultiplier.replace(',', '.')) || 1.5));
+    if (eventType === 'featured_set' && !eventSetId.trim()) {
+      setError('Informe o ID do set para o Featured Set.');
+      return;
+    }
+    try {
+      setWorking(true);
+      setError(null);
+      await startGameEvent({
+        eventType,
+        title: eventTitle.trim() || (eventType === 'double_xp' ? 'Double XP' : eventType === 'rare_boost' ? 'Rare Boost' : 'Featured Set'),
+        durationMinutes: minutes,
+        payload: eventType === 'featured_set'
+          ? { setId: eventSetId.trim(), multiplier }
+          : eventType === 'rare_boost'
+            ? { multiplier }
+            : {},
+      });
+      setNotice('Evento ao vivo ativado.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível iniciar o evento.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function deactivateGameEvent(eventId: string) {
+    if (working) return;
+    try {
+      setWorking(true);
+      await stopGameEvent(eventId);
+      setNotice('Evento encerrado.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível encerrar o evento.');
+    } finally {
+      setWorking(false);
+    }
+  }
 
   async function moderateSelected(action: AdminModerationAction) {
     if (!moderationTarget || working) return;
@@ -930,6 +983,37 @@ export default function AdminScreen() {
             ) : (
               <Text style={[styles.emptyText, { color: colors.muted }]}>Nenhum jogador selecionado.</Text>
             )}
+          </View>
+
+          <SectionTitle title="Eventos ao vivo" />
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#9B7BFF' }]}>
+            <Text style={[styles.emptyText, { color: colors.muted }]}>
+              Crie eventos temporários que mudam a experiência do jogo em tempo real.
+            </Text>
+            <View style={styles.quickRow}>
+              {([
+                ['double_xp','DOUBLE XP'],
+                ['rare_boost','RARE BOOST'],
+                ['featured_set','FEATURED SET'],
+              ] as const).map(([value,label]) => (
+                <Pressable key={value} onPress={() => {
+                  setEventType(value);
+                  setEventTitle(value === 'double_xp' ? 'Double XP' : value === 'rare_boost' ? 'Rare Boost' : 'Featured Set');
+                }} style={[styles.quickChip, { backgroundColor: eventType===value ? '#281F4C' : colors.surfaceAlt, borderColor: eventType===value ? '#9B7BFF' : colors.border }]}>
+                  <Text style={[styles.quickText, { color: eventType===value ? '#CBBEFF' : colors.text }]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextInput value={eventTitle} onChangeText={setEventTitle} placeholder="Nome do evento" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
+            <View style={styles.formSplit}>
+              <TextInput value={eventMinutes} onChangeText={(v)=>setEventMinutes(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Minutos" placeholderTextColor={colors.muted} style={[styles.input,{flexGrow:1,minWidth:120,color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
+              {eventType !== 'double_xp' ? <TextInput value={eventMultiplier} onChangeText={setEventMultiplier} keyboardType="decimal-pad" placeholder="Multiplicador (1.5)" placeholderTextColor={colors.muted} style={[styles.input,{flexGrow:1,minWidth:150,color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/> : null}
+            </View>
+            {eventType === 'featured_set' ? <TextInput value={eventSetId} onChangeText={setEventSetId} autoCapitalize="none" placeholder="ID do set (ex.: sv3pt5)" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/> : null}
+            <Pressable disabled={working} onPress={() => { void activateGameEvent(); }} style={[styles.grantButton,{backgroundColor:'#9B7BFF',opacity:working?.7:1}]}>
+              <Ionicons name="sparkles" size={20} color="#07111F"/><Text style={styles.grantButtonText}>ATIVAR EVENTO</Text>
+            </Pressable>
+            {gameEvents.length ? <View style={styles.friendChips}>{gameEvents.map((event)=><View key={event.id} style={[styles.friendChip,{backgroundColor:colors.surfaceAlt,borderColor:'#9B7BFF'}]}><View style={{flex:1}}><Text style={[styles.friendChipText,{color:colors.text}]}>{event.title}</Text><Text style={[styles.emptyText,{color:colors.muted}]}>{event.event_type} • até {new Date(event.ends_at).toLocaleString('pt-BR')}</Text></View><Pressable onPress={()=>void deactivateGameEvent(event.id)}><Ionicons name="stop-circle" size={20} color="#FF8290"/></Pressable></View>)}</View> : null}
           </View>
 
           <SectionTitle title="Adicionar moedas" />
