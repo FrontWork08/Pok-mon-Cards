@@ -8,6 +8,8 @@ import { claimDailyReward } from '@/services/playerActions';
 import { getMyTrades } from '@/services/trades';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getBattlePass, type BattlePassReward, type BattlePassState } from '@/services/battlePass';
+import { GlobalChatHomeCard } from '@/components/GlobalChatHomeCard';
+import { UpdateLogHomeCard } from '@/components/UpdateLogHomeCard';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -40,6 +42,7 @@ export default function HomeScreen() {
       <View style={styles.heroActions}><Pressable style={[styles.primaryButton,{backgroundColor:colors.yellow}]} onPress={()=>router.push('/(tabs)/packs')}><Ionicons name="cube" color="#07111F" size={19}/><Text style={styles.primaryButtonText}>IR PARA OS PACKS</Text></Pressable><Pressable style={[styles.dailyButton,{backgroundColor:canClaimDaily?colors.accent:colors.surfaceAlt}]} onPress={claimDaily} disabled={!canClaimDaily||claiming}><Ionicons name="gift-outline" color={canClaimDaily?'#fff':colors.muted} size={18}/><Text style={[styles.dailyText,{color:canClaimDaily?'#fff':colors.muted}]}>{claiming?'RECEBENDO...':canClaimDaily?'RECOMPENSA DIÁRIA':'VOLTE AMANHÃ'}</Text></Pressable><Pressable style={[styles.dailyButton,{backgroundColor:colors.surface}]} onPress={()=>router.push('/missions')}><Ionicons name="checkbox-outline" color={colors.accent} size={18}/><Text style={[styles.dailyText,{color:colors.text}]}>MISSÕES</Text></Pressable></View>
     </View>
     <View style={styles.statsGrid}><Stat icon="albums" label="Cards" value={stats.totalCards.toLocaleString('pt-BR')} onPress={()=>router.push('/(tabs)/bag')}/><Stat icon="paw" label="Pokédex" value={String(stats.species)} onPress={()=>router.push('/pokedex')}/><Stat icon="swap-horizontal" label="Trocas" value={String(stats.completedTrades)} onPress={()=>router.push('/(tabs)/trade')}/><Stat icon="flash" label="XP" value={Number(profile?.xp??0).toLocaleString('pt-BR')}/></View>
+    <GlobalChatHomeCard />
     {battlePass?<View style={[styles.passCard,{backgroundColor:colors.surface,borderColor:colors.yellow}]}>
       <Pressable onPress={()=>router.push('/battle-pass')} style={styles.passHeader}>
         <View style={[styles.passIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="ribbon" size={25} color={colors.yellow}/></View>
@@ -58,6 +61,7 @@ export default function HomeScreen() {
     </View>:null}
     <View style={styles.sectionHeader}><View><Text style={[styles.sectionKicker,{color:colors.yellow}]}>JORNADA</Text><Text style={[styles.sectionTitle,{color:colors.text}]}>Seu progresso</Text></View></View>
     <View style={[styles.progressCard,{backgroundColor:colors.surface,borderColor:colors.border}]}><View style={[styles.progressIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="trophy" size={24} color={colors.yellow}/></View><View style={styles.progressBody}><Text style={[styles.progressTitle,{color:colors.text}]}>Colecionador nível {profile?.level??1}</Text><Text style={[styles.progressText,{color:colors.muted}]}>Packs, missões e batalhas concedem XP para sua conta.</Text><View style={[styles.progressTrack,{backgroundColor:colors.surfaceAlt}]}><View style={[styles.progressFill,{backgroundColor:colors.yellow,width:`${Math.min(100,(Number(profile?.xp??0)%250)/2.5)}%`}]}/></View><Text style={[styles.progressMeta,{color:colors.muted}]}>{Number(profile?.xp??0)%250} / 250 XP para o próximo nível</Text></View></View>
+    <UpdateLogHomeCard />
   </Screen>
 }
 function BattlePassPreviewRow({level,currentLevel,vipUnlocked,free,vip}:{level:number;currentLevel:number;vipUnlocked:boolean;free:BattlePassReward|null;vip:BattlePassReward|null}){const{colors}=useAppTheme();return <View style={[styles.passRewardRow,{backgroundColor:colors.surfaceAlt,borderColor:level<=currentLevel?colors.accent:colors.border}]}><View style={[styles.passLevelBadge,{backgroundColor:level<=currentLevel?colors.accentSoft:colors.surface}]}><Text style={[styles.passLevelText,{color:level<=currentLevel?colors.yellow:colors.muted}]}>NV {level}</Text></View><PassRewardMini reward={free} levelLocked={level>currentLevel} vipLocked={false}/><View style={[styles.passDivider,{backgroundColor:colors.border}]}/><PassRewardMini reward={vip} levelLocked={level>currentLevel} vipLocked={!vipUnlocked}/></View>}
