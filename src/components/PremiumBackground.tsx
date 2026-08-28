@@ -11,8 +11,9 @@ const PATTERN_POSITIONS = [
 
 const THEME_ICONS = {
   trainer: 'paw', midnight: 'moon', poke_red: 'radio-button-on', electric: 'flash',
-  ghost: 'skull', fire: 'flame', water: 'water', kanto: 'paw', johto: 'leaf',
-  hoenn: 'water', sinnoh: 'sparkles',
+  ghost: 'skull', fire: 'flame', water: 'water', grass: 'leaf', psychic: 'eye',
+  dragon: 'sparkles', fighting: 'barbell', steel: 'hardware-chip', fairy: 'heart', darkness: 'moon',
+  kanto: 'paw', johto: 'leaf', hoenn: 'water', sinnoh: 'sparkles',
 } as const;
 
 function CaptureOrb({ top, right, left, size, color, opacity }: {
