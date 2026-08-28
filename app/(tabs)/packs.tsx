@@ -106,7 +106,7 @@ export default function PacksScreen() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('free-booster-shop')
+      .channel(`free-booster-shop-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'admin_game_events' },
