@@ -155,12 +155,11 @@ insert into public.app_update_logs(version,title,summary,changes,published_at,ac
 select
   '0.1.1 • OTA 28/08',
   'Social e qualidade de vida',
-  'Atualização focada em navegação, social, administração e acompanhamento da coleção.',
+  'Atualização focada em navegação, social e acompanhamento da coleção.',
   array[
     'Passe de Batalha com 50 níveis, trilhas Grátis e VIP, missões e títulos exclusivos',
     'Valor em US$ das cartas na loja e diretamente no resultado dos boosters',
-    'Correção do topo duplicado e painel administrativo recolhível',
-    'Correção segura de Coins e Diamantes pelo administrador com auditoria',
+    'Correções visuais e de navegação em diferentes telas',
     'Chat global em tempo real na página inicial',
     'Status online dos amigos com opção de privacidade',
     'Botões Voltar com retorno seguro para a página inicial'
