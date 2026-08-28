@@ -24,6 +24,7 @@ import {
 } from '@/services/bag';
 import type { OwnedCardEntry } from '@/services/player';
 import { formatUsd } from '@/services/market';
+import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const PAGE_SIZE = 48;
@@ -233,6 +234,7 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
   const { colors, isLight } = useAppTheme();
   const card = entry.cards;
   if (!card) return null;
+  const combat = getBattleCardPreview(card);
   return (
     <Pressable onPress={() => onOpen(card.id)} style={[styles.card, { width, backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={[styles.imageWrap, { backgroundColor: isLight ? '#E6EDF6' : colors.surfaceAlt }]}>
@@ -240,13 +242,17 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
         <View style={styles.valueBadge}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
         <View style={styles.damageBadge}>
           <Ionicons name="flash" size={11} color="#FFB06A" />
-          <Text style={styles.damageBadgeText}>{Number(card.battle_damage ?? 10).toLocaleString('pt-BR')} DANO</Text>
+          <Text style={styles.damageBadgeText}>{combat.maxDamage.toLocaleString('pt-BR')} DANO</Text>
         </View>
         {entry.favorite ? <View style={styles.favoriteBadge}><Ionicons name="heart" size={13} color="#fff" /></View> : null}
         {Number(entry.quantity ?? 0) > 1 ? <View style={[styles.quantityBadge, { backgroundColor: colors.yellow }]}><Text style={styles.quantityText}>×{entry.quantity}</Text></View> : null}
       </View>
       <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>{card.pokemon_name}</Text>
       <Text style={[styles.setName, { color: colors.muted }]} numberOfLines={1}>{card.set_name}</Text>
+      <View style={styles.combatLine}>
+        <Text style={[styles.combatPwr,{color:colors.yellow}]}>⚔ PWR {combat.battleRating}</Text>
+        <Text style={[styles.combatMeta,{color:colors.muted}]}>HP {combat.hp} • ⚡ {combat.bestEnergy} • VEL {combat.speedScore}</Text>
+      </View>
       <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={[styles.totalValue, { color: colors.yellow }]}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : 'Sem preço'}</Text></View>
     </Pressable>
   );
@@ -304,6 +310,9 @@ const styles = StyleSheet.create({
   cardPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   cardName: { fontWeight: '900', marginTop: 9, fontSize: 14 },
   setName: { fontSize: 10, fontWeight: '700', marginTop: 2 },
+  combatLine: { marginTop: 6, gap: 2 },
+  combatPwr: { fontSize: 9, fontWeight: '900' },
+  combatMeta: { fontSize: 7, fontWeight: '800' },
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginTop: 7 },
   cardMeta: { fontSize: 9, flex: 1 },
   totalValue: { fontSize: 8, fontWeight: '900' },
