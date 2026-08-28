@@ -682,11 +682,11 @@ export default function AdminScreen() {
       setActiveEvent(event);
       setClock(Date.now());
       setNotice(
-        'Admin Abuse ativado: todos os boosters ficarão grátis por ' +
+        'Admin Abuse ativado: boosters de Coins grátis e boosters de Diamantes com 50% OFF por ' +
         minutes.toLocaleString('pt-BR') + ' minuto(s).',
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Não foi possível ativar os boosters grátis.');
+      setError(e instanceof Error ? e.message : 'Não foi possível ativar o Admin Abuse.');
     } finally {
       setWorking(false);
     }
@@ -1140,12 +1140,12 @@ export default function AdminScreen() {
               <View style={[styles.notice, { backgroundColor: '#142C23', borderColor: '#4A9B70' }]}>
                 <Ionicons name="gift" size={20} color="#65D894" />
                 <Text style={[styles.noticeText, { color: colors.text }]}>
-                  BOOSTERS GRÁTIS ATIVOS • preços voltam em {activeEventRemaining}
+                  ADMIN ABUSE ATIVO • 🪙 Coins grátis • 💎 Diamantes 50% OFF • termina em {activeEventRemaining}
                 </Text>
               </View>
             ) : (
               <Text style={[styles.emptyText, { color: colors.muted }]}>
-                Ative um período em que todos os jogadores poderão abrir qualquer booster por 🪙 0.
+                Ative um período em que boosters de 🪙 Coins ficam grátis e boosters de 💎 Diamantes custam metade do preço. Valores ímpares de Diamantes são arredondados para cima.
               </Text>
             )}
 
@@ -1185,7 +1185,7 @@ export default function AdminScreen() {
             >
               <Ionicons name="flash" size={20} color="#07111F" />
               <Text style={styles.grantButtonText}>
-                {activeEvent ? 'REINICIAR TEMPO GRÁTIS' : 'ATIVAR BOOSTERS GRÁTIS'}
+                {activeEvent ? 'REINICIAR ADMIN ABUSE' : 'ATIVAR ADMIN ABUSE'}
               </Text>
             </Pressable>
 
