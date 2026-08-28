@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { getMyPackHistory } from '@/services/collections';
 import { gameTheme } from '@/theme/gameTheme';
@@ -35,7 +36,7 @@ export default function HistoryScreen() {
 
   return (
     <Screen title="Histórico de Packs" subtitle="Reveja boosters abertos e seus melhores pulls.">
-      <Pressable style={styles.backRow} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color="#A9BDD7" /><Text style={styles.backText}>Voltar</Text></Pressable>
+      <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color="#A9BDD7" /><Text style={styles.backText}>Voltar</Text></Pressable>
 
       <View style={styles.hero}><View><Text style={styles.heroKicker}>TOTAL ABERTO</Text><Text style={styles.heroValue}>{history.length}</Text><Text style={styles.heroText}>boosters registrados</Text></View><View style={styles.heroIcon}><Ionicons name="time" size={28} color={gameTheme.colors.yellow} /></View></View>
 
