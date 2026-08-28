@@ -3,7 +3,6 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
-import { TrainerNavigation } from '@/components/TrainerNavigation';
 import { equipCosmetic, getCosmeticsHub, type CosmeticsHub, type CosmeticItem } from '@/services/cosmetics';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -47,7 +46,6 @@ export default function CosmeticsScreen() {
 
   return (
     <Screen title="Cosméticos do Trainer" subtitle="Molduras e backgrounds desbloqueados por progresso real no jogo.">
-      <TrainerNavigation />
       <Pressable style={styles.back} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={18} color={colors.muted} />
         <Text style={[styles.backText, { color: colors.muted }]}>Voltar</Text>
