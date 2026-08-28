@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { getMyBag, getMyProfile, type OwnedCardEntry } from '@/services/player';
 import { getTrainerRank } from '@/services/ranks';
 import { getMySocial, type SocialPlayer } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { cancelMatchmaking, getMyMatchmakingState, joinMatchmaking, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
 
 const MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
   { id: 'quick', label: 'Quick', detail: '1 carta' },
@@ -40,6 +41,8 @@ export default function BattlesHubScreen() {
   const [bagLoading, setBagLoading] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [rankedMode, setRankedMode] = useState<BattleMode>('draft3');
+  const [queueState, setQueueState] = useState<MatchmakingState | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -49,6 +52,7 @@ export default function BattlesHubScreen() {
       setHistory(h);
       setLeaderboard(l);
       setFriends(social.friends);
+      setQueueState(await getMyMatchmakingState().catch(() => null));
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Não foi possível carregar as batalhas.');
     } finally {
@@ -57,6 +61,15 @@ export default function BattlesHubScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useEffect(() => {
+    if (!profile?.id) return;
+    return subscribeMyMatchmaking(profile.id, (state) => {
+      setQueueState(state);
+      if (state.status === 'matched' && state.matched_battle_id) {
+        router.push(`/battle/${state.matched_battle_id}`);
+      }
+    });
+  }, [profile?.id, router]);
   const completed = useMemo(() => history.filter((item) => item.status === 'completed'), [history]);
   const incomingInvites = useMemo(
     () => history.filter((item) => item.status === 'invited' && item.opponent_id === profile?.id),
@@ -66,6 +79,38 @@ export default function BattlesHubScreen() {
   const wins = completed.filter((item) => item.winner_id === profile?.id).length;
   const losses = completed.length - wins;
   const winRate = completed.length ? Math.round(wins / completed.length * 100) : 0;
+
+  async function startRankedSearch() {
+    if (working) return;
+    try {
+      setWorking('matchmaking');
+      const result = await joinMatchmaking(rankedMode);
+      if (result.status === 'matched' && result.battleId) {
+        router.push(`/battle/${result.battleId}`);
+        return;
+      }
+      setQueueState(await getMyMatchmakingState());
+      setNotice('Busca iniciada. Você pode continuar navegando pelo jogo.');
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Não foi possível entrar no matchmaking.');
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function stopRankedSearch() {
+    if (working) return;
+    try {
+      setWorking('matchmaking');
+      await cancelMatchmaking();
+      setQueueState(await getMyMatchmakingState());
+      setNotice('Busca de partida cancelada.');
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Não foi possível cancelar a busca.');
+    } finally {
+      setWorking(null);
+    }
+  }
 
   async function loadBagForStake() {
     if (bag.length) { setPickerOpen(true); return; }
@@ -161,6 +206,36 @@ export default function BattlesHubScreen() {
       </View>
     ) : null}
 
+    <View style={[styles.rankedPanel, { backgroundColor: colors.surface, borderColor: queueState?.status === 'waiting' ? colors.yellow : colors.accent }]}>
+      <View style={styles.rankedHead}>
+        <View style={[styles.rankedIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="radio" size={24} color={colors.yellow}/></View>
+        <View style={styles.grow}>
+          <Text style={[styles.rankedTitle, { color: colors.text }]}>Matchmaking Ranqueado</Text>
+          <Text style={[styles.sectionDescription, { color: colors.muted }]}>
+            {queueState?.status === 'waiting' ? 'Procurando adversário em segundo plano. Pode navegar normalmente.' : 'Encontre qualquer treinador na fila. Se os modos forem diferentes, um dos dois é sorteado.'}
+          </Text>
+        </View>
+        {queueState?.status === 'waiting' ? <View style={styles.searchingDot}><ActivityIndicator size="small" color="#07111F"/></View> : null}
+      </View>
+      <View style={styles.rankedModes}>
+        {MODES.map((item)=><Pressable
+          key={`ranked-${item.id}`}
+          disabled={queueState?.status === 'waiting'}
+          onPress={()=>setRankedMode(item.id)}
+          style={[styles.rankedMode,{backgroundColor:rankedMode===item.id?colors.accentSoft:colors.surfaceAlt,borderColor:rankedMode===item.id?colors.accent:colors.border,opacity:queueState?.status==='waiting'?.65:1}]}
+        ><Text style={[styles.rankedModeTitle,{color:colors.text}]}>{item.label}</Text><Text style={[styles.rankedModeDetail,{color:colors.muted}]}>{item.detail}</Text></Pressable>)}
+      </View>
+      {queueState?.status === 'waiting' ? (
+        <View style={styles.queueFooter}>
+          <View style={styles.grow}><Text style={[styles.queueLabel,{color:colors.yellow}]}>BUSCANDO PARTIDA...</Text><Text style={[styles.sub,{color:colors.muted}]}>Modo escolhido: {queueState.mode_choice === 'draft3' ? 'Draft 3' : queueState.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'}</Text></View>
+          <Pressable disabled={working==='matchmaking'} onPress={()=>void stopRankedSearch()} style={[styles.cancelQueue,{borderColor:'#683243'}]}><Ionicons name="close" size={16} color="#FF8290"/><Text style={styles.cancelQueueText}>CANCELAR</Text></Pressable>
+        </View>
+      ) : (
+        <Pressable disabled={working==='matchmaking'} onPress={()=>void startRankedSearch()} style={[styles.findMatch,{backgroundColor:colors.yellow}]}>{working==='matchmaking'?<ActivityIndicator color="#07111F"/>:<Ionicons name="flash" size={19} color="#07111F"/>}<Text style={styles.findMatchText}>BUSCAR PARTIDA</Text></Pressable>
+      )}
+      <Pressable onPress={()=>router.push('/season')} style={styles.seasonLink}><Ionicons name="trophy" size={15} color={colors.accent}/><Text style={[styles.seasonLinkText,{color:colors.accent}]}>VER TEMPORADA E RECOMPENSAS</Text></Pressable>
+    </View>
+
     <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
       <View><Text style={[styles.kicker, { color: colors.yellow }]}>RANKED RATING</Text><Text style={[styles.rating, { color: colors.text }]}>{profile?.battle_rating ?? 1000}</Text><Text style={[styles.rankLabel, { color: colors.muted }]}>{myRank.symbol} {myRank.displayName}</Text></View>
       <View style={styles.heroStats}><Mini value={profile?.battle_wins ?? wins} label="Vitórias"/><Mini value={profile?.battle_losses ?? losses} label="Derrotas"/><Mini value={`${winRate}%`} label="Win rate"/><Mini value={profile?.best_battle_streak ?? 0} label="Melhor streak"/></View>
@@ -198,7 +273,24 @@ export default function BattlesHubScreen() {
 function Mini({ value, label }: { value: number | string; label: string }) { const { colors } = useAppTheme(); return <View><Text style={[styles.miniValue, { color: colors.text }]}>{value}</Text><Text style={[styles.miniLabel, { color: colors.muted }]}>{label}</Text></View>; }
 
 const styles = StyleSheet.create({
-  notice: { flexDirection: 'row', gap: 8, padding: 11, borderRadius: 14, backgroundColor: '#2B2818', borderWidth: 1, borderColor: '#5A5125' }, noticeText: { flex: 1, color: '#F8EFCB', fontSize: 11, fontWeight: '700' },
+  notice: { flexDirection: 'row', gap: 8, padding: 11, borderRadius: 14, backgroundColor: '#2B2818', borderWidth: 1, borderColor: '#5A5125' },
+  rankedPanel: { borderRadius:22, borderWidth:1, padding:15, gap:12 },
+  rankedHead: { flexDirection:'row', alignItems:'center', gap:10 },
+  rankedIcon: { width:46, height:46, borderRadius:15, alignItems:'center', justifyContent:'center' },
+  rankedTitle: { fontSize:18, fontWeight:'900' },
+  searchingDot: { width:38, height:38, borderRadius:19, backgroundColor:'#FFD447', alignItems:'center', justifyContent:'center' },
+  rankedModes: { flexDirection:'row', flexWrap:'wrap', gap:7 },
+  rankedMode: { flexGrow:1, flexBasis:100, borderRadius:13, borderWidth:1, padding:10 },
+  rankedModeTitle: { fontSize:10, fontWeight:'900' },
+  rankedModeDetail: { fontSize:8, marginTop:2 },
+  queueFooter: { flexDirection:'row', flexWrap:'wrap', alignItems:'center', gap:10 },
+  queueLabel: { fontSize:10, fontWeight:'900', letterSpacing:.7 },
+  cancelQueue: { minHeight:42, borderRadius:12, borderWidth:1, paddingHorizontal:12, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:5 },
+  cancelQueueText: { color:'#FF8290', fontSize:8, fontWeight:'900' },
+  findMatch: { minHeight:50, borderRadius:14, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:7 },
+  findMatchText: { color:'#07111F', fontSize:10, fontWeight:'900', letterSpacing:.4 },
+  seasonLink: { alignSelf:'flex-start', flexDirection:'row', alignItems:'center', gap:6, paddingVertical:3 },
+  seasonLinkText: { fontSize:8, fontWeight:'900' }, noticeText: { flex: 1, color: '#F8EFCB', fontSize: 11, fontWeight: '700' },
   hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', padding: 18, borderRadius: 22, borderWidth: 1 }, kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, rating: { fontSize: 38, fontWeight: '900' }, rankLabel: { fontSize: 10 }, heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 }, miniValue: { fontSize: 17, fontWeight: '900' }, miniLabel: { fontSize: 8, fontWeight: '800' },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }, sectionTitle: { fontSize: 20, fontWeight: '900' }, sectionDescription: { fontSize: 9, marginTop: 2 }, sectionMeta: { fontSize: 9, fontWeight: '900' }, sectionLink: { fontSize: 9, fontWeight: '900' },
   friendList: { gap: 9, paddingRight: 8 }, friend: { width: 145, borderRadius: 17, borderWidth: 1, padding: 11, alignItems: 'flex-start' }, friendAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, friendName: { width: '100%', fontSize: 12, fontWeight: '900', marginTop: 8 }, friendLevel: { fontSize: 8, marginTop: 2 }, challengeTag: { marginTop: 10, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }, challengeTagText: { color: '#07111F', fontSize: 7, fontWeight: '900' },
