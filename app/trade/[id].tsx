@@ -3,6 +3,7 @@ import { ActivityIndicator, AppState, Image, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { CardPickerModal } from '@/components/CardPickerModal';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
 import { cancelTrade, confirmTrade, getTrade, setTradeCards, subscribeToTrade } from '@/services/trades';
@@ -213,7 +214,7 @@ export default function TradeBuilderScreen() {
     try {
       setSaving(true);
       await cancelTrade(String(id));
-      router.back();
+      goBackOrHome(router);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível cancelar a troca.');
     } finally {
@@ -227,7 +228,7 @@ export default function TradeBuilderScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={[styles.content, pending && styles.contentWithDock]} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <Pressable style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.back()}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable>
+          <Pressable style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable>
           <View style={styles.topInfo}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>NEGOCIAÇÃO SEGURA</Text>
             <Text style={[styles.title, { color: colors.text }]}>Troca #{String(id).slice(0, 8)}</Text>
