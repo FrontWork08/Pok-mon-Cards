@@ -1,12 +1,11 @@
 import { PropsWithChildren } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 export function Screen({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle?: string }>) {
   const { colors } = useAppTheme();
-  const insets = useSafeAreaInsets();
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
