@@ -101,10 +101,15 @@ export async function getMyActiveBattle() {
     .or(`challenger_id.eq.${id},opponent_id.eq.${id}`)
     .in('status', ['invited', 'drafting', 'selecting'])
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
   if (error) throw error;
-  return data;
+
+  const inviteCutoff = Date.now() - 15 * 60 * 1000;
+  return (data ?? []).find((battle) => {
+    if (battle.status !== 'invited') return true;
+    const createdAt = new Date(battle.created_at).getTime();
+    return Number.isFinite(createdAt) && createdAt > inviteCutoff;
+  }) ?? null;
 }
 
 export async function getMyBattleHistory(limit = 50) {
