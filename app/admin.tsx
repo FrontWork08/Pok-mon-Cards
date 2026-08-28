@@ -1688,7 +1688,7 @@ export default function AdminScreen() {
                         <Pressable
                           disabled={working}
                           onPress={()=>confirmRevokeTesterTitle(friend.id,friend.username)}
-                          style={[styles.testerRevokeButton,{opacity:working?.55:1}]}
+                          style={[styles.testerRevokeButton,{opacity:working ? .55 : 1}]}
                         >
                           <Ionicons name="close-circle" size={16} color="#FFB0BB"/>
                           <Text style={styles.testerRevokeText}>REVOGAR</Text>
@@ -1697,7 +1697,7 @@ export default function AdminScreen() {
                         <Pressable
                           disabled={working}
                           onPress={()=>{void changeTesterTitle(friend.id,true);}}
-                          style={[styles.testerGrantButton,{opacity:working?.55:1}]}
+                          style={[styles.testerGrantButton,{opacity:working ? .55 : 1}]}
                         >
                           <Ionicons name="ribbon" size={16} color="#0B0B16"/>
                           <Text style={styles.testerGrantText}>CONCEDER</Text>
