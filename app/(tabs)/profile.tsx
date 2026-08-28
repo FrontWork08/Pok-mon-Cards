@@ -101,6 +101,7 @@ export default function ProfileScreen() {
     <View style={styles.statsGrid}><Stat icon="albums" value={stats?.totalCards ?? 0} label="Cards" /><Stat icon="paw" value={stats?.species ?? 0} label="Pokédex" /><Stat icon="cube" value={stats?.packsOpened ?? 0} label="Packs" /><Stat icon="swap-horizontal" value={stats?.completedTrades ?? 0} label="Trocas" /><Stat icon="trophy" value={profile?.battle_wins ?? 0} label="Vitórias" /><Stat icon="people" value={friendCount} label="Amigos" /></View>
 
     <View style={styles.featureGrid}>
+      <FeatureLink icon="ribbon" color={colors.yellow} title="Passe de Batalha" text="50 níveis, missões, recompensas grátis e trilha VIP." onPress={() => router.push('/battle-pass')} />
       <FeatureLink icon="flame" color={colors.yellow} title="Temporada & Jornada" text="Streak, ranque, eventos e recompensas da coleção." onPress={() => router.push('/season')} />
       <FeatureLink icon="sparkles" color={colors.yellow} title="Minha Vitrine" text="Escolha as 6 cartas que aparecem no seu perfil público." onPress={() => router.push('/showcase')} />
       <FeatureLink icon="star" color={colors.accent} title="Card Chase" text="Wishlist e alertas quando suas cartas desejadas aparecem." onPress={() => router.push('/wishlist')} />
