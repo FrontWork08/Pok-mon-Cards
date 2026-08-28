@@ -25,6 +25,8 @@ type CardRow = {
   id: string;
   set_id: string;
   rarity: string | null;
+  market_price_usd: number | null;
+  market_price_source: string | null;
   market_price_updated_at: string | null;
 };
 
@@ -224,16 +226,21 @@ Deno.serve(async (req: Request) => {
 
   const { data: cards, error: cardsError } = await admin
     .from("cards")
-    .select("id,set_id,rarity,market_price_updated_at")
+    .select("id,set_id,rarity,market_price_usd,market_price_source,market_price_updated_at")
     .in("id", allowedIds);
 
   if (cardsError) return json({ error: cardsError.message }, 500);
 
   const staleBefore = Date.now() - 12 * 60 * 60 * 1000;
+  const missingRetryBefore = Date.now() - 30 * 60 * 1000;
   const targets = (cards ?? [])
     .filter((card: any) => {
       if (force || !card.market_price_updated_at) return true;
-      return new Date(card.market_price_updated_at).getTime() < staleBefore;
+      const updatedAt = new Date(card.market_price_updated_at).getTime();
+      if (card.market_price_usd == null || Number(card.market_price_usd) <= 0) {
+        return !Number.isFinite(updatedAt) || updatedAt < missingRetryBefore;
+      }
+      return updatedAt < staleBefore;
     })
     .sort((a: any, b: any) => Number(Boolean(a.market_price_updated_at)) - Number(Boolean(b.market_price_updated_at)))
     .slice(0, scope === "global" ? 500 : 120) as CardRow[];
