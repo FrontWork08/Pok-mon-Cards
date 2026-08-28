@@ -15,10 +15,11 @@ export type PlayerSettings = {
   push_notifications: boolean;
   battle_sounds: boolean;
   battle_vibration: boolean;
+  show_online_status: boolean;
   updated_at: string;
 };
 
-export type SettingsPatch = Partial<Pick<PlayerSettings, 'appearance' | 'theme' | 'chat_notifications' | 'battle_invites' | 'push_notifications' | 'battle_sounds' | 'battle_vibration'>>;
+export type SettingsPatch = Partial<Pick<PlayerSettings, 'appearance' | 'theme' | 'chat_notifications' | 'battle_invites' | 'push_notifications' | 'battle_sounds' | 'battle_vibration' | 'show_online_status'>>;
 
 export async function getMySettings(): Promise<PlayerSettings> {
   const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -27,7 +28,7 @@ export async function getMySettings(): Promise<PlayerSettings> {
 
   const { data, error } = await supabase
     .from('player_settings')
-    .select('player_id,appearance,theme,chat_notifications,battle_invites,push_notifications,battle_sounds,battle_vibration,updated_at')
+    .select('player_id,appearance,theme,chat_notifications,battle_invites,push_notifications,battle_sounds,battle_vibration,show_online_status,updated_at')
     .eq('player_id', auth.user.id)
     .maybeSingle();
   if (error) throw error;
@@ -42,6 +43,7 @@ export async function getMySettings(): Promise<PlayerSettings> {
     push_notifications: true,
     battle_sounds: true,
     battle_vibration: true,
+    show_online_status: true,
   };
   const { data: created, error: createError } = await supabase.from('player_settings').insert(defaults).select().single();
   if (createError) throw createError;
