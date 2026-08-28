@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { GlobalAnnouncementOverlay } from '@/components/GlobalAnnouncement';
@@ -15,11 +15,15 @@ import { WalletProvider } from '@/wallet/WalletProvider';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cancelMatchmaking, getMyMatchmakingState, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
 import { claimDailyLogin } from '@/services/retention';
+import { TrainerNavigation } from '@/components/TrainerNavigation';
+import { useWallet } from '@/wallet/WalletProvider';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { userId } = useWallet();
   const [liveNotification, setLiveNotification] = useState<any>(null);
   const [accountRestriction, setAccountRestriction] = useState<PlayerProfile | null>(null);
   const [matchmaking, setMatchmaking] = useState<MatchmakingState | null>(null);
@@ -322,10 +326,12 @@ function AppStack() {
     };
   }, [settings?.battle_sounds]);
 
+  const showChrome = Boolean(userId) && !accountRestriction && !pathname.startsWith('/battle/');
   return (
-    <>
+    <View style={[styles.appShell,{backgroundColor:colors.bg}]}>
       <StatusBar style={isLight ? 'dark' : 'light'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      {showChrome ? <View style={[styles.appChrome,{backgroundColor:colors.bg,borderBottomColor:colors.border,paddingTop:Math.max(insets.top,6)}]}><TrainerNavigation /></View> : null}
+      <View style={styles.stackHost}><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} /></View>
       <UpdatePrompt />
       <GlobalAnnouncementOverlay />
       {accountRestriction ? (
@@ -401,7 +407,7 @@ function AppStack() {
           </Pressable>
         </View>
       ) : null}
-    </>
+    </View>
   );
 }
 
@@ -411,6 +417,9 @@ export default function RootLayout() {
 
 
 const styles = StyleSheet.create({
+  appShell:{flex:1},
+  stackHost:{flex:1,minHeight:0},
+  appChrome:{zIndex:1500,paddingHorizontal:12,paddingBottom:7,borderBottomWidth:1},
   accountBlocker: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 5000,
