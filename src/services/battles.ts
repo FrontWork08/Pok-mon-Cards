@@ -41,10 +41,14 @@ export async function cancelBattle(battleId: string) {
   return invoke({ action: 'cancel', battleId });
 }
 
+export async function forfeitBattle(battleId: string) {
+  return invoke({ action: 'forfeit', battleId });
+}
+
 export async function getBattle(battleId: string) {
   const { data, error } = await supabase
     .from('battles')
-    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,rounds_to_win,active_round,selection_seconds,selection_deadline,draft_turn_id,draft_pick_count,draft_seconds,challenger_score,opponent_score,winner_id,reward_eligible,rematch_of,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,created_at,updated_at,completed_at')
+    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,rounds_to_win,active_round,selection_seconds,selection_deadline,draft_turn_id,draft_pick_count,draft_seconds,challenger_score,opponent_score,winner_id,reward_eligible,rematch_of,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,forfeited_by,forfeit_rating_neutral,forfeited_at,created_at,updated_at,completed_at')
     .eq('id', battleId)
     .single();
   if (error) throw error;
@@ -119,7 +123,7 @@ export async function getMyBattleHistory(limit = 50) {
   if (!id) throw new Error('Usuário não autenticado.');
   const { data, error } = await supabase
     .from('battles')
-    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,challenger_score,opponent_score,winner_id,reward_eligible,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,created_at,completed_at,challenger:players!battles_challenger_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id),opponent:players!battles_opponent_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id)')
+    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,challenger_score,opponent_score,winner_id,reward_eligible,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,forfeited_by,forfeit_rating_neutral,forfeited_at,created_at,completed_at,challenger:players!battles_challenger_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id),opponent:players!battles_opponent_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id)')
     .or(`challenger_id.eq.${id},opponent_id.eq.${id}`)
     .order('created_at', { ascending: false })
     .limit(limit);
