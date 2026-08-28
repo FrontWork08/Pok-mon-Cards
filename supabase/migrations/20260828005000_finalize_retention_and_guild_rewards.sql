@@ -445,3 +445,7 @@ revoke all on function private.claim_guild_weekly_reward() from public,anon;
 grant execute on function private.claim_guild_weekly_reward() to authenticated,service_role;
 revoke all on function public.claim_guild_weekly_reward() from public,anon;
 grant execute on function public.claim_guild_weekly_reward() to authenticated;
+
+
+create index if not exists guild_weekly_reward_claims_guild_idx
+  on public.guild_weekly_reward_claims(guild_id);
