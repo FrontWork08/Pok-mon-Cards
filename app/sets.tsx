@@ -11,11 +11,10 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
-import { TrainerNavigation } from '@/components/TrainerNavigation';
 import {
   getMyOwnedSetCounts,
   getSetCatalog,
@@ -40,7 +39,6 @@ function SetThumb({ uri }: { uri: string | null }) {
 
 export default function SetsScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [sets, setSets] = useState<SetCatalogEntry[]>([]);
   const [ownedBySet, setOwnedBySet] = useState<Map<string, number>>(new Map());
@@ -117,8 +115,7 @@ export default function SetsScreen() {
 
   const header = (
     <View style={styles.headerContent}>
-      <TrainerNavigation />
-      <View style={styles.pageHeader}>
+<View style={styles.pageHeader}>
         <Text style={styles.eyebrow}>TRAINER HUB</Text>
         <Text style={styles.pageTitle}>Coleções por Set</Text>
         <Text style={styles.pageSubtitle}>
@@ -189,7 +186,7 @@ export default function SetsScreen() {
         }
         contentContainerStyle={[
           styles.content,
-          { paddingTop: Platform.OS === 'web' ? 12 : Math.max(insets.top, 10) },
+          { paddingTop: 12 },
         ]}
         initialNumToRender={6}
         maxToRenderPerBatch={6}
