@@ -1,16 +1,10 @@
 name: Build Android APK
 
+# APK builds are intentionally manual.
+# Day-to-day app changes ship through Expo Updates on the preview channel.
+# Trigger this workflow only when the native runtime really changes.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - app.json
-      - eas.json
-      - package.json
-      - package-lock.json
-      - assets/**
-      - .github/workflows/android-apk.yml
 
 permissions:
   contents: read
