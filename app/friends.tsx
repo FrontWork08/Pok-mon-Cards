@@ -53,6 +53,7 @@ export default function FriendsScreen() {
     finally { setWorkingId(null); }
   }
 
+  function openProfile(player: SocialPlayer) { router.push(`/player/${player.id}`); }
   function openChat(player: SocialPlayer) { router.push(`/chat/${player.id}`); }
 
   async function startTrade(player: SocialPlayer) {
@@ -63,6 +64,7 @@ export default function FriendsScreen() {
 
   function FriendActions({ player }: { player: SocialPlayer }) {
     return <View style={styles.actionRow}>
+      <Pressable style={styles.profileButton} onPress={() => openProfile(player)}><Ionicons name="person-circle-outline" size={16} color={gameTheme.colors.yellow}/><Text style={styles.profileButtonText}>PERFIL</Text></Pressable>
       <Pressable style={styles.chatButton} onPress={() => openChat(player)}><Ionicons name="chatbubble-ellipses" size={16} color="#fff" /><Text style={styles.chatText}>CHAT</Text></Pressable>
       <Pressable style={styles.secondaryButton} onPress={() => startTrade(player)} disabled={workingId === player.id}><Text style={styles.secondaryButtonText}>TROCAR</Text></Pressable>
     </View>;
@@ -95,10 +97,11 @@ export default function FriendsScreen() {
 }
 
 function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) { return <View style={styles.section}><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.count}>{count}</Text></View><View style={styles.sectionBody}>{children}</View></View>; }
-function PlayerRow({ player, children }: { player: SocialPlayer; children: React.ReactNode }) { return <View style={styles.playerRow}><View style={styles.avatar}><Text style={styles.avatarText}>{player.username.slice(0, 1).toUpperCase()}</Text></View><View style={styles.playerInfo}><Text style={styles.playerName}>@{player.username}</Text><Text style={styles.playerLevel}>Treinador nível {player.level}</Text></View>{children}</View>; }
+function PlayerRow({ player, children }: { player: SocialPlayer; children: React.ReactNode }) { const router=useRouter(); return <Pressable onPress={()=>router.push(`/player/${player.id}`)} style={styles.playerRow}><View style={styles.avatar}><Text style={styles.avatarText}>{player.username.slice(0, 1).toUpperCase()}</Text></View><View style={styles.playerInfo}><Text style={styles.playerName}>@{player.username}</Text><Text style={styles.playerLevel}>Treinador nível {player.level}</Text></View>{children}</Pressable>; }
 
 const styles = StyleSheet.create({
   backRow:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:7},backText:{color:'#A9BDD7',fontSize:12,fontWeight:'800'},notice:{flexDirection:'row',alignItems:'center',gap:9,borderRadius:16,padding:13,backgroundColor:'#2B2818',borderWidth:1,borderColor:'#5A5125'},noticeText:{flex:1,color:'#F8EFCB',fontWeight:'700',fontSize:12},
+  profileButton:{minHeight:36,paddingHorizontal:10,borderRadius:10,borderWidth:1,borderColor:'#6A5B23',backgroundColor:'#2B2818',flexDirection:'row',alignItems:'center',gap:5},profileButtonText:{color:'#FFD447',fontSize:8,fontWeight:'900'},
   searchBox:{minHeight:54,flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:14,borderRadius:17,backgroundColor:gameTheme.colors.surface,borderWidth:1,borderColor:gameTheme.colors.border},search:{flex:1,color:'#fff',height:52,fontSize:14},searchButton:{paddingHorizontal:14,paddingVertical:10,borderRadius:12,backgroundColor:gameTheme.colors.blue},searchButtonText:{color:'#fff',fontSize:10,fontWeight:'900'},
   section:{gap:9},sectionHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},sectionTitle:{color:'#fff',fontSize:19,fontWeight:'900'},count:{color:gameTheme.colors.muted,fontSize:12,fontWeight:'800'},sectionBody:{gap:8},playerRow:{flexDirection:'row',alignItems:'center',gap:11,padding:12,borderRadius:17,backgroundColor:'#101D30',borderWidth:1,borderColor:'#263E5C'},avatar:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:'#17345D'},avatarText:{color:'#CFE0F9',fontSize:18,fontWeight:'900'},playerInfo:{flex:1,minWidth:100},playerName:{color:'#fff',fontWeight:'900',fontSize:14},playerLevel:{color:'#7E92AD',fontSize:10,marginTop:3},
   actionRow:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap',justifyContent:'flex-end'},primaryButton:{minHeight:36,justifyContent:'center',paddingHorizontal:11,borderRadius:10,backgroundColor:gameTheme.colors.yellow},primaryButtonText:{color:'#07111F',fontSize:8,fontWeight:'900'},secondaryButton:{minHeight:36,justifyContent:'center',paddingHorizontal:10,borderRadius:10,backgroundColor:gameTheme.colors.blue},secondaryButtonText:{color:'#fff',fontSize:8,fontWeight:'900'},chatButton:{minHeight:36,flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:10,borderRadius:10,backgroundColor:'#5936A8'},chatText:{color:'#fff',fontSize:8,fontWeight:'900'},declineButton:{width:36,height:36,alignItems:'center',justifyContent:'center',borderRadius:10,backgroundColor:'#351A24'},removeButton:{width:36,height:36,alignItems:'center',justifyContent:'center',borderRadius:10,backgroundColor:'#351A24'},pendingBadge:{paddingHorizontal:10,paddingVertical:7,borderRadius:999,backgroundColor:'#222B3A'},pendingText:{color:'#879BB4',fontSize:9,fontWeight:'900'},empty:{alignItems:'center',padding:24,gap:7,borderRadius:18,backgroundColor:'#0D1929',borderWidth:1,borderColor:'#203551'},emptyTitle:{color:'#fff',fontSize:15,fontWeight:'900'},emptyText:{color:'#7E92AD',fontSize:11,textAlign:'center',maxWidth:360},
