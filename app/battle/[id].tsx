@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
@@ -7,7 +7,7 @@ import { CardPickerModal, getBattleCardPreview } from '@/components/CardPickerMo
 import { supabase } from '@/lib/supabase';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
 import { getMyDecks } from '@/services/decks';
-import { cancelBattle, getBattle, getBattleCardStakes, getBattleDraftCards, getBattleEvents, getBattleRounds, lockBattleCard, pickBattleDraftCard, rematchBattle, resolveBattleTimeout, respondToBattle, subscribeToBattle } from '@/services/battles';
+import { cancelBattle, forfeitBattle, getBattle, getBattleCardStakes, getBattleDraftCards, getBattleEvents, getBattleRounds, lockBattleCard, pickBattleDraftCard, rematchBattle, resolveBattleTimeout, respondToBattle, subscribeToBattle } from '@/services/battles';
 import { isFunctionErrorCode } from '@/services/functionErrors';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -186,6 +186,50 @@ export default function BattleScreen() {
     finally { setWorking(false); }
   }
 
+  async function forfeit() {
+    if (!id || working) return;
+    try {
+      setWorking(true);
+      setNotice(null);
+      const result = await forfeitBattle(String(id));
+      setNotice(
+        result?.ratingNeutral
+          ? 'Você desistiu antes de escolher uma carta. O adversário venceu e seu ELO não foi alterado.'
+          : 'Você desistiu da batalha. A vitória foi concedida ao adversário.',
+      );
+      if (settings?.battle_vibration ?? true) Vibration.vibrate(80);
+      await load();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível desistir da batalha.');
+      await load().catch(() => null);
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmForfeit() {
+    const neutralHint =
+      !draftCards.some((item) => item.player_id === userId) &&
+      !events.some((event) =>
+        ['card_locked', 'auto_locked'].includes(event.event_type) &&
+        event.payload?.playerId === userId
+      );
+
+    const message = neutralHint
+      ? 'Você ainda não escolheu nenhuma carta. O adversário receberá a vitória, mas seu ELO não será alterado.'
+      : 'A batalha já começou para você. O adversário receberá a vitória e a derrota contará normalmente no ELO.';
+
+    if (Platform.OS === 'web') {
+      void forfeit();
+      return;
+    }
+
+    Alert.alert('Desistir da batalha?', message, [
+      { text: 'Continuar jogando', style: 'cancel' },
+      { text: 'DESISTIR', style: 'destructive', onPress: () => { void forfeit(); } },
+    ]);
+  }
+
   async function rematch() {
     if (!id) return;
     try { setWorking(true); const next = await rematchBattle(String(id)); router.replace(`/battle/${next}`); }
@@ -215,6 +259,23 @@ export default function BattleScreen() {
           <View style={styles.vs}><Text style={[styles.vsText, { color: colors.text }]}>VS</Text><Text style={[styles.mode, { color: colors.accent }]}>{battle.mode === 'draft3' ? 'DRAFT • 3 RODADAS' : battle.mode === 'mystery' ? 'MELHOR DE 3' : '1 CARTA'}</Text>{battle.stake_type === 'coins' ? <Text style={[styles.wager, { color: colors.yellow }]}>🪙 {Number(battle.wager_coins).toLocaleString('pt-BR')} CADA</Text> : battle.stake_type === 'card' ? <Text style={[styles.wager, { color: '#C7A8FF' }]}>🎴 1 CARTA CADA</Text> : <Text style={[styles.casual, { color: colors.muted }]}>CASUAL</Text>}</View>
           <PlayerSide label="OPONENTE" name={opponent?.username} rating={opponent?.battle_rating} score={battle.opponent_score} right />
         </View>
+
+        {(drafting || selecting) ? (
+          <View style={[styles.forfeitPanel,{backgroundColor:colors.surface,borderColor:'#6B303A'}]}>
+            <View style={styles.forfeitCopy}>
+              <Ionicons name="flag" size={18} color="#FF8792"/>
+              <View style={{flex:1}}>
+                <Text style={styles.forfeitTitle}>Desistir da batalha</Text>
+                <Text style={[styles.forfeitHint,{color:colors.muted}]}>
+                  Antes da sua primeira escolha: vitória do adversário sem alterar seu ELO. Depois de escolher: derrota normal.
+                </Text>
+              </View>
+            </View>
+            <Pressable disabled={working} onPress={confirmForfeit} style={[styles.forfeitButton,working&&styles.disabled]}>
+              <Text style={styles.forfeitButtonText}>DESISTIR</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {invited ? (
           <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -295,6 +356,14 @@ export default function BattleScreen() {
             <Text style={[styles.resultKicker, { color: colors.yellow }]}>BATALHA CONCLUÍDA</Text>
             <Text style={[styles.resultTitle, { color: colors.text }]}>@{winnerName ?? 'Treinador'} venceu</Text>
             <Text style={[styles.resultMeta, { color: colors.muted }]}>{battle.challenger_score} × {battle.opponent_score} • {battle.reward_eligible ? 'resultado válido para progressão' : 'sem recompensa de progressão'}</Text>
+            {battle.forfeited_by ? (
+              <View style={[styles.forfeitResult,{backgroundColor:battle.forfeit_rating_neutral?'#162C22':'#321A20',borderColor:battle.forfeit_rating_neutral?'#367A58':'#6B303A'}]}>
+                <Ionicons name="flag" size={17} color={battle.forfeit_rating_neutral?'#65D894':'#FF8792'}/>
+                <Text style={[styles.forfeitResultText,{color:colors.text}]}>
+                  {battle.forfeited_by===userId ? 'Você desistiu.' : 'O adversário desistiu.'} {battle.forfeit_rating_neutral ? 'Vitória por desistência • SEM ALTERAÇÃO DE ELO.' : 'Vitória por desistência • resultado com ELO normal.'}
+                </Text>
+              </View>
+            ) : null}
             {battle.stake_type === 'card' ? <View style={[styles.stakeResult, { backgroundColor: colors.surfaceAlt }]}><Text style={[styles.stakeResultText, { color: colors.text }]}>🎴 O vencedor recebeu as cartas mantidas em escrow.</Text>{myStake?.cards ? <Text style={[styles.stakeResultValue, { color: colors.yellow }]}>Valor fixo da sua aposta: {(() => { const stakeCard = Array.isArray(myStake.cards) ? myStake.cards[0] : myStake.cards; return stakeCard?.market_price_usd != null ? formatUsd(Number(stakeCard.market_price_usd)) : 'US$ —'; })()}</Text> : null}</View> : null}
             <View style={styles.actions}><Pressable style={[styles.accept, { backgroundColor: colors.yellow }]} onPress={rematch} disabled={working}><Text style={styles.acceptText}>REVANCHE</Text></Pressable><Pressable style={[styles.secondary, { borderColor: colors.border }]} onPress={() => router.push('/battles')}><Text style={[styles.secondaryText, { color: colors.text }]}>BATTLE CENTER</Text></Pressable></View>
           </View>
@@ -399,7 +468,15 @@ const styles = StyleSheet.create({
   safe: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, content: { width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 15, paddingBottom: 48, gap: 13 }, contentWithDock: { paddingBottom: 112 },
   notice: { flexDirection: 'row', gap: 9, alignItems: 'center', padding: 12, borderRadius: 15, borderWidth: 1 }, noticeText: { flex: 1, fontSize: 11, fontWeight: '700' },
   hero: { flexDirection: 'row', alignItems: 'stretch', borderRadius: 22, borderWidth: 1, padding: 15 }, playerSide: { flex: 1, justifyContent: 'center' }, right: { alignItems: 'flex-end' }, sideLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 }, playerName: { fontSize: 17, fontWeight: '900', marginTop: 3 }, ratingText: { fontSize: 9, marginTop: 2 }, score: { fontSize: 32, fontWeight: '900', marginTop: 5 }, vs: { width: 120, alignItems: 'center', justifyContent: 'center' }, vsText: { fontSize: 27, fontWeight: '900' }, mode: { fontSize: 9, fontWeight: '900', marginTop: 3 }, wager: { fontSize: 8, fontWeight: '900', marginTop: 4 }, casual: { fontSize: 8, fontWeight: '900', marginTop: 4 },
-  panel: { alignItems: 'center', gap: 10, padding: 18, borderRadius: 22, borderWidth: 1 }, panelTitle: { fontSize: 22, fontWeight: '900' }, panelText: { maxWidth: 620, textAlign: 'center', fontSize: 11, lineHeight: 17 }, stakeHeadline: { fontSize: 11, fontWeight: '900' }, actions: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 5 }, decline: { flex: 1, minHeight: 49, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 1, backgroundColor: '#231417' }, declineText: { color: '#FF8993', fontSize: 10, fontWeight: '900' }, accept: { flex: 1, minHeight: 49, alignItems: 'center', justifyContent: 'center', borderRadius: 13 }, acceptText: { color: '#07111F', fontSize: 10, fontWeight: '900' }, secondary: { flex: 1, minHeight: 49, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, secondaryText: { fontSize: 10, fontWeight: '900' }, disabled: { opacity: .42 },
+  panel: { alignItems: 'center', gap: 10, padding: 18, borderRadius: 22, borderWidth: 1 },
+  forfeitPanel:{borderRadius:16,borderWidth:1,padding:10,flexDirection:'row',alignItems:'center',gap:10},
+  forfeitCopy:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:8},
+  forfeitTitle:{color:'#FFB0B8',fontSize:9,fontWeight:'900'},
+  forfeitHint:{fontSize:7,lineHeight:11,marginTop:2},
+  forfeitButton:{minHeight:38,borderRadius:11,borderWidth:1,borderColor:'#8B3B49',backgroundColor:'#3A1921',paddingHorizontal:12,alignItems:'center',justifyContent:'center'},
+  forfeitButtonText:{color:'#FF9FAA',fontSize:8,fontWeight:'900'},
+  forfeitResult:{width:'100%',borderRadius:13,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:7},
+  forfeitResultText:{flex:1,fontSize:8,lineHeight:12,fontWeight:'800'}, panelTitle: { fontSize: 22, fontWeight: '900' }, panelText: { maxWidth: 620, textAlign: 'center', fontSize: 11, lineHeight: 17 }, stakeHeadline: { fontSize: 11, fontWeight: '900' }, actions: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 5 }, decline: { flex: 1, minHeight: 49, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 1, backgroundColor: '#231417' }, declineText: { color: '#FF8993', fontSize: 10, fontWeight: '900' }, accept: { flex: 1, minHeight: 49, alignItems: 'center', justifyContent: 'center', borderRadius: 13 }, acceptText: { color: '#07111F', fontSize: 10, fontWeight: '900' }, secondary: { flex: 1, minHeight: 49, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, secondaryText: { fontSize: 10, fontWeight: '900' }, disabled: { opacity: .42 },
   cardStakePanel: { width: '100%', maxWidth: 720, gap: 10, padding: 12, borderRadius: 17 }, stakePreview: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, borderWidth: 1 }, stakeImage: { width: 66, height: 88, borderRadius: 7 }, stakePreviewLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 1 }, stakeName: { fontSize: 14, fontWeight: '900', marginTop: 2 }, stakeMeta: { fontSize: 9, marginTop: 2 }, stakeValue: { fontSize: 11, fontWeight: '900', marginTop: 4 }, chooseStakeButton: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, borderWidth: 1 }, chooseStakeThumb: { width: 55, height: 73, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }, chooseStakeKicker: { fontSize: 7, fontWeight: '900', letterSpacing: 1 }, chooseStakeName: { fontSize: 13, fontWeight: '900', marginTop: 2 }, chooseStakeValue: { fontSize: 9, fontWeight: '800', marginTop: 3 },
   draftPanel: { alignItems: 'center', gap: 10, padding: 15, borderRadius: 22, borderWidth: 1 }, draftTitle: { fontSize: 22, fontWeight: '900', textAlign: 'center' }, draftGrid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }, draftCard: { width: '30%', maxWidth: 150, minWidth: 92, padding: 7, borderRadius: 14, borderWidth: 1 }, draftImage: { width: '100%', aspectRatio: .72, borderRadius: 8 }, draftCardName: { fontSize: 10, fontWeight: '900', marginTop: 5 }, draftOwner: { fontSize: 7, fontWeight: '900', marginTop: 2 },
   timerPanel: { alignItems: 'center', paddingVertical: 10 }, roundLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, timer: { fontSize: 43, fontWeight: '900', marginTop: 4 }, timerHint: { fontSize: 9, textAlign: 'center', lineHeight: 14, marginTop: 5 }, rulesText: { maxWidth: 620, fontSize: 9, lineHeight: 14, fontWeight: '800', textAlign: 'center', marginTop: 7 },
