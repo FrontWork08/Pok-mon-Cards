@@ -162,7 +162,7 @@ export default function PacksScreen() {
       return pack.name.toLowerCase().includes(term) || pack.set_id.toLowerCase().includes(term);
     });
 
-    const normalizedPrice = (pack:Pack) => pack.currency === 'diamonds' ? pack.base_price * 500000 : pack.base_price;
+    const normalizedPrice = (pack:Pack) => pack.currency === 'diamonds' ? pack.base_price * 100000 : pack.base_price;
     return [...visible].sort((a, b) => {
       if (sortMode === 'rarity-high') return b.rarity_score - a.rarity_score || normalizedPrice(b) - normalizedPrice(a);
       if (sortMode === 'rarity-low') return a.rarity_score - b.rarity_score || normalizedPrice(a) - normalizedPrice(b);
@@ -187,11 +187,11 @@ export default function PacksScreen() {
   }
 
   async function exchangeOneDiamond() {
-    const cost=500000;
-    if(coins<cost){setNotice({kind:'error',text:'Você precisa de 🪙 500.000 para trocar por 💎 1 Diamante.'});return;}
-    const run=async()=>{try{const result=await exchangeCoinsForDiamonds(1);setCoins(result.coins);setDiamonds(result.diamonds);await wallet.refresh();setNotice({kind:'success',text:'Câmbio concluído: 🪙 500.000 → 💎 1. Diamantes continuam sendo uma moeda rara.'});}catch(e){setNotice({kind:'error',text:e instanceof Error?e.message:'Não foi possível fazer o câmbio.'});}};
+    const cost=100000;
+    if(coins<cost){setNotice({kind:'error',text:'Você precisa de 🪙 100.000 para trocar por 💎 1 Diamante.'});return;}
+    const run=async()=>{try{const result=await exchangeCoinsForDiamonds(1);setCoins(result.coins);setDiamonds(result.diamonds);await wallet.refresh();setNotice({kind:'success',text:'Câmbio concluído: 🪙 100.000 → 💎 1.'});}catch(e){setNotice({kind:'error',text:e instanceof Error?e.message:'Não foi possível fazer o câmbio.'});}};
     if(Platform.OS==='web') void run();
-    else Alert.alert('Trocar por 1 Diamante?','O câmbio custa 🪙 500.000 e não pode ser desfeito.',[{text:'Cancelar',style:'cancel'},{text:'TROCAR',onPress:()=>{void run();}}]);
+    else Alert.alert('Trocar por 1 Diamante?','O câmbio custa 🪙 100.000 e não pode ser desfeito.',[{text:'Cancelar',style:'cancel'},{text:'TROCAR',onPress:()=>{void run();}}]);
   }
 
   async function toggleFavorite(pack: Pack) {
@@ -277,7 +277,7 @@ export default function PacksScreen() {
           <Text style={[styles.balanceLabel, { color: colors.muted }]}>SEU SALDO</Text>
           <Text style={[styles.balanceValue, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}  •  <Text style={{color:'#68D9FF'}}>💎 {diamonds.toLocaleString('pt-BR')}</Text></Text>
         </View>
-        <View style={styles.balanceActions}><Pressable onPress={()=>void exchangeOneDiamond()} style={[styles.exchangeButton,{backgroundColor:colors.surfaceAlt,borderColor:'#68D9FF'}]}><Ionicons name="diamond" size={15} color="#68D9FF"/><Text style={[styles.exchangeText,{color:colors.text}]}>🪙500K → 💎1</Text></Pressable><View style={[styles.balanceBadge, { backgroundColor: colors.accentSoft }]}><Ionicons name="wallet-outline" size={20} color={colors.yellow} /></View></View>
+        <View style={styles.balanceActions}><Pressable onPress={()=>void exchangeOneDiamond()} style={[styles.exchangeButton,{backgroundColor:colors.surfaceAlt,borderColor:'#68D9FF'}]}><Ionicons name="diamond" size={15} color="#68D9FF"/><Text style={[styles.exchangeText,{color:colors.text}]}>🪙100K → 💎1</Text></Pressable><View style={[styles.balanceBadge, { backgroundColor: colors.accentSoft }]}><Ionicons name="wallet-outline" size={20} color={colors.yellow} /></View></View>
       </View>
 
       {freeUntil ? (
