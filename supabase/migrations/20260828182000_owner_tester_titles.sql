@@ -64,6 +64,8 @@ create index if not exists admin_tester_title_grants_owner_idx
   on public.admin_tester_title_grants(owner_id,granted_at desc);
 create index if not exists admin_tester_title_grants_target_idx
   on public.admin_tester_title_grants(target_id,achievement_id);
+create index if not exists admin_tester_title_grants_achievement_idx
+  on public.admin_tester_title_grants(achievement_id);
 
 alter table public.admin_tester_title_grants enable row level security;
 revoke all on table public.admin_tester_title_grants from anon,authenticated;
