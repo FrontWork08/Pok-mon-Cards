@@ -33,6 +33,25 @@ export type MarketplaceHub = {
   myListings: MarketplaceListing[];
 };
 
+export type MarketOffer = {
+  id: string;
+  listingId: string;
+  amountCoins: number;
+  status: 'pending'|'accepted'|'rejected'|'cancelled'|'expired';
+  expiresAt: string;
+  createdAt: string;
+  buyerId: string;
+  buyerUsername: string;
+  sellerId: string;
+  sellerUsername: string;
+  listingPrice: number;
+  quantity: number;
+  card: { id:string; name:string; rarity:string|null; image:string|null };
+};
+
+export type MarketOffersHub = { incoming: MarketOffer[]; outgoing: MarketOffer[] };
+export type CardPricePoint = { priceUsd:number; recordedAt:string; source:string };
+
 function normalizeListing(row: any, shops: Map<string, any>, guilds: Map<string, any>): MarketplaceListing {
   const shop = shops.get(row.seller_id);
   const membership = guilds.get(row.seller_id);
@@ -131,10 +150,71 @@ export const cancelListing = (listingId:string) =>
 export const buyListing = (listingId:string) =>
   action({action:'buy',listingId});
 
+function normalizeOffer(row:any):MarketOffer{
+  return {
+    id:String(row.id),
+    listingId:String(row.listingId),
+    amountCoins:Number(row.amountCoins??0),
+    status:row.status,
+    expiresAt:String(row.expiresAt),
+    createdAt:String(row.createdAt),
+    buyerId:String(row.buyerId),
+    buyerUsername:String(row.buyerUsername??'Treinador'),
+    sellerId:String(row.sellerId),
+    sellerUsername:String(row.sellerUsername??'Treinador'),
+    listingPrice:Number(row.listingPrice??0),
+    quantity:Number(row.quantity??1),
+    card:{
+      id:String(row.card?.id??''),
+      name:String(row.card?.name??'Carta'),
+      rarity:row.card?.rarity??null,
+      image:row.card?.image??null,
+    },
+  };
+}
+
+export async function getMarketOffers():Promise<MarketOffersHub>{
+  const {data,error}=await supabase.rpc('get_market_offers');
+  if(error) throw error;
+  return {
+    incoming:Array.isArray(data?.incoming)?data.incoming.map(normalizeOffer):[],
+    outgoing:Array.isArray(data?.outgoing)?data.outgoing.map(normalizeOffer):[],
+  };
+}
+export async function createMarketOffer(listingId:string,amountCoins:number){
+  const {data,error}=await supabase.rpc('create_market_offer',{p_listing_id:listingId,p_amount:amountCoins});
+  if(error) throw error;
+  return data;
+}
+export async function respondMarketOffer(offerId:string,accept:boolean){
+  const {data,error}=await supabase.rpc('respond_market_offer',{p_offer_id:offerId,p_accept:accept});
+  if(error) throw error;
+  return data;
+}
+export async function cancelMarketOffer(offerId:string){
+  const {data,error}=await supabase.rpc('cancel_market_offer',{p_offer_id:offerId});
+  if(error) throw error;
+  return data;
+}
+export async function getCardPriceHistory(cardId:string,limit=30):Promise<CardPricePoint[]>{
+  const {data,error}=await supabase.from('card_market_price_history')
+    .select('price_usd,source,recorded_at')
+    .eq('card_id',cardId)
+    .order('recorded_at',{ascending:false})
+    .limit(Math.max(2,Math.min(limit,90)));
+  if(error) throw error;
+  return (data??[]).map((row:any)=>({
+    priceUsd:Number(row.price_usd??0),
+    source:String(row.source??'tcgplayer'),
+    recordedAt:String(row.recorded_at),
+  })).reverse();
+}
+
 export function subscribeMarketplace(onChange:()=>void) {
   const channel = supabase.channel(`marketplace-live-${Date.now()}`)
     .on('postgres_changes',{event:'*',schema:'public',table:'market_listings'},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'player_shops'},onChange)
+    .on('postgres_changes',{event:'*',schema:'public',table:'market_offers'},onChange)
     .subscribe();
   return () => { void supabase.removeChannel(channel); };
 }
