@@ -118,7 +118,7 @@ export async function getBattleLeaderboard(limit = 50) {
 
 export function subscribeToBattle(battleId: string, onChange: () => void) {
   const channel = supabase
-    .channel(`battle:${battleId}`)
+    .channel(`battle:${battleId}:${Date.now()}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'battles', filter: `id=eq.${battleId}` }, onChange)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'battle_events', filter: `battle_id=eq.${battleId}` }, onChange)
     .subscribe();
