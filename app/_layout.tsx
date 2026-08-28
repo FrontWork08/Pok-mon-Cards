@@ -16,6 +16,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { cancelMatchmaking, getMyMatchmakingState, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
 import { claimDailyLogin } from '@/services/retention';
 import { TrainerNavigation } from '@/components/TrainerNavigation';
+import { GlobalBottomNavigation } from '@/components/GlobalBottomNavigation';
 import { useWallet } from '@/wallet/WalletProvider';
 import { isCurrentUserAdmin } from '@/services/market';
 import { getMaintenanceStatus, type AppRuntimeStatus } from '@/services/maintenance';
@@ -386,6 +387,7 @@ function AppStack() {
       <StatusBar style={isLight ? 'dark' : 'light'} />
       {showChrome ? <View style={[styles.appChrome,{backgroundColor:colors.bg,borderBottomColor:colors.border,paddingTop:Math.max(insets.top,6)}]}><TrainerNavigation /></View> : null}
       <View style={styles.stackHost}><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} /></View>
+      {showChrome ? <GlobalBottomNavigation /> : null}
       <UpdatePrompt />
       <GlobalAnnouncementOverlay />
       {maintenanceBlocked ? (
