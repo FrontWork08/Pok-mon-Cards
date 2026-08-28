@@ -70,6 +70,15 @@ export type OwnedCardEntry = {
   } | null;
 };
 
+
+export type CardDetailEntry = {
+  owned: boolean;
+  quantity: number;
+  favorite: boolean;
+  first_obtained_at: string | null;
+  cards: NonNullable<OwnedCardEntry['cards']>;
+};
+
 export async function getMyProfile() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
@@ -107,6 +116,40 @@ export async function getMyBag(search?: string) {
   const { data, error } = await query;
   if (error) throw error;
   return data as unknown as OwnedCardEntry[];
+}
+
+export async function getCardDetail(cardId: string): Promise<CardDetailEntry> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const userId = userData.user?.id;
+  if (!userId) throw new Error('Usuário não autenticado.');
+
+  const [cardResult, ownershipResult] = await Promise.all([
+    supabase
+      .from('cards')
+      .select('id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at, tcg_data')
+      .eq('id', cardId)
+      .single(),
+    supabase
+      .from('player_cards')
+      .select('quantity,favorite,first_obtained_at')
+      .eq('player_id', userId)
+      .eq('card_id', cardId)
+      .gt('quantity', 0)
+      .maybeSingle(),
+  ]);
+
+  if (cardResult.error) throw cardResult.error;
+  if (ownershipResult.error) throw ownershipResult.error;
+
+  const ownership = ownershipResult.data;
+  return {
+    owned: Boolean(ownership),
+    quantity: Number(ownership?.quantity ?? 0),
+    favorite: Boolean(ownership?.favorite ?? false),
+    first_obtained_at: ownership?.first_obtained_at ?? null,
+    cards: cardResult.data as CardDetailEntry['cards'],
+  };
 }
 
 export async function getOwnedCard(cardId: string): Promise<OwnedCardEntry> {
