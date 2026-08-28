@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
 import type { Pack, OpenedCard } from '@/services/packs';
@@ -150,7 +151,7 @@ export default function GuildsScreen() {
   return (
     <Screen title="Guildas Pokémon" subtitle="Quatro equipes fixas, missões coletivas e ranking pelo valor total das cartas.">
       <View style={styles.topRow}>
-        <Pressable style={[styles.back, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color={colors.text} /><Text style={[styles.backText, { color: colors.text }]}>Voltar</Text></Pressable>
+        <Pressable style={[styles.back, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.text} /><Text style={[styles.backText, { color: colors.text }]}>Voltar</Text></Pressable>
         <Pressable style={[styles.refresh, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={() => void load()}><Ionicons name="refresh" size={17} color={colors.yellow} /><Text style={[styles.refreshText, { color: colors.yellow }]}>ATUALIZAR</Text></Pressable>
       </View>
 
