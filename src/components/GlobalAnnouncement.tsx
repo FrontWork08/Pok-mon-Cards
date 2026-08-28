@@ -6,10 +6,14 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 import { getActiveGlobalAnnouncement, type GlobalAnnouncement } from '@/services/liveEvents';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
+
+const SEEN_ANNOUNCEMENTS_KEY = 'pokemon-cards-seen-global-announcements-v1';
+const MAX_SEEN_ANNOUNCEMENTS = 100;
 
 const severityTheme = {
   info: { color: '#6FD3FF', icon: 'information-circle' as const, label: 'INFORMAÇÃO' },
@@ -17,14 +21,43 @@ const severityTheme = {
   critical: { color: '#FF6B81', icon: 'alert-circle' as const, label: 'URGENTE' },
 };
 
+async function loadSeenAnnouncementIds() {
+  try {
+    const raw = await SecureStore.getItemAsync(SEEN_ANNOUNCEMENTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set<string>(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+async function rememberAnnouncement(id: string, current: Set<string>) {
+  const next = new Set(current);
+  next.add(id);
+  const values = [...next].slice(-MAX_SEEN_ANNOUNCEMENTS);
+  try {
+    await SecureStore.setItemAsync(SEEN_ANNOUNCEMENTS_KEY, JSON.stringify(values));
+  } catch {}
+  return new Set(values);
+}
+
 export function GlobalAnnouncementOverlay() {
   const { colors } = useAppTheme();
   const [announcement, setAnnouncement] = useState<GlobalAnnouncement | null>(null);
-  const [dismissedId, setDismissedId] = useState<string | null>(null);
+  const [seenIds, setSeenIds] = useState<Set<string> | null>(null);
 
   const refresh = useCallback(async () => {
     const current = await getActiveGlobalAnnouncement();
     setAnnouncement(current);
+  }, []);
+
+  const dismiss = useCallback(async () => {
+    if (!announcement || !seenIds) return;
+    setSeenIds(await rememberAnnouncement(announcement.id, seenIds));
+  }, [announcement, seenIds]);
+
+  useEffect(() => {
+    void loadSeenAnnouncementIds().then(setSeenIds);
   }, []);
 
   useEffect(() => {
@@ -73,7 +106,7 @@ export function GlobalAnnouncementOverlay() {
     };
   }, [refresh]);
 
-  const visible = Boolean(announcement && dismissedId !== announcement.id);
+  const visible = Boolean(announcement && seenIds && !seenIds.has(announcement.id));
   const visual = severityTheme[announcement?.severity ?? 'info'];
 
   return (
@@ -81,7 +114,7 @@ export function GlobalAnnouncementOverlay() {
       transparent
       animationType="fade"
       visible={visible}
-      onRequestClose={() => setDismissedId(announcement?.id ?? null)}
+      onRequestClose={() => { void dismiss(); }}
     >
       <View style={styles.backdrop}>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: visual.color }]}>
@@ -92,7 +125,7 @@ export function GlobalAnnouncementOverlay() {
           <Text style={[styles.title, { color: colors.text }]}>{announcement?.title}</Text>
           <Text style={[styles.body, { color: colors.muted }]}>{announcement?.body}</Text>
           <Pressable
-            onPress={() => setDismissedId(announcement?.id ?? null)}
+            onPress={() => { void dismiss(); }}
             style={[styles.button, { backgroundColor: visual.color }]}
           >
             <Text style={styles.buttonText}>ENTENDI</Text>
