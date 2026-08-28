@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { findPlayers } from '@/services/player';
 import { runFriendAction } from '@/services/playerActions';
@@ -72,7 +73,7 @@ export default function FriendsScreen() {
 
   return (
     <Screen title="Amigos" subtitle="Converse, desafie para batalhas e negocie cards com seus treinadores.">
-      <Pressable style={styles.backRow} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color="#A9BDD7" /><Text style={styles.backText}>Voltar ao perfil</Text></Pressable>
+      <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color="#A9BDD7" /><Text style={styles.backText}>Voltar ao perfil</Text></Pressable>
       {notice ? <View style={styles.notice}><Ionicons name="information-circle" size={20} color={gameTheme.colors.yellow} /><Text style={styles.noticeText}>{notice}</Text><Pressable onPress={() => setNotice(null)}><Ionicons name="close" size={18} color="#fff" /></Pressable></View> : null}
       <View style={styles.searchBox}><Ionicons name="search" size={20} color={gameTheme.colors.muted} /><TextInput value={search} onChangeText={setSearch} onSubmitEditing={doSearch} placeholder="Buscar treinador por username..." placeholderTextColor="#70839F" autoCapitalize="none" style={styles.search} /><Pressable style={styles.searchButton} onPress={doSearch} disabled={searching}><Text style={styles.searchButtonText}>{searching ? '...' : 'BUSCAR'}</Text></Pressable></View>
 
