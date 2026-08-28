@@ -75,7 +75,7 @@ CREATE OR REPLACE FUNCTION public.claim_season_reward()
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ select private.claim_season_reward(); $function$
+AS $function$ select private.claim_season_reward(); $function$;
 
 
 revoke all on function private.claim_season_reward() from public,anon;
