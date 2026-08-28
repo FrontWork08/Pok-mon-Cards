@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { redeemCode, type RedeemResult } from '@/services/codes';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -34,7 +35,7 @@ export default function CodesScreen() {
 
   return (
     <Screen title="Resgatar Código" subtitle="Cada código pode ser usado uma única vez por conta.">
-      <Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
+      <Pressable style={styles.back} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
       <View style={[styles.hero,{backgroundColor:colors.accentSoft,borderColor:'#68D9FF'}]}>
         <View style={[styles.heroIcon,{backgroundColor:colors.surface}]}><Ionicons name="ticket" size={28} color="#68D9FF"/></View>
         <View style={{flex:1}}><Text style={[styles.kicker,{color:'#68D9FF'}]}>CENTRAL DE RECOMPENSAS</Text><Text style={[styles.title,{color:colors.text}]}>Código de Treinador</Text><Text style={[styles.helper,{color:colors.muted}]}>Digite exatamente o código recebido. Espaços são removidos automaticamente.</Text></View>
