@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, useW
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { getMyBag } from '@/services/player';
 import { generationForNumber, getPokemonCardVersions, type PokemonCardVersion } from '@/services/pokedex';
 import { gameTheme } from '@/theme/gameTheme';
@@ -44,7 +45,7 @@ export default function PokemonVersionsScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}><Ionicons name="arrow-back" size={21} color="#fff" /></Pressable>
+          <Pressable style={styles.backButton} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={21} color="#fff" /></Pressable>
           <View style={styles.topInfo}><Text style={styles.kicker}>POKÉDEX #{String(pokedexNumber).padStart(4, '0')}</Text><Text style={styles.title}>{name}</Text></View>
         </View>
 
