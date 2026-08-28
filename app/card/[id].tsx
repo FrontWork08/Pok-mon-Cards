@@ -6,6 +6,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getOwnedCard, type OwnedCardEntry } from '@/services/player';
 import { setCardFavorite } from '@/services/playerActions';
 import { formatUsd } from '@/services/market';
+import { getCardPriceHistory, type CardPricePoint } from '@/services/marketplace';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { isCardWishlisted, setCardWishlist } from '@/services/retention';
 
@@ -18,6 +19,7 @@ export default function CardDetailScreen() {
   const [saving, setSaving] = useState(false);
   const [wishlistSaving, setWishlistSaving] = useState(false);
   const [wishlisted, setWishlisted] = useState(false);
+  const [priceHistory, setPriceHistory] = useState<CardPricePoint[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -25,12 +27,14 @@ export default function CardDetailScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [owned, wanted] = await Promise.all([
+      const [owned, wanted, history] = await Promise.all([
         getOwnedCard(String(id)),
         isCardWishlisted(String(id)),
+        getCardPriceHistory(String(id), 30),
       ]);
       setEntry(owned);
       setWishlisted(wanted);
+      setPriceHistory(history);
     }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível carregar este card.'); }
     finally { setLoading(false); }
@@ -63,6 +67,10 @@ export default function CardDetailScreen() {
   const unitValue = Number(card?.game_value ?? 0);
   const marketPriceUsd = card?.market_price_usd == null ? null : Number(card.market_price_usd);
   const totalMarketValueUsd = marketPriceUsd == null ? null : marketPriceUsd * Number(entry?.quantity ?? 0);
+  const historyMin = priceHistory.length ? Math.min(...priceHistory.map((point) => point.priceUsd)) : 0;
+  const historyMax = priceHistory.length ? Math.max(...priceHistory.map((point) => point.priceUsd)) : 0;
+  const historyRange = Math.max(.01, historyMax - historyMin);
+  const historyDelta = priceHistory.length > 1 ? priceHistory[priceHistory.length - 1].priceUsd - priceHistory[0].priceUsd : 0;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
@@ -84,6 +92,20 @@ export default function CardDetailScreen() {
 
             <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR DE MERCADO EM USD</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? 'Preço TCGplayer indisponível para esta carta.' : 'Snapshot de mercado TCGplayer'}</Text></View></View>
 
+            {priceHistory.length ? <View style={[styles.historyPanel, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+              <View style={styles.historyHead}>
+                <View><Text style={[styles.valueLabel, { color: colors.muted }]}>HISTÓRICO DE PREÇO</Text><Text style={[styles.historyValue, { color: colors.text }]}>{formatUsd(priceHistory[priceHistory.length - 1].priceUsd)}</Text></View>
+                <Text style={[styles.historyDelta, { color: historyDelta >= 0 ? '#65D894' : '#FF8290' }]}>{historyDelta >= 0 ? '+' : ''}{formatUsd(historyDelta)}</Text>
+              </View>
+              <View style={styles.chart}>
+                {priceHistory.map((point, index) => {
+                  const height = 18 + ((point.priceUsd - historyMin) / historyRange) * 72;
+                  return <View key={point.recordedAt + '-' + index} style={styles.barSlot}><View style={[styles.bar, { height, backgroundColor: colors.accent }]} /></View>;
+                })}
+              </View>
+              <View style={styles.historyDates}><Text style={[styles.historyDate, { color: colors.muted }]}>{new Date(priceHistory[0].recordedAt).toLocaleDateString('pt-BR')}</Text><Text style={[styles.historyDate, { color: colors.muted }]}>Mín. {formatUsd(historyMin)} • Máx. {formatUsd(historyMax)}</Text><Text style={[styles.historyDate, { color: colors.muted }]}>{new Date(priceHistory[priceHistory.length - 1].recordedAt).toLocaleDateString('pt-BR')}</Text></View>
+            </View> : null}
+
             <View style={styles.badges}>{(card.types ?? []).map((type) => <View key={type} style={[styles.badge, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Text style={[styles.badgeText, { color: colors.text }]}>{type}</Text></View>)}</View>
             <View style={styles.statsGrid}><Info label="SET" value={card.set_name} /><Info label="NÚMERO" value={card.card_number ?? '—'} /><Info label="QUANTIDADE" value={`×${entry.quantity}`} /><Info label="VALOR TOTAL EM USD" value={totalMarketValueUsd == null ? '—' : formatUsd(totalMarketValueUsd)} /><Info label="VALOR NO JOGO" value={`🪙 ${unitValue.toLocaleString('pt-BR')}`} /><Info label="OBTIDO" value={new Date(entry.first_obtained_at).toLocaleDateString('pt-BR')} /></View>
             <View style={styles.cardActions}>
@@ -104,5 +126,14 @@ const styles = StyleSheet.create({
   layout: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start', justifyContent: 'center' }, imagePanel: { flexGrow: 1, flexBasis: 330, maxWidth: 480, minHeight: 470, borderRadius: 26, padding: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, image: { width: '100%', height: 570, maxHeight: 570 }, imagePlaceholder: { width: '100%', height: 480, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, infoPanel: { flexGrow: 1, flexBasis: 320, maxWidth: 560, borderRadius: 26, padding: 22, borderWidth: 1 }, kicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }, name: { fontSize: 34, lineHeight: 40, fontWeight: '900', marginTop: 5 }, rarity: { fontSize: 14, fontWeight: '700', marginTop: 4 },
   cardActions: { flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:20 },
   flexAction: { flexGrow:1, minWidth:190, marginTop:0 },
+  historyPanel: { marginTop: 12, borderRadius: 18, borderWidth: 1, padding: 12 },
+  historyHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10 },
+  historyValue: { fontSize: 18, fontWeight: '900', marginTop: 2 },
+  historyDelta: { fontSize: 11, fontWeight: '900' },
+  chart: { height: 96, marginTop: 12, flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  barSlot: { flex: 1, height: '100%', justifyContent: 'flex-end' },
+  bar: { width: '100%', minWidth: 2, borderRadius: 3 },
+  historyDates: { marginTop: 7, flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
+  historyDate: { fontSize: 7, fontWeight: '700' },
   valueHero: { marginTop: 16, borderRadius: 18, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11 }, valueIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, valueLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 }, valueNumber: { fontSize: 24, fontWeight: '900', marginTop: 2 }, valueHint: { fontSize: 8, lineHeight: 12, marginTop: 2 }, badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }, badge: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999, borderWidth: 1 }, badgeText: { fontSize: 11, fontWeight: '900' }, statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }, infoCard: { width: '48%', minHeight: 82, borderRadius: 16, padding: 13, borderWidth: 1 }, infoLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, infoValue: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 5 }, favoriteButton: { marginTop: 20, minHeight: 52, borderRadius: 16, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 }, favoriteButtonText: { color: '#07111F', fontSize: 11, fontWeight: '900', letterSpacing: .4 },
 });
