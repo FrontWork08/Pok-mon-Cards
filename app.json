@@ -16,17 +16,7 @@
       "checkAutomatically": "ON_ERROR_RECOVERY"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "headers": {
-            "X-Frame-Options": "DENY",
-            "X-Content-Type-Options": "nosniff",
-            "Referrer-Policy": "strict-origin-when-cross-origin",
-            "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
-          }
-        }
-      ],
+      "expo-router",
       "expo-secure-store",
       "expo-notifications"
     ],
