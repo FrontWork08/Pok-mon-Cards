@@ -19,6 +19,7 @@ import {
   getAdminRedeemCodes,
   grantCoinsBatch,
   grantDiamondsBatch,
+  grantBattlePassVip,
   createRedeemCode,
   setAdminRedeemCodeActive,
   publishGlobalAnnouncement,
@@ -390,6 +391,34 @@ export default function AdminScreen() {
       'Confirmar Diamantes',
       `Adicionar 💎 ${diamondAmountNumber.toLocaleString('pt-BR')} para cada um dos ${selectedPlayers.length} jogadores selecionados?`,
       [{text:'Cancelar',style:'cancel'},{text:'Adicionar',onPress:()=>{void sendDiamonds();}}],
+    );
+  }
+
+  async function sendBattlePassVip() {
+    if (selectedPlayers.length < 1 || working) return;
+    try {
+      setWorking(true);
+      setError(null);
+      const result = await grantBattlePassVip(selectedPlayers.map((player) => player.id), note);
+      setNotice(`Passe VIP liberado gratuitamente para ${result.recipientCount.toLocaleString('pt-BR')} jogador(es).`);
+      setNote('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível liberar o Passe VIP.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmBattlePassVip() {
+    if (selectedPlayers.length < 1 || working) return;
+    Alert.alert(
+      'Dar Passe VIP grátis?',
+      `Liberar gratuitamente o VIP da temporada atual para ${selectedPlayers.length.toLocaleString('pt-BR')} jogador(es)? Nenhum Diamante será cobrado.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'DAR VIP GRÁTIS', onPress: () => { void sendBattlePassVip(); } },
+      ],
     );
   }
 
@@ -1374,6 +1403,37 @@ export default function AdminScreen() {
             <View style={styles.quickRow}>{[1,5,10,25,50,100].map((quick)=><Pressable key={quick} onPress={()=>setDiamondAmount(String(quick))} style={[styles.quickChip,{backgroundColor:diamondAmountNumber===quick?'#68D9FF':colors.surfaceAlt,borderColor:diamondAmountNumber===quick?'#68D9FF':colors.border}]}><Text style={[styles.quickText,{color:diamondAmountNumber===quick?'#07111F':colors.text}]}>{quick}</Text></Pressable>)}</View>
             <TextInput value={diamondAmount} onChangeText={(value)=>setDiamondAmount(value.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Quantidade de Diamantes" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
             <Pressable disabled={selectedPlayers.length<1||diamondAmountNumber<1||working} onPress={confirmSendDiamonds} style={[styles.grantButton,{backgroundColor:selectedPlayers.length&&diamondAmountNumber?'#68D9FF':colors.surfaceAlt,opacity:working?.75:1}]}><Ionicons name="diamond" size={20} color="#07111F"/><Text style={styles.grantButtonText}>ADICIONAR DIAMANTES</Text></Pressable>
+          </View>
+
+          <SectionTitle title="VIP do Passe de Batalha" />
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
+            <View style={styles.moderationHeader}>
+              <View style={[styles.moderationIcon, { backgroundColor: colors.accentSoft }]}>
+                <Ionicons name="ribbon" size={23} color={colors.yellow} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.moderationTitle, { color: colors.text }]}>Conceder VIP sem cobrar Diamantes</Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>Escolha um ou mais jogadores. O acesso vale para a temporada atual e fica registrado no servidor.</Text>
+              </View>
+            </View>
+            <TextInput value={playerSearch} onChangeText={setPlayerSearch} autoCapitalize="none" autoCorrect={false} placeholder="Buscar jogador pelo nome" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
+            <View style={styles.friendChips}>
+              {visiblePlayers.length === 0 ? <Text style={[styles.emptyText,{color:colors.muted}]}>Nenhum jogador encontrado.</Text> : visiblePlayers.map((player)=>{
+                const active=selectedPlayerIds.has(player.id);
+                return <Pressable key={`pass-vip-${player.id}`} onPress={()=>setSelectedPlayerIds((current)=>{
+                  const next=new Set(current);
+                  if(next.has(player.id)) next.delete(player.id); else next.add(player.id);
+                  return next;
+                })} style={[styles.friendChip,{backgroundColor:active?colors.accentSoft:colors.surfaceAlt,borderColor:active?colors.yellow:colors.border}]}>
+                  <Text style={[styles.friendChipText,{color:colors.text}]}>@{player.username}{active?' • ✓':''}</Text>
+                </Pressable>;
+              })}
+            </View>
+            <TextInput value={note} onChangeText={setNote} placeholder="Motivo/observação opcional" placeholderTextColor={colors.muted} maxLength={180} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
+            <Pressable disabled={selectedPlayers.length<1||working} onPress={confirmBattlePassVip} style={[styles.grantButton,{backgroundColor:selectedPlayers.length?colors.yellow:colors.surfaceAlt,opacity:working?.75:1}]}>
+              {working?<ActivityIndicator size="small" color="#07111F"/>:<Ionicons name="diamond" size={20} color="#07111F"/>}
+              <Text style={styles.grantButtonText}>DAR VIP GRÁTIS • {selectedPlayers.length} JOGADOR(ES)</Text>
+            </Pressable>
           </View>
 
           <SectionTitle title="Códigos de resgate" />
