@@ -46,13 +46,42 @@ export type GuildInvite = {
   createdAt: string;
 };
 
+export type GuildWeeklyReward = {
+  guildId: string | null;
+  weekStart: string;
+  completedMissions: number;
+  claimed: boolean;
+  claimable: boolean;
+  coins: number;
+  diamonds: number;
+  collectionValueUsd: number;
+  packs: number;
+  wins: number;
+};
+
 export type GuildHub = {
   guilds: Guild[];
   myMembership: { guildId: string; role: GuildRole; joinedAt: string } | null;
   myInvites: GuildInvite[];
+  weeklyReward: GuildWeeklyReward;
 };
 
-function normalizeHub(data: any): GuildHub {
+function normalizeWeeklyReward(data: any): GuildWeeklyReward {
+  return {
+    guildId: data?.guildId ?? null,
+    weekStart: String(data?.weekStart ?? ''),
+    completedMissions: Number(data?.completedMissions ?? 0),
+    claimed: Boolean(data?.claimed),
+    claimable: Boolean(data?.claimable),
+    coins: Number(data?.coins ?? 0),
+    diamonds: Number(data?.diamonds ?? 0),
+    collectionValueUsd: Number(data?.collectionValueUsd ?? 0),
+    packs: Number(data?.packs ?? 0),
+    wins: Number(data?.wins ?? 0),
+  };
+}
+
+function normalizeHub(data: any, weeklyReward?: any): GuildHub {
   return {
     guilds: Array.isArray(data?.guilds) ? data.guilds.map((guild: any) => ({
       ...guild,
@@ -71,13 +100,31 @@ function normalizeHub(data: any): GuildHub {
     })) : [],
     myMembership: data?.myMembership ?? null,
     myInvites: Array.isArray(data?.myInvites) ? data.myInvites : [],
+    weeklyReward: normalizeWeeklyReward(weeklyReward),
   };
 }
 
 export async function getGuildHub(): Promise<GuildHub> {
-  const { data, error } = await supabase.rpc('get_guild_hub');
+  const [hubResult, rewardResult] = await Promise.all([
+    supabase.rpc('get_guild_hub'),
+    supabase.rpc('get_guild_weekly_reward_status'),
+  ]);
+  if (hubResult.error) throw hubResult.error;
+  if (rewardResult.error) throw rewardResult.error;
+  return normalizeHub(hubResult.data, rewardResult.data);
+}
+
+export async function claimGuildWeeklyReward() {
+  const { data, error } = await supabase.rpc('claim_guild_weekly_reward');
   if (error) throw error;
-  return normalizeHub(data);
+  return {
+    guildId: String(data?.guildId ?? ''),
+    weekStart: String(data?.weekStart ?? ''),
+    completedMissions: Number(data?.completedMissions ?? 0),
+    coins: Number(data?.coins ?? 0),
+    diamonds: Number(data?.diamonds ?? 0),
+    claimed: Boolean(data?.claimed),
+  };
 }
 
 async function guildAction(args: {
@@ -121,7 +168,8 @@ export function subscribeToGuilds(onChange: () => void) {
   channel
     .on('postgres_changes', { event: '*', schema: 'public', table: 'guilds' }, handleChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_members' }, handleChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_invites' }, handleChange);
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_invites' }, handleChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_weekly_reward_claims' }, handleChange);
 
   channel.subscribe();
 
