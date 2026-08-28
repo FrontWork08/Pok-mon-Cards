@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PackContentsModal } from '@/components/PackContentsModal';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
@@ -57,6 +57,7 @@ const DIAMOND_PACK_BASE: Pack = {
 
 export default function PacksScreen() {
   const { width } = useWindowDimensions();
+  const router = useRouter();
   const { colors, isLight } = useAppTheme();
   const wallet = useWallet();
   const [packs, setPacks] = useState<Pack[]>([]);
@@ -320,13 +321,22 @@ export default function PacksScreen() {
           <Text style={[styles.diamondTitle, { color: colors.text }]}>1 carta lendária acima de US$ 25</Text>
           <Text style={[styles.diamondText, { color: colors.muted }]}>Somente Pokémon lendários ou míticos. Uma carta por abertura, sem itens extras.</Text>
         </View>
-        <Pressable
-          disabled={diamonds < diamondCost}
-          onPress={() => diamonds >= diamondCost ? setSelectedPack(diamondPack) : setNotice({kind:'error',text:`Você precisa de 💎 ${diamondCost} Diamantes para abrir o Cofre Lendário.`})}
-          style={[styles.diamondButton, { backgroundColor: diamonds >= diamondCost ? '#68D9FF' : colors.surfaceAlt }]}
-        >
-          <Text style={[styles.diamondButtonText, diamonds < diamondCost && { color: colors.muted }]}>💎 {diamondCost} • ABRIR</Text>
-        </Pressable>
+        <View style={styles.diamondActions}>
+          <Pressable
+            onPress={() => setContentsPack(diamondPack)}
+            style={[styles.diamondPreviewButton,{backgroundColor:colors.surfaceAlt,borderColor:'#68D9FF'}]}
+          >
+            <Ionicons name="eye" size={15} color="#68D9FF"/>
+            <Text style={[styles.diamondPreviewText,{color:colors.text}]}>VER CARTAS</Text>
+          </Pressable>
+          <Pressable
+            disabled={diamonds < diamondCost}
+            onPress={() => diamonds >= diamondCost ? setSelectedPack(diamondPack) : setNotice({kind:'error',text:`Você precisa de 💎 ${diamondCost} Diamantes para abrir o Cofre Lendário.`})}
+            style={[styles.diamondButton, { backgroundColor: diamonds >= diamondCost ? '#68D9FF' : colors.surfaceAlt }]}
+          >
+            <Text style={[styles.diamondButtonText, diamonds < diamondCost && { color: colors.muted }]}>💎 {diamondCost} • ABRIR</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={[styles.shopHero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
@@ -600,6 +610,9 @@ const styles = StyleSheet.create({
   diamondKicker: { color:'#68D9FF', fontSize:8, fontWeight:'900', letterSpacing:1.2 },
   diamondTitle: { fontSize:17, fontWeight:'900', marginTop:2 },
   diamondText: { fontSize:10, lineHeight:15, marginTop:3 },
+  diamondActions:{gap:7,alignItems:'stretch'},
+  diamondPreviewButton:{minHeight:38,borderRadius:12,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
+  diamondPreviewText:{fontSize:8,fontWeight:'900'},
   diamondButton: { minHeight:45, borderRadius:13, paddingHorizontal:13, alignItems:'center', justifyContent:'center' },
   diamondButtonText: { color:'#07111F', fontSize:9, fontWeight:'900' },
 
