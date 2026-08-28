@@ -37,3 +37,45 @@ export async function renameDeck(deckId: string, name: string) {
 export async function deleteDeck(deckId: string) {
   return invoke({ action: 'delete', deckId });
 }
+
+
+export type DeckBuilderCardEntry = {
+  quantity: number;
+  cards: {
+    id: string;
+    pokemon_name: string;
+    rarity: string | null;
+    set_name: string;
+    image_small: string | null;
+    market_price_usd: number | null;
+  };
+};
+
+export type DeckBuilderPage = {
+  items: DeckBuilderCardEntry[];
+  total: number;
+};
+
+export async function getMyDeck(deckId: string) {
+  const { data, error } = await supabase
+    .from('decks')
+    .select('id,name,is_default,created_at,updated_at,deck_cards(card_id,quantity,cards(id,pokemon_name,rarity,image_small,market_price_usd))')
+    .eq('id', deckId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getDeckBuilderPage(offset: number, limit: number, search = ''): Promise<DeckBuilderPage> {
+  const { data, error } = await supabase.rpc('get_my_deck_builder_page', {
+    p_offset: Math.max(0, Math.floor(offset)),
+    p_limit: Math.max(1, Math.min(60, Math.floor(limit))),
+    p_search: search.trim() || null,
+  });
+  if (error) throw error;
+  const value = (data ?? {}) as any;
+  return {
+    items: Array.isArray(value.items) ? value.items as DeckBuilderCardEntry[] : [],
+    total: Number(value.total ?? 0),
+  };
+}
