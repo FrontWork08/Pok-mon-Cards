@@ -7,6 +7,8 @@ import { Screen } from '@/components/Screen';
 import { formatUsd } from '@/services/market';
 import { getPublicPlayerProfile, type PublicPlayerProfile } from '@/services/publicProfiles';
 import { getTrainerRank } from '@/services/ranks';
+import { runFriendAction } from '@/services/playerActions';
+import { getRelationshipWith, type PublicRelationshipState } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 
@@ -17,13 +19,21 @@ export default function PlayerShowcaseScreen() {
   const [profile, setProfile] = useState<PublicPlayerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [relationship, setRelationship] = useState<PublicRelationshipState>('none');
+  const [friendWorking, setFriendWorking] = useState(false);
+  const [friendNotice, setFriendNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
       setLoading(true);
       setError(null);
-      setProfile(await getPublicPlayerProfile(id));
+      const [nextProfile, nextRelationship] = await Promise.all([
+        getPublicPlayerProfile(id),
+        getRelationshipWith(id),
+      ]);
+      setProfile(nextProfile);
+      setRelationship(nextRelationship);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível abrir este perfil.');
     } finally {
@@ -41,11 +51,37 @@ export default function PlayerShowcaseScreen() {
   const frameColor = player?.frame?.primaryColor ?? player?.guild?.color ?? colors.accent;
   const backgroundColor = player?.background?.secondaryColor ?? colors.accentSoft;
 
+  async function updateFriendship(action: 'send' | 'accept') {
+    if (!player || friendWorking) return;
+    try {
+      setFriendWorking(true);
+      setFriendNotice(null);
+      const result = await runFriendAction(player.id, action);
+      const nextRelationship = result.status === 'accepted'
+        ? 'friend'
+        : result.status === 'pending'
+          ? 'outgoing'
+          : await getRelationshipWith(player.id);
+      setRelationship(nextRelationship);
+      setFriendNotice(
+        nextRelationship === 'friend'
+          ? `Agora você e @${player.username} são amigos.`
+          : 'Solicitação de amizade enviada.',
+      );
+    } catch (e) {
+      setFriendNotice(e instanceof Error ? e.message : 'Não foi possível atualizar a amizade.');
+      setRelationship(await getRelationshipWith(player.id).catch(() => relationship));
+    } finally {
+      setFriendWorking(false);
+    }
+  }
+
   return (
     <Screen title="Perfil de Exibição" subtitle="Cartas mais raras, valor da conta, guilda e desempenho do treinador.">
       <Pressable style={styles.back} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText, { color: colors.muted }]}>Voltar ao ranking</Text></Pressable>
       {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
       {error ? <Pressable style={styles.error} onPress={() => void load()}><Ionicons name="alert-circle" size={19} color="#FF9FAF" /><Text style={styles.errorText}>{error} Toque para tentar novamente.</Text></Pressable> : null}
+      {friendNotice ? <Pressable style={[styles.friendNotice,{backgroundColor:colors.surface,borderColor:colors.border}]} onPress={() => setFriendNotice(null)}><Ionicons name="people" size={17} color={colors.accent}/><Text style={[styles.friendNoticeText,{color:colors.text}]}>{friendNotice}</Text><Ionicons name="close" size={16} color={colors.muted}/></Pressable> : null}
 
       {player && collection ? <>
         <View style={[styles.hero, { backgroundColor, borderColor: frameColor, borderWidth: player.frame ? 2 : 1 }]}>
@@ -59,6 +95,37 @@ export default function PlayerShowcaseScreen() {
           </View>
           {player.guild ? <Pressable onPress={() => router.push('/guilds')} style={[styles.guildBadge, { backgroundColor: player.guild.color + '25', borderColor: player.guild.color }]}><Ionicons name="shield" size={16} color={player.guild.color} /><Text style={[styles.guildText, { color: player.guild.color }]}>{player.guild.name} • Nv. {player.guild.level}</Text></Pressable> : null}
         </View>
+
+        {relationship !== 'self' ? (
+          <View style={[styles.friendPanel,{backgroundColor:colors.surface,borderColor:relationship==='friend'?'#2F9E68':colors.border}]}>
+            <View style={[styles.friendPanelIcon,{backgroundColor:relationship==='friend'?'#153426':colors.accentSoft}]}>
+              <Ionicons name={relationship==='friend'?'people':'person-add'} size={21} color={relationship==='friend'?'#65D894':colors.accent}/>
+            </View>
+            <View style={styles.friendPanelCopy}>
+              <Text style={[styles.friendPanelTitle,{color:colors.text}]}>
+                {relationship==='friend' ? 'Vocês já são amigos' : relationship==='incoming' ? 'Solicitação recebida' : relationship==='outgoing' ? 'Solicitação enviada' : 'Adicionar treinador'}
+              </Text>
+              <Text style={[styles.friendPanelText,{color:colors.muted}]}>
+                {relationship==='friend' ? 'Você pode conversar, trocar cartas e desafiar este treinador.' : relationship==='incoming' ? `@${player.username} quer adicionar você.` : relationship==='outgoing' ? 'Aguardando este treinador aceitar sua solicitação.' : 'Adicione este treinador para liberar chat privado, trocas e desafios entre amigos.'}
+              </Text>
+            </View>
+            {relationship==='none' ? (
+              <Pressable disabled={friendWorking} onPress={() => { void updateFriendship('send'); }} style={[styles.addFriendButton,{backgroundColor:colors.yellow,opacity:friendWorking ? .55 : 1}]}>
+                {friendWorking ? <ActivityIndicator size="small" color="#07111F"/> : <Ionicons name="person-add" size={17} color="#07111F"/>}
+                <Text style={styles.addFriendButtonText}>ADICIONAR AMIGO</Text>
+              </Pressable>
+            ) : relationship==='incoming' ? (
+              <Pressable disabled={friendWorking} onPress={() => { void updateFriendship('accept'); }} style={[styles.addFriendButton,{backgroundColor:'#65D894',opacity:friendWorking ? .55 : 1}]}>
+                {friendWorking ? <ActivityIndicator size="small" color="#07111F"/> : <Ionicons name="checkmark-circle" size={17} color="#07111F"/>}
+                <Text style={styles.addFriendButtonText}>ACEITAR</Text>
+              </Pressable>
+            ) : relationship==='outgoing' ? (
+              <View style={[styles.pendingFriendBadge,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="time" size={15} color={colors.muted}/><Text style={[styles.pendingFriendText,{color:colors.muted}]}>PENDENTE</Text></View>
+            ) : (
+              <View style={styles.friendConfirmedBadge}><Ionicons name="checkmark-circle" size={15} color="#65D894"/><Text style={styles.friendConfirmedText}>AMIGOS</Text></View>
+            )}
+          </View>
+        ) : null}
 
         <View style={[styles.valuePanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
           <View style={{ flex: 1 }}><Text style={[styles.valueKicker, { color: colors.yellow }]}>VALOR TOTAL DA CONTA</Text><Text style={[styles.value, { color: colors.text }]}>{formatUsd(collection.totalValueUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>Soma do preço TCGplayer de todas as cópias da coleção</Text></View>
@@ -113,6 +180,19 @@ const styles = StyleSheet.create({
   backText: { fontSize: 12, fontWeight: '800' },
   error: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 12, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' },
   errorText: { flex: 1, color: '#FFD7DD', fontWeight: '700', fontSize: 11 },
+  friendNotice:{flexDirection:'row',alignItems:'center',gap:8,borderRadius:14,borderWidth:1,padding:10},
+  friendNoticeText:{flex:1,fontSize:10,fontWeight:'800'},
+  friendPanel:{borderRadius:18,borderWidth:1,padding:12,flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'},
+  friendPanelIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},
+  friendPanelCopy:{flex:1,minWidth:190},
+  friendPanelTitle:{fontSize:12,fontWeight:'900'},
+  friendPanelText:{fontSize:8,lineHeight:12,marginTop:2},
+  addFriendButton:{minHeight:40,borderRadius:12,paddingHorizontal:11,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},
+  addFriendButtonText:{color:'#07111F',fontSize:8,fontWeight:'900'},
+  pendingFriendBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:10,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:5},
+  pendingFriendText:{fontSize:7,fontWeight:'900'},
+  friendConfirmedBadge:{borderRadius:999,borderWidth:1,borderColor:'#2F9E68',backgroundColor:'#153426',paddingHorizontal:10,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:5},
+  friendConfirmedText:{color:'#9CEFC1',fontSize:7,fontWeight:'900'},
   hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 13, padding: 17, borderRadius: 23, borderWidth: 1 },
   avatar: { width: 66, height: 66, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 28, fontWeight: '900' },
