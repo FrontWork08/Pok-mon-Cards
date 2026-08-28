@@ -14,6 +14,37 @@ function json(body: unknown, status = 200) {
   });
 }
 
+async function addMarketPrices(admin: ReturnType<typeof createClient>, payload: any) {
+  const cards = Array.isArray(payload?.cards) ? payload.cards : [];
+  const ids = [...new Set(cards.map((card: any) => String(card?.id ?? "")).filter(Boolean))];
+  if (!ids.length) return payload;
+
+  const { data: priceRows, error } = await admin
+    .from("cards")
+    .select("id,market_price_usd")
+    .in("id", ids);
+
+  if (error) {
+    console.warn("Could not enrich opened cards with market prices:", error.message);
+    return payload;
+  }
+
+  const prices = new Map(
+    (priceRows ?? []).map((row: any) => [
+      String(row.id),
+      row.market_price_usd == null ? null : Number(row.market_price_usd),
+    ]),
+  );
+
+  return {
+    ...payload,
+    cards: cards.map((card: any) => ({
+      ...card,
+      marketPriceUsd: prices.get(String(card.id)) ?? card.marketPriceUsd ?? null,
+    })),
+  };
+}
+
 function getSecretKey() {
   const modern = Deno.env.get("SUPABASE_SECRET_KEYS");
   if (modern) {
@@ -87,5 +118,5 @@ Deno.serve(async (req: Request) => {
     return json({ error: message }, status);
   }
 
-  return json(data);
+  return json(await addMarketPrices(admin, data));
 });
