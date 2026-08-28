@@ -15,7 +15,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
-import { TrainerNavigation } from '@/components/TrainerNavigation';
 import {
   generationForNumber,
   getMyOwnedPokedexNumbers,
@@ -118,7 +117,6 @@ export default function PokedexScreen() {
 
   const header = (
     <View style={styles.headerContent}>
-      <TrainerNavigation />
       <View style={styles.pageHeader}>
         <Text style={styles.eyebrow}>TRAINER HUB</Text>
         <Text style={styles.pageTitle}>Pokédex</Text>
