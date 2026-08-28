@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { getGuildHub, subscribeToGuilds, type GuildHub, type GuildWar } from '@/services/guilds';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -33,7 +34,7 @@ export default function GuildWarsScreen() {
 
   return (
     <Screen title="Guild Wars" subtitle="Batalhas ranqueadas contra a guilda adversária valem pontos para sua equipe.">
-      <Pressable style={styles.back} onPress={() => router.back()}>
+      <Pressable style={styles.back} onPress={() => goBackOrHome(router)}>
         <Ionicons name="arrow-back" size={18} color={colors.muted} />
         <Text style={[styles.backText, { color: colors.muted }]}>Voltar às Guildas</Text>
       </Pressable>
