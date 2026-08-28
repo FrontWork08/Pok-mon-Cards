@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,11 +14,13 @@ import { Screen } from '@/components/Screen';
 import {
   getAdminOverview,
   getAdminPlayers,
-  getCoinGrantHistory,
+  getCurrencyAdjustmentHistory,
   getAdminEvents,
   getAdminRedeemCodes,
   grantCoinsBatch,
   grantDiamondsBatch,
+  removeCoinsBatch,
+  removeDiamondsBatch,
   grantBattlePassVip,
   createRedeemCode,
   setAdminRedeemCodeActive,
@@ -35,7 +37,7 @@ import {
   type AdminModerationAction,
   type AdminOverview,
   type AdminPlayer,
-  type CoinGrantHistory,
+  type AdminCurrencyAdjustmentHistory,
   type AdminRedeemCode,
   type GlobalAnnouncement,
 } from '@/services/admin';
@@ -54,7 +56,7 @@ export default function AdminScreen() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [players, setPlayers] = useState<AdminPlayer[]>([]);
   const [selfId, setSelfId] = useState('');
-  const [history, setHistory] = useState<CoinGrantHistory[]>([]);
+  const [history, setHistory] = useState<AdminCurrencyAdjustmentHistory[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [playerSearch, setPlayerSearch] = useState('');
   const [moderationSearch, setModerationSearch] = useState('');
@@ -63,6 +65,9 @@ export default function AdminScreen() {
   const [suspensionHours, setSuspensionHours] = useState('24');
   const [amount, setAmount] = useState('10000');
   const [diamondAmount, setDiamondAmount] = useState('25');
+  const [removeCoinAmount, setRemoveCoinAmount] = useState('1000');
+  const [removeDiamondAmount, setRemoveDiamondAmount] = useState('1');
+  const [correctionNote, setCorrectionNote] = useState('');
   const [note, setNote] = useState('');
   const [adminCodes, setAdminCodes] = useState<AdminRedeemCode[]>([]);
   const [newCode, setNewCode] = useState('');
@@ -122,7 +127,7 @@ export default function AdminScreen() {
       setError(null);
       const [status, grants, events, guildState, codes, runtime, announcements] = await Promise.all([
         getAdminOverview(),
-        getCoinGrantHistory(),
+        getCurrencyAdjustmentHistory(),
         getAdminEvents(),
         getGuildHub(),
         getAdminRedeemCodes(),
@@ -198,6 +203,8 @@ export default function AdminScreen() {
     return Number.isSafeInteger(parsed) ? parsed : 0;
   }, [amount]);
   const diamondAmountNumber = useMemo(() => Number(diamondAmount.replace(/[^0-9]/g, '')) || 0, [diamondAmount]);
+  const removeCoinAmountNumber = useMemo(() => Number(removeCoinAmount.replace(/[^0-9]/g, '')) || 0, [removeCoinAmount]);
+  const removeDiamondAmountNumber = useMemo(() => Number(removeDiamondAmount.replace(/[^0-9]/g, '')) || 0, [removeDiamondAmount]);
 
   const visiblePlayers = useMemo(() => {
     const query = playerSearch.trim().toLowerCase();
@@ -391,6 +398,59 @@ export default function AdminScreen() {
       'Confirmar Diamantes',
       `Adicionar 💎 ${diamondAmountNumber.toLocaleString('pt-BR')} para cada um dos ${selectedPlayers.length} jogadores selecionados?`,
       [{text:'Cancelar',style:'cancel'},{text:'Adicionar',onPress:()=>{void sendDiamonds();}}],
+    );
+  }
+
+  async function removeSelectedCurrency(currency: 'coins' | 'diamonds') {
+    const removeAmount = currency === 'coins' ? removeCoinAmountNumber : removeDiamondAmountNumber;
+    if (selectedPlayers.length < 1 || removeAmount < 1 || working) return;
+    if (correctionNote.trim().length < 3) {
+      setError('Informe o motivo da correção para manter o histórico administrativo claro.');
+      return;
+    }
+    try {
+      setWorking(true);
+      setError(null);
+      const targetIds = selectedPlayers.map((player) => player.id);
+      const result = currency === 'coins'
+        ? await removeCoinsBatch(targetIds, removeAmount, correctionNote)
+        : await removeDiamondsBatch(targetIds, removeAmount, correctionNote);
+      const symbol = currency === 'coins' ? '🪙' : '💎';
+      setNotice(`Retirado ${symbol} ${result.amountEach.toLocaleString('pt-BR')} de ${result.recipientCount.toLocaleString('pt-BR')} jogador(es). Correção registrada no histórico.`);
+      setCorrectionNote('');
+      await load();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '';
+      if (message.includes('INSUFFICIENT_COINS')) {
+        setError('A correção não foi aplicada: pelo menos um jogador não possui Coins suficientes. Nenhum saldo foi alterado.');
+      } else if (message.includes('INSUFFICIENT_DIAMONDS')) {
+        setError('A correção não foi aplicada: pelo menos um jogador não possui Diamantes suficientes. Nenhum saldo foi alterado.');
+      } else {
+        setError(message || 'Não foi possível corrigir o saldo.');
+      }
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmRemoveCurrency(currency: 'coins' | 'diamonds') {
+    const removeAmount = currency === 'coins' ? removeCoinAmountNumber : removeDiamondAmountNumber;
+    if (selectedPlayers.length < 1 || removeAmount < 1 || working) return;
+    if (correctionNote.trim().length < 3) {
+      setError('Informe o motivo da correção antes de retirar saldo.');
+      return;
+    }
+    const symbol = currency === 'coins' ? '🪙' : '💎';
+    const label = currency === 'coins' ? 'Coins' : 'Diamantes';
+    const names = selectedPlayers.slice(0, 4).map((player) => `@${player.username}`).join(', ');
+    const extra = selectedPlayers.length > 4 ? ` e mais ${selectedPlayers.length - 4}` : '';
+    Alert.alert(
+      `Retirar ${label}?`,
+      `Retirar ${symbol} ${removeAmount.toLocaleString('pt-BR')} de cada jogador selecionado?\n\n${names}${extra}\n\nMotivo: ${correctionNote.trim()}\n\nA operação é atômica: se algum jogador não tiver saldo suficiente, ninguém será alterado.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'RETIRAR SALDO', style: 'destructive', onPress: () => { void removeSelectedCurrency(currency); } },
+      ],
     );
   }
 
@@ -658,7 +718,7 @@ export default function AdminScreen() {
             </View>
           </View>
 
-          <SectionTitle title="Modo Manutenção" />
+          <CollapsibleSection title="Modo Manutenção">
           <View
             style={[
               styles.grantPanel,
@@ -763,7 +823,8 @@ export default function AdminScreen() {
             </Pressable>
           </View>
 
-          <SectionTitle title="Liderança das Guildas" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Liderança das Guildas">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: selectedGuild?.color ?? colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>ESCOLHA UMA DAS 4 GUILDAS</Text>
             <View style={styles.quickRow}>
@@ -840,7 +901,8 @@ export default function AdminScreen() {
             ) : null}
           </View>
 
-          <SectionTitle title="Visão geral" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Visão geral">
           <View style={styles.metricGrid}>
             <Metric icon="people" label="USUÁRIOS" value={overview.users.total} hint={`+${overview.users.created24h} em 24h`} />
             <Metric icon="wallet" label="MOEDAS EM CIRCULAÇÃO" value={overview.users.coinsInCirculation} coin />
@@ -850,7 +912,8 @@ export default function AdminScreen() {
             <Metric icon="diamond" label="VALOR GLOBAL DAS COLEÇÕES" valueText={formatUsd(overview.catalog.ownedMarketValueUsd)} />
           </View>
 
-          <SectionTitle title="Packs e atividade" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Packs e atividade">
           <View style={styles.metricGrid}>
             <Metric icon="cube" label="PACKS ATIVOS" value={overview.packs.active} hint={`${overview.packs.withPhysicalArt} com packshot`} />
             <Metric icon="gift" label="PACKS ABERTOS" value={overview.packs.openings} hint={`${overview.packs.openings24h} em 24h`} />
@@ -860,7 +923,8 @@ export default function AdminScreen() {
             <Metric icon="game-controller" label="BATALHAS" value={overview.battles.total} hint={`${overview.battles.active} ativas • ${overview.battles.completed} concluídas`} />
           </View>
 
-          <SectionTitle title="Sistema" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Sistema">
           <View style={styles.metricGrid}>
             <Metric icon="albums-outline" label="DECKS" value={overview.progression.decks} />
             <Metric icon="today" label="MISSÕES DIÁRIAS" value={overview.progression.dailyMissions} />
@@ -884,7 +948,8 @@ export default function AdminScreen() {
             </View>
           </View>
 
-          <SectionTitle title="Anúncio global em tempo real" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Anúncio global em tempo real">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.emptyText, { color: colors.muted }]}>
               Cada anúncio aparece somente uma vez por conta. Você pode encerrá-lo antes do prazo pelo botão abaixo.
@@ -1010,7 +1075,8 @@ export default function AdminScreen() {
             </Pressable>
           </View>
 
-          <SectionTitle title="Admin Abuse" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Admin Abuse">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {activeEvent ? (
               <View style={[styles.notice, { backgroundColor: '#142C23', borderColor: '#4A9B70' }]}>
@@ -1077,7 +1143,8 @@ export default function AdminScreen() {
             ) : null}
           </View>
 
-          <SectionTitle title="Moderação de usuários" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Moderação de usuários">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#A84250' }]}>
             <View style={styles.moderationHeader}>
               <View style={styles.moderationIcon}>
@@ -1245,7 +1312,8 @@ export default function AdminScreen() {
             )}
           </View>
 
-          <SectionTitle title="Eventos ao vivo" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Eventos ao vivo">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#9B7BFF' }]}>
             <Text style={[styles.emptyText, { color: colors.muted }]}>
               Crie eventos temporários que mudam a experiência do jogo em tempo real.
@@ -1276,7 +1344,8 @@ export default function AdminScreen() {
             {gameEvents.length ? <View style={styles.friendChips}>{gameEvents.map((event)=><View key={event.id} style={[styles.friendChip,{backgroundColor:colors.surfaceAlt,borderColor:'#9B7BFF'}]}><View style={{flex:1}}><Text style={[styles.friendChipText,{color:colors.text}]}>{event.title}</Text><Text style={[styles.emptyText,{color:colors.muted}]}>{event.event_type} • até {new Date(event.ends_at).toLocaleString('pt-BR')}</Text></View><Pressable onPress={()=>void deactivateGameEvent(event.id)}><Ionicons name="stop-circle" size={20} color="#FF8290"/></Pressable></View>)}</View> : null}
           </View>
 
-          <SectionTitle title="Adicionar moedas" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Adicionar moedas">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>
               ESCOLHA UM OU MAIS JOGADORES • {selectedPlayers.length} DE {players.length}
@@ -1393,7 +1462,8 @@ export default function AdminScreen() {
             </Pressable>
           </View>
 
-          <SectionTitle title="Adicionar Diamantes" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Adicionar Diamantes">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#68D9FF' }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>
               MESMA SELEÇÃO MÚLTIPLA • {selectedPlayers.length} JOGADOR(ES)
@@ -1405,7 +1475,104 @@ export default function AdminScreen() {
             <Pressable disabled={selectedPlayers.length<1||diamondAmountNumber<1||working} onPress={confirmSendDiamonds} style={[styles.grantButton,{backgroundColor:selectedPlayers.length&&diamondAmountNumber?'#68D9FF':colors.surfaceAlt,opacity:working?.75:1}]}><Ionicons name="diamond" size={20} color="#07111F"/><Text style={styles.grantButtonText}>ADICIONAR DIAMANTES</Text></Pressable>
           </View>
 
-          <SectionTitle title="VIP do Passe de Batalha" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Correção de saldo">
+          <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#A84250' }]}>
+            <View style={styles.moderationHeader}>
+              <View style={[styles.moderationIcon, { backgroundColor: '#351A24' }]}>
+                <Ionicons name="remove-circle" size={23} color="#FF8290" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.moderationTitle, { color: colors.text }]}>Retirar Coins ou Diamantes</Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>
+                  Use apenas para corrigir recompensa enviada por engano. Toda retirada fica registrada com saldo anterior, saldo final e motivo.
+                </Text>
+              </View>
+            </View>
+
+            <TextInput
+              value={playerSearch}
+              onChangeText={setPlayerSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Buscar jogador pelo nome"
+              placeholderTextColor={colors.muted}
+              style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}
+            />
+
+            <View style={styles.friendChips}>
+              {visiblePlayers.length === 0 ? (
+                <Text style={[styles.emptyText,{color:colors.muted}]}>Nenhum jogador encontrado.</Text>
+              ) : visiblePlayers.map((player)=>{
+                const active=selectedPlayerIds.has(player.id);
+                return (
+                  <Pressable
+                    key={`correction-${player.id}`}
+                    onPress={()=>setSelectedPlayerIds((current)=>{
+                      const next=new Set(current);
+                      if(next.has(player.id))next.delete(player.id);else next.add(player.id);
+                      return next;
+                    })}
+                    style={[styles.friendChip,{backgroundColor:active?'#351A24':colors.surfaceAlt,borderColor:active?'#FF8290':colors.border}]}
+                  >
+                    <Text style={[styles.friendChipText,{color:colors.text}]}>
+                      @{player.username}{active ? ` • 🪙 ${Number(player.coins).toLocaleString('pt-BR')} • 💎 ${Number(player.diamonds).toLocaleString('pt-BR')} • ✓` : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.correctionGrid}>
+              <View style={[styles.correctionCard,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                <Text style={[styles.fieldLabel,{color:colors.muted}]}>RETIRAR COINS</Text>
+                <View style={styles.quickRow}>
+                  {[1000,5000,10000,50000,100000].map((quick)=>(
+                    <Pressable key={`remove-coins-${quick}`} onPress={()=>setRemoveCoinAmount(String(quick))} style={[styles.quickChip,{backgroundColor:removeCoinAmountNumber===quick?'#351A24':colors.surface,borderColor:removeCoinAmountNumber===quick?'#FF8290':colors.border}]}>
+                      <Text style={[styles.quickText,{color:removeCoinAmountNumber===quick?'#FFB2BC':colors.text}]}>{quick.toLocaleString('pt-BR')}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput value={removeCoinAmount} onChangeText={(value)=>setRemoveCoinAmount(value.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Quantidade de Coins" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surface,borderColor:colors.border}]}/>
+                <Pressable disabled={selectedPlayers.length<1||removeCoinAmountNumber<1||working} onPress={()=>confirmRemoveCurrency('coins')} style={[styles.destructiveGrantButton,{opacity:selectedPlayers.length<1||removeCoinAmountNumber<1||working?.45:1}]}>
+                  <Ionicons name="remove-circle" size={19} color="#FFD7DD"/>
+                  <Text style={styles.destructiveGrantText}>RETIRAR COINS</Text>
+                </Pressable>
+              </View>
+
+              <View style={[styles.correctionCard,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                <Text style={[styles.fieldLabel,{color:colors.muted}]}>RETIRAR DIAMANTES</Text>
+                <View style={styles.quickRow}>
+                  {[1,5,10,25,50,100].map((quick)=>(
+                    <Pressable key={`remove-diamonds-${quick}`} onPress={()=>setRemoveDiamondAmount(String(quick))} style={[styles.quickChip,{backgroundColor:removeDiamondAmountNumber===quick?'#351A24':colors.surface,borderColor:removeDiamondAmountNumber===quick?'#FF8290':colors.border}]}>
+                      <Text style={[styles.quickText,{color:removeDiamondAmountNumber===quick?'#FFB2BC':colors.text}]}>{quick}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput value={removeDiamondAmount} onChangeText={(value)=>setRemoveDiamondAmount(value.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Quantidade de Diamantes" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surface,borderColor:colors.border}]}/>
+                <Pressable disabled={selectedPlayers.length<1||removeDiamondAmountNumber<1||working} onPress={()=>confirmRemoveCurrency('diamonds')} style={[styles.destructiveGrantButton,{opacity:selectedPlayers.length<1||removeDiamondAmountNumber<1||working?.45:1}]}>
+                  <Ionicons name="diamond" size={18} color="#FFD7DD"/>
+                  <Text style={styles.destructiveGrantText}>RETIRAR DIAMANTES</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Text style={[styles.fieldLabel,{color:colors.muted}]}>MOTIVO DA CORREÇÃO • OBRIGATÓRIO</Text>
+            <TextInput
+              value={correctionNote}
+              onChangeText={setCorrectionNote}
+              placeholder="Ex.: recompensa duplicada enviada por engano"
+              placeholderTextColor={colors.muted}
+              maxLength={180}
+              style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}
+            />
+            <Text style={[styles.emptyText,{color:colors.muted}]}>
+              A retirada nunca deixa saldo negativo. Em seleção múltipla, se uma conta não tiver saldo suficiente, a operação inteira é cancelada.
+            </Text>
+          </View>
+
+                    </CollapsibleSection>
+          <CollapsibleSection title="VIP do Passe de Batalha">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
             <View style={styles.moderationHeader}>
               <View style={[styles.moderationIcon, { backgroundColor: colors.accentSoft }]}>
@@ -1436,7 +1603,8 @@ export default function AdminScreen() {
             </Pressable>
           </View>
 
-          <SectionTitle title="Códigos de resgate" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Códigos de resgate">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.emptyText,{color:colors.muted}]}>Cada conta pode usar cada código uma única vez. A recompensa é aplicada e registrada pelo servidor.</Text>
             <View style={styles.formSplit}>
@@ -1459,11 +1627,12 @@ export default function AdminScreen() {
             <View style={styles.historyList}>{adminCodes.map((item)=>{const used=Number(item.code_redemptions?.[0]?.count??0);return <View key={item.id} style={[styles.historyRow,{backgroundColor:colors.surfaceAlt,borderColor:item.active?'#65D894':colors.border}]}><View style={{flex:1}}><Text style={[styles.historyUser,{color:colors.text}]}>{item.code}</Text><Text style={[styles.historyMeta,{color:colors.muted}]}>{rewardSummary(item.reward)} • {used} resgate(s){item.max_total_uses?`/${item.max_total_uses}`:''}</Text></View><Pressable disabled={working} onPress={()=>void toggleCode(item)} style={[styles.quickChip,{backgroundColor:item.active?'#15392A':'#351A24',borderColor:item.active?'#65D894':'#683243'}]}><Text style={[styles.quickText,{color:item.active?'#AEF0CC':'#FF9FAF'}]}>{item.active?'ATIVO':'DESATIVADO'}</Text></Pressable></View>;})}</View>
           </View>
 
-          <SectionTitle title="Histórico administrativo" />
+                    </CollapsibleSection>
+          <CollapsibleSection title="Histórico administrativo">
           <View style={styles.historyList}>
             {history.length === 0 ? (
               <View style={[styles.emptyHistory, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.emptyText, { color: colors.muted }]}>Nenhuma concessão de moedas ainda.</Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>Nenhum ajuste de Coins ou Diamantes ainda.</Text>
               </View>
             ) : history.map((item) => (
               <View key={item.id} style={[styles.historyRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -1477,7 +1646,9 @@ export default function AdminScreen() {
                   </Text>
                 </View>
                 <View style={styles.historyValueWrap}>
-                  <Text style={[styles.historyValue, { color: colors.yellow }]}>+🪙 {Number(item.amount).toLocaleString('pt-BR')}</Text>
+                  <Text style={[styles.historyValue, { color: Number(item.amount) < 0 ? '#FF8290' : item.currency === 'diamonds' ? '#68D9FF' : colors.yellow }]}>
+                    {Number(item.amount) < 0 ? '−' : '+'}{item.currency === 'diamonds' ? '💎' : '🪙'} {Math.abs(Number(item.amount)).toLocaleString('pt-BR')}
+                  </Text>
                   <Text style={[styles.historyBalance, { color: colors.muted }]}>
                     saldo {Number(item.balance_after).toLocaleString('pt-BR')}
                   </Text>
@@ -1485,15 +1656,32 @@ export default function AdminScreen() {
               </View>
             ))}
           </View>
+          </CollapsibleSection>
         </>
       ) : null}
     </Screen>
   );
 }
 
-function SectionTitle({ title }: { title: string }) {
+function CollapsibleSection({ title, children }: { title: string; children: ReactNode }) {
   const { colors } = useAppTheme();
-  return <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>;
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <View style={styles.collapsibleSection}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={() => setExpanded((value) => !value)}
+        style={[styles.collapsibleHeader, { backgroundColor: colors.surface, borderColor: expanded ? colors.accent : colors.border }]}
+      >
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+        <View style={[styles.collapsibleChevron, { backgroundColor: expanded ? colors.accentSoft : colors.surfaceAlt }]}>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={expanded ? colors.yellow : colors.muted} />
+        </View>
+      </Pressable>
+      {expanded ? <View style={styles.collapsibleBody}>{children}</View> : null}
+    </View>
+  );
 }
 
 function rewardSummary(reward: AdminRedeemCode['reward']) {
@@ -1549,7 +1737,15 @@ const styles = StyleSheet.create({
   heroKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   heroTitle: { fontSize: 18, fontWeight: '900', marginTop: 2 },
   heroText: { fontSize: 10, lineHeight: 15, marginTop: 3 },
-  sectionTitle: { fontSize: 19, fontWeight: '900', marginTop: 3 },
+  sectionTitle: { flex: 1, fontSize: 16, fontWeight: '900' },
+  collapsibleSection: { gap: 8 },
+  collapsibleHeader: { minHeight: 58, borderRadius: 17, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  collapsibleChevron: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  collapsibleBody: { gap: 10 },
+  correctionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  correctionCard: { flexGrow: 1, flexBasis: 250, minWidth: 220, borderRadius: 16, borderWidth: 1, padding: 11, gap: 9 },
+  destructiveGrantButton: { minHeight: 48, borderRadius: 13, backgroundColor: '#6B2634', borderWidth: 1, borderColor: '#A84250', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  destructiveGrantText: { color: '#FFD7DD', fontSize: 9, fontWeight: '900', letterSpacing: .3 },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   metric: { flexGrow: 1, flexBasis: 155, minWidth: 145, borderRadius: 17, borderWidth: 1, padding: 12 },
   metricIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
