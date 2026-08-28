@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatUsd } from '@/services/market';
 import { listPackCards, type Pack, type PackCardPreview } from '@/services/packs';
@@ -27,6 +28,7 @@ type Props = {
 
 export function PackContentsModal({ visible, pack, onClose }: Props) {
   const { colors } = useAppTheme();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [cards, setCards] = useState<PackCardPreview[]>([]);
   const [total, setTotal] = useState(0);
@@ -103,6 +105,7 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
             <Text style={[styles.kicker, { color: colors.yellow }]}>CONTEÚDO DO BOOSTER</Text>
             <Text numberOfLines={1} style={[styles.title, { color: colors.text }]}>{pack.name}</Text>
             <Text style={[styles.subtitle, { color: colors.muted }]}>{headerSubtitle}</Text>
+            <Text style={[styles.openHint,{color:colors.accent}]}>Toque em uma carta para ver imagem, preço e estatísticas de batalha antes de comprar.</Text>
           </View>
           <Pressable onPress={onClose} style={[styles.close, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="close" size={22} color={colors.text} />
@@ -138,7 +141,14 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
             onEndReachedThreshold={0.5}
             onEndReached={loadMore}
             renderItem={({ item }) => (
-              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Pressable
+                onPress={() => {
+                  const cardId = item.id;
+                  onClose();
+                  setTimeout(() => router.push(`/card/${cardId}`), 80);
+                }}
+                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
                 {(() => {
                   const candidates = [item.image, item.image_fallback]
                     .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
@@ -160,10 +170,16 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
                 })()}
                 <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>{item.name}</Text>
                 <Text numberOfLines={1} style={[styles.rarity, { color: colors.muted }]}>{item.rarity ?? 'Sem raridade'}</Text>
-                <Text style={[styles.price, { color: colors.yellow }]}>
-                  {item.market_price_usd == null ? 'US$ —' : formatUsd(item.market_price_usd)}
-                </Text>
-              </View>
+                <View style={styles.cardFooter}>
+                  <Text style={[styles.price, { color: colors.yellow }]}>
+                    {item.market_price_usd == null ? 'US$ —' : formatUsd(item.market_price_usd)}
+                  </Text>
+                  <View style={[styles.detailsChip,{backgroundColor:colors.accentSoft}]}>
+                    <Ionicons name="eye" size={12} color={colors.accent}/>
+                    <Text style={[styles.detailsText,{color:colors.accent}]}>DETALHES</Text>
+                  </View>
+                </View>
+              </Pressable>
             )}
             ListFooterComponent={
               loadingMore ? <ActivityIndicator style={styles.footerLoader} color={colors.yellow} /> : null
@@ -181,6 +197,7 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.3 },
   title: { fontSize: 20, fontWeight: '900', marginTop: 2 },
   subtitle: { fontSize: 10, marginTop: 3 },
+  openHint: { fontSize: 8, lineHeight: 12, fontWeight: '800', marginTop: 5 },
   close: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   tools:{paddingHorizontal:12,paddingVertical:9,borderBottomWidth:1,gap:8},searchBox:{height:44,borderRadius:13,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',gap:8},searchInput:{flex:1,height:'100%',fontSize:12},sortRow:{flexDirection:'row',gap:7},sortChip:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},sortText:{fontSize:8,fontWeight:'900'},
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 28 },
@@ -193,7 +210,10 @@ const styles = StyleSheet.create({
   imageFallback: { alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   name: { fontSize: 11, fontWeight: '900', marginTop: 6 },
   rarity: { fontSize: 8, marginTop: 2 },
-  price: { fontSize: 10, fontWeight: '900', marginTop: 5 },
+  cardFooter:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:6,marginTop:5},
+  price: { fontSize: 10, fontWeight: '900' },
+  detailsChip:{borderRadius:999,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},
+  detailsText:{fontSize:7,fontWeight:'900'},
   footerLoader: { marginVertical: 18 },
 });
 
