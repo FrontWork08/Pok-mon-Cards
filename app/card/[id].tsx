@@ -69,7 +69,7 @@ export default function CardDetailScreen() {
   const combat = getBattleCardPreview(card ?? null);
   const unitValue = Number(card?.game_value ?? 0);
   const marketPriceUsd = card?.market_price_usd == null ? null : Number(card.market_price_usd);
-  const totalMarketValueUsd = marketPriceUsd == null ? null : marketPriceUsd * Number(entry?.quantity ?? 0);
+  const totalMarketValueUsd = !entry?.owned || marketPriceUsd == null ? null : marketPriceUsd * Number(entry.quantity ?? 0);
   const historyMin = priceHistory.length ? Math.min(...priceHistory.map((point) => point.priceUsd)) : 0;
   const historyMax = priceHistory.length ? Math.max(...priceHistory.map((point) => point.priceUsd)) : 0;
   const historyRange = Math.max(.01, historyMax - historyMin);
