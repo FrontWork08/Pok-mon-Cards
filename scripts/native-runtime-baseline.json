@@ -1,0 +1,16 @@
+{
+  "appVersion": "0.1.1",
+  "runtimeVersionPolicy": "appVersion",
+  "androidPackage": "com.frontwork.pokemoncards",
+  "scheme": "pokemoncards",
+  "updatesUrl": "https://u.expo.dev/e02b9525-0e99-4b45-a84f-1c44501633be",
+  "easProjectId": "e02b9525-0e99-4b45-a84f-1c44501633be",
+  "googleServicesFile": "./google-services.json",
+  "plugins": [
+    "expo-notifications",
+    "expo-router",
+    "expo-secure-store"
+  ],
+  "expoSdk": "53.0.27",
+  "reactNative": "0.79.6"
+}
