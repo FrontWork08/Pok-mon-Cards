@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-apk-${{ github.ref }}
@@ -57,3 +57,21 @@ jobs:
           path: builds/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Validate published download metadata
+        run: |
+          node -e "const fs=require('fs'); const p='public/download/release.json'; const x=JSON.parse(fs.readFileSync(p,'utf8')); if(x.status!=='ready'||!/^https:\/\//.test(x.downloadUrl)||!/^[a-f0-9]{64}$/i.test(x.sha256)||!(x.sizeBytes>0)){throw new Error('Invalid release metadata')}"
+
+      - name: Publish download metadata
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/download/release.json
+          if git diff --cached --quiet; then
+            echo "Release metadata already current."
+            exit 0
+          fi
+          git commit -m "release: update Android download metadata"
+          git pull --rebase origin main
+          git push origin HEAD:main
