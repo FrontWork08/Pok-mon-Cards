@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { CardPickerModal, getBattleCardPreview } from '@/components/CardPickerModal';
 import { supabase } from '@/lib/supabase';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
@@ -180,7 +181,7 @@ export default function BattleScreen() {
 
   async function cancel() {
     if (!id) return;
-    try { setWorking(true); await cancelBattle(String(id)); router.back(); }
+    try { setWorking(true); await cancelBattle(String(id)); goBackOrHome(router); }
     catch (error) { setNotice(error instanceof Error ? error.message : 'Não foi possível cancelar.'); }
     finally { setWorking(false); }
   }
@@ -299,7 +300,7 @@ export default function BattleScreen() {
           </View>
         ) : null}
 
-        {!invited && !drafting && !selecting && !completed ? <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.panelTitle, { color: colors.text }]}>Batalha {String(battle.status).toLowerCase()}</Text><Text style={[styles.panelText, { color: colors.muted }]}>Este desafio já não está ativo.</Text><Pressable style={[styles.secondary, { borderColor: colors.border }]} onPress={() => router.back()}><Text style={[styles.secondaryText, { color: colors.text }]}>VOLTAR</Text></Pressable></View> : null}
+        {!invited && !drafting && !selecting && !completed ? <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.panelTitle, { color: colors.text }]}>Batalha {String(battle.status).toLowerCase()}</Text><Text style={[styles.panelText, { color: colors.muted }]}>Este desafio já não está ativo.</Text><Pressable style={[styles.secondary, { borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Text style={[styles.secondaryText, { color: colors.text }]}>VOLTAR</Text></Pressable></View> : null}
       </ScrollView>
 
       {selecting ? (
