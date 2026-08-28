@@ -76,7 +76,6 @@ export function TrainerNavigation() {
   return (
     <>
       <View style={styles.row}>
-        <Pressable accessibilityLabel="Ir para o início" onPress={() => router.replace('/(tabs)')} style={[styles.homeButton,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="home" size={20} color={colors.yellow}/></Pressable>
         <Pressable
           accessibilityLabel="Abrir menu"
           onPress={() => setOpen(true)}
@@ -137,7 +136,6 @@ export function TrainerNavigation() {
 
 const styles = StyleSheet.create({
   row: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 8 },
-  homeButton:{width:40,height:40,borderRadius:13,borderWidth:1,alignItems:'center',justifyContent:'center'},
   rankStrip:{width:'100%',flexDirection:'row',gap:6,marginTop:6},
   rankPill:{flex:1,minHeight:34,borderRadius:11,borderWidth:1,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:5},
   rankPillText:{fontSize:7,fontWeight:'900'},
