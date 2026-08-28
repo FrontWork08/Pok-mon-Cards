@@ -44,6 +44,24 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    if (body.action === "matchmaking_join") {
+      const mode = body.mode === "draft3" ? "draft3" : body.mode === "mystery" ? "mystery" : "quick";
+      const { data, error } = await admin.rpc("server_matchmaking_join", {
+        p_player_id: user.id,
+        p_mode: mode,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "matchmaking_cancel") {
+      const { data, error } = await admin.rpc("server_matchmaking_cancel", {
+        p_player_id: user.id,
+      });
+      if (error) throw error;
+      return json({ data: { status: data } });
+    }
+
     if (body.action === "create") {
       const mode = body.mode === "draft3" ? "draft3" : body.mode === "mystery" ? "mystery" : "quick";
       const stakeType = body.stakeType === "coins" ? "coins" : body.stakeType === "card" ? "card" : "none";
