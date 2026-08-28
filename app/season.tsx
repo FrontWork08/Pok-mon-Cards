@@ -8,6 +8,7 @@ import { getMyOwnedSetCounts, getSetCatalog } from '@/services/collections';
 import {
   claimCollectionMilestone,
   claimDailyLogin,
+  claimSeasonReward,
   getRetentionHub,
   seasonDivision,
   type RetentionHub,
@@ -15,6 +16,17 @@ import {
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const TOTAL_MILESTONES = [50,151,251,386,493,649,721,809,905,1025];
+const GENERATIONS = [
+  { gen:1, min:1, max:151, label:'Kanto' },
+  { gen:2, min:152, max:251, label:'Johto' },
+  { gen:3, min:252, max:386, label:'Hoenn' },
+  { gen:4, min:387, max:493, label:'Sinnoh' },
+  { gen:5, min:494, max:649, label:'Unova' },
+  { gen:6, min:650, max:721, label:'Kalos' },
+  { gen:7, min:722, max:809, label:'Alola' },
+  { gen:8, min:810, max:905, label:'Galar' },
+  { gen:9, min:906, max:1025, label:'Paldea' },
+];
 
 export default function SeasonScreen() {
   const router = useRouter();
@@ -64,6 +76,18 @@ export default function SeasonScreen() {
     } finally { setWorking(null); }
   }
 
+  async function collectSeasonReward() {
+    if (working || !hub?.claimableSeason) return;
+    try {
+      setWorking('season-reward');
+      const reward=await claimSeasonReward();
+      setNotice(`Recompensa da temporada: ${reward.tier.toUpperCase()} • 🪙 ${reward.coins.toLocaleString('pt-BR')} + 💎 ${reward.diamonds}`);
+      await load();
+    } catch(e) {
+      setNotice(e instanceof Error?e.message:'Não foi possível coletar a temporada.');
+    } finally { setWorking(null); }
+  }
+
   async function claim(kind:'pokedex_total'|'pokedex_gen'|'set_complete', key:string) {
     const token=`${kind}:${key}`;
     if (working) return;
@@ -89,14 +113,21 @@ export default function SeasonScreen() {
       <View style={styles.quickLinks}><Pressable onPress={()=>router.push('/(tabs)/battles')} style={[styles.quick,{borderColor:colors.accent}]}><Ionicons name="flash" size={18} color={colors.accent}/><Text style={[styles.quickText,{color:colors.text}]}>BUSCAR PARTIDA</Text></Pressable><Pressable onPress={()=>router.push('/wishlist')} style={[styles.quick,{borderColor:colors.yellow}]}><Ionicons name="star" size={18} color={colors.yellow}/><Text style={[styles.quickText,{color:colors.text}]}>WISHLIST ({hub.wishlistCount})</Text></Pressable></View>
     </View>:null}
 
+    {hub?.claimableSeason ? <View style={[styles.panel,{backgroundColor:colors.surface,borderColor:colors.yellow}]}>
+      <View style={styles.panelHead}><View><Text style={[styles.sectionTitle,{color:colors.text}]}>🏆 Recompensa de temporada</Text><Text style={[styles.sub,{color:colors.muted}]}>{hub.claimableSeason.name} terminou com {hub.claimableSeason.points.toLocaleString('pt-BR')} pontos.</Text></View><Text style={[styles.streak,{color:colors.yellow}]}>{seasonDivision(hub.claimableSeason.points).label}</Text></View>
+      <Pressable disabled={working==='season-reward'} onPress={()=>void collectSeasonReward()} style={[styles.primary,{backgroundColor:colors.yellow}]}><Text style={styles.primaryText}>COLETAR RECOMPENSA FINAL</Text></Pressable>
+    </View> : null}
+
     <View style={[styles.panel,{backgroundColor:colors.surface,borderColor:colors.border}]}>
       <View style={styles.panelHead}><View><Text style={[styles.sectionTitle,{color:colors.text}]}>🔥 Recompensa diária</Text><Text style={[styles.sub,{color:colors.muted}]}>Ciclo de 7 dias com Diamante no sétimo.</Text></View><Text style={[styles.streak,{color:colors.yellow}]}>{hub?.login.currentStreak??0} dias</Text></View>
       <Pressable disabled={working==='daily'||hub?.login.claimedToday} onPress={()=>void dailyClaim()} style={[styles.primary,{backgroundColor:hub?.login.claimedToday?colors.surfaceAlt:colors.yellow}]}><Text style={[styles.primaryText,hub?.login.claimedToday&&{color:colors.muted}]}>{hub?.login.claimedToday?'COLETADO HOJE':'COLETAR RECOMPENSA'}</Text></Pressable>
     </View>
 
-    {(hub?.activeEvents.length??0)>0?<View style={styles.stack}><Text style={[styles.sectionTitle,{color:colors.text}]}>Eventos ao vivo</Text>{hub!.activeEvents.map((event)=><View key={event.id} style={[styles.event,{backgroundColor:colors.surface,borderColor:colors.yellow}]}><Ionicons name="sparkles" size={20} color={colors.yellow}/><View style={{flex:1}}><Text style={[styles.eventTitle,{color:colors.text}]}>{event.type.replaceAll('_',' ').toUpperCase()}</Text><Text style={[styles.sub,{color:colors.muted}]}>Até {new Date(event.endsAt).toLocaleString('pt-BR')}</Text></View></View>)}</View>:null}
+    {(hub?.activeEvents.length??0)>0?<View style={styles.stack}><Text style={[styles.sectionTitle,{color:colors.text}]}>Eventos ao vivo</Text>{hub!.activeEvents.map((event)=><View key={event.id} style={[styles.event,{backgroundColor:colors.surface,borderColor:colors.yellow}]}><Ionicons name="sparkles" size={20} color={colors.yellow}/><View style={{flex:1}}><Text style={[styles.eventTitle,{color:colors.text}]}>{event.title ?? event.type.replaceAll('_',' ').toUpperCase()}</Text><Text style={[styles.sub,{color:colors.muted}]}>Até {new Date(event.endsAt).toLocaleString('pt-BR')}</Text></View></View>)}</View>:null}
 
     <View style={styles.stack}><Text style={[styles.sectionTitle,{color:colors.text}]}>Recompensas da Pokédex</Text>{TOTAL_MILESTONES.map((target)=>{const done=ownedNumbers.length>=target;const got=claimed.has(`pokedex_total:${target}`);return <View key={target} style={[styles.rewardRow,{backgroundColor:colors.surface,borderColor:done?colors.accent:colors.border}]}><View style={{flex:1}}><Text style={[styles.rewardTitle,{color:colors.text}]}>{target} espécies</Text><Text style={[styles.sub,{color:colors.muted}]}>{Math.min(ownedNumbers.length,target)} / {target}</Text></View><Pressable disabled={!done||got||Boolean(working)} onPress={()=>void claim('pokedex_total',String(target))} style={[styles.claim,{backgroundColor:got?colors.surfaceAlt:done?colors.yellow:colors.surfaceAlt}]}><Text style={[styles.claimText,{color:done&&!got?'#07111F':colors.muted}]}>{got?'COLETADO':done?'COLETAR':'BLOQUEADO'}</Text></Pressable></View>;})}</View>
+
+    <View style={styles.stack}><Text style={[styles.sectionTitle,{color:colors.text}]}>Medalhas por geração</Text>{GENERATIONS.map((item)=>{const count=ownedNumbers.filter((n)=>n>=item.min&&n<=item.max).length;const target=item.max-item.min+1;const done=count>=target;const got=claimed.has(`pokedex_gen:${item.gen}`);return <View key={item.gen} style={[styles.rewardRow,{backgroundColor:colors.surface,borderColor:done?colors.yellow:colors.border}]}><View style={{flex:1}}><Text style={[styles.rewardTitle,{color:colors.text}]}>Gen {item.gen} • {item.label}</Text><Text style={[styles.sub,{color:colors.muted}]}>{count} / {target} espécies</Text></View><Pressable disabled={!done||got||Boolean(working)} onPress={()=>void claim('pokedex_gen',String(item.gen))} style={[styles.claim,{backgroundColor:got?colors.surfaceAlt:done?colors.yellow:colors.surfaceAlt}]}><Text style={[styles.claimText,{color:done&&!got?'#07111F':colors.muted}]}>{got?'MEDALHA ✓':done?'COLETAR':'BLOQUEADO'}</Text></Pressable></View>;})}</View>
 
     {completedSets.length?<View style={styles.stack}><Text style={[styles.sectionTitle,{color:colors.text}]}>Sets 100% completos</Text>{completedSets.slice(0,12).map((setId)=>{const got=claimed.has(`set_complete:${setId}`);return <View key={setId} style={[styles.rewardRow,{backgroundColor:colors.surface,borderColor:colors.yellow}]}><View style={{flex:1}}><Text style={[styles.rewardTitle,{color:colors.text}]}>{setId.toUpperCase()}</Text><Text style={[styles.sub,{color:colors.muted}]}>Coleção completa</Text></View><Pressable disabled={got||Boolean(working)} onPress={()=>void claim('set_complete',setId)} style={[styles.claim,{backgroundColor:got?colors.surfaceAlt:colors.yellow}]}><Text style={[styles.claimText,{color:got?colors.muted:'#07111F'}]}>{got?'COLETADO':'COLETAR'}</Text></Pressable></View>;})}</View>:null}
 
