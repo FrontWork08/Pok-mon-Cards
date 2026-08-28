@@ -173,11 +173,17 @@ where not exists (
   where version='0.1.1 • OTA 28/08'
 );
 
-do $$
+do $
 begin
   begin
     alter publication supabase_realtime add table public.global_chat_messages;
   exception
     when duplicate_object then null;
   end;
-end $$;
+
+  begin
+    alter publication supabase_realtime add table public.player_settings;
+  exception
+    when duplicate_object then null;
+  end;
+end $;
