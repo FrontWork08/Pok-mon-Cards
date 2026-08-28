@@ -55,3 +55,29 @@ export async function getMySocial(): Promise<SocialState> {
 
   return { friends, incoming, outgoing };
 }
+
+
+export type PublicRelationshipState = 'self' | 'friend' | 'incoming' | 'outgoing' | 'none';
+
+export async function getRelationshipWith(playerId: string): Promise<PublicRelationshipState> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const myId = userData.user?.id;
+  if (!myId) throw new Error('Usuário não autenticado.');
+  if (myId === playerId) return 'self';
+
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('requester_id,addressee_id,status,created_at')
+    .or(`and(requester_id.eq.${myId},addressee_id.eq.${playerId}),and(requester_id.eq.${playerId},addressee_id.eq.${myId})`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return 'none';
+  if (data.status === 'accepted') return 'friend';
+  if (data.status === 'pending' && data.addressee_id === myId) return 'incoming';
+  if (data.status === 'pending' && data.requester_id === myId) return 'outgoing';
+  return 'none';
+}
