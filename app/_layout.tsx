@@ -387,7 +387,7 @@ function AppStack() {
         </View>
       ) : null}
       {liveNotification && !accountRestriction ? (
-        <View pointerEvents="box-none" style={[styles.liveNotificationHost, { top: Math.max(insets.top + 8, 14) }]}>
+        <View pointerEvents="box-none" style={[styles.liveNotificationHost, { top: showChrome ? Math.max(insets.top + 92, 98) : Math.max(insets.top + 8, 14) }]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${liveNotification.title ?? 'Notificação'}: ${liveNotification.body ?? ''}`}
