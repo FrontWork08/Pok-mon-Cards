@@ -84,8 +84,8 @@ export default function BattlePassScreen() {
     try {
       setWorkingKey(key);
       setError(null);
-      await claimBattlePassReward(reward.level, reward.track);
-      setNotice(`Recompensa do nível ${reward.level} resgatada.`);
+      const result = await claimBattlePassReward(reward.level, reward.track);
+      setNotice(result.titleName ? `Recompensa do nível ${reward.level} resgatada. Título liberado: ${result.titleName}.` : `Recompensa do nível ${reward.level} resgatada.`);
       await Promise.all([load(), wallet.refresh()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível resgatar a recompensa.');
@@ -315,7 +315,7 @@ function RewardCell({
   return (
     <View style={styles.rewardCell}>
       <View style={styles.rewardLabelRow}>
-        <Ionicons name={reward.track === 'vip' ? 'diamond' : 'gift'} size={14} color={reward.track === 'vip' ? colors.yellow : colors.accent} />
+        <Ionicons name={reward.reward.titleId ? 'ribbon' : reward.track === 'vip' ? 'diamond' : 'gift'} size={14} color={reward.track === 'vip' ? colors.yellow : colors.accent} />
         <Text style={[styles.rewardTrack, { color: reward.track === 'vip' ? colors.yellow : colors.accent }]}>{reward.track === 'vip' ? 'VIP' : 'GRÁTIS'}</Text>
       </View>
       <Text numberOfLines={2} style={[styles.rewardLabel, { color: colors.text }]}>{reward.label}</Text>
