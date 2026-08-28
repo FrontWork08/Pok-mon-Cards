@@ -238,6 +238,10 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
       <View style={[styles.imageWrap, { backgroundColor: isLight ? '#E6EDF6' : colors.surfaceAlt }]}>
         {card.image_small ? <Image source={{ uri: card.image_small }} style={styles.cardImage} resizeMode="contain" resizeMethod="resize" fadeDuration={0} /> : <View style={styles.cardPlaceholder}><Ionicons name="image-outline" size={28} color={colors.muted} /></View>}
         <View style={styles.valueBadge}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
+        <View style={styles.damageBadge}>
+          <Ionicons name="flash" size={11} color="#FFB06A" />
+          <Text style={styles.damageBadgeText}>{Number(card.battle_damage ?? 10).toLocaleString('pt-BR')} DANO</Text>
+        </View>
         {entry.favorite ? <View style={styles.favoriteBadge}><Ionicons name="heart" size={13} color="#fff" /></View> : null}
         {Number(entry.quantity ?? 0) > 1 ? <View style={[styles.quantityBadge, { backgroundColor: colors.yellow }]}><Text style={styles.quantityText}>×{entry.quantity}</Text></View> : null}
       </View>
@@ -305,6 +309,8 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 8, fontWeight: '900' },
   valueBadge: { position: 'absolute', left: 7, bottom: 7, backgroundColor: '#050505E6', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 4 },
   valueBadgeText: { fontSize: 9, fontWeight: '900' },
+  damageBadge: { position: 'absolute', right: 7, bottom: 7, backgroundColor: '#2D160FEF', borderRadius: 999, borderWidth: 1, borderColor: '#8A4027', paddingHorizontal: 7, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  damageBadgeText: { color: '#FFD2AE', fontSize: 8, fontWeight: '900' },
   quantityBadge: { position: 'absolute', right: 7, top: 7, borderRadius: 999, minWidth: 30, paddingHorizontal: 7, paddingVertical: 4, alignItems: 'center' },
   quantityText: { color: '#07111F', fontWeight: '900', fontSize: 11 },
   favoriteBadge: { position: 'absolute', left: 7, top: 7, width: 27, height: 27, borderRadius: 999, backgroundColor: '#E34D65', alignItems: 'center', justifyContent: 'center' },
