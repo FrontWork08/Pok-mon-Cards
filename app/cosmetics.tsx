@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { equipCosmetic, getCosmeticsHub, type CosmeticsHub, type CosmeticItem } from '@/services/cosmetics';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -46,7 +47,7 @@ export default function CosmeticsScreen() {
 
   return (
     <Screen title="Cosméticos do Trainer" subtitle="Molduras e backgrounds desbloqueados por progresso real no jogo.">
-      <Pressable style={styles.back} onPress={() => router.back()}>
+      <Pressable style={styles.back} onPress={() => goBackOrHome(router)}>
         <Ionicons name="arrow-back" size={18} color={colors.muted} />
         <Text style={[styles.backText, { color: colors.muted }]}>Voltar</Text>
       </Pressable>
