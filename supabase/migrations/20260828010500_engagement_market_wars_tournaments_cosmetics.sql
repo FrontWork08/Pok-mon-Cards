@@ -76,6 +76,7 @@ grant select on public.guild_war_player_points to authenticated;
 drop policy if exists "guild war points readable" on public.guild_war_player_points;
 create policy "guild war points readable" on public.guild_war_player_points for select to authenticated using (true);
 create index if not exists guild_war_player_points_guild_idx on public.guild_war_player_points(war_id,guild_id,points desc);
+create index if not exists guild_war_player_points_guild_only_idx on public.guild_war_player_points(guild_id);
 create index if not exists guild_war_player_points_player_idx on public.guild_war_player_points(player_id);
 
 create table if not exists public.guild_collective_boosters (
