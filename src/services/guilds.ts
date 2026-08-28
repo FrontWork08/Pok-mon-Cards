@@ -2,6 +2,19 @@ import { supabase } from '@/lib/supabase';
 
 export type GuildRole = 'leader' | 'officer' | 'member';
 
+export type GuildChatMessage = {
+  id: string;
+  guildId: string;
+  playerId: string;
+  body: string;
+  username: string;
+  profileIcon: string;
+  titleId: string | null;
+  title: string | null;
+  titleIcon: string | null;
+  createdAt: string;
+};
+
 export type GuildMember = {
   id: string;
   username: string;
@@ -256,4 +269,63 @@ export function subscribeToGuilds(onChange: () => void) {
     disposed = true;
     void supabase.removeChannel(channel);
   };
+}
+
+
+function mapGuildChatMessage(row: any): GuildChatMessage {
+  return {
+    id: String(row.id),
+    guildId: String(row.guild_id),
+    playerId: String(row.player_id),
+    body: String(row.body ?? ''),
+    username: String(row.sender_username ?? 'Treinador'),
+    profileIcon: String(row.sender_profile_icon ?? 'pokeball'),
+    titleId: row.sender_title_id == null ? null : String(row.sender_title_id),
+    title: row.sender_title == null ? null : String(row.sender_title),
+    titleIcon: row.sender_title_icon == null ? null : String(row.sender_title_icon),
+    createdAt: String(row.created_at ?? ''),
+  };
+}
+
+export async function getGuildChatMessages(guildId: string, limit = 60): Promise<GuildChatMessage[]> {
+  const { data, error } = await supabase
+    .from('guild_chat_messages')
+    .select('id,guild_id,player_id,body,sender_username,sender_profile_icon,sender_title_id,sender_title,sender_title_icon,created_at')
+    .eq('guild_id', guildId)
+    .order('created_at', { ascending: false })
+    .limit(Math.max(1, Math.min(100, limit)));
+  if (error) throw error;
+  return (data ?? []).map(mapGuildChatMessage).reverse();
+}
+
+export async function sendGuildChatMessage(guildId: string, body: string) {
+  const message = body.trim();
+  if (!message) throw new Error('Digite uma mensagem.');
+  if (message.length > 280) throw new Error('A mensagem pode ter no máximo 280 caracteres.');
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  const playerId = auth.user?.id;
+  if (!playerId) throw new Error('Usuário não autenticado.');
+
+  const { data, error } = await supabase
+    .from('guild_chat_messages')
+    .insert({ guild_id: guildId, player_id: playerId, body: message })
+    .select('id,guild_id,player_id,body,sender_username,sender_profile_icon,sender_title_id,sender_title,sender_title_icon,created_at')
+    .single();
+  if (error) throw error;
+  return mapGuildChatMessage(data);
+}
+
+let guildChatSequence = 0;
+export function subscribeToGuildChat(guildId: string, onChange: () => void) {
+  guildChatSequence += 1;
+  const channel = supabase
+    .channel(`guild-chat:${guildId}:${guildChatSequence}:${Date.now()}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'guild_chat_messages', filter: `guild_id=eq.${guildId}` },
+      onChange,
+    )
+    .subscribe();
+  return () => { void supabase.removeChannel(channel); };
 }
