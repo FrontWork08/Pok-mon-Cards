@@ -18,6 +18,19 @@ create policy "own guild reward claims readable"
 on public.guild_weekly_reward_claims for select to authenticated
 using ((select auth.uid())=player_id);
 
+
+do $
+begin
+  if not exists(
+    select 1 from pg_publication_tables
+    where pubname='supabase_realtime'
+      and schemaname='public'
+      and tablename='guild_weekly_reward_claims'
+  ) then
+    alter publication supabase_realtime add table public.guild_weekly_reward_claims;
+  end if;
+end $;
+
 insert into public.achievement_definitions(id,name,description,category,target,title,icon,sort_order,active)
 values
 ('pokedex_gen_1','Kanto completo','Descubra todas as 151 espécies de Kanto.','collection',151,'Mestre de Kanto','🔴',31,true),
