@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -17,8 +18,8 @@ import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PackContentsModal } from '@/components/PackContentsModal';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
 import { PremiumBackground } from '@/components/PremiumBackground';
-import { TrainerNavigation } from '@/components/TrainerNavigation';
 import {
+  exchangeCoinsForDiamonds,
   getFavoritePackIds,
   getLegendaryPackConfig,
   listPacks,
@@ -149,9 +150,10 @@ export default function PacksScreen() {
       return pack.name.toLowerCase().includes(term) || pack.set_id.toLowerCase().includes(term);
     });
 
+    const normalizedPrice = (pack:Pack) => pack.currency === 'diamonds' ? pack.base_price * 500000 : pack.base_price;
     return [...visible].sort((a, b) => {
-      if (sortMode === 'price-high') return b.base_price - a.base_price;
-      if (sortMode === 'price-low') return a.base_price - b.base_price;
+      if (sortMode === 'price-high') return normalizedPrice(b) - normalizedPrice(a);
+      if (sortMode === 'price-low') return normalizedPrice(a) - normalizedPrice(b);
       if (sortMode === 'az') return a.name.localeCompare(b.name, 'pt-BR');
       const aDate = a.release_date ? new Date(a.release_date).getTime() : 0;
       const bDate = b.release_date ? new Date(b.release_date).getTime() : 0;
@@ -160,15 +162,22 @@ export default function PacksScreen() {
   }, [packs, search, favoriteOnly, favoriteIds, sortMode]);
 
   function choosePack(pack: Pack) {
-    if (coins < pack.price) {
-      setNotice({
-        kind: 'error',
-        text: `Moedas insuficientes: você tem 🪙 ${coins.toLocaleString('pt-BR')} e este booster custa 🪙 ${pack.price.toLocaleString('pt-BR')}.`,
-      });
+    const balance = pack.currency === 'diamonds' ? diamonds : coins;
+    const icon = pack.currency === 'diamonds' ? '💎' : '🪙';
+    if (balance < pack.price) {
+      setNotice({ kind:'error', text:`Saldo insuficiente: você tem ${icon} ${balance.toLocaleString('pt-BR')} e este booster custa ${icon} ${pack.price.toLocaleString('pt-BR')}.` });
       return;
     }
     setNotice(null);
     setSelectedPack(pack);
+  }
+
+  async function exchangeOneDiamond() {
+    const cost=500000;
+    if(coins<cost){setNotice({kind:'error',text:'Você precisa de 🪙 500.000 para trocar por 💎 1 Diamante.'});return;}
+    const run=async()=>{try{const result=await exchangeCoinsForDiamonds(1);setCoins(result.coins);setDiamonds(result.diamonds);await wallet.refresh();setNotice({kind:'success',text:'Câmbio concluído: 🪙 500.000 → 💎 1. Diamantes continuam sendo uma moeda rara.'});}catch(e){setNotice({kind:'error',text:e instanceof Error?e.message:'Não foi possível fazer o câmbio.'});}};
+    if(Platform.OS==='web') void run();
+    else Alert.alert('Trocar por 1 Diamante?','O câmbio custa 🪙 500.000 e não pode ser desfeito.',[{text:'Cancelar',style:'cancel'},{text:'TROCAR',onPress:()=>{void run();}}]);
   }
 
   async function toggleFavorite(pack: Pack) {
@@ -218,15 +227,16 @@ export default function PacksScreen() {
     const latestPack = latestPacks.find((pack) => pack.id === selectedPack.id);
     if (!latestPack) throw new Error('Este booster não está mais disponível.');
     setSelectedPack(latestPack);
-    setCoins(before.coins);
-    if (before.coins < latestPack.price) {
-      throw new Error(`Moedas insuficientes. Seu saldo atual é 🪙 ${before.coins.toLocaleString('pt-BR')}.`);
+    setCoins(before.coins); setDiamonds(before.diamonds);
+    const balance = latestPack.currency === 'diamonds' ? before.diamonds : before.coins;
+    if (balance < latestPack.price) {
+      throw new Error(`${latestPack.currency === 'diamonds' ? 'Diamantes' : 'Moedas'} insuficientes. Seu saldo atual é ${latestPack.currency === 'diamonds' ? '💎' : '🪙'} ${balance.toLocaleString('pt-BR')}.`);
     }
 
     try {
       const result = await openPack(latestPack.id);
       const after = await getMyProfile();
-      setCoins(after.coins);
+      setCoins(after.coins); setDiamonds(after.diamonds);
       await wallet.refresh();
       return result.cards;
     } catch (error) {
@@ -238,7 +248,6 @@ export default function PacksScreen() {
 
   const header = (
     <View style={styles.headerStack}>
-      <TrainerNavigation />
       <View style={styles.headerTop}>
         <View style={styles.header}>
           <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
@@ -254,9 +263,7 @@ export default function PacksScreen() {
           <Text style={[styles.balanceLabel, { color: colors.muted }]}>SEU SALDO</Text>
           <Text style={[styles.balanceValue, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}  •  <Text style={{color:'#68D9FF'}}>💎 {diamonds.toLocaleString('pt-BR')}</Text></Text>
         </View>
-        <View style={[styles.balanceBadge, { backgroundColor: colors.accentSoft }]}>
-          <Ionicons name="wallet-outline" size={20} color={colors.yellow} />
-        </View>
+        <View style={styles.balanceActions}><Pressable onPress={()=>void exchangeOneDiamond()} style={[styles.exchangeButton,{backgroundColor:colors.surfaceAlt,borderColor:'#68D9FF'}]}><Ionicons name="diamond" size={15} color="#68D9FF"/><Text style={[styles.exchangeText,{color:colors.text}]}>🪙500K → 💎1</Text></Pressable><View style={[styles.balanceBadge, { backgroundColor: colors.accentSoft }]}><Ionicons name="wallet-outline" size={20} color={colors.yellow} /></View></View>
       </View>
 
       {freeUntil ? (
@@ -417,7 +424,7 @@ export default function PacksScreen() {
         removeClippedSubviews={Platform.OS === 'android'}
         showsVerticalScrollIndicator={false}
         renderItem={({ item: pack }) => {
-          const affordable = coins >= pack.price;
+          const affordable = (pack.currency === 'diamonds' ? diamonds : coins) >= pack.price;
           const favorite = favoriteIds.has(pack.id);
 
           return (
@@ -476,7 +483,7 @@ export default function PacksScreen() {
                   </Pressable>
 
                   <Text style={[styles.price, { color: affordable ? colors.yellow : colors.muted }]}>
-                    {pack.price === 0 ? '🎁 GRÁTIS' : `🪙 ${pack.price.toLocaleString('pt-BR')}`}
+                    {pack.price === 0 ? '🎁 GRÁTIS' : `${pack.currency === 'diamonds' ? '💎' : '🪙'} ${pack.price.toLocaleString('pt-BR')}`}
                   </Text>
                 </View>
 
@@ -514,8 +521,8 @@ export default function PacksScreen() {
         onFinished={() => setNotice({
           kind: 'success',
           text: selectedPack?.currency === 'diamonds'
-            ? 'Cofre aberto! Sua carta lendária já está na Bag.'
-            : 'Booster aberto! Os cards já estão na sua Bag, você ganhou +20 XP e avançou suas missões.',
+            ? 'Booster de Diamantes aberto! As cartas já estão na sua Bag.'
+            : 'Booster aberto! Os cards já estão na sua Bag e avançaram suas missões.',
         })}
       />
     </SafeAreaView>
@@ -536,7 +543,7 @@ const styles = StyleSheet.create({
   balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 13, borderWidth: 1 },
   balanceLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   balanceValue: { fontSize: 22, fontWeight: '900', marginTop: 2 },
-  balanceBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  balanceActions:{flexDirection:'row',alignItems:'center',gap:7},exchangeButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},exchangeText:{fontSize:8,fontWeight:'900'},balanceBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   diamondHero: { flexDirection:'row', flexWrap:'wrap', alignItems:'center', gap:12, borderRadius:20, borderWidth:1, padding:14 },
   diamondOrb: { width:52, height:52, borderRadius:18, backgroundColor:'#163C55', alignItems:'center', justifyContent:'center' },
   diamondKicker: { color:'#68D9FF', fontSize:8, fontWeight:'900', letterSpacing:1.2 },
