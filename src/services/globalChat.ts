@@ -5,6 +5,9 @@ export type GlobalChatMessage = {
   playerId: string;
   username: string;
   profileIcon: string;
+  titleId: string | null;
+  title: string | null;
+  titleIcon: string | null;
   body: string;
   createdAt: string;
 };
@@ -15,6 +18,9 @@ function mapRow(row: any): GlobalChatMessage {
     playerId: String(row.player_id),
     username: String(row.sender_username ?? 'Trainer'),
     profileIcon: String(row.sender_profile_icon ?? 'pokeball'),
+    titleId: row.sender_title_id == null ? null : String(row.sender_title_id),
+    title: row.sender_title == null ? null : String(row.sender_title),
+    titleIcon: row.sender_title_icon == null ? null : String(row.sender_title_icon),
     body: String(row.body ?? ''),
     createdAt: String(row.created_at),
   };
@@ -24,7 +30,7 @@ export async function getGlobalChatMessages(limit = 8): Promise<GlobalChatMessag
   const safeLimit = Math.max(1, Math.min(30, Math.floor(limit)));
   const { data, error } = await supabase
     .from('global_chat_messages')
-    .select('id,player_id,body,sender_username,sender_profile_icon,created_at')
+    .select('id,player_id,body,sender_username,sender_profile_icon,sender_title_id,sender_title,sender_title_icon,created_at')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(safeLimit);
@@ -50,6 +56,9 @@ export async function sendGlobalChatMessage(body: string): Promise<GlobalChatMes
     playerId: String(row.playerId),
     username: String(row.username ?? 'Trainer'),
     profileIcon: String(row.profileIcon ?? 'pokeball'),
+    titleId: row.titleId == null ? null : String(row.titleId),
+    title: row.title == null ? null : String(row.title),
+    titleIcon: row.titleIcon == null ? null : String(row.titleIcon),
     body: String(row.body ?? ''),
     createdAt: String(row.createdAt),
   };
