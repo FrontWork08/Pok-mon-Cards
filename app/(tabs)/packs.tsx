@@ -35,10 +35,14 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 
 type Notice = { kind: 'error' | 'success'; text: string } | null;
-type SortMode = 'newest' | 'oldest' | 'price-high' | 'price-low' | 'az';
+type SortMode = 'newest' | 'oldest' | 'rarity-high' | 'rarity-low' | 'price-high' | 'price-low' | 'az';
+type GenerationFilter = 'all' | number;
+
 const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
   { id: 'newest', label: 'MAIS NOVOS' },
   { id: 'oldest', label: 'MAIS ANTIGOS' },
+  { id: 'rarity-high', label: 'MAIS RAROS' },
+  { id: 'rarity-low', label: 'MENOS RAROS' },
   { id: 'price-high', label: 'MAIOR PREÇO' },
   { id: 'price-low', label: 'MENOR PREÇO' },
   { id: 'az', label: 'A–Z' },
@@ -48,7 +52,7 @@ const DIAMOND_PACK_BASE: Pack = {
   id:'diamond-legendary',name:'Cofre Lendário',set_id:'legendary-vault',
   price:25,base_price:25,free_until:null,cards_per_pack:1,image_url:null,art_url:null,
   booster_art_url:null,booster_art_urls:[],booster_back_url:null,booster_logo_url:null,
-  booster_art_source:'trainer-vault',release_date:null,active:true,currency:'diamonds',
+  booster_art_source:'trainer-vault',release_date:null,generation:null,rarity_score:999,active:true,currency:'diamonds',
 };
 
 export default function PacksScreen() {
@@ -62,6 +66,7 @@ export default function PacksScreen() {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('newest');
+  const [generationFilter, setGenerationFilter] = useState<GenerationFilter>('all');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
@@ -142,16 +147,25 @@ export default function PacksScreen() {
   }, [clock, freeUntil]);
 
 
+  const generationOptions = useMemo(
+    () => [...new Set(packs.map((pack) => pack.generation).filter((value): value is number => value != null))]
+      .sort((a, b) => a - b),
+    [packs],
+  );
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const visible = packs.filter((pack) => {
       if (favoriteOnly && !favoriteIds.has(pack.id)) return false;
+      if (generationFilter !== 'all' && pack.generation !== generationFilter) return false;
       if (!term) return true;
       return pack.name.toLowerCase().includes(term) || pack.set_id.toLowerCase().includes(term);
     });
 
     const normalizedPrice = (pack:Pack) => pack.currency === 'diamonds' ? pack.base_price * 500000 : pack.base_price;
     return [...visible].sort((a, b) => {
+      if (sortMode === 'rarity-high') return b.rarity_score - a.rarity_score || normalizedPrice(b) - normalizedPrice(a);
+      if (sortMode === 'rarity-low') return a.rarity_score - b.rarity_score || normalizedPrice(a) - normalizedPrice(b);
       if (sortMode === 'price-high') return normalizedPrice(b) - normalizedPrice(a);
       if (sortMode === 'price-low') return normalizedPrice(a) - normalizedPrice(b);
       if (sortMode === 'az') return a.name.localeCompare(b.name, 'pt-BR');
@@ -159,7 +173,7 @@ export default function PacksScreen() {
       const bDate = b.release_date ? new Date(b.release_date).getTime() : 0;
       return sortMode === 'oldest' ? aDate - bDate : bDate - aDate;
     });
-  }, [packs, search, favoriteOnly, favoriteIds, sortMode]);
+  }, [packs, search, favoriteOnly, favoriteIds, generationFilter, sortMode]);
 
   function choosePack(pack: Pack) {
     const balance = pack.currency === 'diamonds' ? diamonds : coins;
@@ -366,6 +380,43 @@ export default function PacksScreen() {
         <Text style={[styles.resultCount, { color: colors.muted }]}>{filtered.length} encontrados</Text>
       </View>
 
+      <View style={styles.generationSection}>
+        <Text style={[styles.filterLabel, { color: colors.muted }]}>GERAÇÃO</Text>
+        <View style={styles.sortRow}>
+          <Pressable
+            onPress={() => setGenerationFilter('all')}
+            style={[
+              styles.sortChip,
+              {
+                backgroundColor: generationFilter === 'all' ? colors.accentSoft : colors.surface,
+                borderColor: generationFilter === 'all' ? colors.accent : colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.sortChipText, { color: generationFilter === 'all' ? colors.accent : colors.muted }]}>TODAS</Text>
+          </Pressable>
+          {generationOptions.map((generation) => {
+            const active = generationFilter === generation;
+            return (
+              <Pressable
+                key={generation}
+                onPress={() => setGenerationFilter(generation)}
+                style={[
+                  styles.sortChip,
+                  {
+                    backgroundColor: active ? colors.accentSoft : colors.surface,
+                    borderColor: active ? colors.accent : colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.sortChipText, { color: active ? colors.accent : colors.muted }]}>GEN {generation}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <Text style={[styles.filterLabel, { color: colors.muted }]}>ORDENAR</Text>
       <View style={styles.sortRow}>
         {SORT_OPTIONS.map((option) => {
           const active = sortMode === option.id;
@@ -567,7 +618,9 @@ const styles = StyleSheet.create({
   favoriteFilter: { minHeight: 39, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
   favoriteFilterText: { fontSize: 9, fontWeight: '900', letterSpacing: .4 },
   resultCount: { fontSize: 12, fontWeight: '700' },
-  sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 9 },
+  generationSection: { marginTop: 4 },
+  filterLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.1, marginTop: 8 },
+  sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 7 },
   sortChip: { minHeight: 34, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
   sortChipText: { fontSize: 8, fontWeight: '900', letterSpacing: .35 },
   sectionTitle: { fontSize: 21, fontWeight: '900' },
