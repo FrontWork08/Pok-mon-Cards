@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -6,14 +6,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
-import { getActiveGlobalAnnouncement, type GlobalAnnouncement } from '@/services/liveEvents';
+import { getUnseenGlobalAnnouncement, type GlobalAnnouncement } from '@/services/liveEvents';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
-
-const SEEN_ANNOUNCEMENTS_KEY = 'pokemon-cards-seen-global-announcements-v1';
-const MAX_SEEN_ANNOUNCEMENTS = 100;
 
 const severityTheme = {
   info: { color: '#6FD3FF', icon: 'information-circle' as const, label: 'INFORMAÇÃO' },
@@ -21,59 +17,47 @@ const severityTheme = {
   critical: { color: '#FF6B81', icon: 'alert-circle' as const, label: 'URGENTE' },
 };
 
-async function loadSeenAnnouncementIds() {
-  try {
-    const raw = await SecureStore.getItemAsync(SEEN_ANNOUNCEMENTS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return new Set<string>(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []);
-  } catch {
-    return new Set<string>();
-  }
-}
-
-async function rememberAnnouncement(id: string, current: Set<string>) {
-  const next = new Set(current);
-  next.add(id);
-  const values = [...next].slice(-MAX_SEEN_ANNOUNCEMENTS);
-  try {
-    await SecureStore.setItemAsync(SEEN_ANNOUNCEMENTS_KEY, JSON.stringify(values));
-  } catch {}
-  return new Set(values);
-}
-
 export function GlobalAnnouncementOverlay() {
   const { colors } = useAppTheme();
   const [announcement, setAnnouncement] = useState<GlobalAnnouncement | null>(null);
-  const [seenIds, setSeenIds] = useState<Set<string> | null>(null);
+  const announcementRef = useRef<GlobalAnnouncement | null>(null);
+  const claimingRef = useRef(false);
 
-  const refresh = useCallback(async () => {
-    const current = await getActiveGlobalAnnouncement();
-    setAnnouncement(current);
+  const clearAnnouncement = useCallback(() => {
+    announcementRef.current = null;
+    setAnnouncement(null);
   }, []);
 
-  const dismiss = useCallback(async () => {
-    if (!announcement || !seenIds) return;
-    setSeenIds(await rememberAnnouncement(announcement.id, seenIds));
-  }, [announcement, seenIds]);
-
-  useEffect(() => {
-    void loadSeenAnnouncementIds().then(setSeenIds);
+  const refresh = useCallback(async () => {
+    if (announcementRef.current || claimingRef.current) return;
+    claimingRef.current = true;
+    try {
+      const current = await getUnseenGlobalAnnouncement();
+      if (!current) return;
+      announcementRef.current = current;
+      setAnnouncement(current);
+    } finally {
+      claimingRef.current = false;
+    }
   }, []);
 
   useEffect(() => {
     let disposed = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
+    const removeChannel = () => {
+      if (!channel) return;
+      void supabase.removeChannel(channel);
+      channel = null;
+    };
+
     const connect = async () => {
       const { data } = await supabase.auth.getSession();
       if (disposed) return;
 
       if (!data.session?.user) {
-        setAnnouncement(null);
-        if (channel) {
-          void supabase.removeChannel(channel);
-          channel = null;
-        }
+        removeChannel();
+        clearAnnouncement();
         return;
       }
 
@@ -85,36 +69,49 @@ export function GlobalAnnouncementOverlay() {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'global_announcements' },
-          () => { void refresh().catch(() => null); },
+          (change) => {
+            const current = announcementRef.current;
+            const next = change.new as { id?: string; active?: boolean } | null;
+            if (
+              current &&
+              change.eventType === 'UPDATE' &&
+              next?.id === current.id &&
+              next.active === false
+            ) {
+              clearAnnouncement();
+              return;
+            }
+            void refresh().catch(() => null);
+          },
         )
         .subscribe();
     };
 
     void connect();
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        removeChannel();
+        clearAnnouncement();
+        return;
+      }
       void connect();
     });
-    const expiryTimer = setInterval(() => {
-      void refresh().catch(() => null);
-    }, 15000);
 
     return () => {
       disposed = true;
-      clearInterval(expiryTimer);
       authListener.subscription.unsubscribe();
-      if (channel) void supabase.removeChannel(channel);
+      removeChannel();
     };
-  }, [refresh]);
+  }, [clearAnnouncement, refresh]);
 
-  const visible = Boolean(announcement && seenIds && !seenIds.has(announcement.id));
   const visual = severityTheme[announcement?.severity ?? 'info'];
 
   return (
     <Modal
       transparent
       animationType="fade"
-      visible={visible}
-      onRequestClose={() => { void dismiss(); }}
+      visible={Boolean(announcement)}
+      onRequestClose={clearAnnouncement}
     >
       <View style={styles.backdrop}>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: visual.color }]}>
@@ -125,7 +122,7 @@ export function GlobalAnnouncementOverlay() {
           <Text style={[styles.title, { color: colors.text }]}>{announcement?.title}</Text>
           <Text style={[styles.body, { color: colors.muted }]}>{announcement?.body}</Text>
           <Pressable
-            onPress={() => { void dismiss(); }}
+            onPress={clearAnnouncement}
             style={[styles.button, { backgroundColor: visual.color }]}
           >
             <Text style={styles.buttonText}>ENTENDI</Text>
