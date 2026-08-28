@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
-import { getOwnedCard, type OwnedCardEntry } from '@/services/player';
+import { getCardDetail, type CardDetailEntry } from '@/services/player';
 import { setCardFavorite } from '@/services/playerActions';
 import { formatUsd } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
@@ -16,7 +16,7 @@ export default function CardDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useAppTheme();
-  const [entry, setEntry] = useState<OwnedCardEntry | null>(null);
+  const [entry, setEntry] = useState<CardDetailEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [wishlistSaving, setWishlistSaving] = useState(false);
@@ -30,7 +30,7 @@ export default function CardDetailScreen() {
       setLoading(true);
       setError(null);
       const [owned, wanted, history] = await Promise.all([
-        getOwnedCard(String(id)),
+        getCardDetail(String(id)),
         isCardWishlisted(String(id)),
         getCardPriceHistory(String(id), 30),
       ]);
@@ -44,7 +44,7 @@ export default function CardDetailScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function toggleFavorite() {
-    if (!entry?.cards || saving) return;
+    if (!entry?.owned || !entry?.cards || saving) return;
     const next = !entry.favorite;
     try { setSaving(true); await setCardFavorite(entry.cards.id, next); setEntry((current) => current ? { ...current, favorite: next } : current); }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível atualizar o favorito.'); }
@@ -81,7 +81,7 @@ export default function CardDetailScreen() {
         <View style={styles.topBar}>
           <Pressable style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={22} color={colors.text} /></Pressable>
           <Text style={[styles.topTitle, { color: colors.muted }]}>DETALHES DO CARD</Text>
-          <Pressable style={[styles.iconButton, { backgroundColor: entry?.favorite ? '#B73C59' : colors.surface, borderColor: entry?.favorite ? '#E8657F' : colors.border }]} onPress={toggleFavorite} disabled={!card || saving}><Ionicons name={entry?.favorite ? 'heart' : 'heart-outline'} size={22} color={entry?.favorite ? '#fff' : colors.yellow} /></Pressable>
+          <Pressable style={[styles.iconButton, { backgroundColor: entry?.favorite ? '#B73C59' : colors.surface, borderColor: entry?.favorite ? '#E8657F' : colors.border, opacity: entry?.owned ? 1 : .45 }]} onPress={toggleFavorite} disabled={!card || saving || !entry?.owned}><Ionicons name={entry?.favorite ? 'heart' : 'heart-outline'} size={22} color={entry?.favorite ? '#fff' : colors.yellow} /></Pressable>
         </View>
         {loading ? <ActivityIndicator size="large" color={colors.yellow} style={{ marginTop: 80 }} /> : null}
         {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={20} color="#FF9C9C" /><Text style={styles.errorText}>{error}</Text></View> : null}
@@ -92,6 +92,7 @@ export default function CardDetailScreen() {
             <Text style={[styles.kicker, { color: colors.yellow }]}>#{card.pokedex_numbers?.[0] ?? '---'} • {card.set_id.toUpperCase()}</Text>
             <Text style={[styles.name, { color: colors.text }]}>{card.pokemon_name}</Text>
             <Text style={[styles.rarity, { color: colors.muted }]}>{card.rarity ?? 'Sem raridade informada'}</Text>
+            {!entry.owned ? <View style={[styles.previewBadge,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name="eye" size={15} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.previewBadgeTitle,{color:colors.text}]}>PRÉVIA DA CARTA</Text><Text style={[styles.previewBadgeText,{color:colors.muted}]}>Você ainda não possui esta carta. Veja as estatísticas antes de tentar obtê-la em um booster.</Text></View></View> : null}
 
             <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR DE MERCADO EM USD</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? 'Preço TCGplayer indisponível para esta carta.' : 'Snapshot de mercado TCGplayer'}</Text></View></View>
 
@@ -131,9 +132,9 @@ export default function CardDetailScreen() {
             </View> : null}
 
             <View style={styles.badges}>{(card.types ?? []).map((type) => <View key={type} style={[styles.badge, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Text style={[styles.badgeText, { color: colors.text }]}>{type}</Text></View>)}</View>
-            <View style={styles.statsGrid}><Info label="SET" value={card.set_name} /><Info label="NÚMERO" value={card.card_number ?? '—'} /><Info label="QUANTIDADE" value={`×${entry.quantity}`} /><Info label="VALOR TOTAL EM USD" value={totalMarketValueUsd == null ? '—' : formatUsd(totalMarketValueUsd)} /><Info label="VALOR NO JOGO" value={`🪙 ${unitValue.toLocaleString('pt-BR')}`} /><Info label="OBTIDO" value={new Date(entry.first_obtained_at).toLocaleDateString('pt-BR')} /></View>
+            <View style={styles.statsGrid}><Info label="SET" value={card.set_name} /><Info label="NÚMERO" value={card.card_number ?? '—'} /><Info label="QUANTIDADE" value={entry.owned ? `×${entry.quantity}` : 'Ainda não possui'} /><Info label="VALOR TOTAL EM USD" value={totalMarketValueUsd == null ? '—' : formatUsd(totalMarketValueUsd)} /><Info label="VALOR NO JOGO" value={`🪙 ${unitValue.toLocaleString('pt-BR')}`} /><Info label="OBTIDO" value={entry.first_obtained_at ? new Date(entry.first_obtained_at).toLocaleDateString('pt-BR') : 'Ainda não está na Bag'} /></View>
             <View style={styles.cardActions}>
-              <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: entry.favorite ? '#B73C59' : colors.yellow }]} onPress={toggleFavorite} disabled={saving}><Ionicons name={entry.favorite ? 'heart' : 'heart-outline'} size={19} color={entry.favorite ? '#fff' : '#07111F'} /><Text style={[styles.favoriteButtonText, entry.favorite && { color: '#fff' }]}>{saving ? 'SALVANDO...' : entry.favorite ? 'REMOVER FAVORITO' : 'FAVORITAR'}</Text></Pressable>
+              {entry.owned ? <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: entry.favorite ? '#B73C59' : colors.yellow }]} onPress={toggleFavorite} disabled={saving}><Ionicons name={entry.favorite ? 'heart' : 'heart-outline'} size={19} color={entry.favorite ? '#fff' : '#07111F'} /><Text style={[styles.favoriteButtonText, entry.favorite && { color: '#fff' }]}>{saving ? 'SALVANDO...' : entry.favorite ? 'REMOVER FAVORITO' : 'FAVORITAR'}</Text></Pressable> : null}
               <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: wishlisted ? '#FFD447' : colors.accentSoft, borderWidth: 1, borderColor: wishlisted ? '#FFD447' : colors.accent }]} onPress={toggleWishlist} disabled={wishlistSaving}><Ionicons name={wishlisted ? 'star' : 'star-outline'} size={19} color={wishlisted ? '#07111F' : colors.accent} /><Text style={[styles.favoriteButtonText, { color: wishlisted ? '#07111F' : colors.text }]}>{wishlistSaving ? 'SALVANDO...' : wishlisted ? 'NO CARD CHASE' : 'QUERO ESTA CARTA'}</Text></Pressable>
             </View>
           </View>
@@ -152,6 +153,7 @@ const styles = StyleSheet.create({
   layout: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start', justifyContent: 'center' }, imagePanel: { flexGrow: 1, flexBasis: 330, maxWidth: 480, minHeight: 470, borderRadius: 26, padding: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, image: { width: '100%', height: 570, maxHeight: 570 }, imagePlaceholder: { width: '100%', height: 480, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, infoPanel: { flexGrow: 1, flexBasis: 320, maxWidth: 560, borderRadius: 26, padding: 22, borderWidth: 1 }, kicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }, name: { fontSize: 34, lineHeight: 40, fontWeight: '900', marginTop: 5 }, rarity: { fontSize: 14, fontWeight: '700', marginTop: 4 },
   cardActions: { flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:20 },
   flexAction: { flexGrow:1, minWidth:190, marginTop:0 },
+  previewBadge:{marginTop:12,borderRadius:14,borderWidth:1,padding:10,flexDirection:'row',alignItems:'center',gap:8}, previewBadgeTitle:{fontSize:8,fontWeight:'900',letterSpacing:.8}, previewBadgeText:{fontSize:8,lineHeight:12,marginTop:2},
   battlePanel:{marginTop:12,borderRadius:18,borderWidth:1,padding:13,gap:10},
   battlePanelHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
   battlePower:{fontSize:21,fontWeight:'900',marginTop:3},
