@@ -65,6 +65,44 @@ function normalizeTcgdexTcgplayer(pricing: any) {
   return Object.keys(prices).length ? { prices, updatedAt: tcg.updated ?? null } : null;
 }
 
+async function fetchEurUsdRate() {
+  try {
+    const response = await fetch("https://api.frankfurter.dev/v2/rate/EUR/USD", {
+      headers: { "User-Agent": "Pokemon-Cards-FX/1.0" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return numeric(payload?.rate);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeCardmarketUsd(cardmarket: any, eurUsd: number | null) {
+  if (!cardmarket || !eurUsd) return null;
+  const prices = cardmarket?.prices ?? {};
+  const trend = numeric(prices.trendPrice);
+  const average = numeric(prices.averageSellPrice);
+  const low = numeric(prices.lowPrice);
+  const base = trend ?? average ?? low;
+  if (!base) return null;
+  const market = Number((base * eurUsd).toFixed(4));
+  const lowUsd = low ? Number((low * eurUsd).toFixed(4)) : null;
+  return {
+    prices: {
+      normal: {
+        market,
+        mid: average ? Number((average * eurUsd).toFixed(4)) : market,
+        low: lowUsd,
+        high: null,
+      },
+    },
+    cardmarket,
+    fx: { base: "EUR", quote: "USD", rate: eurUsd },
+  };
+}
+
 async function fetchTcgdexFallback(cardId: string) {
   try {
     const response = await fetch(
@@ -79,7 +117,7 @@ async function fetchTcgdexFallback(cardId: string) {
   }
 }
 
-async function enrichWithTcgdexFallback(cards: any[]) {
+async function enrichWithTcgdexFallback(cards: any[], eurUsd: number | null) {
   const enriched = cards.map((card) => ({ ...card, pricing_source: "pokemontcg" }));
   const targets = enriched.filter((card) => !hasUsableTcgplayer(card?.tcgplayer));
 
@@ -98,6 +136,16 @@ async function enrichWithTcgdexFallback(cards: any[]) {
       }
     }
   }
+
+  for (const card of enriched) {
+    if (hasUsableTcgplayer(card?.tcgplayer)) continue;
+    const cardmarketUsd = normalizeCardmarketUsd(card?.cardmarket, eurUsd);
+    if (cardmarketUsd) {
+      card.tcgplayer = cardmarketUsd;
+      card.pricing_source = "cardmarket";
+    }
+  }
+
   return enriched;
 }
 
@@ -111,7 +159,7 @@ async function fetchPage(setId: string, page: number) {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const response = await fetch(
-        `https://api.pokemontcg.io/v2/cards?q=${query}&page=${page}&pageSize=250&select=id,rarity,tcgplayer`,
+        `https://api.pokemontcg.io/v2/cards?q=${query}&page=${page}&pageSize=250&select=id,rarity,tcgplayer,cardmarket`,
         { headers, signal: AbortSignal.timeout(25_000) },
       );
       if (response.ok) return await response.json();
@@ -157,11 +205,12 @@ Deno.serve(async (request: Request) => {
   if (claimError) return Response.json({ error: claimError.message.includes("FORBIDDEN") ? "Forbidden" : claimError.message }, { status: claimError.message.includes("FORBIDDEN") ? 403 : 500 });
 
   const results: any[] = [];
+  const eurUsd = await fetchEurUsdRate();
   for (const job of claimed ?? []) {
     const setId = String(job.set_id ?? "");
     try {
       const cards = await fetchSet(setId);
-      const enrichedCards = await enrichWithTcgdexFallback(cards);
+      const enrichedCards = await enrichWithTcgdexFallback(cards, eurUsd);
       const { data, error } = await admin.rpc("apply_market_price_sync_set", {
         p_token: syncToken,
         p_set_id: setId,
