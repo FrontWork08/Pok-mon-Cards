@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -20,6 +21,7 @@ import {
   renameDeck,
   setDeckCards,
   type DeckBuilderCardEntry,
+  type DeckBuilderSortMode,
 } from '@/services/decks';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -47,6 +49,13 @@ export default function DeckEditorScreen() {
   const [prices, setPrices] = useState<PriceMap>({});
   const [name, setName] = useState('');
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [rarityFilter, setRarityFilter] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<DeckBuilderSortMode>('name');
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+  const [availableRarities, setAvailableRarities] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [preview, setPreview] = useState<DeckBuilderCardEntry | null>(null);
   const [loadingDeck, setLoadingDeck] = useState(true);
   const [loadingCards, setLoadingCards] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -55,6 +64,13 @@ export default function DeckEditorScreen() {
 
   const pageRequestId = useRef(0);
   const loadingMoreRef = useRef(false);
+
+  const builderFilters = useMemo(() => ({
+    search,
+    typeFilter,
+    rarityFilter,
+    sortMode,
+  }), [rarityFilter, search, sortMode, typeFilter]);
 
   const mergePrices = useCallback((rows: DeckBuilderCardEntry[]) => {
     setPrices((current) => {
@@ -99,14 +115,16 @@ export default function DeckEditorScreen() {
     }
   }, [id]);
 
-  const loadFirstPage = useCallback(async (term: string) => {
+  const loadFirstPage = useCallback(async () => {
     const currentRequest = ++pageRequestId.current;
     try {
       setLoadingCards(true);
-      const page = await getDeckBuilderPage(0, PAGE_SIZE, term);
+      const page = await getDeckBuilderPage(0, PAGE_SIZE, builderFilters);
       if (currentRequest !== pageRequestId.current) return;
       setCards(page.items);
       setTotalCards(page.total);
+      setAvailableTypes(page.availableTypes);
+      setAvailableRarities(page.availableRarities);
       mergePrices(page.items);
     } catch (err) {
       if (currentRequest !== pageRequestId.current) return;
@@ -116,7 +134,7 @@ export default function DeckEditorScreen() {
     } finally {
       if (currentRequest === pageRequestId.current) setLoadingCards(false);
     }
-  }, [mergePrices]);
+  }, [builderFilters, mergePrices]);
 
   useEffect(() => {
     void loadDeck();
@@ -124,8 +142,8 @@ export default function DeckEditorScreen() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void loadFirstPage(search);
-    }, search.trim() ? 220 : 20);
+      void loadFirstPage();
+    }, search.trim() ? 220 : 40);
     return () => clearTimeout(timer);
   }, [loadFirstPage, search]);
 
@@ -135,7 +153,7 @@ export default function DeckEditorScreen() {
     setLoadingMore(true);
     const currentRequest = pageRequestId.current;
     try {
-      const page = await getDeckBuilderPage(cards.length, PAGE_SIZE, search);
+      const page = await getDeckBuilderPage(cards.length, PAGE_SIZE, builderFilters);
       if (currentRequest !== pageRequestId.current) return;
       setCards((current) => {
         const known = new Set(current.map((item) => item.cards?.id));
@@ -149,7 +167,7 @@ export default function DeckEditorScreen() {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [cards.length, loadingCards, mergePrices, search, totalCards]);
+  }, [builderFilters, cards.length, loadingCards, mergePrices, totalCards]);
 
   const total = useMemo(
     () => Object.values(selected).reduce((sum, qty) => sum + qty, 0),
@@ -262,6 +280,62 @@ export default function DeckEditorScreen() {
         ) : null}
       </View>
 
+      <Pressable
+        onPress={() => setShowFilters((value) => !value)}
+        style={[styles.filterToggle,{backgroundColor:colors.surface,borderColor:showFilters?colors.accent:colors.border}]}
+      >
+        <Ionicons name="options" size={17} color={showFilters?colors.accent:colors.muted}/>
+        <Text style={[styles.filterToggleText,{color:colors.text}]}>FILTROS E ORDENAÇÃO</Text>
+        {(typeFilter || rarityFilter || sortMode !== 'name') ? <View style={[styles.activeFilterDot,{backgroundColor:colors.yellow}]}/> : null}
+        <Ionicons name={showFilters?'chevron-up':'chevron-down'} size={17} color={colors.muted}/>
+      </Pressable>
+
+      {showFilters ? (
+        <View style={[styles.filterPanel,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+          <Text style={[styles.filterLabel,{color:colors.muted}]}>ORDENAR</Text>
+          <View style={styles.filterChips}>
+            {([
+              ['name','A–Z'],['damage','MAIOR DANO'],['hp','MAIOR HP'],['value','MAIOR VALOR'],['quantity','MAIS CÓPIAS'],
+            ] as Array<[DeckBuilderSortMode,string]>).map(([value,label]) => (
+              <Pressable key={value} onPress={() => setSortMode(value)} style={[styles.filterChip,{backgroundColor:sortMode===value?colors.accentSoft:colors.surfaceAlt,borderColor:sortMode===value?colors.accent:colors.border}]}>
+                <Text style={[styles.filterChipText,{color:sortMode===value?colors.text:colors.muted}]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={[styles.filterLabel,{color:colors.muted}]}>TIPO</Text>
+          <View style={styles.filterChips}>
+            <Pressable onPress={() => setTypeFilter(null)} style={[styles.filterChip,{backgroundColor:!typeFilter?colors.accentSoft:colors.surfaceAlt,borderColor:!typeFilter?colors.accent:colors.border}]}>
+              <Text style={[styles.filterChipText,{color:!typeFilter?colors.text:colors.muted}]}>TODOS</Text>
+            </Pressable>
+            {availableTypes.map((type) => (
+              <Pressable key={type} onPress={() => setTypeFilter(typeFilter===type?null:type)} style={[styles.filterChip,{backgroundColor:typeFilter===type?colors.accentSoft:colors.surfaceAlt,borderColor:typeFilter===type?colors.accent:colors.border}]}>
+                <Text style={[styles.filterChipText,{color:typeFilter===type?colors.text:colors.muted}]}>{type.toUpperCase()}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={[styles.filterLabel,{color:colors.muted}]}>RARIDADE</Text>
+          <View style={styles.filterChips}>
+            <Pressable onPress={() => setRarityFilter(null)} style={[styles.filterChip,{backgroundColor:!rarityFilter?colors.accentSoft:colors.surfaceAlt,borderColor:!rarityFilter?colors.accent:colors.border}]}>
+              <Text style={[styles.filterChipText,{color:!rarityFilter?colors.text:colors.muted}]}>TODAS</Text>
+            </Pressable>
+            {availableRarities.map((rarity) => (
+              <Pressable key={rarity} onPress={() => setRarityFilter(rarityFilter===rarity?null:rarity)} style={[styles.filterChip,{backgroundColor:rarityFilter===rarity?colors.accentSoft:colors.surfaceAlt,borderColor:rarityFilter===rarity?colors.accent:colors.border}]}>
+                <Text style={[styles.filterChipText,{color:rarityFilter===rarity?colors.text:colors.muted}]}>{rarity.toUpperCase()}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {(typeFilter || rarityFilter || sortMode!=='name') ? (
+            <Pressable onPress={() => {setTypeFilter(null);setRarityFilter(null);setSortMode('name');}} style={[styles.clearFilters,{backgroundColor:colors.surfaceAlt}]}>
+              <Ionicons name="refresh" size={15} color={colors.muted}/>
+              <Text style={[styles.clearFiltersText,{color:colors.muted}]}>LIMPAR FILTROS</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       <View style={styles.resultsRow}>
         <Text style={[styles.resultsTitle, { color: colors.text }]}>Cartas disponíveis</Text>
         <Text style={[styles.resultsCount, { color: colors.muted }]}>{totalCards.toLocaleString('pt-BR')}</Text>
@@ -321,6 +395,7 @@ export default function DeckEditorScreen() {
             width={tileWidth}
             selectedQty={selected[item.cards.id] ?? 0}
             onChange={change}
+            onPreview={setPreview}
           />
         )}
         ListHeaderComponent={header}
@@ -344,8 +419,47 @@ export default function DeckEditorScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       />
+
+      <Modal visible={Boolean(preview)} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
+        <View style={styles.previewBackdrop}>
+          {preview ? (
+            <View style={[styles.previewModal,{backgroundColor:colors.surface,borderColor:colors.accent}]}>
+              <View style={styles.previewHeader}>
+                <View style={{flex:1}}>
+                  <Text style={[styles.previewKicker,{color:colors.yellow}]}>ESTATÍSTICAS DE BATALHA • REGRA V4</Text>
+                  <Text numberOfLines={1} style={[styles.previewTitle,{color:colors.text}]}>{preview.cards.pokemon_name}</Text>
+                  <Text style={[styles.previewMeta,{color:colors.muted}]}>{preview.cards.rarity ?? 'Sem raridade'} • {preview.cards.set_name}</Text>
+                </View>
+                <Pressable onPress={() => setPreview(null)} style={[styles.previewClose,{backgroundColor:colors.surfaceAlt}]}><Ionicons name="close" size={20} color={colors.text}/></Pressable>
+              </View>
+              <View style={styles.previewBody}>
+                {preview.cards.image_small ? <Image source={{uri:preview.cards.image_small}} resizeMode="contain" style={styles.previewImage}/> : null}
+                <View style={styles.previewStats}>
+                  <PreviewStat label="PWR" value={preview.cards.battle_profile?.battleRating ?? 0} suffix="/1000"/>
+                  <PreviewStat label="HP" value={preview.cards.battle_profile?.hp ?? 0}/>
+                  <PreviewStat label="DANO" value={preview.cards.battle_profile?.maxDamage ?? 0}/>
+                  <PreviewStat label="ENERGIA" value={preview.cards.battle_profile?.bestEnergy ?? 0}/>
+                  <PreviewStat label="EFICIÊNCIA" value={preview.cards.battle_profile?.efficiencyScore ?? 0} suffix="/100"/>
+                  <PreviewStat label="VELOCIDADE" value={preview.cards.battle_profile?.speedScore ?? 0} suffix="/100"/>
+                  <PreviewStat label="TÉCNICA" value={preview.cards.battle_profile?.techniqueScore ?? 0} suffix="/100"/>
+                </View>
+              </View>
+              <View style={styles.previewFooter}>
+                <Text style={[styles.previewPrice,{color:colors.yellow}]}>{preview.cards.market_price_usd!=null?formatUsd(Number(preview.cards.market_price_usd)):'US$ —'}</Text>
+                <Text style={[styles.previewTypes,{color:colors.muted}]}>{(preview.cards.types ?? []).join(' • ') || 'Sem tipo'}</Text>
+              </View>
+              <Pressable onPress={() => setPreview(null)} style={[styles.previewDone,{backgroundColor:colors.yellow}]}><Text style={styles.previewDoneText}>VOLTAR AO DECK</Text></Pressable>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
+}
+
+function PreviewStat({label,value,suffix=''}:{label:string;value:number;suffix?:string}) {
+  const {colors}=useAppTheme();
+  return <View style={[styles.previewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.previewStatLabel,{color:colors.muted}]}>{label}</Text><Text style={[styles.previewStatValue,{color:colors.text}]}>{Number(value).toLocaleString('pt-BR')}{suffix}</Text></View>;
 }
 
 const DeckCardTile = memo(function DeckCardTile({
@@ -353,11 +467,13 @@ const DeckCardTile = memo(function DeckCardTile({
   width,
   selectedQty,
   onChange,
+  onPreview,
 }: {
   entry: DeckBuilderCardEntry;
   width: number;
   selectedQty: number;
   onChange: (cardId: string, owned: number, delta: number) => void;
+  onPreview: (entry: DeckBuilderCardEntry) => void;
 }) {
   const { colors, isLight } = useAppTheme();
   const card = entry.cards;
@@ -373,7 +489,7 @@ const DeckCardTile = memo(function DeckCardTile({
         },
       ]}
     >
-      <View style={[styles.imageWrap, { backgroundColor: isLight ? '#E6EDF6' : colors.surfaceAlt }]}>
+      <Pressable onPress={() => onPreview(entry)} style={[styles.imageWrap, { backgroundColor: isLight ? '#E6EDF6' : colors.surfaceAlt }]}>
         {card.image_small ? (
           <Image
             source={{ uri: card.image_small }}
@@ -392,12 +508,16 @@ const DeckCardTile = memo(function DeckCardTile({
             {card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}
           </Text>
         </View>
-      </View>
+        <View style={styles.statsBadge}><Ionicons name="stats-chart" size={11} color="#fff"/><Text style={styles.statsBadgeText}>STATS</Text></View>
+      </Pressable>
 
       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.pokemon_name}</Text>
       <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>
         {card.rarity ?? 'Comum'} • Bag ×{entry.quantity}
       </Text>
+      <Pressable onPress={() => onPreview(entry)} style={styles.inlineStats}>
+        <Text style={[styles.inlineStatsText,{color:colors.accent}]}>⚔ PWR {card.battle_profile?.battleRating ?? 0} • HP {card.battle_profile?.hp ?? 0} • DANO {card.battle_profile?.maxDamage ?? 0}</Text>
+      </Pressable>
       {selectedQty > 0 ? (
         <Text style={[styles.selectedValue, { color: colors.yellow }]}>
           No deck: {card.market_price_usd != null ? formatUsd(Number(card.market_price_usd) * selectedQty) : 'US$ —'}
@@ -449,6 +569,16 @@ const styles = StyleSheet.create({
   helper: { fontSize: 10, lineHeight: 15 },
   searchBox: { height: 50, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderRadius: 15, borderWidth: 1 },
   search: { flex: 1, height: '100%' },
+  filterToggle:{minHeight:44,borderRadius:13,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',gap:8},
+  filterToggleText:{flex:1,fontSize:9,fontWeight:'900'},
+  activeFilterDot:{width:8,height:8,borderRadius:4},
+  filterPanel:{borderRadius:16,borderWidth:1,padding:11,gap:8},
+  filterLabel:{fontSize:7,fontWeight:'900',letterSpacing:.9,marginTop:2},
+  filterChips:{flexDirection:'row',flexWrap:'wrap',gap:6},
+  filterChip:{borderRadius:999,borderWidth:1,paddingHorizontal:9,paddingVertical:6},
+  filterChipText:{fontSize:7,fontWeight:'900'},
+  clearFilters:{alignSelf:'flex-start',borderRadius:10,paddingHorizontal:9,paddingVertical:7,flexDirection:'row',alignItems:'center',gap:5,marginTop:2},
+  clearFiltersText:{fontSize:7,fontWeight:'900'},
   resultsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   resultsTitle: { fontSize: 16, fontWeight: '900' },
   resultsCount: { fontSize: 10, fontWeight: '800' },
@@ -460,8 +590,12 @@ const styles = StyleSheet.create({
   cardPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   valueBadge: { position: 'absolute', left: 5, bottom: 5, backgroundColor: '#050505E6', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 999 },
   valueText: { fontSize: 8, fontWeight: '900' },
+  statsBadge:{position:'absolute',right:5,bottom:5,borderRadius:999,backgroundColor:'#6A3FA8E8',paddingHorizontal:6,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:3},
+  statsBadgeText:{color:'#fff',fontSize:6,fontWeight:'900'},
   cardName: { fontSize: 11, fontWeight: '900', marginTop: 6 },
   cardMeta: { fontSize: 8, marginTop: 2 },
+  inlineStats:{marginTop:4},
+  inlineStatsText:{fontSize:7,fontWeight:'900'},
   selectedValue: { fontSize: 8, fontWeight: '900', marginTop: 3 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
   qtyButton: { width: 31, height: 31, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
@@ -478,4 +612,22 @@ const styles = StyleSheet.create({
   empty: { marginTop: 8, borderRadius: 18, borderWidth: 1, padding: 26, alignItems: 'center', gap: 7 },
   emptyTitle: { fontSize: 15, fontWeight: '900' },
   emptyText: { fontSize: 9, textAlign: 'center' },
+  previewBackdrop:{flex:1,backgroundColor:'#05030AD9',alignItems:'center',justifyContent:'center',padding:18},
+  previewModal:{width:'100%',maxWidth:660,borderRadius:22,borderWidth:1,padding:14,gap:12},
+  previewHeader:{flexDirection:'row',alignItems:'flex-start',gap:10},
+  previewKicker:{fontSize:7,fontWeight:'900',letterSpacing:.8},
+  previewTitle:{fontSize:22,fontWeight:'900',marginTop:3},
+  previewMeta:{fontSize:9,marginTop:2},
+  previewClose:{width:38,height:38,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  previewBody:{flexDirection:'row',flexWrap:'wrap',gap:12,alignItems:'flex-start'},
+  previewImage:{width:150,height:210,borderRadius:10},
+  previewStats:{flex:1,minWidth:230,flexDirection:'row',flexWrap:'wrap',gap:7},
+  previewStat:{flexGrow:1,flexBasis:100,borderRadius:12,borderWidth:1,padding:9},
+  previewStatLabel:{fontSize:6,fontWeight:'900',letterSpacing:.7},
+  previewStatValue:{fontSize:14,fontWeight:'900',marginTop:2},
+  previewFooter:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:10},
+  previewPrice:{fontSize:14,fontWeight:'900'},
+  previewTypes:{fontSize:8,fontWeight:'800',textAlign:'right'},
+  previewDone:{minHeight:46,borderRadius:13,alignItems:'center',justifyContent:'center'},
+  previewDoneText:{color:'#07111F',fontSize:9,fontWeight:'900'},
 });
