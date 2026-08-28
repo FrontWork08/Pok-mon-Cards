@@ -33,9 +33,16 @@ export type AdminModerationAction = 'warn' | 'suspend' | 'ban' | 'restore';
 export type CoinGrantResult = { targetId: string; username: string; amount: number; balanceBefore: number; balanceAfter: number };
 export type CoinGrantBatchResult = { recipientCount: number; amountEach: number; totalGranted: number; recipients: CoinGrantResult[] };
 export type DiamondGrantBatchResult = CoinGrantBatchResult;
+export type CurrencyRemovalBatchResult = {
+  recipientCount: number;
+  amountEach: number;
+  totalRemoved: number;
+  recipients: CoinGrantResult[];
+};
 export type BattlePassVipGrantResult = { seasonId: string; recipientCount: number; recipients: Array<{ id: string; username: string }> };
 export type AdminRedeemCode = { id: string; code: string; reward: { coins?: number; diamonds?: number; cardId?: string; cardQuantity?: number }; active: boolean; max_total_uses: number | null; expires_at: string | null; created_at: string; code_redemptions?: Array<{ count: number }> };
 export type CoinGrantHistory = { id: string; target_id: string; amount: number; balance_before: number; balance_after: number; note: string | null; created_at: string; players?: { username?: string } | null };
+export type AdminCurrencyAdjustmentHistory = CoinGrantHistory & { currency: 'coins' | 'diamonds' };
 export type AdminGameEvent = { id: string; event_type: 'free_boosters' | 'double_xp' | 'rare_boost' | 'featured_set'; title: string; payload?: Record<string, unknown>; active: boolean; starts_at: string; ends_at: string; created_at: string };
 export type GlobalAnnouncement = { id: string; title: string; body: string; severity: 'info' | 'warning' | 'critical'; starts_at: string; ends_at: string | null; created_at: string };
 
@@ -46,8 +53,11 @@ export async function moderatePlayer(targetId: string, moderationAction: AdminMo
 }
 export async function grantCoins(targetId: string, amount: number, note?: string) { return invokeAdmin({ action: 'grant_coins', targetId, amount, note: note?.trim() || null }) as Promise<CoinGrantResult>; }
 export async function getCoinGrantHistory() { return invokeAdmin({ action: 'coin_history' }) as Promise<CoinGrantHistory[]>; }
+export async function getCurrencyAdjustmentHistory() { return invokeAdmin({ action: 'currency_history' }) as Promise<AdminCurrencyAdjustmentHistory[]>; }
 export async function grantCoinsBatch(targetIds: string[], amount: number, note?: string) { return invokeAdmin({ action: 'grant_coins_batch', targetIds, amount, note: note?.trim() || null }) as Promise<CoinGrantBatchResult>; }
 export async function grantDiamondsBatch(targetIds: string[], amount: number, note?: string) { return invokeAdmin({ action: 'grant_diamonds_batch', targetIds, amount, note: note?.trim() || null }) as Promise<DiamondGrantBatchResult>; }
+export async function removeCoinsBatch(targetIds: string[], amount: number, note?: string) { return invokeAdmin({ action: 'remove_coins_batch', targetIds, amount, note: note?.trim() || null }) as Promise<CurrencyRemovalBatchResult>; }
+export async function removeDiamondsBatch(targetIds: string[], amount: number, note?: string) { return invokeAdmin({ action: 'remove_diamonds_batch', targetIds, amount, note: note?.trim() || null }) as Promise<CurrencyRemovalBatchResult>; }
 export async function grantBattlePassVip(targetIds: string[], note?: string) { return invokeAdmin({ action: 'grant_battle_pass_vip', targetIds, note: note?.trim() || null }) as Promise<BattlePassVipGrantResult>; }
 export async function createRedeemCode(input: { code: string; reward: AdminRedeemCode['reward']; maxTotalUses?: number | null; expiresHours?: number | null }) { return invokeAdmin({ action: 'create_redeem_code', code: input.code, reward: input.reward, maxTotalUses: input.maxTotalUses ?? null, expiresHours: input.expiresHours ?? null }) as Promise<AdminRedeemCode>; }
 export async function getAdminRedeemCodes() { return invokeAdmin({ action: 'redeem_codes' }) as Promise<AdminRedeemCode[]>; }
