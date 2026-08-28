@@ -22,6 +22,7 @@ type MenuItem = {
 const MENU_ITEMS: MenuItem[] = [
   { label: 'Início', description: 'Voltar direto para o hub principal', href: '/(tabs)', icon: 'home' },
   { label: 'Inbox', description: 'Mensagens, convites e avisos', href: '/inbox', icon: 'mail-unread' },
+  { label: 'Passe de Batalha', description: '50 níveis, recompensas grátis, VIP e missões', href: '/battle-pass', icon: 'ribbon' },
   { label: 'Temporada & Jornada', description: 'Ranque, streak, eventos e recompensas', href: '/season', icon: 'flame' },
   { label: 'Card Chase', description: 'Wishlist e alertas de cartas desejadas', href: '/wishlist', icon: 'star' },
   { label: 'Vitrine do Perfil', description: 'Escolha suas 6 cartas de destaque', href: '/showcase', icon: 'sparkles' },
