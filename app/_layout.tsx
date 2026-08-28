@@ -13,6 +13,7 @@ import { getMyProfile, type PlayerProfile } from '@/services/player';
 import { supabase } from '@/lib/supabase';
 import { WalletProvider } from '@/wallet/WalletProvider';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { cancelMatchmaking, getMyMatchmakingState, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
@@ -20,7 +21,9 @@ function AppStack() {
   const insets = useSafeAreaInsets();
   const [liveNotification, setLiveNotification] = useState<any>(null);
   const [accountRestriction, setAccountRestriction] = useState<PlayerProfile | null>(null);
+  const [matchmaking, setMatchmaking] = useState<MatchmakingState | null>(null);
   const liveNotificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastOpenedMatch = useRef<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -136,6 +139,65 @@ function AppStack() {
     if (data?.battleId) router.push(`/battle/${data.battleId}`);
     else if (data?.senderId) router.push(`/chat/${data.senderId}`);
     else router.push('/inbox');
+  }
+
+  useEffect(() => {
+    let disposed = false;
+    let unsubscribe: (() => void) | null = null;
+
+    const clear = () => {
+      unsubscribe?.();
+      unsubscribe = null;
+    };
+
+    const handleState = (state: MatchmakingState | null) => {
+      if (disposed) return;
+      setMatchmaking(state);
+      if (
+        state?.status === 'matched' &&
+        state.matched_battle_id &&
+        lastOpenedMatch.current !== state.matched_battle_id
+      ) {
+        lastOpenedMatch.current = state.matched_battle_id;
+        router.push(`/battle/${state.matched_battle_id}`);
+      }
+    };
+
+    const attach = async (userId?: string | null) => {
+      clear();
+      if (!userId || disposed) {
+        setMatchmaking(null);
+        lastOpenedMatch.current = null;
+        return;
+      }
+      const initial = await getMyMatchmakingState().catch(() => null);
+      if (disposed) return;
+      handleState(initial);
+      unsubscribe = subscribeMyMatchmaking(userId, (next) => handleState(next));
+    };
+
+    supabase.auth.getUser().then(({ data }) => {
+      void attach(data.user?.id ?? null);
+    }).catch(() => null);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void attach(session?.user?.id ?? null);
+    });
+
+    return () => {
+      disposed = true;
+      clear();
+      authListener.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  async function cancelGlobalMatchmaking() {
+    try {
+      await cancelMatchmaking();
+      setMatchmaking((current) => current ? { ...current, status: 'cancelled', matched_battle_id: null } : null);
+    } catch {
+      // Keep the search indicator if cancellation was not acknowledged.
+    }
   }
 
   useEffect(() => {
@@ -259,6 +321,24 @@ function AppStack() {
           </View>
         </View>
       ) : null}
+      {matchmaking?.status === 'waiting' && !accountRestriction ? (
+        <View pointerEvents="box-none" style={[styles.matchmakingHost, { bottom: Math.max(insets.bottom + 12, 18) }]}>
+          <View style={[styles.matchmakingBanner, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
+            <View style={[styles.matchmakingPulse, { backgroundColor: colors.yellow }]}>
+              <Text style={styles.matchmakingPulseText}>⚡</Text>
+            </View>
+            <Pressable style={styles.matchmakingBody} onPress={() => router.push('/(tabs)/battles')}>
+              <Text style={[styles.matchmakingTitle, { color: colors.text }]}>Buscando partida ranqueada...</Text>
+              <Text style={[styles.matchmakingText, { color: colors.muted }]}>
+                {matchmaking.mode_choice === 'draft3' ? 'Draft 3' : matchmaking.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'} • continue navegando normalmente
+              </Text>
+            </Pressable>
+            <Pressable accessibilityLabel="Cancelar busca de partida" onPress={() => { void cancelGlobalMatchmaking(); }} style={[styles.matchmakingCancel, { borderColor: colors.border }]}>
+              <Text style={styles.matchmakingCancelText}>✕</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
       {liveNotification && !accountRestriction ? (
         <View pointerEvents="box-none" style={[styles.liveNotificationHost, { top: Math.max(insets.top + 8, 14) }]}>
           <Pressable
@@ -323,6 +403,50 @@ const styles = StyleSheet.create({
   accountUntil: { fontSize: 11, fontWeight: '900', marginTop: 12 },
   accountSignOut: { minHeight: 48, minWidth: 180, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 18, paddingHorizontal: 16 },
   accountSignOutText: { fontSize: 9, fontWeight: '900', letterSpacing: .5 },
+  matchmakingHost: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    zIndex: 1300,
+    alignItems: 'center',
+  },
+  matchmakingBanner: {
+    width: '100%',
+    maxWidth: 600,
+    minHeight: 68,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    shadowColor: '#000',
+    shadowOpacity: .3,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 12,
+  },
+  matchmakingPulse: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matchmakingPulseText: { fontSize: 18 },
+  matchmakingBody: { flex: 1, minWidth: 0 },
+  matchmakingTitle: { fontSize: 12, fontWeight: '900' },
+  matchmakingText: { fontSize: 8, lineHeight: 12, marginTop: 3 },
+  matchmakingCancel: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matchmakingCancelText: { color: '#FF8290', fontSize: 18, fontWeight: '900' },
   liveNotificationHost: {
     position: 'absolute',
     left: 12,
