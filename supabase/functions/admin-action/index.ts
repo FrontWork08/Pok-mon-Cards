@@ -25,7 +25,7 @@ Deno.serve(async (req: Request) => {
   const { data: userData, error: userError } = await admin.auth.getUser(token);
   const user = userData.user;
   if (userError || !user) return json({ error: "Unauthorized" }, 401);
-  const { data: adminRow, error: adminError } = await admin.from("admin_members").select("player_id").eq("player_id", user.id).maybeSingle();
+  const { data: adminRow, error: adminError } = await admin.from("admin_members").select("player_id,role").eq("player_id", user.id).maybeSingle();
   if (adminError) return json({ error: adminError.message }, 500);
   if (!adminRow) return json({ error: "FORBIDDEN" }, 403);
   const body = await req.json().catch(() => ({}));
@@ -60,6 +60,30 @@ Deno.serve(async (req: Request) => {
       const raw=Array.isArray(body.targetIds)?body.targetIds:[];const targetIds=[...new Set(raw.filter((id):id is string=>typeof id==="string"&&id.length>0))];const note=typeof body.note==="string"?body.note:null;
       if(targetIds.length<1||targetIds.length>100)return json({error:"INVALID_TARGETS"},400);
       const {data,error}=await admin.rpc("server_admin_grant_battle_pass_vip",{p_actor_id:user.id,p_target_ids:targetIds,p_note:note});if(error)throw error;return json({data});
+    }
+    if(body.action==="tester_title_hub"){
+      if(adminRow.role!=="owner")return json({data:{isOwner:false,title:null,friends:[]}});
+      const [{data:title,error:titleError},{data:relations,error:relationsError},{data:grants,error:grantsError}]=await Promise.all([
+        admin.from("achievement_definitions").select("id,name,title,description,icon").eq("id","tester_official").eq("active",true).maybeSingle(),
+        admin.from("friendships").select("requester_id,addressee_id,created_at").eq("status","accepted").or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`).order("created_at",{ascending:true}),
+        admin.from("admin_tester_title_grants").select("target_id,achievement_id,granted_at,revoked_at").eq("achievement_id","tester_official"),
+      ]);
+      if(titleError)throw titleError;if(relationsError)throw relationsError;if(grantsError)throw grantsError;
+      const friendIds=[...new Set((relations??[]).map((row:any)=>row.requester_id===user.id?row.addressee_id:row.requester_id).filter(Boolean))];
+      let players:any[]=[];
+      if(friendIds.length){const {data,error}=await admin.from("players").select("id,username,level").in("id",friendIds).order("username",{ascending:true});if(error)throw error;players=data??[];}
+      const activeGrants=new Map((grants??[]).filter((row:any)=>!row.revoked_at).map((row:any)=>[row.target_id,row]));
+      return json({data:{isOwner:true,title:title??null,friends:players.map((player:any)=>({id:player.id,username:player.username,level:player.level,hasTitle:activeGrants.has(player.id),grantedAt:activeGrants.get(player.id)?.granted_at??null}))}});
+    }
+    if(body.action==="grant_tester_title"||body.action==="revoke_tester_title"){
+      if(adminRow.role!=="owner")return json({error:"OWNER_ONLY"},403);
+      const targetId=typeof body.targetId==="string"?body.targetId:"";const note=typeof body.note==="string"?body.note:null;
+      if(!targetId)return json({error:"INVALID_TARGET"},400);
+      const rpc=body.action==="grant_tester_title"?"server_owner_grant_tester_title":"server_owner_revoke_tester_title";
+      const args=body.action==="grant_tester_title"
+        ?{p_actor_id:user.id,p_target_id:targetId,p_achievement_id:"tester_official",p_note:note}
+        :{p_actor_id:user.id,p_target_id:targetId,p_achievement_id:"tester_official"};
+      const {data,error}=await admin.rpc(rpc,args);if(error)throw error;return json({data});
     }
     if(body.action==="create_redeem_code"){
       const code=typeof body.code==="string"?body.code:"";const reward=body.reward&&typeof body.reward==="object"?body.reward:{};const maxTotalUses=body.maxTotalUses==null?null:Number(body.maxTotalUses);const expiresHours=body.expiresHours==null?null:Number(body.expiresHours);
