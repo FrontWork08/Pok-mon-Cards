@@ -37,6 +37,8 @@ export default function PlayerShowcaseScreen() {
   const rank = player?.battleRating == null ? null : getTrainerRank(player.battleRating);
   const winTotal = Number(player?.battleWins ?? 0) + Number(player?.battleLosses ?? 0);
   const winRate = winTotal ? Math.round(Number(player?.battleWins ?? 0) / winTotal * 100) : 0;
+  const frameColor = player?.frame?.primaryColor ?? player?.guild?.color ?? colors.accent;
+  const backgroundColor = player?.background?.secondaryColor ?? colors.accentSoft;
 
   return (
     <Screen title="Perfil de Exibição" subtitle="Cartas mais raras, valor da conta, guilda e desempenho do treinador.">
@@ -45,13 +47,14 @@ export default function PlayerShowcaseScreen() {
       {error ? <Pressable style={styles.error} onPress={() => void load()}><Ionicons name="alert-circle" size={19} color="#FF9FAF" /><Text style={styles.errorText}>{error} Toque para tentar novamente.</Text></Pressable> : null}
 
       {player && collection ? <>
-        <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: player.guild?.color ?? colors.accent }]}>
-          <TrainerAvatar icon={player.profileIcon} color={player.guild?.color ?? colors.accent} backgroundColor={colors.surfaceAlt} size={66} />
+        <View style={[styles.hero, { backgroundColor, borderColor: frameColor, borderWidth: player.frame ? 2 : 1 }]}>
+          <TrainerAvatar icon={player.profileIcon} color={frameColor} backgroundColor={player.background?.primaryColor ? player.background.primaryColor + '22' : colors.surfaceAlt} size={66} />
           <View style={styles.heroInfo}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER SHOWCASE</Text>
             <Text style={[styles.username, { color: colors.text }]}>@{player.username}</Text>
             {player.equippedTitle ? <Text style={[styles.titleText, { color: colors.yellow }]}>{player.equippedTitle.icon} {player.equippedTitle.title}</Text> : null}
             <Text style={[styles.meta, { color: colors.muted }]}>Nível {player.level} • {rank ? `${rank.symbol} ${rank.displayName}` : 'ELO oculto'}</Text>
+            {player.frame || player.background ? <Text style={[styles.cosmeticMeta, { color: frameColor }]}>{player.frame?.name ?? 'Sem moldura'} • {player.background?.name ?? 'Sem background'}</Text> : null}
           </View>
           {player.guild ? <Pressable onPress={() => router.push('/guilds')} style={[styles.guildBadge, { backgroundColor: player.guild.color + '25', borderColor: player.guild.color }]}><Ionicons name="shield" size={16} color={player.guild.color} /><Text style={[styles.guildText, { color: player.guild.color }]}>{player.guild.name} • Nv. {player.guild.level}</Text></Pressable> : null}
         </View>
@@ -117,6 +120,7 @@ const styles = StyleSheet.create({
   username: { fontSize: 24, fontWeight: '900', marginTop: 2 },
   titleText: { fontSize: 11, fontWeight: '900', marginTop: 2 },
   meta: { fontSize: 10, marginTop: 4 },
+  cosmeticMeta: { fontSize: 8, fontWeight: '900', marginTop: 4, letterSpacing: .4 },
   guildBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
   guildText: { fontSize: 9, fontWeight: '900' },
   valuePanel: { borderRadius: 21, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
