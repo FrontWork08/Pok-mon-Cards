@@ -23,6 +23,9 @@ import {
   removeCoinsBatch,
   removeDiamondsBatch,
   grantBattlePassVip,
+  getTesterTitleHub,
+  grantTesterTitle,
+  revokeTesterTitle,
   createRedeemCode,
   setAdminRedeemCodeActive,
   publishGlobalAnnouncement,
@@ -41,6 +44,7 @@ import {
   type AdminCurrencyAdjustmentHistory,
   type AdminRedeemCode,
   type GlobalAnnouncement,
+  type TesterTitleHub,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
@@ -83,6 +87,9 @@ export default function AdminScreen() {
   const [announcementSeverity, setAnnouncementSeverity] = useState<'info' | 'warning' | 'critical'>('info');
   const [announcementHours, setAnnouncementHours] = useState('24');
   const [activeAnnouncement, setActiveAnnouncement] = useState<GlobalAnnouncement | null>(null);
+  const [testerHub, setTesterHub] = useState<TesterTitleHub | null>(null);
+  const [testerSearch, setTesterSearch] = useState('');
+  const [testerNote, setTesterNote] = useState('');
   const [freeBoosterMinutes, setFreeBoosterMinutes] = useState('1');
   const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
   const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
@@ -126,7 +133,7 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [status, grants, events, guildState, codes, runtime, announcements] = await Promise.all([
+      const [status, grants, events, guildState, codes, runtime, announcements, testerState] = await Promise.all([
         getAdminOverview(),
         getCurrencyAdjustmentHistory(),
         getAdminEvents(),
@@ -134,6 +141,7 @@ export default function AdminScreen() {
         getAdminRedeemCodes(),
         getMaintenanceStatus(),
         getActiveGlobalAnnouncementsAdmin(),
+        getTesterTitleHub(),
         syncPlayers(),
       ]);
       setOverview(status);
@@ -145,6 +153,7 @@ export default function AdminScreen() {
       setMaintenanceStatus(runtime);
       setMaintenanceMessage(runtime.maintenance_message);
       setActiveAnnouncement(announcements[0] ?? null);
+      setTesterHub(testerState);
       setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
@@ -217,6 +226,13 @@ export default function AdminScreen() {
     () => players.filter((player) => selectedPlayerIds.has(player.id)),
     [players, selectedPlayerIds],
   );
+
+  const visibleTesterFriends = useMemo(() => {
+    const query = testerSearch.trim().toLowerCase();
+    const friends = testerHub?.friends ?? [];
+    if (!query) return friends;
+    return friends.filter((friend) => friend.username.toLowerCase().includes(query));
+  }, [testerHub, testerSearch]);
 
   const visibleModerationPlayers = useMemo(() => {
     const query = moderationSearch.trim().toLowerCase();
@@ -451,6 +467,47 @@ export default function AdminScreen() {
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'RETIRAR SALDO', style: 'destructive', onPress: () => { void removeSelectedCurrency(currency); } },
+      ],
+    );
+  }
+
+  async function changeTesterTitle(targetId: string, grant: boolean) {
+    if (working) return;
+    try {
+      setWorking(true);
+      setError(null);
+      const result = grant
+        ? await grantTesterTitle(targetId, testerNote)
+        : await revokeTesterTitle(targetId);
+      setNotice(
+        grant
+          ? `${result.icon ?? '🧪'} Título "${result.title}" concedido a @${result.username}.`
+          : `Título de tester revogado de @${result.username}.`,
+      );
+      if (grant) setTesterNote('');
+      setTesterHub(await getTesterTitleHub());
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '';
+      setError(
+        message.includes('TARGET_MUST_BE_FRIEND')
+          ? 'O título de tester só pode ser concedido a um amigo confirmado.'
+          : message.includes('OWNER_ONLY')
+            ? 'Somente o dono do jogo pode gerenciar títulos de tester.'
+            : message || 'Não foi possível atualizar o título de tester.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmRevokeTesterTitle(targetId: string, username: string) {
+    if (working) return;
+    Alert.alert(
+      'Revogar título de tester?',
+      `Remover o título exclusivo de @${username}? Se estiver equipado, ele será retirado do perfil.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'REVOGAR', style: 'destructive', onPress: () => { void changeTesterTitle(targetId, false); } },
       ],
     );
   }
@@ -1573,6 +1630,94 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          {testerHub?.isOwner ? (
+            <CollapsibleSection title="Títulos de Tester">
+              <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#7D5CFF' }]}>
+                <View style={styles.moderationHeader}>
+                  <View style={[styles.moderationIcon, { backgroundColor: '#211B3A' }]}>
+                    <Text style={styles.testerTitleEmoji}>{testerHub.title?.icon ?? '🧪'}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.moderationTitle, { color: colors.text }]}>
+                      {testerHub.title?.title ?? 'Tester Oficial'}
+                    </Text>
+                    <Text style={[styles.emptyText, { color: colors.muted }]}>
+                      Exclusivo do dono. Só amigos confirmados podem receber este título e ele aparece em Conquistas e Títulos para ser equipado no perfil.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.testerPreview, { backgroundColor: colors.surfaceAlt, borderColor: '#7D5CFF' }]}>
+                  <Text style={styles.testerPreviewIcon}>{testerHub.title?.icon ?? '🧪'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.testerPreviewName, { color: colors.text }]}>{testerHub.title?.title ?? 'Tester Oficial'}</Text>
+                    <Text style={[styles.testerPreviewDesc, { color: colors.muted }]}>
+                      {testerHub.title?.description ?? 'Título exclusivo para testers oficiais do jogo.'}
+                    </Text>
+                  </View>
+                  <View style={styles.ownerOnlyBadge}><Ionicons name="lock-closed" size={12} color="#C9BCFF"/><Text style={styles.ownerOnlyText}>SÓ DONO</Text></View>
+                </View>
+
+                <TextInput
+                  value={testerSearch}
+                  onChangeText={setTesterSearch}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="Buscar entre seus amigos..."
+                  placeholderTextColor={colors.muted}
+                  style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}
+                />
+
+                <View style={styles.testerFriendsList}>
+                  {visibleTesterFriends.length === 0 ? (
+                    <View style={[styles.emptyHistory,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                      <Text style={[styles.emptyText,{color:colors.muted}]}>Nenhum amigo encontrado.</Text>
+                    </View>
+                  ) : visibleTesterFriends.map((friend)=>(
+                    <View key={`tester-${friend.id}`} style={[styles.testerFriendRow,{backgroundColor:colors.surfaceAlt,borderColor:friend.hasTitle?'#7D5CFF':colors.border}]}>
+                      <View style={[styles.testerAvatar,{backgroundColor:friend.hasTitle?'#2A2150':colors.surface}]}>
+                        <Text style={styles.testerAvatarText}>{friend.username.slice(0,1).toUpperCase()}</Text>
+                      </View>
+                      <View style={{flex:1,minWidth:120}}>
+                        <Text style={[styles.testerFriendName,{color:colors.text}]}>@{friend.username}</Text>
+                        <Text style={[styles.testerFriendMeta,{color:friend.hasTitle?'#B8A9FF':colors.muted}]}>
+                          Nível {friend.level} • {friend.hasTitle ? '🧪 TESTER ATIVO' : 'Sem título de tester'}
+                        </Text>
+                      </View>
+                      {friend.hasTitle ? (
+                        <Pressable
+                          disabled={working}
+                          onPress={()=>confirmRevokeTesterTitle(friend.id,friend.username)}
+                          style={[styles.testerRevokeButton,{opacity:working?.55:1}]}
+                        >
+                          <Ionicons name="close-circle" size={16} color="#FFB0BB"/>
+                          <Text style={styles.testerRevokeText}>REVOGAR</Text>
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          disabled={working}
+                          onPress={()=>{void changeTesterTitle(friend.id,true);}}
+                          style={[styles.testerGrantButton,{opacity:working?.55:1}]}
+                        >
+                          <Ionicons name="ribbon" size={16} color="#0B0B16"/>
+                          <Text style={styles.testerGrantText}>CONCEDER</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ))}
+                </View>
+
+                <TextInput
+                  value={testerNote}
+                  onChangeText={setTesterNote}
+                  maxLength={180}
+                  placeholder="Observação opcional sobre o tester"
+                  placeholderTextColor={colors.muted}
+                  style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}
+                />
+              </View>
+            </CollapsibleSection>
+          ) : null}
           <CollapsibleSection title="VIP do Passe de Batalha">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
             <View style={styles.moderationHeader}>
@@ -1744,6 +1889,23 @@ const styles = StyleSheet.create({
   collapsibleChevron: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   collapsibleBody: { gap: 10 },
   correctionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  testerTitleEmoji: { fontSize: 24 },
+  testerPreview: { borderRadius: 16, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  testerPreviewIcon: { fontSize: 28 },
+  testerPreviewName: { fontSize: 15, fontWeight: '900' },
+  testerPreviewDesc: { fontSize: 9, lineHeight: 14, marginTop: 2 },
+  ownerOnlyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, backgroundColor: '#2A2150', paddingHorizontal: 8, paddingVertical: 5 },
+  ownerOnlyText: { color: '#C9BCFF', fontSize: 7, fontWeight: '900', letterSpacing: .4 },
+  testerFriendsList: { gap: 8 },
+  testerFriendRow: { minHeight: 64, borderRadius: 15, borderWidth: 1, padding: 9, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  testerAvatar: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  testerAvatarText: { color: '#E7E2FF', fontSize: 16, fontWeight: '900' },
+  testerFriendName: { fontSize: 12, fontWeight: '900' },
+  testerFriendMeta: { fontSize: 8, fontWeight: '800', marginTop: 3 },
+  testerGrantButton: { minHeight: 38, borderRadius: 11, backgroundColor: '#A995FF', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  testerGrantText: { color: '#0B0B16', fontSize: 8, fontWeight: '900' },
+  testerRevokeButton: { minHeight: 38, borderRadius: 11, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#743344', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  testerRevokeText: { color: '#FFB0BB', fontSize: 8, fontWeight: '900' },
   correctionCard: { flexGrow: 1, flexBasis: 250, minWidth: 220, borderRadius: 16, borderWidth: 1, padding: 11, gap: 9 },
   destructiveGrantButton: { minHeight: 48, borderRadius: 13, backgroundColor: '#6B2634', borderWidth: 1, borderColor: '#A84250', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   destructiveGrantText: { color: '#FFD7DD', fontSize: 9, fontWeight: '900', letterSpacing: .3 },
