@@ -270,7 +270,14 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
                 ) : (
                   <View style={styles.imageFallback}><Ionicons name="image-outline" size={54} color="#666" /></View>
                 );
-              })()}<View style={styles.rewardInfo}><Text style={styles.rewardName}>{currentCard.name}</Text><Text style={[styles.rewardRarity, { color: theme.color }]}>{currentCard.rarity ?? 'Comum'}</Text></View></Animated.View>
+              })()}<View style={styles.rewardInfo}>
+                <View style={styles.pullBadges}>
+                  {currentCard.isNew ? <View style={styles.newBadge}><Text style={styles.pullBadgeText}>NEW</Text></View> : null}
+                  {currentCard.wishlistHit ? <View style={styles.chaseBadge}><Ionicons name="star" size={11} color="#07111F" /><Text style={styles.chaseBadgeText}>CHASE HIT</Text></View> : null}
+                </View>
+                <Text style={styles.rewardName}>{currentCard.name}</Text>
+                <Text style={[styles.rewardRarity, { color: theme.color }]}>{currentCard.rarity ?? 'Comum'}</Text>
+              </View></Animated.View>
             </Animated.View>
           </Pressable>
         </View>
@@ -291,7 +298,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
           ) : (
             <View style={styles.summaryFallback}><Ionicons name="image-outline" size={28} color="#555" /></View>
           );
-        })()}<Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text></View>; })}</View><View style={styles.summaryActions}><Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Abrir Bag" style={styles.summaryBagButton} onPress={goToBag}><Ionicons name="bag-outline" size={22} color="#FFD447" /></Pressable></View></ScrollView> : null}
+        })()}<View style={styles.summaryBadgeRow}>{card.isNew ? <View style={styles.summaryNewBadge}><Text style={styles.summaryBadgeText}>NEW</Text></View> : null}{card.wishlistHit ? <View style={styles.summaryChaseBadge}><Text style={styles.summaryChaseText}>★ CHASE</Text></View> : null}</View><Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text></View>; })}</View><View style={styles.summaryActions}><Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Abrir Bag" style={styles.summaryBagButton} onPress={goToBag}><Ionicons name="bag-outline" size={22} color="#FFD447" /></Pressable></View></ScrollView> : null}
 
       {stage === 'opening' ? <><Animated.View pointerEvents="none" style={[styles.openingColorWash, { opacity: openingColorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: openingFlash }]} /></> : null}
       {stage === 'cards' && currentCard ? <><Animated.View pointerEvents="none" style={[styles.colorWash, { backgroundColor: revealColor, opacity: colorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: screenFlash }]} /></> : null}
@@ -301,6 +308,16 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
 const styles = StyleSheet.create({
   actionRow: { flexDirection:'row', flexWrap:'wrap', justifyContent:'center', gap:8 },
+  pullBadges: { flexDirection:'row', flexWrap:'wrap', gap:6, justifyContent:'center', marginBottom:5 },
+  newBadge: { borderRadius:999, paddingHorizontal:9, paddingVertical:4, backgroundColor:'#4EA5FF' },
+  chaseBadge: { borderRadius:999, paddingHorizontal:9, paddingVertical:4, backgroundColor:'#FFD447', flexDirection:'row', alignItems:'center', gap:4 },
+  pullBadgeText: { color:'#fff', fontSize:8, fontWeight:'900', letterSpacing:.7 },
+  chaseBadgeText: { color:'#07111F', fontSize:8, fontWeight:'900', letterSpacing:.5 },
+  summaryBadgeRow: { minHeight:18, flexDirection:'row', flexWrap:'wrap', gap:4, marginTop:4 },
+  summaryNewBadge: { borderRadius:7, paddingHorizontal:5, paddingVertical:2, backgroundColor:'#4EA5FF' },
+  summaryChaseBadge: { borderRadius:7, paddingHorizontal:5, paddingVertical:2, backgroundColor:'#FFD447' },
+  summaryBadgeText: { color:'#fff', fontSize:6, fontWeight:'900' },
+  summaryChaseText: { color:'#07111F', fontSize:6, fontWeight:'900' },
   revealAllButton: { minWidth:170, height:48, borderRadius:12, borderWidth:1, borderColor:'#5A4A18', backgroundColor:'#19160C', flexDirection:'row', alignItems:'center', justifyContent:'center', gap:7 },
   revealAllText: { color:'#FFD447', fontSize:9, fontWeight:'900' },
   container: { flex: 1, backgroundColor: '#030303', overflow: 'hidden' }, shadeTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 120, backgroundColor: 'rgba(0,0,0,.48)' }, shadeBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, backgroundColor: 'rgba(0,0,0,.45)' }, header: { minHeight: 74, paddingHorizontal: 18, paddingTop: 17, flexDirection: 'row', alignItems: 'flex-start', gap: 12, zIndex: 30 }, kicker: { color: '#FFD447', fontSize: 9, fontWeight: '900', letterSpacing: 2 }, title: { color: '#F5F5F5', fontSize: 18, fontWeight: '900', marginTop: 4 }, closeButton: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111', borderWidth: 1, borderColor: '#292929' },
