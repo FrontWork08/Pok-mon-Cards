@@ -38,3 +38,18 @@ export async function isCurrentUserAdmin() {
   if (error) throw error;
   return data === true;
 }
+
+
+export async function refreshOwnedMarketPrices(cardIds: string[]) {
+  const ids = [...new Set(cardIds.filter(Boolean))].slice(0, 120);
+  if (!ids.length) return { refreshed: 0, priced: 0 };
+  const { data, error } = await supabase.functions.invoke('market-prices', {
+    body: { scope: 'owned', cardIds: ids },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(String(data.error));
+  return {
+    refreshed: Number(data?.data?.refreshed ?? 0),
+    priced: Number(data?.data?.priced ?? 0),
+  };
+}
