@@ -48,12 +48,39 @@ export type DeckBuilderCardEntry = {
     set_name: string;
     image_small: string | null;
     market_price_usd: number | null;
+    types: string[];
+    battle_profile?: {
+      hp: number;
+      maxDamage: number;
+      minEnergy: number;
+      bestEnergy: number;
+      retreatCost: number;
+      attackCount: number;
+      abilityCount: number;
+      effectAttackCount: number;
+      damagePerEnergy: number;
+      efficiencyScore: number;
+      speedScore: number;
+      techniqueScore: number;
+      battleRating: number;
+    };
   };
+};
+
+export type DeckBuilderSortMode = 'name' | 'value' | 'damage' | 'hp' | 'quantity';
+
+export type DeckBuilderFilters = {
+  search?: string;
+  typeFilter?: string | null;
+  rarityFilter?: string | null;
+  sortMode?: DeckBuilderSortMode;
 };
 
 export type DeckBuilderPage = {
   items: DeckBuilderCardEntry[];
   total: number;
+  availableTypes: string[];
+  availableRarities: string[];
 };
 
 export async function getMyDeck(deckId: string) {
@@ -66,16 +93,25 @@ export async function getMyDeck(deckId: string) {
   return data;
 }
 
-export async function getDeckBuilderPage(offset: number, limit: number, search = ''): Promise<DeckBuilderPage> {
-  const { data, error } = await supabase.rpc('get_my_deck_builder_page', {
+export async function getDeckBuilderPage(
+  offset: number,
+  limit: number,
+  filters: DeckBuilderFilters = {},
+): Promise<DeckBuilderPage> {
+  const { data, error } = await supabase.rpc('get_my_deck_builder_page_v2', {
     p_offset: Math.max(0, Math.floor(offset)),
     p_limit: Math.max(1, Math.min(60, Math.floor(limit))),
-    p_search: search.trim() || null,
+    p_search: filters.search?.trim() || null,
+    p_type_filter: filters.typeFilter ?? null,
+    p_rarity_filter: filters.rarityFilter ?? null,
+    p_sort_mode: filters.sortMode ?? 'name',
   });
   if (error) throw error;
   const value = (data ?? {}) as any;
   return {
     items: Array.isArray(value.items) ? value.items as DeckBuilderCardEntry[] : [],
     total: Number(value.total ?? 0),
+    availableTypes: Array.isArray(value.availableTypes) ? value.availableTypes.map(String) : [],
+    availableRarities: Array.isArray(value.availableRarities) ? value.availableRarities.map(String) : [],
   };
 }
