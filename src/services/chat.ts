@@ -33,7 +33,7 @@ export async function getMessages(conversationId: string, limit = 100) {
 
 export function subscribeToMessages(conversationId: string, onMessage: (message: any) => void) {
   const channel = supabase
-    .channel(`chat:${conversationId}`)
+    .channel(`chat:${conversationId}:${Date.now()}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => onMessage(payload.new))
     .subscribe();
   return () => { supabase.removeChannel(channel); };
