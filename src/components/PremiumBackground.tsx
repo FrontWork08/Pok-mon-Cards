@@ -1,7 +1,8 @@
 import { memo } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Image, Platform, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { getThemeVisual } from '@/theme/themeCatalog';
 
 const PATTERN_POSITIONS = [
   ['8%', '12%', -14], ['78%', '18%', 12], ['23%', '39%', 8],
@@ -29,7 +30,8 @@ function CaptureOrb({ top, right, left, size, color, opacity }: {
 
 export const PremiumBackground = memo(function PremiumBackground() {
   const { colors, isLight, themeName } = useAppTheme();
-  const patternIcon = THEME_ICONS[themeName];
+  const patternIcon = THEME_ICONS[themeName as keyof typeof THEME_ICONS] ?? 'paw';
+  const visual = getThemeVisual(themeName);
   const webTexture = Platform.OS === 'web' ? ({
     backgroundImage:
       `radial-gradient(circle at 88% 10%, ${colors.accent}20 0 54px, transparent 55px),` +
@@ -40,6 +42,8 @@ export const PremiumBackground = memo(function PremiumBackground() {
 
   return (
     <View style={[styles.layer, { backgroundColor: colors.bg }, webTexture]}>
+      <Image source={{uri:visual.image}} resizeMode="contain" style={[styles.themePokemonRight,{opacity:isLight?.08:.13}]} />
+      <Image source={{uri:visual.image}} resizeMode="contain" style={[styles.themePokemonLeft,{opacity:isLight?.045:.07}]} />
       <View style={[styles.landMass, { backgroundColor: colors.accent, opacity: isLight ? .045 : .08 }]} />
       <View style={[styles.landMassTwo, { backgroundColor: colors.yellow, opacity: isLight ? .035 : .055 }]} />
       {Platform.OS !== 'web' ? (
@@ -61,6 +65,8 @@ export const PremiumBackground = memo(function PremiumBackground() {
 
 const styles = StyleSheet.create({
   layer: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', pointerEvents: 'none' } as any,
+  themePokemonRight:{position:'absolute',right:-52,top:'8%',width:240,height:320,transform:[{rotate:'8deg'}]},
+  themePokemonLeft:{position:'absolute',left:-80,bottom:'3%',width:260,height:350,transform:[{rotate:'-10deg'}]},
   orb: { position: 'absolute', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   orbLine: { position: 'absolute', left: 0, right: 0, height: 3 },
   orbCenter: { borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
