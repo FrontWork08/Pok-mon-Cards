@@ -186,7 +186,7 @@ export async function exchangeCoinsForDiamonds(diamonds = 1) {
   return {
     diamondsBought:Number(data?.diamondsBought??0),
     coinsSpent:Number(data?.coinsSpent??0),
-    rate:Number(data?.rate??500000),
+    rate:Number(data?.rate??100000),
     coins:Number(data?.coins??0),
     diamonds:Number(data?.diamonds??0),
   };
