@@ -10,11 +10,11 @@ export type TrainerRank = {
 
 const TIERS = [
   { minimum: 1000, name: 'Starter Trainer', symbol: '◇' },
-  { minimum: 1500, name: 'Ace Trainer', symbol: '◆' },
-  { minimum: 2000, name: 'Veteran Trainer', symbol: '✦' },
-  { minimum: 2500, name: 'Elite Trainer', symbol: '✧' },
-  { minimum: 3000, name: 'Master Trainer', symbol: '★' },
-  { minimum: 3500, name: 'Grand Trainer', symbol: '♛' },
+  { minimum: 1250, name: 'Ace Trainer', symbol: '◆' },
+  { minimum: 1500, name: 'Veteran Trainer', symbol: '✦' },
+  { minimum: 1750, name: 'Elite Trainer', symbol: '✧' },
+  { minimum: 2000, name: 'Master Trainer', symbol: '★' },
+  { minimum: 2250, name: 'Grand Trainer', symbol: '♛' },
 ] as const;
 
 const DIVISIONS = ['V', 'IV', 'III', 'II', 'I'] as const;
@@ -38,12 +38,12 @@ export function getTrainerRank(value: number | null | undefined): TrainerRank {
     if (rating >= TIERS[index].minimum) tierIndex = index;
   }
   const tier = TIERS[tierIndex];
-  const divisionIndex = Math.min(4, Math.floor((rating - tier.minimum) / 100));
+  const divisionIndex = Math.min(4, Math.floor((rating - tier.minimum) / 50));
   const division = DIVISIONS[divisionIndex];
   const nextTier = TIERS[tierIndex + 1];
-  const nextAt = divisionIndex < 4 ? tier.minimum + (divisionIndex + 1) * 100 : nextTier?.minimum ?? null;
-  const divisionStart = tier.minimum + divisionIndex * 100;
-  const divisionEnd = nextAt ?? divisionStart + 100;
+  const nextAt = divisionIndex < 4 ? tier.minimum + (divisionIndex + 1) * 50 : nextTier?.minimum ?? null;
+  const divisionStart = tier.minimum + divisionIndex * 50;
+  const divisionEnd = nextAt ?? divisionStart + 50;
 
   return {
     name: tier.name,
