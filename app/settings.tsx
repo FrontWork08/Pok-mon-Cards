@@ -7,7 +7,7 @@ import { Screen } from '@/components/Screen';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import type { AppearanceMode, ThemeName } from '@/services/settings';
 import { registerPushNotifications } from '@/services/notifications';
-import { getMyProfile, setMyProfileIcon } from '@/services/player';
+import { getMyProfile, setMyOnlineVisibility, setMyProfileIcon } from '@/services/player';
 import { setRatingVisibility } from '@/services/achievements';
 import { TrainerAvatar, type ProfileIcon } from '@/components/TrainerAvatar';
 import { THEME_CATALOG } from '@/theme/themeCatalog';
@@ -33,9 +33,11 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { colors, appearance, themeName, settings, updatePreferences } = useAppTheme();
   const [showRating, setShowRating] = useState(true);
+  const [showOnline, setShowOnline] = useState(true);
   const [profileIcon, setProfileIcon] = useState<ProfileIcon>('pokeball');
   useEffect(() => { getMyProfile().then((profile) => {
     setShowRating(profile.show_battle_rating);
+    setShowOnline(profile.show_online_status !== false);
     setProfileIcon((profile.profile_icon || 'pokeball') as ProfileIcon);
   }).catch(() => null); }, []);
   const modes: Array<{ id: AppearanceMode; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
@@ -50,6 +52,12 @@ export default function SettingsScreen() {
   async function togglePush(value:boolean){
     await updatePreferences({push_notifications:value});
     if(value) await registerPushNotifications().catch(()=>null);
+  }
+
+  async function toggleOnline(value:boolean){
+    const previous=showOnline;
+    setShowOnline(value);
+    try{await setMyOnlineVisibility(value);}catch{setShowOnline(previous);}
   }
 
   async function chooseProfileIcon(value: ProfileIcon) {
@@ -84,6 +92,7 @@ export default function SettingsScreen() {
         <SettingToggle title="Notificações do chat" text="Avisar quando um amigo enviar mensagem." value={settings?.chat_notifications ?? true} onChange={(value)=>updatePreferences({chat_notifications:value})} colors={colors}/>
         <SettingToggle title="Push no celular" text="Receber mensagens, convites e resultados mesmo com o app fechado." value={settings?.push_notifications ?? true} onChange={togglePush} colors={colors}/>
         <SettingToggle title="Exibir meu ELO" text="Mostrar pontos e símbolo do rank para outros treinadores no perfil e ranking." value={showRating} onChange={toggleRating} colors={colors}/>
+        <SettingToggle title="Mostrar quando estou online" text="Permitir que seus amigos vejam seu status online em tempo real. Desative para aparecer como offline." value={showOnline} onChange={toggleOnline} colors={colors}/>
         <SettingToggle title="Convites de batalha" text="Permitir que amigos enviem desafios pelo chat." value={settings?.battle_invites ?? true} onChange={(value)=>updatePreferences({battle_invites:value})} colors={colors}/>
         <SettingToggle title="Som nas batalhas" text="Usar efeitos sonoros nas revelações e resultados." value={settings?.battle_sounds ?? true} onChange={(value)=>updatePreferences({battle_sounds:value})} colors={colors}/>
         <SettingToggle title="Vibração nas batalhas" text="Vibrar ao travar, revelar e concluir uma partida." value={settings?.battle_vibration ?? true} onChange={(value)=>updatePreferences({battle_vibration:value})} colors={colors}/>
