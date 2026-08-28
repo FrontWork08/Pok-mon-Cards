@@ -10,7 +10,7 @@ create or replace function public.get_my_owned_pokedex_numbers()
 returns integer[]
 language sql
 stable
-security definer
+security invoker
 set search_path = ''
 as $$
   select coalesce(array_agg(distinct n order by n), array[]::integer[])
@@ -30,7 +30,7 @@ create or replace function public.get_my_owned_set_counts()
 returns table(set_id text, owned_count bigint)
 language sql
 stable
-security definer
+security invoker
 set search_path = ''
 as $$
   select c.set_id, count(*)::bigint
@@ -51,7 +51,7 @@ create or replace function public.get_my_owned_card_ids_for_set(p_set_id text)
 returns text[]
 language sql
 stable
-security definer
+security invoker
 set search_path = ''
 as $$
   select coalesce(array_agg(pc.card_id order by pc.card_id), array[]::text[])
@@ -70,7 +70,7 @@ to authenticated;
 create or replace function public.server_background_tick()
 returns jsonb
 language plpgsql
-security definer
+security invoker
 set search_path = 'public'
 as $$
 declare
