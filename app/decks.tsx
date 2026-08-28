@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { createDeck, deleteDeck, getMyDecks, setDefaultDeck } from '@/services/decks';
 import { formatUsd } from '@/services/market';
@@ -44,7 +45,7 @@ export default function DecksScreen() {
 
   return (
     <Screen title="Meus Decks" subtitle="Monte equipes com cards da sua Bag e deixe um deck principal pronto para batalhas.">
-      <Pressable style={styles.backRow} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color="#A9BDD7" /><Text style={styles.backText}>Voltar</Text></Pressable>
+      <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color="#A9BDD7" /><Text style={styles.backText}>Voltar</Text></Pressable>
       {notice ? <Pressable style={styles.notice} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={19} color={gameTheme.colors.yellow} /><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
 
       <View style={styles.createBox}>
