@@ -22,6 +22,8 @@ import {
   createRedeemCode,
   setAdminRedeemCodeActive,
   publishGlobalAnnouncement,
+  getActiveGlobalAnnouncementsAdmin,
+  stopGlobalAnnouncement,
   moderatePlayer,
   startFreeBoosters,
   stopFreeBoosters,
@@ -34,6 +36,7 @@ import {
   type AdminPlayer,
   type CoinGrantHistory,
   type AdminRedeemCode,
+  type GlobalAnnouncement,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
@@ -72,6 +75,7 @@ export default function AdminScreen() {
   const [announcementBody, setAnnouncementBody] = useState('');
   const [announcementSeverity, setAnnouncementSeverity] = useState<'info' | 'warning' | 'critical'>('info');
   const [announcementHours, setAnnouncementHours] = useState('24');
+  const [activeAnnouncement, setActiveAnnouncement] = useState<GlobalAnnouncement | null>(null);
   const [freeBoosterMinutes, setFreeBoosterMinutes] = useState('1');
   const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
   const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
@@ -115,13 +119,14 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [status, grants, events, guildState, codes, runtime] = await Promise.all([
+      const [status, grants, events, guildState, codes, runtime, announcements] = await Promise.all([
         getAdminOverview(),
         getCoinGrantHistory(),
         getAdminEvents(),
         getGuildHub(),
         getAdminRedeemCodes(),
         getMaintenanceStatus(),
+        getActiveGlobalAnnouncementsAdmin(),
         syncPlayers(),
       ]);
       setOverview(status);
@@ -132,6 +137,7 @@ export default function AdminScreen() {
       setAdminCodes(codes);
       setMaintenanceStatus(runtime);
       setMaintenanceMessage(runtime.maintenance_message);
+      setActiveAnnouncement(announcements[0] ?? null);
       setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
@@ -430,20 +436,53 @@ export default function AdminScreen() {
     try {
       setWorking(true);
       setError(null);
-      await publishGlobalAnnouncement(
+      const published = await publishGlobalAnnouncement(
         announcementTitle,
         announcementBody,
         announcementSeverity,
         hours,
       );
+      setActiveAnnouncement(published);
       setAnnouncementTitle('');
       setAnnouncementBody('');
-      setNotice('Anúncio global publicado em tempo real para todos os jogadores.');
+      setNotice('Anúncio global publicado. Cada conta verá este anúncio somente uma vez.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível publicar o anúncio.');
     } finally {
       setWorking(false);
     }
+  }
+
+
+  async function stopCurrentAnnouncement() {
+    if (!activeAnnouncement || working) return;
+    try {
+      setWorking(true);
+      setError(null);
+      await stopGlobalAnnouncement(activeAnnouncement.id);
+      setActiveAnnouncement(null);
+      setNotice('Anúncio global encerrado. Ele não aparecerá mais para os jogadores.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível parar o anúncio global.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmStopAnnouncement() {
+    if (!activeAnnouncement || working) return;
+    Alert.alert(
+      'Parar anúncio global?',
+      `Encerrar "${activeAnnouncement.title}" agora? O anúncio deixará de aparecer imediatamente.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'PARAR ANÚNCIO',
+          style: 'destructive',
+          onPress: () => { void stopCurrentAnnouncement(); },
+        },
+      ],
+    );
   }
 
   async function applyMaintenanceMode(enabled: boolean) {
@@ -818,6 +857,46 @@ export default function AdminScreen() {
 
           <SectionTitle title="Anúncio global em tempo real" />
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.emptyText, { color: colors.muted }]}>
+              Cada anúncio aparece somente uma vez por conta. Você pode encerrá-lo antes do prazo pelo botão abaixo.
+            </Text>
+
+            {activeAnnouncement ? (
+              <View style={[styles.moderationBox, { backgroundColor: colors.surfaceAlt, borderColor: '#FF8290' }]}>
+                <View style={styles.moderationStatusRow}>
+                  <Ionicons name="megaphone" size={19} color="#FF8290" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.historyUser, { color: colors.text }]}>
+                      ATIVO: {activeAnnouncement.title}
+                    </Text>
+                    <Text style={[styles.historyMeta, { color: colors.muted }]}>
+                      {activeAnnouncement.ends_at
+                        ? `Programado até ${new Date(activeAnnouncement.ends_at).toLocaleString('pt-BR')}`
+                        : 'Ativo até ser encerrado'}
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  disabled={working}
+                  onPress={confirmStopAnnouncement}
+                  style={[
+                    styles.grantButton,
+                    { backgroundColor: '#C74658', opacity: working ? 0.6 : 1 },
+                  ]}
+                >
+                  <Ionicons name="stop-circle" size={20} color="#FFFFFF" />
+                  <Text style={[styles.grantButtonText, { color: '#FFFFFF' }]}>
+                    PARAR ANÚNCIO GLOBAL
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={[styles.notice, { backgroundColor: '#142C23', borderColor: '#4A9B70' }]}>
+                <Ionicons name="checkmark-circle" size={18} color="#65D894" />
+                <Text style={[styles.noticeText, { color: '#C7F4DA' }]}>Nenhum anúncio global ativo.</Text>
+              </View>
+            )}
+
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>TÍTULO</Text>
             <TextInput
               value={announcementTitle}
