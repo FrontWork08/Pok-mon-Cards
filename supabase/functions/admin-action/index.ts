@@ -50,6 +50,12 @@ Deno.serve(async (req: Request) => {
       if(targetIds.length<1||targetIds.length>100||!Number.isSafeInteger(amount)||amount<1)return json({error:"INVALID_AMOUNT_OR_TARGETS"},400);
       const rpc=body.action==="grant_coins_batch"?"server_admin_grant_coins_batch":"server_admin_grant_diamonds_batch";const {data,error}=await admin.rpc(rpc,{p_actor_id:user.id,p_target_ids:targetIds,p_amount:amount,p_note:note});if(error)throw error;return json({data});
     }
+    if(body.action==="remove_coins_batch"||body.action==="remove_diamonds_batch"){
+      const raw=Array.isArray(body.targetIds)?body.targetIds:[];const targetIds=[...new Set(raw.filter((id):id is string=>typeof id==="string"&&id.length>0))];const amount=Number(body.amount);const note=typeof body.note==="string"?body.note:null;
+      if(targetIds.length<1||targetIds.length>100||!Number.isSafeInteger(amount)||amount<1)return json({error:"INVALID_AMOUNT_OR_TARGETS"},400);
+      const rpc=body.action==="remove_coins_batch"?"server_admin_remove_coins_batch":"server_admin_remove_diamonds_batch";
+      const {data,error}=await admin.rpc(rpc,{p_actor_id:user.id,p_target_ids:targetIds,p_amount:amount,p_note:note});if(error)throw error;return json({data});
+    }
     if(body.action==="grant_battle_pass_vip"){
       const raw=Array.isArray(body.targetIds)?body.targetIds:[];const targetIds=[...new Set(raw.filter((id):id is string=>typeof id==="string"&&id.length>0))];const note=typeof body.note==="string"?body.note:null;
       if(targetIds.length<1||targetIds.length>100)return json({error:"INVALID_TARGETS"},400);
@@ -82,6 +88,18 @@ Deno.serve(async (req: Request) => {
     if(body.action==="stop_game_event"){const eventId=typeof body.eventId==="string"?body.eventId:"";if(!eventId)return json({error:"INVALID_EVENT_ID"},400);const {data,error}=await admin.rpc("server_admin_stop_game_event",{p_actor_id:user.id,p_event_id:eventId});if(error)throw error;return json({data});}
     if(body.action==="start_free_boosters"){const durationMinutes=Number(body.durationMinutes);if(!Number.isSafeInteger(durationMinutes)||durationMinutes<1||durationMinutes>1440)return json({error:"INVALID_DURATION"},400);const {data,error}=await admin.rpc("server_admin_start_free_boosters",{p_actor_id:user.id,p_duration_minutes:durationMinutes});if(error)throw error;return json({data});}
     if(body.action==="stop_free_boosters"){const {data,error}=await admin.rpc("server_admin_stop_free_boosters",{p_actor_id:user.id});if(error)throw error;return json({data});}
+    if(body.action==="currency_history"){
+      const [coins,diamonds]=await Promise.all([
+        admin.from("admin_coin_adjustments").select("id,target_id,amount,balance_before,balance_after,note,created_at,players!admin_coin_adjustments_target_id_fkey(username)").order("created_at",{ascending:false}).limit(40),
+        admin.from("admin_diamond_adjustments").select("id,target_id,amount,balance_before,balance_after,note,created_at,players!admin_diamond_adjustments_target_id_fkey(username)").order("created_at",{ascending:false}).limit(40),
+      ]);
+      if(coins.error)throw coins.error;if(diamonds.error)throw diamonds.error;
+      const data=[
+        ...(coins.data??[]).map((item:any)=>({...item,currency:"coins"})),
+        ...(diamonds.data??[]).map((item:any)=>({...item,currency:"diamonds"})),
+      ].sort((a:any,b:any)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).slice(0,60);
+      return json({data});
+    }
     if(body.action==="coin_history"){const {data,error}=await admin.from("admin_coin_adjustments").select("id,target_id,amount,balance_before,balance_after,note,created_at,players!admin_coin_adjustments_target_id_fkey(username)").order("created_at",{ascending:false}).limit(30);if(error)throw error;return json({data:data??[]});}
     return json({error:"Invalid action"},400);
   } catch(error){const message=error instanceof Error?error.message:String(error);const status=message.includes("FORBIDDEN")?403:message.includes("NOT_FOUND")?404:message.includes("INVALID")?400:409;return json({error:message},status);}
