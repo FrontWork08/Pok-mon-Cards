@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { claimMission, getMissions, type PlayerMission } from '@/services/missions';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -36,7 +37,7 @@ export default function MissionsScreen() {
   }
 
   return <Screen title="Missões" subtitle="Objetivos diários e semanais com atalhos para cada atividade.">
-    <Pressable style={styles.backRow} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText, { color: colors.muted }]}>Voltar</Text></Pressable>
+    <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText, { color: colors.muted }]}>Voltar</Text></Pressable>
     {notice ? <Pressable style={[styles.notice, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={() => setNotice(null)}><Ionicons name="gift" size={19} color={colors.yellow}/><Text style={[styles.noticeText, { color: colors.text }]}>{notice}</Text></Pressable> : null}
     <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><View style={styles.grow}><Text style={[styles.kicker, { color: colors.yellow }]}>CENTRAL DE MISSÕES</Text><Text style={[styles.heroTitle, { color: colors.text }]}>Jogue e resgate</Text><Text style={[styles.heroText, { color: colors.muted }]}>O progresso é conferido no servidor. Diárias reiniciam todos os dias; semanais, toda segunda-feira.</Text></View><Ionicons name="calendar" size={42} color={colors.yellow}/></View>
     {loading ? <ActivityIndicator size="large" color={colors.yellow}/> : null}
