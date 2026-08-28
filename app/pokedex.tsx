@@ -14,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import {
   generationForNumber,
@@ -125,7 +126,7 @@ export default function PokedexScreen() {
         </Text>
       </View>
 
-      <Pressable style={styles.backRow} onPress={() => router.back()}>
+      <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}>
         <Ionicons name="arrow-back" size={18} color="#A9BDD7" />
         <Text style={styles.backText}>Voltar</Text>
       </Pressable>
