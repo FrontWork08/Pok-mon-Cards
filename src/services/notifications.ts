@@ -102,7 +102,7 @@ export async function disableCurrentPushToken() {
 
 export function subscribeToMyNotifications(playerId: string, onNotification: (notification: any) => void) {
   const channel = supabase
-    .channel(`notifications:${playerId}`)
+    .channel(`notifications:${playerId}:${Date.now()}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `player_id=eq.${playerId}` }, (payload) => onNotification(payload.new))
     .subscribe();
   return () => { supabase.removeChannel(channel); };
