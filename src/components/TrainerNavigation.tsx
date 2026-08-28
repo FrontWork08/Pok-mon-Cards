@@ -20,6 +20,9 @@ type MenuItem = {
 
 const MENU_ITEMS: MenuItem[] = [
   { label: 'Inbox', description: 'Mensagens, convites e avisos', href: '/inbox', icon: 'mail-unread' },
+  { label: 'Temporada & Jornada', description: 'Ranque, streak, eventos e recompensas', href: '/season', icon: 'flame' },
+  { label: 'Card Chase', description: 'Wishlist e alertas de cartas desejadas', href: '/wishlist', icon: 'star' },
+  { label: 'Vitrine do Perfil', description: 'Escolha suas 6 cartas de destaque', href: '/showcase', icon: 'sparkles' },
   { label: 'Conquistas e Títulos', description: 'Progresso e títulos equipáveis', href: '/achievements', icon: 'ribbon' },
   { label: 'Ranking de Coleções', description: 'Contas com maior valor de mercado', href: '/collection-ranking', icon: 'podium' },
   { label: 'Guildas Pokémon', description: 'Equipe, missões e ranking coletivo', href: '/guilds', icon: 'shield' },
