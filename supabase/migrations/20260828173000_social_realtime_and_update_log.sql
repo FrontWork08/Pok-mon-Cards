@@ -1,14 +1,14 @@
 -- Social realtime: global chat, online visibility and in-app update log.
 -- Live schema was applied first; this migration keeps Git history/reproducibility aligned.
 
-alter table public.players
+alter table public.player_settings
   add column if not exists show_online_status boolean not null default true;
 
 create table if not exists public.global_chat_messages (
   id uuid primary key default gen_random_uuid(),
   player_id uuid not null references public.players(id) on delete cascade,
   body text not null,
-  sender_username text not null,
+  sender_username text not null default '',
   sender_profile_icon text not null default 'pokeball',
   created_at timestamptz not null default now(),
   deleted_at timestamptz,
@@ -58,72 +58,83 @@ create policy "authenticated read update logs"
   for select to authenticated
   using (active=true);
 
-create or replace function public.set_my_online_visibility(p_visible boolean)
-returns boolean
+create or replace function private.prepare_global_chat_message()
+returns trigger
 language plpgsql
 security definer
 set search_path=''
 as $$
 declare
-  v_id uuid := auth.uid();
-begin
-  if v_id is null then raise exception 'UNAUTHENTICATED'; end if;
-
-  update public.players
-  set show_online_status=coalesce(p_visible,true)
-  where id=v_id;
-
-  if not found then raise exception 'PLAYER_NOT_FOUND'; end if;
-  return coalesce(p_visible,true);
-end;
-$$;
-
-revoke all on function public.set_my_online_visibility(boolean) from public,anon,authenticated;
-grant execute on function public.set_my_online_visibility(boolean) to authenticated;
-
-create or replace function public.send_global_chat_message(p_body text)
-returns jsonb
-language plpgsql
-security definer
-set search_path=''
-as $$
-declare
-  v_player_id uuid := auth.uid();
-  v_body text := trim(coalesce(p_body,''));
+  v_uid uuid := auth.uid();
   v_username text;
   v_profile_icon text;
-  v_row public.global_chat_messages%rowtype;
 begin
-  if v_player_id is null then raise exception 'UNAUTHENTICATED'; end if;
-  if char_length(v_body) < 1 or char_length(v_body) > 280 then
+  if v_uid is null or new.player_id is distinct from v_uid then
+    raise exception 'FORBIDDEN';
+  end if;
+
+  new.body := trim(coalesce(new.body,''));
+  if char_length(new.body) < 1 or char_length(new.body) > 280 then
     raise exception 'INVALID_MESSAGE';
   end if;
 
   select username,profile_icon
   into v_username,v_profile_icon
   from public.players
-  where id=v_player_id and account_status='active';
+  where id=v_uid and account_status='active';
 
   if v_username is null then raise exception 'ACCOUNT_RESTRICTED'; end if;
 
   if exists(
     select 1
     from public.global_chat_messages
-    where player_id=v_player_id
+    where player_id=v_uid
       and created_at > now() - interval '2 seconds'
   ) then
     raise exception 'CHAT_RATE_LIMIT';
   end if;
 
+  new.sender_username := v_username;
+  new.sender_profile_icon := coalesce(v_profile_icon,'pokeball');
+  new.deleted_at := null;
+  return new;
+end;
+$$;
+
+revoke all on function private.prepare_global_chat_message() from public,anon,authenticated;
+
+drop trigger if exists trg_prepare_global_chat_message on public.global_chat_messages;
+create trigger trg_prepare_global_chat_message
+before insert on public.global_chat_messages
+for each row execute function private.prepare_global_chat_message();
+
+grant insert on table public.global_chat_messages to authenticated;
+
+drop policy if exists "players send own global chat" on public.global_chat_messages;
+create policy "players send own global chat"
+  on public.global_chat_messages
+  for insert to authenticated
+  with check (
+    (select auth.uid()) = player_id
+    and deleted_at is null
+    and char_length(trim(body)) between 1 and 280
+  );
+
+create or replace function public.send_global_chat_message(p_body text)
+returns jsonb
+language plpgsql
+security invoker
+set search_path=''
+as $$
+declare
+  v_row public.global_chat_messages%rowtype;
+begin
+  if auth.uid() is null then raise exception 'UNAUTHENTICATED'; end if;
+
   insert into public.global_chat_messages(
     player_id,body,sender_username,sender_profile_icon
   )
-  values(
-    v_player_id,
-    v_body,
-    v_username,
-    coalesce(v_profile_icon,'pokeball')
-  )
+  values(auth.uid(),trim(coalesce(p_body,'')),'','pokeball')
   returning * into v_row;
 
   return jsonb_build_object(
