@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import {
   claimBattlePassReward,
@@ -131,7 +132,7 @@ export default function BattlePassScreen() {
   const header = state ? (
     <View style={styles.headerStack}>
 <View style={styles.topRow}>
-        <Pressable onPress={() => router.back()} style={[styles.back, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        <Pressable onPress={() => goBackOrHome(router)} style={[styles.back, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Ionicons name="arrow-back" size={18} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>Voltar</Text>
         </Pressable>
@@ -220,7 +221,7 @@ export default function BattlePassScreen() {
   }
 
   if (!state) {
-    return <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}><PremiumBackground /><View style={styles.center}><Ionicons name="calendar-outline" size={38} color={colors.muted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum passe ativo</Text><Text style={[styles.loadingText, { color: colors.muted }]}>A próxima temporada aparecerá aqui.</Text><Pressable onPress={() => router.back()} style={[styles.back, { borderColor: colors.border, backgroundColor: colors.surface }]}><Text style={[styles.backText, { color: colors.text }]}>Voltar</Text></Pressable></View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}><PremiumBackground /><View style={styles.center}><Ionicons name="calendar-outline" size={38} color={colors.muted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum passe ativo</Text><Text style={[styles.loadingText, { color: colors.muted }]}>A próxima temporada aparecerá aqui.</Text><Pressable onPress={() => goBackOrHome(router)} style={[styles.back, { borderColor: colors.border, backgroundColor: colors.surface }]}><Text style={[styles.backText, { color: colors.text }]}>Voltar</Text></Pressable></View></SafeAreaView>;
   }
 
   return (
