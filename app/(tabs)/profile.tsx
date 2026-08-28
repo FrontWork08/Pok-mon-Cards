@@ -83,7 +83,7 @@ export default function ProfileScreen() {
   const profileFrameColor = frameDefinition?.primary_color ?? colors.accent;
   const profileBackgroundColor = backgroundDefinition?.secondary_color ?? colors.accentSoft;
 
-  return <Screen title="Trainer Profile" subtitle="Sua identidade, valor de mercado da coleção, ranking global e progresso.">
+  return <Screen title="Trainer Profile" subtitle="Sua identidade, cosméticos, valor de mercado da coleção, ranking global e progresso.">
     {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
     {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={20} color="#FF9FAF" /><Text style={styles.errorText}>{error}</Text></View> : null}
 
