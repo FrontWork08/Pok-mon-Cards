@@ -19,6 +19,8 @@ export type Pack = {
   booster_logo_url: string | null;
   booster_art_source: string | null;
   release_date: string | null;
+  generation: number | null;
+  rarity_score: number;
   active: boolean;
   currency: 'coins' | 'diamonds';
 };
@@ -50,7 +52,7 @@ export async function listPacks(): Promise<Pack[]> {
     supabase
       .from('packs')
       .select(
-        'id,name,set_id,price,currency,cards_per_pack,image_url,art_url,booster_art_url,booster_art_urls,booster_back_url,booster_logo_url,booster_art_source,release_date,active',
+        'id,name,set_id,price,currency,cards_per_pack,image_url,art_url,booster_art_url,booster_art_urls,booster_back_url,booster_logo_url,booster_art_source,release_date,generation,rarity_score,active',
       )
       .eq('active', true)
       .order('price', { ascending: true }),
@@ -71,6 +73,8 @@ export async function listPacks(): Promise<Pack[]> {
       base_price: basePrice,
       currency: pack.currency === 'diamonds' ? 'diamonds' : 'coins',
       free_until: freeEvent?.ends_at ?? null,
+      generation: pack.generation == null ? null : Number(pack.generation),
+      rarity_score: Number(pack.rarity_score ?? 0),
       booster_art_url: pack.booster_art_url ?? boosterArtUrls[0] ?? null,
       booster_art_urls: boosterArtUrls,
       booster_art_source:
