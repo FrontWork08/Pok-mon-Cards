@@ -30,6 +30,8 @@ export type OpenedCard = {
   image: string | null;
   imageLarge?: string | null;
   imageSmall?: string | null;
+  isNew?: boolean;
+  wishlistHit?: boolean;
 };
 
 export type PackCardPreview = {
