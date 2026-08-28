@@ -172,8 +172,8 @@ export async function listPackCards(setId: string, page = 0, pageSize = 36, sear
       id: card.id,
       name: card.pokemon_name,
       rarity: card.rarity,
-      image: card.image_small ?? card.image_large ?? `https://images.pokemontcg.io/${card.set_id}/${card.card_number}.png`,
-      image_fallback: `https://images.pokemontcg.io/${card.set_id}/${card.card_number}.png`,
+      image: card.image_small ?? `https://images.pokemontcg.io/${card.set_id}/${card.card_number}.png`,
+      image_fallback: card.image_large ?? `https://images.pokemontcg.io/${card.set_id}/${card.card_number}_hires.png`,
       market_price_usd: card.market_price_usd == null ? null : Number(card.market_price_usd),
     })) as PackCardPreview[],
   };
@@ -191,3 +191,4 @@ export async function exchangeCoinsForDiamonds(diamonds = 1) {
     diamonds:Number(data?.diamonds??0),
   };
 }
+

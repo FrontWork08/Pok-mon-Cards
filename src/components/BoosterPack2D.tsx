@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Animated, Image, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import type { Pack } from '@/services/packs';
 
@@ -38,16 +38,29 @@ function BoosterPack2DComponent({ pack, width = 224, tear, seamCharge, style }: 
   const mouthOpacity = safeTear.interpolate({ inputRange: [0, .1, 1], outputRange: [0, .96, 1] });
   const tearShardOpacity = safeTear.interpolate({ inputRange: [0, .08, .24, 1], outputRange: [0, 0, .72, .92] });
 
-  const realArtwork = pack.booster_art_url;
+  const artworkCandidates = [
+    pack.booster_art_url,
+    ...(pack.booster_art_urls ?? []),
+    pack.art_url,
+  ].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
+  const artworkKey = artworkCandidates.join('|');
+  const [artworkIndex, setArtworkIndex] = useState(0);
+
+  useEffect(() => {
+    setArtworkIndex(0);
+  }, [artworkKey]);
+
+  const realArtwork = artworkCandidates[artworkIndex] ?? null;
 
   return (
     <View style={[styles.shadowWrap, { width, height }, style]}>
       {realArtwork ? (
         <View style={styles.realPackWrap}>
           <Image
-            source={{ uri: realArtwork }}
+            source={{ uri: realArtwork, cache: 'force-cache' }}
             resizeMode="contain"
             style={styles.realPackImage}
+            onError={() => setArtworkIndex((current) => current + 1)}
           />
 
           <Animated.View
@@ -384,3 +397,4 @@ const styles = StyleSheet.create({
   fallbackTearLeft: { left: 0 },
   fallbackTearRight: { right: 0 },
 });
+

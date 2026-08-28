@@ -36,7 +36,7 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'number'|'price-high'>('number');
-  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [failedImages, setFailedImages] = useState<Record<string, number>>({});
 
   const hasMore = cards.length < total;
 
@@ -46,7 +46,7 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
     setTotal(0);
     setPage(0);
     setError(null);
-    setFailedImages(new Set());
+    setFailedImages({});
 
     let active = true;
     const timer = setTimeout(() => {
@@ -139,13 +139,25 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
             onEndReached={loadMore}
             renderItem={({ item }) => (
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                {item.image ? (
-                  <Image source={{ uri: failedImages.has(item.id) ? (item.image_fallback ?? item.image) : item.image }} resizeMode="contain" style={styles.image} onError={()=>setFailedImages(current=>{const next=new Set(current);next.add(item.id);return next;})} />
-                ) : (
-                  <View style={[styles.image, styles.imageFallback, { backgroundColor: colors.surfaceAlt }]}>
-                    <Ionicons name="image-outline" size={28} color={colors.muted} />
-                  </View>
-                )}
+                {(() => {
+                  const candidates = [item.image, item.image_fallback]
+                    .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
+                  const level = failedImages[item.id] ?? 0;
+                  const uri = candidates[level] ?? null;
+
+                  return uri ? (
+                    <Image
+                      source={{ uri, cache: 'force-cache' }}
+                      resizeMode="contain"
+                      style={styles.image}
+                      onError={() => setFailedImages((current) => ({ ...current, [item.id]: level + 1 }))}
+                    />
+                  ) : (
+                    <View style={[styles.image, styles.imageFallback, { backgroundColor: colors.surfaceAlt }]}>
+                      <Ionicons name="image-outline" size={28} color={colors.muted} />
+                    </View>
+                  );
+                })()}
                 <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>{item.name}</Text>
                 <Text numberOfLines={1} style={[styles.rarity, { color: colors.muted }]}>{item.rarity ?? 'Sem raridade'}</Text>
                 <Text style={[styles.price, { color: colors.yellow }]}>
@@ -184,3 +196,4 @@ const styles = StyleSheet.create({
   price: { fontSize: 10, fontWeight: '900', marginTop: 5 },
   footerLoader: { marginVertical: 18 },
 });
+
