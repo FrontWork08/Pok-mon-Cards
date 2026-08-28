@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { getGlobalChatMessages, sendGlobalChatMessage, subscribeGlobalChat, type GlobalChatMessage } from '@/services/globalChat';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -14,6 +15,7 @@ function timeLabel(value: string) {
 
 export function GlobalChatHomeCard() {
   const { colors } = useAppTheme();
+  const router = useRouter();
   const { userId } = useWallet();
   const [messages, setMessages] = useState<GlobalChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -97,18 +99,32 @@ export function GlobalChatHomeCard() {
             const mine = message.playerId === userId;
             return (
               <View key={message.id} style={[styles.messageRow, mine && styles.messageMine]}>
-                <TrainerAvatar
-                  icon={message.profileIcon}
-                  size={31}
-                  color={mine ? colors.yellow : colors.accent}
-                  backgroundColor={colors.surfaceAlt}
-                />
+                <Pressable onPress={() => router.push(`/player/${message.playerId}`)} style={styles.avatarPress}>
+                  <TrainerAvatar
+                    icon={message.profileIcon}
+                    size={31}
+                    color={mine ? colors.yellow : colors.accent}
+                    backgroundColor={colors.surfaceAlt}
+                  />
+                </Pressable>
                 <View style={[styles.bubble, { backgroundColor: mine ? colors.accentSoft : colors.surfaceAlt, borderColor: mine ? colors.accent : colors.border }]}>
                   <View style={styles.metaRow}>
-                    <Text numberOfLines={1} style={[styles.username, { color: mine ? colors.yellow : colors.text }]}>@{message.username}</Text>
+                    <Pressable onPress={() => router.push(`/player/${message.playerId}`)} style={styles.identityPress}>
+                      <Text numberOfLines={1} style={[styles.username, { color: mine ? colors.yellow : colors.text }]}>@{message.username}</Text>
+                      {message.title ? (
+                        <View style={[styles.titleBadge,{borderColor:mine?colors.yellow:colors.accent,backgroundColor:colors.surface}]}>
+                          <Text style={styles.titleIcon}>{message.titleIcon ?? '🏷️'}</Text>
+                          <Text numberOfLines={1} style={[styles.titleBadgeText,{color:mine?colors.yellow:colors.accent}]}>{message.title}</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
                     <Text style={[styles.time, { color: colors.muted }]}>{timeLabel(message.createdAt)}</Text>
                   </View>
                   <Text style={[styles.body, { color: colors.text }]}>{message.body}</Text>
+                  <Pressable onPress={() => router.push(`/player/${message.playerId}`)} style={styles.profileHint}>
+                    <Ionicons name="person-circle-outline" size={12} color={colors.muted}/>
+                    <Text style={[styles.profileHintText,{color:colors.muted}]}>VER PERFIL</Text>
+                  </Pressable>
                 </View>
               </View>
             );
@@ -173,11 +189,18 @@ const styles=StyleSheet.create({
   messages:{gap:7},
   messageRow:{flexDirection:'row',alignItems:'flex-end',gap:7},
   messageMine:{paddingLeft:18},
+  avatarPress:{borderRadius:999},
   bubble:{flex:1,borderRadius:14,borderWidth:1,paddingHorizontal:10,paddingVertical:8},
-  metaRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
-  username:{flex:1,fontSize:9,fontWeight:'900'},
+  metaRow:{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between',gap:8},
+  identityPress:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},
+  username:{fontSize:9,fontWeight:'900'},
+  titleBadge:{maxWidth:160,borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:2,flexDirection:'row',alignItems:'center',gap:3},
+  titleIcon:{fontSize:8},
+  titleBadgeText:{flexShrink:1,fontSize:7,fontWeight:'900'},
   time:{fontSize:7,fontWeight:'700'},
   body:{fontSize:11,lineHeight:15,marginTop:3},
+  profileHint:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:4,marginTop:6},
+  profileHintText:{fontSize:6,fontWeight:'900',letterSpacing:.5},
   error:{flexDirection:'row',alignItems:'center',gap:6,borderRadius:10,padding:8,backgroundColor:'#351A24'},
   errorText:{flex:1,color:'#FFD7DD',fontSize:8,fontWeight:'700'},
   composer:{minHeight:48,borderRadius:14,borderWidth:1,paddingLeft:11,paddingRight:6,flexDirection:'row',alignItems:'center',gap:6},
