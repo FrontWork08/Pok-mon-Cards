@@ -53,7 +53,7 @@ export default function PlayerShowcaseScreen() {
             {player.equippedTitle ? <Text style={[styles.titleText, { color: colors.yellow }]}>{player.equippedTitle.icon} {player.equippedTitle.title}</Text> : null}
             <Text style={[styles.meta, { color: colors.muted }]}>Nível {player.level} • {rank ? `${rank.symbol} ${rank.displayName}` : 'ELO oculto'}</Text>
           </View>
-          {player.guild ? <Pressable onPress={() => router.push('/guilds')} style={[styles.guildBadge, { backgroundColor: player.guild.color + '25', borderColor: player.guild.color }]}><Ionicons name="shield" size={16} color={player.guild.color} /><Text style={[styles.guildText, { color: player.guild.color }]}>{player.guild.name}</Text></Pressable> : null}
+          {player.guild ? <Pressable onPress={() => router.push('/guilds')} style={[styles.guildBadge, { backgroundColor: player.guild.color + '25', borderColor: player.guild.color }]}><Ionicons name="shield" size={16} color={player.guild.color} /><Text style={[styles.guildText, { color: player.guild.color }]}>{player.guild.name} • Nv. {player.guild.level}</Text></Pressable> : null}
         </View>
 
         <View style={[styles.valuePanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
@@ -67,6 +67,19 @@ export default function PlayerShowcaseScreen() {
           <Metric icon="trophy" label="VITÓRIAS" value={player.battleWins.toLocaleString('pt-BR')} />
           <Metric icon="analytics" label="WIN RATE" value={`${winRate}%`} />
         </View>
+
+        {collection.showcase.length ? <>
+          <View style={styles.sectionHead}><View><Text style={[styles.sectionTitle, { color: colors.text }]}>Vitrine do treinador</Text><Text style={[styles.sectionHint, { color: colors.muted }]}>As cartas escolhidas para representar esta coleção.</Text></View><Text style={[styles.count, { color: colors.yellow }]}>{collection.showcase.length}/6</Text></View>
+          <View style={styles.showcaseGrid}>
+            {collection.showcase.map((card) => <View key={`showcase-${card.slot}`} style={[styles.showcaseCard, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
+              <Text style={[styles.showcaseSlot, { color: colors.yellow }]}>SLOT {card.slot}</Text>
+              {card.imageSmall ? <Image source={{ uri: card.imageSmall }} resizeMode="contain" resizeMethod="resize" fadeDuration={0} style={styles.showcaseImage} /> : <View style={[styles.showcaseImage, { backgroundColor: colors.surfaceAlt }]} />}
+              <Text numberOfLines={1} style={[styles.showcaseName, { color: colors.text }]}>{card.name}</Text>
+              <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{card.rarity ?? 'Sem raridade'}</Text>
+              <Text style={[styles.cardValue, { color: colors.yellow }]}>{card.marketPriceUsd == null ? 'US$ —' : formatUsd(card.marketPriceUsd)}</Text>
+            </View>)}
+          </View>
+        </> : null}
 
         <View style={styles.sectionHead}><View><Text style={[styles.sectionTitle, { color: colors.text }]}>Cartas mais raras</Text><Text style={[styles.sectionHint, { color: colors.muted }]}>Ordenadas por raridade e valor dentro do jogo.</Text></View><Text style={[styles.count, { color: colors.yellow }]}>{collection.rarestCards.length}</Text></View>
         {collection.rarestCards.length === 0 ? <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="images-outline" size={30} color={colors.muted} /><Text style={[styles.emptyText, { color: colors.muted }]}>Este treinador ainda não possui cartas.</Text></View> : null}
@@ -119,6 +132,11 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 21, fontWeight: '900' },
   sectionHint: { fontSize: 10, marginTop: 2 },
   count: { fontSize: 15, fontWeight: '900' },
+  showcaseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  showcaseCard: { flexGrow: 1, flexBasis: 140, maxWidth: 190, minWidth: 128, borderRadius: 17, borderWidth: 1, padding: 8 },
+  showcaseSlot: { fontSize: 7, fontWeight: '900', letterSpacing: .8 },
+  showcaseImage: { width: '100%', height: 175, marginTop: 5 },
+  showcaseName: { fontSize: 11, fontWeight: '900', marginTop: 6 },
   cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   card: { flexGrow: 1, flexBasis: 145, maxWidth: 210, minWidth: 138, borderRadius: 17, borderWidth: 1, padding: 8 },
   imageWrap: { width: '100%', aspectRatio: .72, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
