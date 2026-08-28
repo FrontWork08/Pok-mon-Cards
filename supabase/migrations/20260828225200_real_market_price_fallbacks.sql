@@ -1,7 +1,8 @@
 -- Real market-price coverage improvement.
 -- TCGplayer market is preferred; real TCGplayer mid/low values are accepted when
--- market is unavailable. Edge workers may supply TCGdex's TCGplayer USD snapshot
--- using pricing_source='tcgdex'. Synthetic prices are never generated here.
+-- market is unavailable. Edge workers may supply TCGdex TCGplayer USD snapshots
+-- or Cardmarket EUR values converted with a live EUR/USD reference rate.
+-- Synthetic prices are never generated here.
 
 create or replace function public.apply_market_price_sync_set(
   p_token text,
@@ -98,6 +99,7 @@ begin
       market_price_source=case
         when chosen.market is null then 'pokemontcg:no_tcgplayer_price'
         when chosen.pricing_source='tcgdex' then 'tcgdex:tcgplayer_'||chosen.value_kind
+        when chosen.pricing_source='cardmarket' then 'cardmarket:eur_to_usd_'||chosen.value_kind
         else 'pokemontcg:tcgplayer_'||chosen.value_kind
       end,
       market_price_data=coalesce(chosen.tcgplayer,'{}'::jsonb),
