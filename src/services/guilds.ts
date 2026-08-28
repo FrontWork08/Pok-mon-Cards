@@ -30,6 +30,8 @@ export type Guild = {
   memberCount: number;
   collectionValueUsd: number;
   rank: number;
+  xp: number;
+  level: number;
   members: GuildMember[];
   missions: GuildMission[];
 };
@@ -57,6 +59,8 @@ function normalizeHub(data: any): GuildHub {
       memberCount: Number(guild.memberCount ?? 0),
       collectionValueUsd: Number(guild.collectionValueUsd ?? 0),
       rank: Number(guild.rank ?? 0),
+      xp: Number(guild.xp ?? 0),
+      level: Number(guild.level ?? 1),
       members: Array.isArray(guild.members) ? guild.members.map((member: any) => ({ ...member, level: Number(member.level ?? 1) })) : [],
       missions: Array.isArray(guild.missions) ? guild.missions.map((mission: any) => ({
         ...mission,
