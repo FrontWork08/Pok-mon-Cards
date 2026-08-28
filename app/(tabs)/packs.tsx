@@ -394,7 +394,7 @@ export default function PacksScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
+    <SafeAreaView edges={['left','right','bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
         key={`pack-grid-${columns}`}
