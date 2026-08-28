@@ -90,6 +90,23 @@ export async function getBattleEvents(battleId: string) {
   return data ?? [];
 }
 
+export async function getMyActiveBattle() {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  const id = auth.user?.id;
+  if (!id) return null;
+  const { data, error } = await supabase
+    .from('battles')
+    .select('id,status,mode,challenger_id,opponent_id,created_at')
+    .or(`challenger_id.eq.${id},opponent_id.eq.${id}`)
+    .in('status', ['invited', 'drafting', 'selecting'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function getMyBattleHistory(limit = 50) {
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
