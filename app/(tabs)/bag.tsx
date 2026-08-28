@@ -23,7 +23,7 @@ import {
   type BagSortMode,
 } from '@/services/bag';
 import type { OwnedCardEntry } from '@/services/player';
-import { formatUsd } from '@/services/market';
+import { formatUsd, refreshOwnedMarketPrices } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -51,6 +51,7 @@ export default function BagScreen() {
   const [reloadTick, setReloadTick] = useState(0);
   const requestId = useRef(0);
   const loadingMoreRef = useRef(false);
+  const priceRefreshAttemptedRef = useRef(new Set<string>());
   const listRef = useRef<FlatList<OwnedCardEntry> | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -82,6 +83,24 @@ export default function BagScreen() {
       if (currentRequest !== requestId.current) return;
       setCards(page.items);
       setTotalFiltered(page.totalFiltered);
+
+      const priceCandidates = page.items
+        .map((item) => item.cards)
+        .filter((card): card is NonNullable<OwnedCardEntry['cards']> => Boolean(card?.id))
+        .filter((card) => !priceRefreshAttemptedRef.current.has(card.id))
+        .slice(0, 48)
+        .map((card) => card.id);
+
+      if (priceCandidates.length) {
+        priceCandidates.forEach((cardId) => priceRefreshAttemptedRef.current.add(cardId));
+        void refreshOwnedMarketPrices(priceCandidates)
+          .then((result) => {
+            if (result.refreshed > 0 && currentRequest === requestId.current) {
+              setReloadTick((value) => value + 1);
+            }
+          })
+          .catch(() => null);
+      }
     } catch (e) {
       if (currentRequest !== requestId.current) return;
       setCards([]);
