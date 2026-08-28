@@ -24,13 +24,23 @@ export type PublicPlayerProfile = {
     battleRating: number | null;
     showBattleRating: boolean;
     equippedTitle: { id: string; title: string; icon: string } | null;
-    guild: { id: string; name: string; color: string; role: 'leader' | 'officer' | 'member' } | null;
+    guild: { id: string; name: string; color: string; role: 'leader' | 'officer' | 'member'; level: number; xp: number } | null;
   };
   collection: {
     uniqueCards: number;
     totalCopies: number;
     totalValueUsd: number;
     rarestCards: PublicRareCard[];
+    showcase: Array<{
+      slot: number;
+      id: string;
+      name: string;
+      setName: string;
+      rarity: string | null;
+      imageSmall: string | null;
+      imageLarge: string | null;
+      marketPriceUsd: number | null;
+    }>;
   };
 };
 
@@ -48,6 +58,11 @@ export async function getPublicPlayerProfile(playerId: string): Promise<PublicPl
       battleLosses: Number(value.player?.battleLosses ?? 0),
       battleStreak: Number(value.player?.battleStreak ?? 0),
       battleRating: value.player?.battleRating == null ? null : Number(value.player.battleRating),
+      guild: value.player?.guild ? {
+        ...value.player.guild,
+        level: Number(value.player.guild.level ?? 1),
+        xp: Number(value.player.guild.xp ?? 0),
+      } : null,
     },
     collection: {
       uniqueCards: Number(value.collection?.uniqueCards ?? 0),
@@ -59,6 +74,13 @@ export async function getPublicPlayerProfile(playerId: string): Promise<PublicPl
           marketPriceUsd: card.marketPriceUsd == null ? null : Number(card.marketPriceUsd),
           quantity: Number(card.quantity ?? 0),
           rarity_tier: Number(card.rarity_tier ?? 0),
+        }))
+        : [],
+      showcase: Array.isArray(value.collection?.showcase)
+        ? value.collection.showcase.map((card: any) => ({
+          ...card,
+          slot: Number(card.slot ?? 0),
+          marketPriceUsd: card.marketPriceUsd == null ? null : Number(card.marketPriceUsd),
         }))
         : [],
     },
