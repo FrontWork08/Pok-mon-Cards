@@ -20,7 +20,7 @@ export type Pack = {
   booster_art_source: string | null;
   release_date: string | null;
   active: boolean;
-  currency?: 'coins' | 'diamonds';
+  currency: 'coins' | 'diamonds';
 };
 
 export type OpenedCard = {
@@ -32,6 +32,8 @@ export type OpenedCard = {
   imageSmall?: string | null;
   isNew?: boolean;
   wishlistHit?: boolean;
+  imageFallback?: string | null;
+  imageFallbackLarge?: string | null;
 };
 
 export type PackCardPreview = {
@@ -40,6 +42,7 @@ export type PackCardPreview = {
   rarity: string | null;
   image: string | null;
   market_price_usd: number | null;
+  image_fallback: string | null;
 };
 
 export async function listPacks(): Promise<Pack[]> {
@@ -47,7 +50,7 @@ export async function listPacks(): Promise<Pack[]> {
     supabase
       .from('packs')
       .select(
-        'id,name,set_id,price,cards_per_pack,image_url,art_url,booster_art_url,booster_art_urls,booster_back_url,booster_logo_url,booster_art_source,release_date,active',
+        'id,name,set_id,price,currency,cards_per_pack,image_url,art_url,booster_art_url,booster_art_urls,booster_back_url,booster_logo_url,booster_art_source,release_date,active',
       )
       .eq('active', true)
       .order('price', { ascending: true }),
@@ -66,6 +69,7 @@ export async function listPacks(): Promise<Pack[]> {
       ...pack,
       price: freeEvent ? 0 : basePrice,
       base_price: basePrice,
+      currency: pack.currency === 'diamonds' ? 'diamonds' : 'coins',
       free_until: freeEvent?.ends_at ?? null,
       booster_art_url: pack.booster_art_url ?? boosterArtUrls[0] ?? null,
       booster_art_urls: boosterArtUrls,
@@ -143,16 +147,18 @@ export async function setPackFavorite(packId: string, favorite: boolean) {
   if (error) throw error;
 }
 
-export async function listPackCards(setId: string, page = 0, pageSize = 36) {
+export async function listPackCards(setId: string, page = 0, pageSize = 36, search = '', sort: 'number'|'price-high' = 'number') {
   const from = page * pageSize;
   const to = from + pageSize - 1;
-
-  const { data, error, count } = await supabase
+  let query = supabase
     .from('cards')
-    .select('id,pokemon_name,rarity,image_small,image_large,market_price_usd', { count: 'exact' })
-    .eq('set_id', setId)
-    .order('card_number', { ascending: true })
-    .range(from, to);
+    .select('id,pokemon_name,rarity,image_small,image_large,market_price_usd,set_id,card_number', { count: 'exact' })
+    .eq('set_id', setId);
+  if (search.trim()) query = query.ilike('pokemon_name', `%${search.trim()}%`);
+  query = sort === 'price-high'
+    ? query.order('market_price_usd', { ascending: false, nullsFirst: false })
+    : query.order('card_number', { ascending: true });
+  const { data, error, count } = await query.range(from, to);
 
   if (error) throw error;
 
@@ -162,8 +168,22 @@ export async function listPackCards(setId: string, page = 0, pageSize = 36) {
       id: card.id,
       name: card.pokemon_name,
       rarity: card.rarity,
-      image: card.image_small ?? card.image_large ?? null,
+      image: card.image_small ?? card.image_large ?? `https://images.pokemontcg.io/${card.set_id}/${card.card_number}.png`,
+      image_fallback: `https://images.pokemontcg.io/${card.set_id}/${card.card_number}.png`,
       market_price_usd: card.market_price_usd == null ? null : Number(card.market_price_usd),
     })) as PackCardPreview[],
+  };
+}
+
+
+export async function exchangeCoinsForDiamonds(diamonds = 1) {
+  const {data,error}=await supabase.rpc('exchange_coins_for_diamonds',{p_diamonds:diamonds});
+  if(error) throw error;
+  return {
+    diamondsBought:Number(data?.diamondsBought??0),
+    coinsSpent:Number(data?.coinsSpent??0),
+    rate:Number(data?.rate??500000),
+    coins:Number(data?.coins??0),
+    diamonds:Number(data?.diamonds??0),
   };
 }
