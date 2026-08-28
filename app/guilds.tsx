@@ -234,6 +234,8 @@ export default function GuildsScreen() {
           booster_logo_url: null,
           booster_art_source: null,
           release_date: null,
+          generation: null,
+          rarity_score: 0,
           active: true,
           currency: 'coins',
         } as Pack) : null}
