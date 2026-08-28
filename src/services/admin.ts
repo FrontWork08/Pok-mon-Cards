@@ -125,8 +125,9 @@ export type CoinGrantHistory = {
 
 export type AdminGameEvent = {
   id: string;
-  event_type: 'free_boosters';
+  event_type: 'free_boosters' | 'double_xp' | 'rare_boost' | 'featured_set';
   title: string;
+  payload?: Record<string, unknown>;
   active: boolean;
   starts_at: string;
   ends_at: string;
@@ -237,6 +238,25 @@ export async function publishGlobalAnnouncement(
 
 export async function getAdminEvents() {
   return invokeAdmin({ action: 'events' }) as Promise<AdminGameEvent[]>;
+}
+
+export async function startGameEvent(input: {
+  eventType: 'double_xp' | 'rare_boost' | 'featured_set';
+  title: string;
+  durationMinutes: number;
+  payload?: Record<string, unknown>;
+}) {
+  return invokeAdmin({
+    action: 'start_game_event',
+    eventType: input.eventType,
+    title: input.title.trim(),
+    durationMinutes: input.durationMinutes,
+    payload: input.payload ?? {},
+  }) as Promise<AdminGameEvent>;
+}
+
+export async function stopGameEvent(eventId: string) {
+  return invokeAdmin({ action: 'stop_game_event', eventId }) as Promise<AdminGameEvent>;
 }
 
 export async function startFreeBoosters(durationMinutes: number) {
