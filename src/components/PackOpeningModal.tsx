@@ -206,10 +206,19 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   }
 
   const bestPull = useMemo(() => cards.length ? cards.reduce((best, card) => rarityScore(card) > rarityScore(best) ? card : best, cards[0]) : null, [cards]);
+  const pricedCardCount = useMemo(
+    () => cards.filter((card) => card.marketPriceUsd != null).length,
+    [cards],
+  );
   const totalMarketValueUsd = useMemo(
     () => cards.reduce((sum, card) => sum + (card.marketPriceUsd ?? 0), 0),
     [cards],
   );
+  const totalMarketValueLabel = pricedCardCount === 0
+    ? 'Valor total indisponível'
+    : pricedCardCount === cards.length
+      ? `Valor total: ${formatUsd(totalMarketValueUsd)}`
+      : `Valor conhecido: ${formatUsd(totalMarketValueUsd)} • ${pricedCardCount}/${cards.length} cartas`;
   if (!pack) return null;
   const currentCard = cards[cardIndex];
   const theme = rarityTheme(currentCard?.rarity);
@@ -320,7 +329,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
         <View style={styles.actionRow}><Pressable style={[styles.nextButton, { borderColor: `${revealColor}90` }]} onPress={nextCard}><Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text><Ionicons name="arrow-forward" size={18} color="#F4F4F4" /></Pressable>{cards.length > 1 ? <Pressable style={styles.revealAllButton} onPress={revealAll}><Ionicons name="albums" size={17} color="#FFD447" /><Text style={styles.revealAllText}>REVELAR TODAS</Text></Pressable> : null}</View>
       </View> : null}
 
-      {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPull ? <Text style={styles.bestPull}>Melhor pull: {bestPull.name}</Text> : null}<View style={styles.summaryValuePill}><Ionicons name="cash-outline" size={16} color="#65D894"/><Text style={styles.summaryValueText}>Valor total: {formatUsd(totalMarketValueUsd)}</Text></View><Text style={styles.summarySubtitle}>{pack.currency === 'diamonds' ? 'Sua carta lendária foi enviada para a Bag.' : 'Todos os cards foram enviados para sua Bag • +20 XP'}</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <View key={key} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>{(() => {
+      {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPull ? <Text style={styles.bestPull}>Melhor pull: {bestPull.name}</Text> : null}<View style={styles.summaryValuePill}><Ionicons name="cash-outline" size={16} color="#65D894"/><Text style={styles.summaryValueText}>{totalMarketValueLabel}</Text></View><Text style={styles.summarySubtitle}>{pack.currency === 'diamonds' ? 'Sua carta lendária foi enviada para a Bag.' : 'Todos os cards foram enviados para sua Bag • +20 XP'}</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <View key={key} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>{(() => {
           const candidates = cardImageCandidates(card);
           const level = imageFailureLevel[key] ?? 0;
           const uri = candidates[level] ?? null;
