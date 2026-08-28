@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { WalletProvider } from '@/wallet/WalletProvider';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cancelMatchmaking, getMyMatchmakingState, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
+import { claimDailyLogin } from '@/services/retention';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
@@ -138,8 +139,48 @@ function AppStack() {
     setLiveNotification(null);
     if (data?.battleId) router.push(`/battle/${data.battleId}`);
     else if (data?.senderId) router.push(`/chat/${data.senderId}`);
+    else if (data?.route) router.push(data.route as never);
     else router.push('/inbox');
   }
+
+  useEffect(() => {
+    let disposed = false;
+    let lastUserId: string | null = null;
+
+    const claimFor = async (userId?: string | null) => {
+      if (!userId || disposed || lastUserId === userId) return;
+      lastUserId = userId;
+      try {
+        const result = await claimDailyLogin();
+        if (disposed || !result.claimed) return;
+        setLiveNotification({
+          title: `Sequência diária 🔥 ${result.streak}`,
+          body: `+🪙 ${result.coins.toLocaleString('pt-BR')}${result.diamonds ? ` +💎 ${result.diamonds}` : ''}`,
+          metadata: { route: '/season' },
+        });
+        if (liveNotificationTimer.current) clearTimeout(liveNotificationTimer.current);
+        liveNotificationTimer.current = setTimeout(() => {
+          if (!disposed) setLiveNotification(null);
+        }, 7000);
+      } catch {
+        // Daily login is a bonus; it must never block app startup.
+      }
+    };
+
+    supabase.auth.getUser().then(({ data }) => {
+      void claimFor(data.user?.id ?? null);
+    }).catch(() => null);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user?.id) lastUserId = null;
+      else void claimFor(session.user.id);
+    });
+
+    return () => {
+      disposed = true;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     let disposed = false;
