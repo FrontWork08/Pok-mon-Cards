@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +34,9 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<'number'|'price-high'>('number');
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   const hasMore = cards.length < total;
 
@@ -42,10 +46,12 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
     setTotal(0);
     setPage(0);
     setError(null);
+    setFailedImages(new Set());
 
     let active = true;
-    setLoading(true);
-    listPackCards(pack.set_id, 0, PAGE_SIZE)
+    const timer = setTimeout(() => {
+      setLoading(true);
+      listPackCards(pack.set_id, 0, PAGE_SIZE, search, sort)
       .then((result) => {
         if (!active) return;
         setCards(result.cards);
@@ -58,16 +64,17 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
       .finally(() => {
         if (active) setLoading(false);
       });
+    }, 220);
 
-    return () => { active = false; };
-  }, [visible, pack?.id, pack?.set_id]);
+    return () => { active = false; clearTimeout(timer); };
+  }, [visible, pack?.id, pack?.set_id, search, sort]);
 
   async function loadMore() {
     if (!pack || loadingMore || !hasMore) return;
     const nextPage = page + 1;
     try {
       setLoadingMore(true);
-      const result = await listPackCards(pack.set_id, nextPage, PAGE_SIZE);
+      const result = await listPackCards(pack.set_id, nextPage, PAGE_SIZE, search, sort);
       setCards((current) => {
         const seen = new Set(current.map((card) => card.id));
         return [...current, ...result.cards.filter((card) => !seen.has(card.id))];
@@ -102,6 +109,11 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
           </Pressable>
         </View>
 
+        <View style={[styles.tools,{borderBottomColor:colors.border}]}>
+          <View style={[styles.searchBox,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="search" size={18} color={colors.muted}/><TextInput value={search} onChangeText={setSearch} placeholder="Pesquisar carta neste booster..." placeholderTextColor={colors.muted} autoCapitalize="none" style={[styles.searchInput,{color:colors.text}]}/>{search?<Pressable onPress={()=>setSearch('')}><Ionicons name="close-circle" size={18} color={colors.muted}/></Pressable>:null}</View>
+          <View style={styles.sortRow}><Pressable onPress={()=>setSort('number')} style={[styles.sortChip,{backgroundColor:sort==='number'?colors.accentSoft:colors.surface,borderColor:sort==='number'?colors.accent:colors.border}]}><Text style={[styles.sortText,{color:sort==='number'?colors.accent:colors.muted}]}>NÚMERO</Text></Pressable><Pressable onPress={()=>setSort('price-high')} style={[styles.sortChip,{backgroundColor:sort==='price-high'?colors.accentSoft:colors.surface,borderColor:sort==='price-high'?colors.accent:colors.border}]}><Ionicons name="cash" size={14} color={sort==='price-high'?colors.yellow:colors.muted}/><Text style={[styles.sortText,{color:sort==='price-high'?colors.yellow:colors.muted}]}>MAIS CARAS</Text></Pressable></View>
+        </View>
+
         {loading ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.yellow} />
@@ -128,7 +140,7 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
             renderItem={({ item }) => (
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {item.image ? (
-                  <Image source={{ uri: item.image }} resizeMode="contain" style={styles.image} />
+                  <Image source={{ uri: failedImages.has(item.id) ? (item.image_fallback ?? item.image) : item.image }} resizeMode="contain" style={styles.image} onError={()=>setFailedImages(current=>{const next=new Set(current);next.add(item.id);return next;})} />
                 ) : (
                   <View style={[styles.image, styles.imageFallback, { backgroundColor: colors.surfaceAlt }]}>
                     <Ionicons name="image-outline" size={28} color={colors.muted} />
@@ -158,6 +170,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '900', marginTop: 2 },
   subtitle: { fontSize: 10, marginTop: 3 },
   close: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  tools:{paddingHorizontal:12,paddingVertical:9,borderBottomWidth:1,gap:8},searchBox:{height:44,borderRadius:13,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',gap:8},searchInput:{flex:1,height:'100%',fontSize:12},sortRow:{flexDirection:'row',gap:7},sortChip:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},sortText:{fontSize:8,fontWeight:'900'},
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 28 },
   loadingText: { fontSize: 11 },
   error: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
