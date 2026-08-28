@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { getConversationInbox, getMyNotifications, markNotificationRead } from '@/services/notifications';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -14,7 +15,7 @@ export default function InboxScreen(){
   async function openNotification(item:any){if(!item.read_at)await markNotificationRead(item.id).catch(()=>null);const data=item.metadata??{};if(data.battleId)router.push(`/battle/${data.battleId}`);else if(data.senderId)router.push(`/chat/${data.senderId}`);else load();}
   const unread=conversations.reduce((s,x)=>s+Number(x.unread_count??0),0);const unreadAlerts=notifications.filter(x=>!x.read_at).length;
   return <Screen title="Inbox" subtitle="Mensagens, desafios e avisos do Trainer Hub.">
-    <Pressable style={styles.back} onPress={()=>router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
+    <Pressable style={styles.back} onPress={()=>goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
     {error?<View style={styles.error}><Ionicons name="alert-circle" size={19} color="#FF9FAF"/><Text style={styles.errorText}>{error}</Text></View>:null}
     <View style={styles.summary}><View style={[styles.summaryCard,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.summaryValue,{color:colors.accent}]}>{unread}</Text><Text style={[styles.summaryLabel,{color:colors.muted}]}>mensagens não lidas</Text></View><View style={[styles.summaryCard,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.summaryValue,{color:colors.yellow}]}>{unreadAlerts}</Text><Text style={[styles.summaryLabel,{color:colors.muted}]}>avisos novos</Text></View></View>
     {loading?<ActivityIndicator size="large" color={colors.yellow}/>:null}
