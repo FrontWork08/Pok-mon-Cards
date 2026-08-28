@@ -26,7 +26,7 @@ function rarityTheme(rarity?: string | null): RarityTheme {
   return { color: '#AAB3BF', soft: '#181B20', label: 'COMUM', tier: 1 };
 }
 function cardImageCandidates(card: OpenedCard) {
-  return [card.imageLarge, card.image, card.imageSmall]
+  return [card.imageLarge, card.image, card.imageSmall, card.imageFallbackLarge, card.imageFallback]
     .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
 }
 
@@ -176,7 +176,21 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
   function goToBag() {
     onClose();
-    requestAnimationFrame(() => router.push('/bag'));
+    requestAnimationFrame(() => router.replace('/(tabs)/bag'));
+  }
+
+  async function buyAnother() {
+    if (!pack || stage !== 'summary') return;
+    setError(null); setCards([]); setCardIndex(0); setFaceUp(false); setImageFailureLevel({});
+    resetOpening(); resetReveal(); cardEnter.setValue(0); rarityPulse.setValue(0); setStage('opening');
+    try {
+      const [receivedCards] = await Promise.all([onPurchase(), runOpeningAnimation()]);
+      setCards(receivedCards); setCardIndex(0); setFaceUp(false); resetReveal(); setStage('cards');
+      requestAnimationFrame(() => { animateCardIn(); startRarityPulse(); });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível comprar outro booster.');
+      setStage('summary');
+    }
   }
 
   async function shareBestPull() {
@@ -309,7 +323,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
           ) : (
             <View style={styles.summaryFallback}><Ionicons name="image-outline" size={28} color="#555" /></View>
           );
-        })()}<View style={styles.summaryBadgeRow}>{card.isNew ? <View style={styles.summaryNewBadge}><Text style={styles.summaryBadgeText}>NEW</Text></View> : null}{card.wishlistHit ? <View style={styles.summaryChaseBadge}><Text style={styles.summaryChaseText}>★ CHASE</Text></View> : null}</View><Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text></View>; })}</View><View style={styles.summaryActions}><Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Abrir Bag" style={styles.summaryBagButton} onPress={goToBag}><Ionicons name="bag-outline" size={22} color="#FFD447" /></Pressable>{bestPull ? <Pressable accessibilityRole="button" accessibilityLabel="Compartilhar melhor pull" style={styles.summaryBagButton} onPress={()=>void shareBestPull()}><Ionicons name="share-social-outline" size={22} color="#FFD447" /></Pressable> : null}</View></ScrollView> : null}
+        })()}<View style={styles.summaryBadgeRow}>{card.isNew ? <View style={styles.summaryNewBadge}><Text style={styles.summaryBadgeText}>NEW</Text></View> : null}{card.wishlistHit ? <View style={styles.summaryChaseBadge}><Text style={styles.summaryChaseText}>★ CHASE</Text></View> : null}</View><Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text></View>; })}</View><View style={styles.summaryActions}><Pressable style={styles.buyAgainButton} onPress={()=>void buyAnother()}><Ionicons name="cube" size={18} color="#07111F"/><Text style={styles.buyAgainText}>COMPRAR OUTRO</Text></Pressable><Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Abrir Bag" style={styles.summaryBagButton} onPress={goToBag}><Ionicons name="bag-outline" size={22} color="#FFD447" /></Pressable>{bestPull ? <Pressable accessibilityRole="button" accessibilityLabel="Compartilhar melhor pull" style={styles.summaryBagButton} onPress={()=>void shareBestPull()}><Ionicons name="share-social-outline" size={22} color="#FFD447" /></Pressable> : null}</View></ScrollView> : null}
 
       {stage === 'opening' ? <><Animated.View pointerEvents="none" style={[styles.openingColorWash, { opacity: openingColorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: openingFlash }]} /></> : null}
       {stage === 'cards' && currentCard ? <><Animated.View pointerEvents="none" style={[styles.colorWash, { backgroundColor: revealColor, opacity: colorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: screenFlash }]} /></> : null}
@@ -319,6 +333,8 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
 const styles = StyleSheet.create({
   actionRow: { flexDirection:'row', flexWrap:'wrap', justifyContent:'center', gap:8 },
+  buyAgainButton:{minHeight:44,borderRadius:12,paddingHorizontal:13,backgroundColor:'#FFD447',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},
+  buyAgainText:{color:'#07111F',fontSize:8,fontWeight:'900'},
   pullBadges: { flexDirection:'row', flexWrap:'wrap', gap:6, justifyContent:'center', marginBottom:5 },
   newBadge: { borderRadius:999, paddingHorizontal:9, paddingVertical:4, backgroundColor:'#4EA5FF' },
   chaseBadge: { borderRadius:999, paddingHorizontal:9, paddingVertical:4, backgroundColor:'#FFD447', flexDirection:'row', alignItems:'center', gap:4 },
