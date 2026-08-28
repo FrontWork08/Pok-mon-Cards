@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
-import { TrainerNavigation } from '@/components/TrainerNavigation';
 import {
   claimBattlePassReward,
   getBattlePass,
@@ -131,8 +130,7 @@ export default function BattlePassScreen() {
 
   const header = state ? (
     <View style={styles.headerStack}>
-      <TrainerNavigation />
-      <View style={styles.topRow}>
+<View style={styles.topRow}>
         <Pressable onPress={() => router.back()} style={[styles.back, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Ionicons name="arrow-back" size={18} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>Voltar</Text>
