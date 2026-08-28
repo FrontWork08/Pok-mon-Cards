@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
@@ -33,6 +34,45 @@ function findArtifactUrl(build) {
     build?.artifactUrl ??
     null
   );
+}
+
+async function getAppVersion() {
+  try {
+    const raw = await readFile(path.join(root, 'app.json'), 'utf8');
+    const config = JSON.parse(raw);
+    return String(config?.expo?.version ?? '0.0.0');
+  } catch {
+    return '0.0.0';
+  }
+}
+
+async function writeDownloadReleaseMetadata({ build, url, bytes }) {
+  const version = build?.appVersion ? String(build.appVersion) : await getAppVersion();
+  const buildVersion = String(
+    build?.appBuildVersion ??
+    build?.versionCode ??
+    build?.metadata?.versionCode ??
+    buildVersionLabel(build),
+  );
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  const release = {
+    appName: 'Pokémon Cards',
+    version,
+    buildVersion,
+    downloadUrl: url,
+    sha256,
+    sizeBytes: bytes.length,
+    publishedAt: new Date().toISOString(),
+    channel: 'preview',
+    status: 'ready',
+  };
+
+  const releasePath = path.join(root, 'public', 'download', 'release.json');
+  await mkdir(path.dirname(releasePath), { recursive: true });
+  await writeFile(releasePath, JSON.stringify(release, null, 2) + '\n');
+
+  console.log('🔐 SHA-256:', sha256);
+  console.log('🌐 Metadados do site:', releasePath);
 }
 
 function buildVersionLabel(build) {
@@ -97,6 +137,7 @@ async function downloadLatestApk() {
   const bytes = Buffer.from(await response.arrayBuffer());
   await mkdir(outputDir, { recursive: true });
   await writeFile(destination, bytes);
+  await writeDownloadReleaseMetadata({ build, url, bytes });
 
   console.log('\n✅ APK pronto:');
   console.log(destination);
