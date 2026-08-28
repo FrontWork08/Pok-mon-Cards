@@ -50,6 +50,11 @@ Deno.serve(async (req: Request) => {
       if(targetIds.length<1||targetIds.length>100||!Number.isSafeInteger(amount)||amount<1)return json({error:"INVALID_AMOUNT_OR_TARGETS"},400);
       const rpc=body.action==="grant_coins_batch"?"server_admin_grant_coins_batch":"server_admin_grant_diamonds_batch";const {data,error}=await admin.rpc(rpc,{p_actor_id:user.id,p_target_ids:targetIds,p_amount:amount,p_note:note});if(error)throw error;return json({data});
     }
+    if(body.action==="grant_battle_pass_vip"){
+      const raw=Array.isArray(body.targetIds)?body.targetIds:[];const targetIds=[...new Set(raw.filter((id):id is string=>typeof id==="string"&&id.length>0))];const note=typeof body.note==="string"?body.note:null;
+      if(targetIds.length<1||targetIds.length>100)return json({error:"INVALID_TARGETS"},400);
+      const {data,error}=await admin.rpc("server_admin_grant_battle_pass_vip",{p_actor_id:user.id,p_target_ids:targetIds,p_note:note});if(error)throw error;return json({data});
+    }
     if(body.action==="create_redeem_code"){
       const code=typeof body.code==="string"?body.code:"";const reward=body.reward&&typeof body.reward==="object"?body.reward:{};const maxTotalUses=body.maxTotalUses==null?null:Number(body.maxTotalUses);const expiresHours=body.expiresHours==null?null:Number(body.expiresHours);
       if(!code||(maxTotalUses!=null&&(!Number.isSafeInteger(maxTotalUses)||maxTotalUses<1))||(expiresHours!=null&&(!Number.isFinite(expiresHours)||expiresHours<1||expiresHours>8760)))return json({error:"INVALID_CODE_CONFIGURATION"},400);
