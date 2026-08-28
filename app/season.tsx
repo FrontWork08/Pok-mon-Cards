@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { getMyOwnedPokedexNumbers } from '@/services/pokedex';
 import { getMyOwnedSetCounts, getSetCatalog } from '@/services/collections';
@@ -102,7 +103,7 @@ export default function SeasonScreen() {
   }
 
   return <Screen title="Temporada & Jornada" subtitle="Ranque, streak, eventos e recompensas de coleção em um só lugar.">
-    <Pressable style={styles.back} onPress={()=>router.back()}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
+    <Pressable style={styles.back} onPress={()=>goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
     {notice?<Pressable onPress={()=>setNotice(null)} style={[styles.notice,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Ionicons name="close" size={16} color={colors.muted}/></Pressable>:null}
     {loading?<ActivityIndicator size="large" color={colors.yellow}/>:null}
 
