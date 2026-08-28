@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PackContentsModal } from '@/components/PackContentsModal';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
@@ -57,7 +57,6 @@ const DIAMOND_PACK_BASE: Pack = {
 
 export default function PacksScreen() {
   const { width } = useWindowDimensions();
-  const router = useRouter();
   const { colors, isLight } = useAppTheme();
   const wallet = useWallet();
   const [packs, setPacks] = useState<Pack[]>([]);
