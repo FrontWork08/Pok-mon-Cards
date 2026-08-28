@@ -19,6 +19,7 @@ import { TrainerNavigation } from '@/components/TrainerNavigation';
 import { useWallet } from '@/wallet/WalletProvider';
 import { isCurrentUserAdmin } from '@/services/market';
 import { getMaintenanceStatus, type AppRuntimeStatus } from '@/services/maintenance';
+import { publishMyOnlinePresence } from '@/services/presence';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
@@ -34,6 +35,51 @@ function AppStack() {
   const [maintenanceRefreshVersion, setMaintenanceRefreshVersion] = useState(0);
   const liveNotificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastOpenedMatch = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    let disposed = false;
+    let publisher: ReturnType<typeof publishMyOnlinePresence> | null = null;
+
+    const applyVisibility = (visible: boolean) => {
+      if (disposed) return;
+      if (!publisher) publisher = publishMyOnlinePresence(userId, visible);
+      else void publisher.setVisible(visible).catch(() => null);
+    };
+
+    const loadVisibility = async () => {
+      const { data, error } = await supabase
+        .from('players')
+        .select('show_online_status')
+        .eq('id', userId)
+        .single();
+      if (disposed || error) return;
+      applyVisibility(data?.show_online_status !== false);
+    };
+
+    void loadVisibility();
+
+    const channel = supabase
+      .channel(`online-visibility-${userId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${userId}` },
+        (payload) => {
+          const next = payload.new as { show_online_status?: boolean };
+          if (typeof next.show_online_status === 'boolean') {
+            applyVisibility(next.show_online_status);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      disposed = true;
+      publisher?.stop();
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
