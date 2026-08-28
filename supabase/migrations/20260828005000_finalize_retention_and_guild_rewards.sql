@@ -259,7 +259,7 @@ CREATE OR REPLACE FUNCTION public.claim_guild_weekly_reward()
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ select private.claim_guild_weekly_reward(); $function$
+AS $function$ select private.claim_guild_weekly_reward(); $function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_guild_weekly_reward_status()
@@ -267,14 +267,14 @@ CREATE OR REPLACE FUNCTION public.get_guild_weekly_reward_status()
  LANGUAGE sql
  STABLE
  SET search_path TO ''
-AS $function$ select private.get_guild_weekly_reward_status(); $function$
+AS $function$ select private.get_guild_weekly_reward_status(); $function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_retention_hub()
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ select private.get_retention_hub(); $function$
+AS $function$ select private.get_retention_hub(); $function$;
 
 
 CREATE OR REPLACE FUNCTION public.server_refresh_player_achievements(p_player_id uuid)
