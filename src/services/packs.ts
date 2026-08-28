@@ -34,6 +34,7 @@ export type OpenedCard = {
   imageSmall?: string | null;
   isNew?: boolean;
   wishlistHit?: boolean;
+  marketPriceUsd?: number | null;
   imageFallback?: string | null;
   imageFallbackLarge?: string | null;
 };
