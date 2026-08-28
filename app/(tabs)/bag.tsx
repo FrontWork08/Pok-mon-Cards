@@ -15,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
-import { TrainerNavigation } from '@/components/TrainerNavigation';
 import {
   getMyBagOverview,
   getMyBagPage,
@@ -142,8 +141,7 @@ export default function BagScreen() {
 
   const header = (
     <View style={styles.headerContent}>
-      <TrainerNavigation />
-      <View style={styles.pageHeaderRow}>
+<View style={styles.pageHeaderRow}>
         <View style={styles.pageHeader}>
           <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
           <Text style={[styles.title, { color: colors.text }]}>Pokémon Bag</Text>
