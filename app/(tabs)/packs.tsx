@@ -270,22 +270,32 @@ export default function PacksScreen() {
 
   const header = (
     <View style={styles.headerStack}>
-      <View style={styles.headerTop}>
-        <View style={styles.header}>
-          <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Pack Shop</Text>
-          <Text style={[styles.subtitle, { color: colors.muted }]}>
-            Preços consideram a chase card e o valor esperado das cartas que o booster entrega.
+      <View style={styles.vaultHero}>
+        <View style={styles.vaultHeroMark}>
+          <Ionicons name="cube" size={28} color="#080B13" />
+        </View>
+        <View style={styles.vaultHeroCopy}>
+          <Text style={styles.vaultKicker}>TRAINER COLLECTION • PACK VAULT</Text>
+          <Text style={[styles.vaultTitle, { color: colors.text }]}>Descubra seu próximo grande pull.</Text>
+          <Text style={[styles.vaultSubtitle, { color: colors.muted }]}>
+            Boosters oficiais organizados por geração, raridade e valor. A economia continua calculada pela chase card e pelo valor esperado real do pack.
           </Text>
+          <View style={styles.vaultStats}>
+            <View style={styles.vaultStat}><Text style={styles.vaultStatValue}>{packs.length}</Text><Text style={styles.vaultStatLabel}>BOOSTERS</Text></View>
+            <View style={styles.vaultStatDivider}/>
+            <View style={styles.vaultStat}><Text style={styles.vaultStatValue}>{generationOptions.length}</Text><Text style={styles.vaultStatLabel}>GERAÇÕES</Text></View>
+            <View style={styles.vaultStatDivider}/>
+            <View style={styles.vaultStat}><Text style={[styles.vaultStatValue,{color:'#68D9FF'}]}>{diamonds}</Text><Text style={styles.vaultStatLabel}>DIAMANTES</Text></View>
+          </View>
         </View>
       </View>
 
-      <View style={[styles.balanceRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.balanceRow}>
         <View>
           <Text style={[styles.balanceLabel, { color: colors.muted }]}>SEU SALDO</Text>
           <Text style={[styles.balanceValue, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}  •  <Text style={{color:'#68D9FF'}}>💎 {diamonds.toLocaleString('pt-BR')}</Text></Text>
         </View>
-        <View style={styles.balanceActions}><Pressable onPress={()=>void exchangeOneDiamond()} style={[styles.exchangeButton,{backgroundColor:colors.surfaceAlt,borderColor:'#68D9FF'}]}><Ionicons name="diamond" size={15} color="#68D9FF"/><Text style={[styles.exchangeText,{color:colors.text}]}>🪙100K → 💎1</Text></Pressable><View style={[styles.balanceBadge, { backgroundColor: colors.accentSoft }]}><Ionicons name="wallet-outline" size={20} color={colors.yellow} /></View></View>
+        <View style={styles.balanceActions}><Pressable onPress={()=>void exchangeOneDiamond()} style={[styles.exchangeButton,{backgroundColor:colors.surfaceAlt,borderColor:'#68D9FF'}]}><Ionicons name="diamond" size={15} color="#68D9FF"/><Text style={[styles.exchangeText,{color:colors.text}]}>🪙100K → 💎1</Text></Pressable><View style={styles.balanceBadge}><Ionicons name="wallet-outline" size={20} color="#D9B24C" /></View></View>
       </View>
 
       {freeUntil ? (
@@ -348,14 +358,16 @@ export default function PacksScreen() {
         </View>
       </View>
 
-      <View style={[styles.shopHero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
-        <View style={[styles.shopHeroIcon, { backgroundColor: colors.surface }]}>
-          <Ionicons name="sparkles" size={22} color={colors.yellow} />
+      <View style={styles.shopHero}>
+        <View style={styles.shopHeroIcon}>
+          <Ionicons name="sparkles" size={22} color="#D9B24C" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.shopHeroKicker, { color: colors.yellow }]}>BOOSTER WALL</Text>
-          <Text style={[styles.shopHeroTitle, { color: colors.text }]}>{packs.length || 173} packs para colecionar</Text>
+          <Text style={styles.shopHeroKicker}>COLEÇÃO DE BOOSTERS</Text>
+          <Text style={[styles.shopHeroTitle, { color: colors.text }]}>{filtered.length} opções disponíveis agora</Text>
+          <Text style={[styles.shopHeroText,{color:colors.muted}]}>Escolha por geração, valor ou raridade e visualize todas as cartas possíveis antes de abrir.</Text>
         </View>
+        <View style={styles.shopHeroSeal}><Ionicons name="shield-checkmark" size={17} color="#D9B24C"/><Text style={styles.shopHeroSealText}>SERVER VERIFIED</Text></View>
       </View>
 
       <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -493,6 +505,20 @@ export default function PacksScreen() {
         renderItem={({ item: pack }) => {
           const affordable = (pack.currency === 'diamonds' ? diamonds : coins) >= pack.price;
           const favorite = favoriteIds.has(pack.id);
+          const tierLabel = pack.currency === 'diamonds'
+            ? 'LENDÁRIO'
+            : pack.rarity_score >= 80
+              ? 'ELITE'
+              : pack.rarity_score >= 50
+                ? 'RARO'
+                : 'STANDARD';
+          const tierColor = pack.currency === 'diamonds'
+            ? '#68D9FF'
+            : pack.rarity_score >= 80
+              ? '#D9B24C'
+              : pack.rarity_score >= 50
+                ? '#9D86FF'
+                : '#7E8798';
 
           return (
             <View
@@ -505,7 +531,7 @@ export default function PacksScreen() {
                 style={[
                   styles.pack,
                   isMobile && styles.packMobile,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  { backgroundColor: '#0D1320', borderColor: affordable ? '#3F3520' : '#293044' },
                   !affordable && styles.packUnaffordable,
                 ]}
               >
@@ -516,7 +542,11 @@ export default function PacksScreen() {
                     { height: displayHeight, backgroundColor: colors.surfaceAlt },
                   ]}
                 >
-                  <View style={[styles.spotlight, { backgroundColor: colors.accent }]} />
+                  <View style={[styles.spotlight, { backgroundColor: tierColor }]} />
+                  <View style={[styles.tierBadge,{borderColor:tierColor,backgroundColor:'#080C15E8'}]}>
+                    <View style={[styles.tierDot,{backgroundColor:tierColor}]}/>
+                    <Text style={[styles.tierText,{color:tierColor}]}>{tierLabel}</Text>
+                  </View>
                   <BoosterPack2D pack={pack} width={artWidth} />
                   <View style={styles.shelfShadow} />
 
@@ -528,9 +558,15 @@ export default function PacksScreen() {
                     <Ionicons name={favorite ? 'heart' : 'heart-outline'} size={19} color={favorite ? '#FF5C86' : colors.text} />
                   </Pressable>
 
-                  <View style={[styles.cardCountBadge, { backgroundColor: colors.bg }]}>
-                    <Text style={[styles.cardCountText, { color: colors.text }]}>{pack.cards_per_pack} cards</Text>
+                  <View style={styles.cardCountBadge}>
+                    <Ionicons name="albums-outline" size={11} color="#C6CFDD"/>
+                    <Text style={styles.cardCountText}>{pack.cards_per_pack} CARTAS</Text>
                   </View>
+                  {pack.generation ? (
+                    <View style={styles.generationBadge}>
+                      <Text style={styles.generationBadgeText}>GEN {pack.generation}</Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 <View style={styles.packTitleRow}>
@@ -543,13 +579,13 @@ export default function PacksScreen() {
                 <View style={styles.packMetaActions}>
                   <Pressable
                     onPress={() => setContentsPack(pack)}
-                    style={[styles.contentsButton, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+                    style={styles.contentsButton}
                   >
-                    <Ionicons name="grid-outline" size={15} color={colors.accent} />
+                    <Ionicons name="grid-outline" size={15} color="#D9B24C" />
                     <Text style={[styles.contentsButtonText, { color: colors.text }]}>VER CARTAS</Text>
                   </Pressable>
 
-                  <Text style={[styles.price, { color: affordable ? colors.yellow : colors.muted }]}>
+                  <Text style={[styles.price, { color: affordable ? (pack.currency === 'diamonds' ? '#68D9FF' : '#F2CF69') : colors.muted }]}>
                     {pack.price === 0
                       ? '🎁 GRÁTIS'
                       : `${pack.currency === 'diamonds' ? '💎' : '🪙'} ${pack.price.toLocaleString('pt-BR')}${pack.free_until && pack.currency === 'diamonds' ? ' • 50% OFF' : ''}`}
@@ -561,12 +597,12 @@ export default function PacksScreen() {
                   style={[
                     styles.openButton,
                     {
-                      backgroundColor: affordable ? colors.yellow : colors.surfaceAlt,
-                      borderColor: affordable ? colors.yellow : colors.border,
+                      backgroundColor: affordable ? '#D9B24C' : '#171D29',
+                      borderColor: affordable ? '#F2D46E' : '#2A3345',
                     },
                   ]}
                 >
-                  <Text style={[styles.openButtonText, { color: affordable ? '#07111F' : colors.muted }]}>
+                  <Text style={[styles.openButtonText, { color: affordable ? '#080B13' : colors.muted }]}>
                     {affordable ? (pack.price === 0 ? 'ABRIR GRÁTIS' : pack.free_until && pack.currency === 'diamonds' ? 'ABRIR • 50% OFF' : 'ABRIR PACK') : 'SEM SALDO'}
                   </Text>
                 </Pressable>
@@ -603,16 +639,16 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 10, paddingTop: 10, paddingBottom: 34 },
   columnWrap: { alignItems: 'stretch' },
   headerStack: { gap: 14, paddingHorizontal: 6, paddingBottom: 14 },
-  headerTop: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
-  header: { gap: 5, marginBottom: 2 },
-  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
-  title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
-  subtitle: { fontSize: 14, lineHeight: 20 },
+  vaultHero:{borderRadius:26,borderWidth:1,borderColor:'#6B5628',backgroundColor:'#0B101A',padding:18,flexDirection:'row',alignItems:'flex-start',gap:14,overflow:'hidden'},
+  vaultHeroMark:{width:58,height:58,borderRadius:18,backgroundColor:'#D9B24C',alignItems:'center',justifyContent:'center',shadowColor:'#D9B24C',shadowOpacity:.24,shadowRadius:16},
+  vaultHeroCopy:{flex:1,minWidth:0},vaultKicker:{color:'#D9B24C',fontSize:8,fontWeight:'900',letterSpacing:1.35},
+  vaultTitle:{fontSize:28,lineHeight:33,fontWeight:'900',marginTop:5,letterSpacing:-.5},vaultSubtitle:{fontSize:11,lineHeight:17,marginTop:6,maxWidth:780},
+  vaultStats:{flexDirection:'row',alignItems:'center',gap:10,marginTop:14,flexWrap:'wrap'},vaultStat:{minWidth:64},vaultStatValue:{color:'#F2CF69',fontSize:16,fontWeight:'900'},vaultStatLabel:{color:'#7F8998',fontSize:6.5,fontWeight:'900',letterSpacing:.8,marginTop:1},vaultStatDivider:{width:1,height:25,backgroundColor:'#343A46'},
 
-  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 13, borderWidth: 1 },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 13, borderWidth: 1, backgroundColor:'#101521', borderColor:'#343A47' },
   balanceLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   balanceValue: { fontSize: 22, fontWeight: '900', marginTop: 2 },
-  balanceActions:{flexDirection:'row',alignItems:'center',gap:7},exchangeButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},exchangeText:{fontSize:8,fontWeight:'900'},balanceBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  balanceActions:{flexDirection:'row',alignItems:'center',gap:7},exchangeButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},exchangeText:{fontSize:8,fontWeight:'900'},balanceBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor:'#27210F', borderWidth:1, borderColor:'#6B5628' },
   diamondHero: { flexDirection:'row', flexWrap:'wrap', alignItems:'center', gap:12, borderRadius:20, borderWidth:1, padding:14 },
   diamondOrb: { width:52, height:52, borderRadius:18, backgroundColor:'#163C55', alignItems:'center', justifyContent:'center' },
   diamondKicker: { color:'#68D9FF', fontSize:8, fontWeight:'900', letterSpacing:1.2 },
@@ -627,11 +663,13 @@ const styles = StyleSheet.create({
   notice: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
   noticeText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
 
-  shopHero: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 16, borderWidth: 1 },
-  shopHeroIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  shopHeroKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
-  shopHeroTitle: { fontSize: 19, fontWeight: '900', marginTop: 2 },
-  shopHeroText: { fontSize: 12, lineHeight: 17, marginTop: 3 },
+  shopHero: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 20, padding: 14, borderWidth: 1, borderColor:'#3C3421', backgroundColor:'#11151D' },
+  shopHeroIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor:'#25200F', borderWidth:1, borderColor:'#69562A' },
+  shopHeroKicker: { color:'#D9B24C', fontSize: 8, fontWeight: '900', letterSpacing: 1.15 },
+  shopHeroTitle: { fontSize: 18, fontWeight: '900', marginTop: 2 },
+  shopHeroText: { fontSize: 9, lineHeight: 14, marginTop: 3 },
+  shopHeroSeal:{minHeight:34,borderRadius:999,borderWidth:1,borderColor:'#5B4B28',backgroundColor:'#1A1810',paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},
+  shopHeroSealText:{color:'#D9B24C',fontSize:6.5,fontWeight:'900',letterSpacing:.65},
 
   searchBox: { height: 52, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 14, height: '100%' },
@@ -649,29 +687,33 @@ const styles = StyleSheet.create({
   itemWrap: { paddingHorizontal: 6, paddingBottom: 12 },
   itemSingle: { width: '100%' },
   itemMulti: { flex: 1, minWidth: 0 },
-  pack: { flex: 1, borderRadius: 20, padding: 9, borderWidth: 1 },
-  packMobile: { padding: 10, borderRadius: 22 },
+  pack: { flex: 1, borderRadius: 22, padding: 9, borderWidth: 1, shadowColor:'#000', shadowOpacity:.28, shadowRadius:16, shadowOffset:{width:0,height:8}, elevation:8 },
+  packMobile: { padding: 10, borderRadius: 24 },
   packUnaffordable: { opacity: .72 },
 
-  displayCase: { minHeight: 315, borderRadius: 17, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
+  displayCase: { minHeight: 315, borderRadius: 18, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', borderWidth:1, borderColor:'#252D3A', backgroundColor:'#080C14' },
   displayCaseMobile: { paddingVertical: 12 },
-  spotlight: { position: 'absolute', top: -80, width: 230, height: 260, borderRadius: 130, opacity: .14, transform: [{ scaleX: 1.45 }] },
+  spotlight: { position: 'absolute', top: -92, width: 250, height: 295, borderRadius: 150, opacity: .16, transform: [{ scaleX: 1.55 }] },
   shelfShadow: { position: 'absolute', bottom: 21, width: 155, height: 22, borderRadius: 80, backgroundColor: 'rgba(0,0,0,.56)', transform: [{ scaleX: 1.12 }] },
 
-  favoriteButton: { position: 'absolute', top: 12, left: 12, width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', opacity: .94 },
-  cardCountBadge: { position: 'absolute', top: 12, right: 12, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999, opacity: .9 },
-  cardCountText: { fontSize: 8, fontWeight: '900' },
+  favoriteButton: { position: 'absolute', top: 12, left: 12, width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', opacity: .96, borderWidth:1, borderColor:'#343B49' },
+  tierBadge:{position:'absolute',top:13,alignSelf:'center',minHeight:27,borderRadius:999,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5,zIndex:4},
+  tierDot:{width:6,height:6,borderRadius:3},tierText:{fontSize:6.5,fontWeight:'900',letterSpacing:.8},
+  cardCountBadge: { position: 'absolute', top: 12, right: 12, paddingHorizontal: 8, minHeight:28, borderRadius: 999, backgroundColor:'#080C15E8', borderWidth:1, borderColor:'#303846', flexDirection:'row',alignItems:'center',gap:4 },
+  cardCountText: { color:'#C6CFDD',fontSize: 7, fontWeight: '900',letterSpacing:.45 },
+  generationBadge:{position:'absolute',bottom:12,left:12,minHeight:25,borderRadius:999,paddingHorizontal:8,backgroundColor:'#0B1019E8',borderWidth:1,borderColor:'#343C49',alignItems:'center',justifyContent:'center'},
+  generationBadgeText:{color:'#AAB4C4',fontSize:6.5,fontWeight:'900',letterSpacing:.6},
 
   packTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 9 },
-  packName: { fontSize: 14, lineHeight: 18, fontWeight: '900', minHeight: 36 },
-  setId: { fontSize: 9, fontWeight: '800', marginTop: 2 },
+  packName: { fontSize: 15, lineHeight: 19, fontWeight: '900', minHeight: 38 },
+  setId: { fontSize: 8, fontWeight: '900', marginTop: 2, letterSpacing:.65 },
 
-  packMetaActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 7 },
-  contentsButton: { minHeight: 36, paddingHorizontal: 10, borderRadius: 11, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  packMetaActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 },
+  contentsButton: { minHeight: 36, paddingHorizontal: 10, borderRadius: 11, borderWidth: 1, borderColor:'#4A3D20', backgroundColor:'#19170F', flexDirection: 'row', alignItems: 'center', gap: 6 },
   contentsButtonText: { fontSize: 8, fontWeight: '900', letterSpacing: .3 },
-  price: { fontSize: 13, fontWeight: '900' },
+  price: { fontSize: 14, fontWeight: '900' },
 
-  openButton: { minHeight: 44, marginTop: 8, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  openButton: { minHeight: 46, marginTop: 9, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   openButtonText: { fontSize: 9, fontWeight: '900', letterSpacing: .3 },
 
   empty: { marginHorizontal: 6, borderRadius: 20, padding: 24, alignItems: 'center', gap: 8, borderWidth: 1 },
