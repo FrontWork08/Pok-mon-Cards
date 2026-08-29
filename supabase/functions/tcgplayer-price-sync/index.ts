@@ -103,15 +103,68 @@ function normalizeCardmarketUsd(cardmarket: any, eurUsd: number | null) {
   };
 }
 
-async function fetchTcgdexFallback(cardId: string) {
+function toTcgdexCardId(cardId: string) {
+  const match = cardId.match(/^(.+)-([^-]+)$/);
+  if (!match) return cardId;
+
+  const [, setId, localId] = match;
+  const halfSet = setId.match(/^me(\d+)pt5$/i);
+  const fullSet = setId.match(/^me(\d+)$/i);
+
+  if (!halfSet && !fullSet) return cardId;
+
+  const mappedSet = halfSet
+    ? `me${halfSet[1].padStart(2, "0")}.5`
+    : `me${fullSet![1].padStart(2, "0")}`;
+  const mappedLocalId = /^\d+$/.test(localId) ? localId.padStart(3, "0") : localId;
+
+  return `${mappedSet}-${mappedLocalId}`;
+}
+
+function normalizeTcgdexCardmarketUsd(pricing: any, eurUsd: number | null) {
+  const cardmarket = pricing?.cardmarket;
+  if (!cardmarket || !eurUsd) return null;
+
+  const trend = numeric(cardmarket.trend) ?? numeric(cardmarket["trend-holo"]);
+  const average = numeric(cardmarket.avg) ?? numeric(cardmarket["avg-holo"]);
+  const low = numeric(cardmarket.low) ?? numeric(cardmarket["low-holo"]);
+  const base = trend ?? average ?? low;
+  if (!base) return null;
+
+  const market = Number((base * eurUsd).toFixed(4));
+  const lowUsd = low ? Number((low * eurUsd).toFixed(4)) : null;
+
+  return {
+    prices: {
+      normal: {
+        market,
+        mid: average ? Number((average * eurUsd).toFixed(4)) : market,
+        low: lowUsd,
+        high: null,
+      },
+    },
+    cardmarket,
+    fx: { base: "EUR", quote: "USD", rate: eurUsd },
+  };
+}
+
+async function fetchTcgdexFallback(cardId: string, eurUsd: number | null) {
   try {
+    const tcgdexCardId = toTcgdexCardId(cardId);
     const response = await fetch(
-      `https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(cardId)}`,
-      { headers: { "User-Agent": "Pokemon-Cards-Price-Fallback/1.0" }, signal: AbortSignal.timeout(8_000) },
+      `https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(tcgdexCardId)}`,
+      { headers: { "User-Agent": "Pokemon-Cards-Price-Fallback/1.1" }, signal: AbortSignal.timeout(8_000) },
     );
     if (!response.ok) return null;
+
     const payload = await response.json();
-    return normalizeTcgdexTcgplayer(payload?.pricing);
+    const tcgplayer = normalizeTcgdexTcgplayer(payload?.pricing);
+    if (tcgplayer) return { tcgplayer, pricingSource: "tcgdex" };
+
+    const cardmarket = normalizeTcgdexCardmarketUsd(payload?.pricing, eurUsd);
+    if (cardmarket) return { tcgplayer: cardmarket, pricingSource: "cardmarket" };
+
+    return null;
   } catch {
     return null;
   }
@@ -121,18 +174,24 @@ async function enrichWithTcgdexFallback(cards: any[], eurUsd: number | null) {
   const enriched = cards.map((card) => ({ ...card, pricing_source: "pokemontcg" }));
   const targets = enriched.filter((card) => !hasUsableTcgplayer(card?.tcgplayer));
 
-  for (let index = 0; index < targets.length; index += 12) {
-    const chunk = targets.slice(index, index + 12);
+  for (let index = 0; index < targets.length; index += 24) {
+    const chunk = targets.slice(index, index + 24);
     const values = await Promise.all(chunk.map(async (card) => ({
       id: String(card.id ?? ""),
-      tcgplayer: await fetchTcgdexFallback(String(card.id ?? "")),
+      fallback: await fetchTcgdexFallback(String(card.id ?? ""), eurUsd),
     })));
-    const byId = new Map(values.filter((item) => item.tcgplayer).map((item) => [item.id, item.tcgplayer]));
+
+    const byId = new Map(
+      values
+        .filter((item) => item.fallback)
+        .map((item) => [item.id, item.fallback!]),
+    );
+
     for (const card of enriched) {
       const fallback = byId.get(String(card.id ?? ""));
       if (fallback) {
-        card.tcgplayer = fallback;
-        card.pricing_source = "tcgdex";
+        card.tcgplayer = fallback.tcgplayer;
+        card.pricing_source = fallback.pricingSource;
       }
     }
   }
@@ -147,6 +206,50 @@ async function enrichWithTcgdexFallback(cards: any[], eurUsd: number | null) {
   }
 
   return enriched;
+}
+
+async function fetchLocalSetFromTcgdex(admin: any, setId: string, eurUsd: number | null) {
+  const { data: localCards, error } = await admin
+    .from("cards")
+    .select("id,rarity")
+    .eq("set_id", setId);
+
+  if (error) throw new UpstreamError(`LOCAL_SET_LOOKUP_FAILED: ${error.message}`);
+
+  const cards = (localCards ?? []).map((card: any) => ({
+    id: card.id,
+    rarity: card.rarity,
+    tcgplayer: null,
+    pricing_source: "tcgdex",
+  }));
+
+  for (let index = 0; index < cards.length; index += 24) {
+    const chunk = cards.slice(index, index + 24);
+    const values = await Promise.all(chunk.map(async (card: any) => ({
+      id: String(card.id ?? ""),
+      fallback: await fetchTcgdexFallback(String(card.id ?? ""), eurUsd),
+    })));
+
+    const byId = new Map(
+      values
+        .filter((item) => item.fallback)
+        .map((item) => [item.id, item.fallback!]),
+    );
+
+    for (const card of cards) {
+      const fallback = byId.get(String(card.id ?? ""));
+      if (fallback) {
+        card.tcgplayer = fallback.tcgplayer;
+        card.pricing_source = fallback.pricingSource;
+      }
+    }
+  }
+
+  if (!cards.some((card: any) => hasUsableTcgplayer(card.tcgplayer))) {
+    throw new UpstreamError(`TCGDEX_SET_FALLBACK_EMPTY_${setId}`);
+  }
+
+  return cards;
 }
 
 async function fetchPage(setId: string, page: number) {
@@ -209,8 +312,21 @@ Deno.serve(async (request: Request) => {
   for (const job of claimed ?? []) {
     const setId = String(job.set_id ?? "");
     try {
-      const cards = await fetchSet(setId);
-      const enrichedCards = await enrichWithTcgdexFallback(cards, eurUsd);
+      let enrichedCards: any[];
+      try {
+        const cards = await fetchSet(setId);
+        enrichedCards = await enrichWithTcgdexFallback(cards, eurUsd);
+      } catch (primaryError) {
+        const fallbackCards = await fetchLocalSetFromTcgdex(admin, setId, eurUsd);
+        enrichedCards = fallbackCards;
+        results.push({
+          ok: true,
+          setId,
+          fallback: "tcgdex-set",
+          primaryError: primaryError instanceof Error ? primaryError.message : "UNKNOWN_PRIMARY_ERROR",
+        });
+      }
+
       const { data, error } = await admin.rpc("apply_market_price_sync_set", {
         p_token: syncToken,
         p_set_id: setId,
