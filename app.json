@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Pokémon Cards",
+    "name": "Trainer Collection",
     "slug": "pokemon-cards",
     "owner": "frontwork",
-    "version": "0.1.1",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "pokemoncards",
