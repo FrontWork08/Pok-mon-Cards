@@ -76,7 +76,9 @@ export function ReleaseCampaignNotice() {
 
   if (!campaign || !userId) return null;
 
-  const forced = campaign.force_update && Boolean(campaign.download_url);
+  const activeCampaign = campaign;
+  const activeUserId = userId;
+  const forced = activeCampaign.force_update && Boolean(activeCampaign.download_url);
   const answered = Boolean(vote);
 
   async function respond(nextVote: -1 | 1) {
@@ -84,7 +86,7 @@ export function ReleaseCampaignNotice() {
     setSubmitting(nextVote);
     setErrorText('');
     try {
-      const response = await submitReleaseCampaignVote(campaign.id, userId!, nextVote);
+      const response = await submitReleaseCampaignVote(activeCampaign.id, activeUserId, nextVote);
       setVote(response);
     } catch (error) {
       setErrorText(
@@ -98,8 +100,8 @@ export function ReleaseCampaignNotice() {
   }
 
   async function openDownload() {
-    if (!campaign.download_url) return;
-    await Linking.openURL(campaign.download_url);
+    if (!activeCampaign.download_url) return;
+    await Linking.openURL(activeCampaign.download_url);
   }
 
   return (
