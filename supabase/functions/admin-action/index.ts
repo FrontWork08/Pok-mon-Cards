@@ -139,6 +139,46 @@ Deno.serve(async (req: Request) => {
       return json({ data: { ...campaign, selections: selections ?? 0, submissions: submissions ?? 0 } });
     }
 
+    if (body.action === "set_release_download_url") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+
+      const rawUrl = typeof body.downloadUrl === "string" ? body.downloadUrl.trim() : "";
+      let validatedUrl = "";
+      try {
+        const parsed = new URL(rawUrl);
+        const host = parsed.hostname.toLowerCase();
+        const allowedHosts = [
+          "expo.dev",
+          "github.com",
+          "objects.githubusercontent.com",
+          "github-releases.githubusercontent.com",
+        ];
+        const allowedHost = allowedHosts.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+        if (parsed.protocol !== "https:" || !allowedHost || !parsed.pathname.toLowerCase().includes(".apk")) {
+          return json({ error: "INVALID_RELEASE_DOWNLOAD_URL" }, 400);
+        }
+        validatedUrl = parsed.toString();
+      } catch {
+        return json({ error: "INVALID_RELEASE_DOWNLOAD_URL" }, 400);
+      }
+
+      const { data: campaign, error } = await admin
+        .from("release_campaigns")
+        .update({ download_url: validatedUrl, updated_at: new Date().toISOString() })
+        .eq("code", "trainer_collection_1_0_beta_transition")
+        .eq("active", true)
+        .select("id,code,title,target_version,release_date,phase,active,reward_coins,reward_diamonds,legacy_card_limit,legacy_selection_enabled,economy_frozen,force_update,download_url,updated_at")
+        .single();
+      if (error) throw error;
+
+      const [{ count: selections }, { count: submissions }] = await Promise.all([
+        admin.from("release_campaign_legacy_selections").select("*", { count: "exact", head: true }).eq("campaign_id", campaign.id),
+        admin.from("release_campaign_legacy_submissions").select("*", { count: "exact", head: true }).eq("campaign_id", campaign.id),
+      ]);
+
+      return json({ data: { ...campaign, selections: selections ?? 0, submissions: submissions ?? 0 } });
+    }
+
     if (body.action === "set_legacy_selection") {
       if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
       const enabled = body.enabled === true;
