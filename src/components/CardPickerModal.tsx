@@ -20,6 +20,7 @@ type Props = {
   selectedId?: string | null;
   selectedMap?: QuantityMap;
   maxPerCard?: number;
+  maxTotal?: number;
   displayMode?: 'market' | 'battle';
   onSelectedIdChange?: (id: string | null) => void;
   onSelectedMapChange?: (value: QuantityMap) => void;
@@ -38,6 +39,7 @@ export function CardPickerModal({
   selectedId = null,
   selectedMap = {},
   maxPerCard,
+  maxTotal,
   displayMode = 'market',
   onSelectedIdChange,
   onSelectedMapChange,
@@ -93,7 +95,10 @@ export function CardPickerModal({
     if (!id) return;
     const owned = Number(entry.quantity ?? 0);
     const cap = Math.min(owned, maxPerCard ?? owned);
-    const nextQty = Math.max(0, Math.min(cap, Number(selectedMap[id] ?? 0) + delta));
+    const currentQty = Number(selectedMap[id] ?? 0);
+    if (delta > 0 && maxTotal != null && selectedCount >= maxTotal && currentQty === 0) return;
+    const nextQty = Math.max(0, Math.min(cap, currentQty + delta));
+    if (delta > 0 && maxTotal != null && selectedCount - currentQty + nextQty > maxTotal) return;
     const next = { ...selectedMap };
     if (!nextQty) delete next[id]; else next[id] = nextQty;
     onSelectedMapChange?.(next);
@@ -167,7 +172,7 @@ export function CardPickerModal({
         <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <View style={styles.footerInfo}>
             <Text style={[styles.footerLabel, { color: colors.muted }]}>{mode === 'single' ? 'SELEÇÃO' : 'CARTAS SELECIONADAS'}</Text>
-            <Text style={[styles.footerValue, { color: colors.text }]}>{selectedCount} • {displayMode === 'battle' ? 'preço não conta' : formatUsd(selectedValue)}</Text>
+            <Text style={[styles.footerValue, { color: colors.text }]}>{selectedCount}{maxTotal != null ? `/${maxTotal}` : ''} • {displayMode === 'battle' ? 'preço não conta' : formatUsd(selectedValue)}</Text>
           </View>
           <Pressable
             style={[styles.confirm, { backgroundColor: colors.yellow }, selectedCount === 0 && styles.disabled]}
