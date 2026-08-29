@@ -1,5 +1,5 @@
 export const THEME_CATALOG = {
-  trainer: { name:'Trainer', icon:'shield', accent:'#4D8DFF', secondary:'#FFD54A', soft:'#172A48', bg:'#091423', surface:'#101F32', surfaceAlt:'#182B42', lightBg:'#EDF5FF', mascot:'Pikachu', image:'https://images.pokemontcg.io/ru1/7.png' },
+  trainer: { name:'Trainer Gold', icon:'shield', accent:'#D9B24C', secondary:'#6D82FF', soft:'#2A2417', bg:'#070A12', surface:'#0D1320', surfaceAlt:'#151D2B', lightBg:'#FFF8E8', mascot:'Rayquaza', image:'https://images.pokemontcg.io/col1/SL10.png' },
   midnight: { name:'Midnight', icon:'moon', accent:'#9B7BFF', secondary:'#5EDCFF', soft:'#2D2358', bg:'#100D24', surface:'#1B1635', surfaceAlt:'#282047', lightBg:'#F1EEFF', mascot:'Umbreon', image:'https://images.pokemontcg.io/ecard2/H29.png' },
   poke_red: { name:'Poké Red', icon:'radio-button-on', accent:'#FF5264', secondary:'#FFD54A', soft:'#4A2029', bg:'#1F0C12', surface:'#30131B', surfaceAlt:'#45202A', lightBg:'#FFF0F2', mascot:'Charizard', image:'https://images.pokemontcg.io/bw8/136.png' },
   electric: { name:'Elétrico', icon:'flash', accent:'#FFD83D', secondary:'#4F9BFF', soft:'#4A4019', bg:'#191707', surface:'#29250B', surfaceAlt:'#3B3512', lightBg:'#FFFBE5', mascot:'Pikachu', image:'https://images.pokemontcg.io/ru1/7.png' },
