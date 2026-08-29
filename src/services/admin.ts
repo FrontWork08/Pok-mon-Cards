@@ -53,6 +53,26 @@ export type TesterTitleHub = {
 };
 export type TesterTitleGrantResult = { targetId: string; username: string; achievementId: string; title: string; icon?: string };
 
+export type AdminReleaseCampaignStatus = {
+  id: string;
+  code: string;
+  title: string;
+  target_version: string;
+  release_date: string;
+  phase: 'notice' | 'legacy_selection' | 'freeze' | 'update_required' | 'completed';
+  active: boolean;
+  reward_coins: number;
+  reward_diamonds: number;
+  legacy_card_limit: number;
+  legacy_selection_enabled: boolean;
+  economy_frozen: boolean;
+  force_update: boolean;
+  download_url: string | null;
+  updated_at: string;
+  selections: number;
+  submissions: number;
+};
+
 export type AdminPermission =
   | 'audit_users'
   | 'moderate_users'
@@ -190,6 +210,13 @@ export async function stopGameEvent(eventId: string) { return invokeAdmin({ acti
 export async function startFreeBoosters(durationMinutes: number) { return invokeAdmin({ action: 'start_free_boosters', durationMinutes }) as Promise<AdminGameEvent>; }
 export async function stopFreeBoosters() { return invokeAdmin({ action: 'stop_free_boosters' }) as Promise<AdminGameEvent | null>; }
 export async function setMaintenanceMode(enabled: boolean, message: string) { return invokeAdmin({ action: 'set_maintenance', enabled, message: message.trim() }) as Promise<AppRuntimeStatus>; }
+
+export async function getAdminReleaseCampaignStatus() {
+  return invokeAdmin({ action: 'release_campaign_status' }) as Promise<AdminReleaseCampaignStatus | null>;
+}
+export async function setLegacySelectionEnabled(enabled: boolean) {
+  return invokeAdmin({ action: 'set_legacy_selection', enabled }) as Promise<AdminReleaseCampaignStatus>;
+}
 
 export async function getTesterTitleHub() { return invokeAdmin({ action: 'tester_title_hub' }) as Promise<TesterTitleHub>; }
 export async function grantTesterTitle(targetId: string, note?: string) { return invokeAdmin({ action: 'grant_tester_title', targetId, note: note?.trim() || null }) as Promise<TesterTitleGrantResult>; }
