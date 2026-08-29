@@ -134,6 +134,7 @@ async function action(args: Record<string, unknown>) {
       CANNOT_BUY_OWN_LISTING:'Você não pode comprar sua própria oferta.',
       LISTING_LIMIT_REACHED:'Sua loja atingiu o limite de 100 ofertas ativas.',
       INVALID_SHOP_NAME:'O nome da loja deve ter entre 3 e 32 caracteres.',
+      LEGACY_CARD_LOCKED:'A última cópia desta carta está protegida pelo seu Legado Beta e não pode sair da coleção antes da migração 1.0.',
     };
     const key=Object.keys(map).find((item)=>error.message.includes(item));
     throw new Error(key ? map[key] : error.message);
@@ -188,7 +189,12 @@ export async function createMarketOffer(listingId:string,amountCoins:number){
 }
 export async function respondMarketOffer(offerId:string,accept:boolean){
   const {data,error}=await supabase.rpc('respond_market_offer',{p_offer_id:offerId,p_accept:accept});
-  if(error) throw error;
+  if(error) {
+    if (error.message.includes('LEGACY_CARD_LOCKED')) {
+      throw new Error('A última cópia desta carta está protegida pelo Legado Beta e não pode ser transferida antes da migração 1.0.');
+    }
+    throw error;
+  }
   return data;
 }
 export async function cancelMarketOffer(offerId:string){
