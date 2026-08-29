@@ -6,6 +6,7 @@ import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { formatUsd } from '@/services/market';
 import { getPublicPlayerProfile, type PublicPlayerProfile } from '@/services/publicProfiles';
+import { getProfileAvatarUrl } from '@/services/player';
 import { getTrainerRank } from '@/services/ranks';
 import { runFriendAction } from '@/services/playerActions';
 import { getRelationshipWith, type PublicRelationshipState } from '@/services/social';
@@ -89,7 +90,7 @@ export default function PlayerShowcaseScreen() {
         <View style={[styles.hero, { backgroundColor, borderColor: frameColor, borderWidth: player.frame ? 2 : 1 }]}>
           <View style={[styles.heroGlow,{backgroundColor:frameColor}]} />
           <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/>
-          <TrainerAvatar icon={player.profileIcon} color={frameColor} backgroundColor={player.background?.primaryColor ? player.background.primaryColor + '22' : colors.surfaceAlt} size={66} />
+          <TrainerAvatar icon={player.profileIcon} avatarUrl={avatarUrl} color={frameColor} backgroundColor={player.background?.primaryColor ? player.background.primaryColor + '22' : colors.surfaceAlt} size={66} />
           <View style={styles.heroInfo}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER SHOWCASE • 1.0</Text>
             <Text style={[styles.username, { color: colors.text }]}>@{player.username}</Text>
