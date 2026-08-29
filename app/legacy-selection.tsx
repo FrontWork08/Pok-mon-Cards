@@ -31,6 +31,7 @@ export default function LegacySelectionScreen() {
   const [playerId, setPlayerId] = useState('');
   const [bag, setBag] = useState<OwnedCardEntry[]>([]);
   const [savedCardIds, setSavedCardIds] = useState<string[]>([]);
+  const [selectionSources, setSelectionSources] = useState<Record<string, 'manual' | 'automatic'>>({});
   const [draft, setDraft] = useState<SelectionMap>({});
   const [submission, setSubmission] = useState<LegacySelectionSubmission | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -57,6 +58,7 @@ export default function LegacySelectionScreen() {
           const legacy = await getLegacySelection(result.campaign.id, profile.id);
           if (disposed) return;
           setSavedCardIds(legacy.cardIds);
+          setSelectionSources(legacy.sources);
           setDraft(toSelectionMap(legacy.cardIds));
           setSubmission(legacy.submission);
         }
@@ -88,6 +90,7 @@ export default function LegacySelectionScreen() {
     && campaign.legacy_selection_enabled,
   );
   const locked = Boolean(submission);
+  const autoFilledCount = Number(submission?.auto_filled_count ?? 0);
   const draftCount = Object.values(draft).reduce((sum, value) => sum + Number(value), 0);
 
   function openPicker() {
@@ -121,6 +124,7 @@ export default function LegacySelectionScreen() {
       setError('');
       const result = await saveLegacySelection(campaign.id, playerId, cardIds);
       setSavedCardIds(result.cardIds);
+      setSelectionSources(result.sources);
       setDraft(toSelectionMap(result.cardIds));
       setSubmission(result.submission);
       setPickerOpen(false);
@@ -184,10 +188,14 @@ export default function LegacySelectionScreen() {
               <Text style={[styles.heroTitle,{color:colors.text}]}>{locked ? 'Seu legado está confirmado.' : `Preserve até ${limit} cartas.`}</Text>
               <Text style={[styles.heroText,{color:colors.muted}]}>
                 {locked
-                  ? 'A seleção está bloqueada. O sistema protege pelo menos uma cópia de cada carta confirmada durante a janela de migração.'
+                  ? autoFilledCount > 0
+                    ? `Seu legado está fechado. ${autoFilledCount} vaga(s) foram completadas automaticamente com as cartas mais valiosas da sua Bag.`
+                    : savedCardIds.length < limit
+                      ? `Suas ${savedCardIds.length} escolha(s) manuais estão protegidas. Na migração, o sistema completará as ${limit - savedCardIds.length} vaga(s) restantes com as cartas mais caras da sua Bag.`
+                      : 'A seleção está bloqueada. Uma cópia de cada carta confirmada está protegida para a migração.'
                   : selectionOpen
-                    ? 'Escolha as cartas que você mais quer manter. Salvar não bloqueia a lista; a confirmação final é permanente.'
-                    : 'A fase de escolha ainda não foi liberada pelo servidor. Sua coleção continua funcionando normalmente.'}
+                    ? 'Escolha as cartas que você mais quer manter. Se deixar vagas livres, a migração completa automaticamente com as cartas mais caras da sua Bag.'
+                    : 'A fase de escolha ainda não foi liberada. Se você não completar as 10 vagas quando a migração começar, o sistema escolherá as cartas mais caras disponíveis.'}
               </Text>
               <View style={styles.heroStats}>
                 <View style={[styles.stat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.statValue,{color:colors.text}]}>{savedCardIds.length}/{limit}</Text><Text style={[styles.statLabel,{color:colors.muted}]}>ESCOLHIDAS</Text></View>
@@ -203,6 +211,18 @@ export default function LegacySelectionScreen() {
               <Text style={[styles.rewardTitle,{color:colors.text}]}>Recompensa de veterano</Text>
               <Text style={[styles.rewardValue,{color:colors.yellow}]}>🪙 {campaign.reward_coins.toLocaleString('pt-BR')} + 💎 {campaign.reward_diamonds}</Text>
               <Text style={[styles.rewardHint,{color:colors.muted}]}>A confirmação destas cartas não executa o reset. Ela apenas registra e protege sua escolha.</Text>
+            </View>
+          </View>
+
+          <View style={[styles.autoRule,{backgroundColor:colors.surface,borderColor:colors.accent}]}>
+            <View style={[styles.autoRuleIcon,{backgroundColor:colors.accentSoft}]}>
+              <Ionicons name="sparkles" size={21} color={colors.yellow}/>
+            </View>
+            <View style={{flex:1}}>
+              <Text style={[styles.autoRuleTitle,{color:colors.text}]}>Preenchimento automático na migração</Text>
+              <Text style={[styles.autoRuleText,{color:colors.muted}]}>
+                Se você tiver menos de {limit} cartas escolhidas, suas escolhas são mantidas primeiro e as vagas restantes são preenchidas pelas cartas com maior valor de mercado da sua Bag. Se alguma carta não tiver preço, o valor interno do jogo é usado como desempate.
+              </Text>
             </View>
           </View>
 
@@ -224,6 +244,9 @@ export default function LegacySelectionScreen() {
               {selectedEntries.map((entry, index) => (
                 <View key={entry.cards!.id} style={[styles.card,{backgroundColor:colors.surface,borderColor:locked ? '#2F9E68' : colors.border}]}>
                   <View style={[styles.slot,{backgroundColor:locked ? '#173A2F' : colors.accentSoft}]}><Text style={[styles.slotText,{color:locked ? '#65D894' : colors.yellow}]}>#{index + 1}</Text></View>
+                  {selectionSources[entry.cards!.id] === 'automatic' ? (
+                    <View style={styles.autoBadge}><Ionicons name="sparkles" size={9} color="#07111F"/><Text style={styles.autoBadgeText}>AUTO</Text></View>
+                  ) : null}
                   {entry.cards?.image_small ? <Image source={{uri:entry.cards.image_small}} resizeMode="contain" style={styles.cardImage}/> : <View style={[styles.cardImage,{backgroundColor:colors.surfaceAlt}]}/>}
                   <Text numberOfLines={1} style={[styles.cardName,{color:colors.text}]}>{entry.cards?.pokemon_name}</Text>
                   <Text numberOfLines={1} style={[styles.cardMeta,{color:colors.muted}]}>{entry.cards?.rarity ?? 'Sem raridade'}</Text>
@@ -244,7 +267,7 @@ export default function LegacySelectionScreen() {
               <Ionicons name={confirmArmed ? 'warning' : 'lock-closed'} size={22} color={confirmArmed ? '#FF8A9A' : colors.yellow}/>
               <View style={{flex:1}}>
                 <Text style={[styles.confirmTitle,{color:colors.text}]}>{confirmArmed ? 'Confirmação permanente' : 'Pronto para fechar seu legado?'}</Text>
-                <Text style={[styles.confirmHint,{color:colors.muted}]}>{confirmArmed ? 'Depois deste botão você não poderá trocar as cartas selecionadas. O reset ainda NÃO será executado.' : 'Revise a lista antes da confirmação final.'}</Text>
+                <Text style={[styles.confirmHint,{color:colors.muted}]}>{confirmArmed ? `Depois deste botão suas escolhas manuais não poderão ser trocadas. Se houver menos de ${limit}, as vagas restantes serão preenchidas automaticamente pelas cartas mais caras somente na migração. O reset ainda NÃO será executado.` : 'Revise a lista. Vagas livres serão completadas automaticamente na migração.'}</Text>
               </View>
               <Pressable disabled={working} onPress={() => { void confirmSelection(); }} style={[styles.confirmButton,{backgroundColor:confirmArmed ? '#C74658' : colors.yellow}]}>
                 {working ? <ActivityIndicator size="small" color={confirmArmed ? '#fff' : '#07111F'}/> : <Ionicons name={confirmArmed ? 'shield-checkmark' : 'lock-closed'} size={17} color={confirmArmed ? '#fff' : '#07111F'}/>}
@@ -258,7 +281,7 @@ export default function LegacySelectionScreen() {
       <CardPickerModal
         visible={pickerOpen}
         title="Escolha seu legado"
-        subtitle={`Selecione até ${limit} cartas únicas. Cada escolha preserva 1 cópia.`}
+        subtitle={`Selecione até ${limit} cartas únicas. Se faltarem vagas na migração, o sistema completa com as cartas mais caras da Bag.`}
         bag={bag}
         mode="quantity"
         selectedMap={draft}
@@ -293,6 +316,10 @@ const styles = StyleSheet.create({
   statValue:{fontSize:15,fontWeight:'900'},
   statLabel:{fontSize:7,fontWeight:'900',letterSpacing:.6,marginTop:1},
   reward:{borderRadius:20,borderWidth:1,padding:13,flexDirection:'row',alignItems:'center',gap:10},
+  autoRule:{borderRadius:20,borderWidth:1,padding:13,flexDirection:'row',alignItems:'center',gap:10},
+  autoRuleIcon:{width:45,height:45,borderRadius:14,alignItems:'center',justifyContent:'center'},
+  autoRuleTitle:{fontSize:12,fontWeight:'900'},
+  autoRuleText:{fontSize:8.5,lineHeight:13,marginTop:3},
   rewardIcon:{width:45,height:45,borderRadius:14,alignItems:'center',justifyContent:'center'},
   rewardTitle:{fontSize:13,fontWeight:'900'},
   rewardValue:{fontSize:16,fontWeight:'900',marginTop:2},
@@ -306,6 +333,8 @@ const styles = StyleSheet.create({
   card:{flexGrow:1,flexBasis:130,maxWidth:185,minWidth:125,borderRadius:18,borderWidth:1,padding:8,position:'relative'},
   slot:{position:'absolute',top:7,left:7,zIndex:2,minWidth:28,height:28,borderRadius:999,alignItems:'center',justifyContent:'center'},
   slotText:{fontSize:8,fontWeight:'900'},
+  autoBadge:{position:'absolute',top:7,right:7,zIndex:2,minHeight:24,borderRadius:999,paddingHorizontal:7,backgroundColor:'#70DCBA',flexDirection:'row',alignItems:'center',gap:3},
+  autoBadgeText:{fontSize:6.5,fontWeight:'900',color:'#07111F',letterSpacing:.35},
   cardImage:{width:'100%',height:170,borderRadius:11},
   cardName:{fontSize:11,fontWeight:'900',marginTop:6},
   cardMeta:{fontSize:8,marginTop:2},
