@@ -205,20 +205,40 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     }
   }
 
-  const bestPull = useMemo(() => cards.length ? cards.reduce((best, card) => rarityScore(card) > rarityScore(best) ? card : best, cards[0]) : null, [cards]);
+  const bestPull = useMemo(() => {
+    if (!cards.length) return null;
+    const pricedCards = cards.filter(
+      (card) => card.marketPriceUsd != null && Number(card.marketPriceUsd) > 0,
+    );
+    if (pricedCards.length) {
+      return pricedCards.reduce(
+        (best, card) => Number(card.marketPriceUsd ?? 0) > Number(best.marketPriceUsd ?? 0) ? card : best,
+        pricedCards[0],
+      );
+    }
+    return cards.reduce(
+      (best, card) => rarityScore(card) > rarityScore(best) ? card : best,
+      cards[0],
+    );
+  }, [cards]);
   const pricedCardCount = useMemo(
-    () => cards.filter((card) => card.marketPriceUsd != null).length,
+    () => cards.filter((card) => card.marketPriceUsd != null && Number(card.marketPriceUsd) > 0).length,
     [cards],
   );
   const totalMarketValueUsd = useMemo(
-    () => cards.reduce((sum, card) => sum + (card.marketPriceUsd ?? 0), 0),
+    () => cards.reduce((sum, card) => sum + Math.max(0, Number(card.marketPriceUsd ?? 0)), 0),
     [cards],
   );
   const totalMarketValueLabel = pricedCardCount === 0
-    ? 'Valor total indisponível'
+    ? 'Valor do booster: aguardando cotação'
     : pricedCardCount === cards.length
-      ? `Valor total: ${formatUsd(totalMarketValueUsd)}`
-      : `Valor conhecido: ${formatUsd(totalMarketValueUsd)} • ${pricedCardCount}/${cards.length} cartas`;
+      ? `Valor do booster: ${formatUsd(totalMarketValueUsd)}`
+      : `Valor parcial: ${formatUsd(totalMarketValueUsd)} • ${pricedCardCount}/${cards.length} cotadas`;
+  const bestPullLabel = bestPull
+    ? bestPull.marketPriceUsd != null && Number(bestPull.marketPriceUsd) > 0
+      ? `Melhor pull: ${bestPull.name} • ${formatUsd(bestPull.marketPriceUsd)}`
+      : `Melhor pull por raridade: ${bestPull.name}`
+    : null;
   if (!pack) return null;
   const currentCard = cards[cardIndex];
   const theme = rarityTheme(currentCard?.rarity);
@@ -329,7 +349,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
         <View style={styles.actionRow}><Pressable style={[styles.nextButton, { borderColor: `${revealColor}90` }]} onPress={nextCard}><Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text><Ionicons name="arrow-forward" size={18} color="#F4F4F4" /></Pressable>{cards.length > 1 ? <Pressable style={styles.revealAllButton} onPress={revealAll}><Ionicons name="albums" size={17} color="#FFD447" /><Text style={styles.revealAllText}>REVELAR TODAS</Text></Pressable> : null}</View>
       </View> : null}
 
-      {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPull ? <Text style={styles.bestPull}>Melhor pull: {bestPull.name}</Text> : null}<View style={styles.summaryValuePill}><Ionicons name="cash-outline" size={16} color="#65D894"/><Text style={styles.summaryValueText}>{totalMarketValueLabel}</Text></View><Text style={styles.summarySubtitle}>{pack.currency === 'diamonds' ? 'Sua carta lendária foi enviada para a Bag.' : 'Todos os cards foram enviados para sua Bag • +20 XP'}</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <View key={key} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>{(() => {
+      {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPullLabel ? <Text style={styles.bestPull}>{bestPullLabel}</Text> : null}<View style={styles.summaryValuePill}><Ionicons name="cash-outline" size={16} color="#65D894"/><Text style={styles.summaryValueText}>{totalMarketValueLabel}</Text></View><Text style={styles.summarySubtitle}>{pack.currency === 'diamonds' ? 'Sua carta lendária foi enviada para a Bag.' : 'Todos os cards foram enviados para sua Bag • +20 XP'}</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <View key={key} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>{(() => {
           const candidates = cardImageCandidates(card);
           const level = imageFailureLevel[key] ?? 0;
           const uri = candidates[level] ?? null;
@@ -343,7 +363,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
           ) : (
             <View style={styles.summaryFallback}><Ionicons name="image-outline" size={28} color="#555" /></View>
           );
-        })()}<View style={styles.summaryBadgeRow}>{card.isNew ? <View style={styles.summaryNewBadge}><Text style={styles.summaryBadgeText}>NEW</Text></View> : null}{card.wishlistHit ? <View style={styles.summaryChaseBadge}><Text style={styles.summaryChaseText}>★ CHASE</Text></View> : null}</View><Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text><Text numberOfLines={1} style={styles.summaryPrice}>{card.marketPriceUsd == null ? 'US$ —' : formatUsd(card.marketPriceUsd)}</Text></View>; })}</View><View style={styles.summaryActions}>{pack.id !== 'guild-collective' ? <Pressable style={styles.buyAgainButton} onPress={()=>void buyAnother()}><Ionicons name="cube" size={18} color="#07111F"/><Text style={styles.buyAgainText}>COMPRAR OUTRO</Text></Pressable> : null}<Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Abrir Bag" style={styles.summaryBagButton} onPress={goToBag}><Ionicons name="bag-outline" size={22} color="#FFD447" /></Pressable>{bestPull ? <Pressable accessibilityRole="button" accessibilityLabel="Compartilhar melhor pull" style={styles.summaryBagButton} onPress={()=>void shareBestPull()}><Ionicons name="share-social-outline" size={22} color="#FFD447" /></Pressable> : null}</View></ScrollView> : null}
+        })()}<View style={styles.summaryBadgeRow}>{card.isNew ? <View style={styles.summaryNewBadge}><Text style={styles.summaryBadgeText}>NEW</Text></View> : null}{card.wishlistHit ? <View style={styles.summaryChaseBadge}><Text style={styles.summaryChaseText}>★ CHASE</Text></View> : null}</View><Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text><Text numberOfLines={1} style={styles.summaryPrice}>{card.marketPriceUsd == null || Number(card.marketPriceUsd) <= 0 ? 'Sem cotação' : formatUsd(card.marketPriceUsd)}</Text></View>; })}</View><View style={styles.summaryActions}>{pack.id !== 'guild-collective' ? <Pressable style={styles.buyAgainButton} onPress={()=>void buyAnother()}><Ionicons name="cube" size={18} color="#07111F"/><Text style={styles.buyAgainText}>COMPRAR OUTRO</Text></Pressable> : null}<Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Abrir Bag" style={styles.summaryBagButton} onPress={goToBag}><Ionicons name="bag-outline" size={22} color="#FFD447" /></Pressable>{bestPull ? <Pressable accessibilityRole="button" accessibilityLabel="Compartilhar melhor pull" style={styles.summaryBagButton} onPress={()=>void shareBestPull()}><Ionicons name="share-social-outline" size={22} color="#FFD447" /></Pressable> : null}</View></ScrollView> : null}
 
       {stage === 'opening' ? <><Animated.View pointerEvents="none" style={[styles.openingColorWash, { opacity: openingColorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: openingFlash }]} /></> : null}
       {stage === 'cards' && currentCard ? <><Animated.View pointerEvents="none" style={[styles.colorWash, { backgroundColor: revealColor, opacity: colorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: screenFlash }]} /></> : null}
