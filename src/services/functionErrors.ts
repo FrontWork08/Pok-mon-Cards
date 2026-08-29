@@ -26,6 +26,7 @@ const messages: Record<string, string> = {
   NOT_PARTICIPANT: 'Você não participa desta troca.',
   INSUFFICIENT_CARD_QUANTITY: 'Uma das cartas selecionadas não está mais disponível na quantidade informada.',
   PACK_NOT_FOUND: 'Este booster não está mais disponível.',
+  LEGACY_CARD_LOCKED: 'Esta é a última cópia de uma carta confirmada no seu Legado Beta. Ela está protegida até a migração 1.0.',
 };
 
 function errorText(value: unknown): string {
