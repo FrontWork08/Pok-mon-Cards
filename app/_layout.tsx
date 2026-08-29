@@ -5,6 +5,7 @@ import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { GlobalAnnouncementOverlay } from '@/components/GlobalAnnouncement';
+import { ReleaseCampaignNotice } from '@/components/ReleaseCampaignNotice';
 import { ThemeProvider, useAppTheme } from '@/theme/ThemeProvider';
 import { registerPushNotifications, subscribeToMyNotifications } from '@/services/notifications';
 import { playBattleSound } from '@/services/battleEffects';
@@ -401,6 +402,7 @@ function AppStack() {
       {showChrome ? <GlobalBottomNavigation /> : null}
       <UpdatePrompt />
       <GlobalAnnouncementOverlay />
+      <ReleaseCampaignNotice />
       {maintenanceBlocked ? (
         <View style={styles.maintenanceBlocker}>
           <View style={[styles.maintenanceCard, { backgroundColor: colors.surface, borderColor: '#FF6475' }]}>
