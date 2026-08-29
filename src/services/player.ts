@@ -6,6 +6,7 @@ export type PlayerProfile = {
   coins: number;
   diamonds: number;
   profile_icon: string;
+  avatar_path: string | null;
   level: number;
   xp: number;
   battle_rating: number;
@@ -86,7 +87,7 @@ export async function getMyProfile() {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id, username, coins, diamonds, profile_icon, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), equipped_frame_id, equipped_background_id, equipped_frame:cosmetic_definitions!players_equipped_frame_id_fkey(id,name,primary_color,secondary_color), equipped_background:cosmetic_definitions!players_equipped_background_id_fkey(id,name,primary_color,secondary_color), show_battle_rating, created_at, last_daily_claim_at, account_status, suspended_until, moderation_reason, warning_count')
+    .select('id, username, coins, diamonds, profile_icon, avatar_path, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), equipped_frame_id, equipped_background_id, equipped_frame:cosmetic_definitions!players_equipped_frame_id_fkey(id,name,primary_color,secondary_color), equipped_background:cosmetic_definitions!players_equipped_background_id_fkey(id,name,primary_color,secondary_color), show_battle_rating, created_at, last_daily_claim_at, account_status, suspended_until, moderation_reason, warning_count')
     .eq('id', userData.user.id)
     .single();
 
