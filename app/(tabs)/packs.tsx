@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -33,6 +34,7 @@ import { getMyProfile } from '@/services/player';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
+import { getThemeVisual } from '@/theme/themeCatalog';
 
 type Notice = { kind: 'error' | 'success'; text: string } | null;
 type SortMode = 'newest' | 'oldest' | 'rarity-high' | 'rarity-low' | 'price-high' | 'price-low' | 'az';
@@ -57,7 +59,8 @@ const DIAMOND_PACK_BASE: Pack = {
 
 export default function PacksScreen() {
   const { width } = useWindowDimensions();
-  const { colors, isLight } = useAppTheme();
+  const { colors, isLight, themeName } = useAppTheme();
+  const themeVisual = getThemeVisual(themeName);
   const wallet = useWallet();
   const [packs, setPacks] = useState<Pack[]>([]);
   const [coins, setCoins] = useState(0);
@@ -272,10 +275,14 @@ export default function PacksScreen() {
     <View style={styles.headerStack}>
       <View style={styles.headerTop}>
         <View style={styles.header}>
-          <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Pack Shop</Text>
+          <View style={styles.brandRow}>
+            <View style={[styles.brandDot,{backgroundColor:colors.yellow}]} />
+            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER COLLECTION</Text>
+            <View style={[styles.versionPill,{backgroundColor:colors.accentSoft,borderColor:colors.border}]}><Text style={[styles.versionText,{color:colors.accent}]}>1.0</Text></View>
+          </View>
+          <Text style={[styles.title, { color: colors.text }]}>Pack Lab</Text>
           <Text style={[styles.subtitle, { color: colors.muted }]}>
-            Preços consideram a chase card e o valor esperado das cartas que o booster entrega.
+            Explore eras, compare raridade e abra boosters com economia registrada pelo servidor.
           </Text>
         </View>
       </View>
@@ -349,12 +356,22 @@ export default function PacksScreen() {
       </View>
 
       <View style={[styles.shopHero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
-        <View style={[styles.shopHeroIcon, { backgroundColor: colors.surface }]}>
-          <Ionicons name="sparkles" size={22} color={colors.yellow} />
+        <View style={[styles.shopHeroGlow,{backgroundColor:colors.accent}]} />
+        <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.shopHeroPokemon} />
+        <View style={styles.shopHeroContent}>
+          <View style={[styles.shopHeroIcon, { backgroundColor: colors.surface }]}>
+            <Ionicons name="sparkles" size={22} color={colors.yellow} />
+          </View>
+          <View style={{ flex: 1, minWidth: 190 }}>
+            <Text style={[styles.shopHeroKicker, { color: colors.yellow }]}>COLLECTOR PACK LAB</Text>
+            <Text style={[styles.shopHeroTitle, { color: colors.text }]}>Escolha sua próxima era.</Text>
+            <Text style={[styles.shopHeroText,{color:colors.muted}]}>Do clássico ao chase premium, organize a parede de boosters do seu jeito.</Text>
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.shopHeroKicker, { color: colors.yellow }]}>BOOSTER WALL</Text>
-          <Text style={[styles.shopHeroTitle, { color: colors.text }]}>{packs.length || 173} packs para colecionar</Text>
+        <View style={styles.catalogStats}>
+          <View style={[styles.catalogStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.catalogStatValue,{color:colors.text}]}>{packs.length}</Text><Text style={[styles.catalogStatLabel,{color:colors.muted}]}>PACKS</Text></View>
+          <View style={[styles.catalogStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.catalogStatValue,{color:colors.text}]}>{generationOptions.length}</Text><Text style={[styles.catalogStatLabel,{color:colors.muted}]}>GERAÇÕES</Text></View>
+          <View style={[styles.catalogStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.catalogStatValue,{color:'#FF6F96'}]}>{favoriteIds.size}</Text><Text style={[styles.catalogStatLabel,{color:colors.muted}]}>FAVORITOS</Text></View>
         </View>
       </View>
 
@@ -509,6 +526,7 @@ export default function PacksScreen() {
                   !affordable && styles.packUnaffordable,
                 ]}
               >
+                <View style={[styles.packAccent,{backgroundColor:pack.currency === 'diamonds' ? '#68D9FF' : colors.accent}]} />
                 <View
                   style={[
                     styles.displayCase,
@@ -530,6 +548,10 @@ export default function PacksScreen() {
 
                   <View style={[styles.cardCountBadge, { backgroundColor: colors.bg }]}>
                     <Text style={[styles.cardCountText, { color: colors.text }]}>{pack.cards_per_pack} cards</Text>
+                  </View>
+                  <View style={[styles.tierBadge,{backgroundColor:colors.bg,borderColor:pack.currency === 'diamonds' ? '#68D9FF' : colors.border}]}>
+                    <Ionicons name={pack.rarity_score >= 70 ? 'sparkles' : pack.rarity_score >= 35 ? 'star' : 'layers'} size={11} color={pack.currency === 'diamonds' ? '#68D9FF' : colors.yellow}/>
+                    <Text style={[styles.tierText,{color:colors.text}]}>{pack.rarity_score >= 70 ? 'CHASE' : pack.rarity_score >= 35 ? 'PREMIUM' : 'CLÁSSICO'}{pack.generation ? ` • GEN ${pack.generation}` : ''}</Text>
                   </View>
                 </View>
 
@@ -605,7 +627,11 @@ const styles = StyleSheet.create({
   headerStack: { gap: 14, paddingHorizontal: 6, paddingBottom: 14 },
   headerTop: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
   header: { gap: 5, marginBottom: 2 },
+  brandRow:{flexDirection:'row',alignItems:'center',gap:7},
+  brandDot:{width:7,height:7,borderRadius:999},
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
+  versionPill:{borderWidth:1,borderRadius:999,paddingHorizontal:7,paddingVertical:2},
+  versionText:{fontSize:8,fontWeight:'900',letterSpacing:.6},
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { fontSize: 14, lineHeight: 20 },
 
@@ -627,11 +653,18 @@ const styles = StyleSheet.create({
   notice: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
   noticeText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
 
-  shopHero: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 16, borderWidth: 1 },
+  shopHero: { borderRadius: 26, padding: 16, borderWidth: 1, overflow:'hidden', position:'relative', gap:13 },
+  shopHeroGlow:{position:'absolute',right:-65,top:-80,width:250,height:250,borderRadius:999,opacity:.15},
+  shopHeroPokemon:{position:'absolute',right:-18,bottom:-34,width:180,height:190,opacity:.25,transform:[{rotate:'7deg'}]},
+  shopHeroContent:{flexDirection:'row',alignItems:'center',gap:14,zIndex:2},
   shopHeroIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   shopHeroKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
   shopHeroTitle: { fontSize: 19, fontWeight: '900', marginTop: 2 },
-  shopHeroText: { fontSize: 12, lineHeight: 17, marginTop: 3 },
+  shopHeroText: { fontSize: 12, lineHeight: 17, marginTop: 3, maxWidth:480 },
+  catalogStats:{flexDirection:'row',gap:8,zIndex:2,paddingRight:78},
+  catalogStat:{minWidth:78,borderRadius:14,borderWidth:1,paddingHorizontal:11,paddingVertical:9},
+  catalogStatValue:{fontSize:17,fontWeight:'900'},
+  catalogStatLabel:{fontSize:7,fontWeight:'900',letterSpacing:.8,marginTop:1},
 
   searchBox: { height: 52, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 14, height: '100%' },
@@ -649,7 +682,8 @@ const styles = StyleSheet.create({
   itemWrap: { paddingHorizontal: 6, paddingBottom: 12 },
   itemSingle: { width: '100%' },
   itemMulti: { flex: 1, minWidth: 0 },
-  pack: { flex: 1, borderRadius: 20, padding: 9, borderWidth: 1 },
+  pack: { flex: 1, borderRadius: 22, padding: 9, borderWidth: 1, overflow:'hidden', position:'relative' },
+  packAccent:{height:3,borderRadius:999,marginBottom:7,opacity:.9},
   packMobile: { padding: 10, borderRadius: 22 },
   packUnaffordable: { opacity: .72 },
 
@@ -661,6 +695,8 @@ const styles = StyleSheet.create({
   favoriteButton: { position: 'absolute', top: 12, left: 12, width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', opacity: .94 },
   cardCountBadge: { position: 'absolute', top: 12, right: 12, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999, opacity: .9 },
   cardCountText: { fontSize: 8, fontWeight: '900' },
+  tierBadge:{position:'absolute',left:12,bottom:12,minHeight:26,borderRadius:999,borderWidth:1,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:5,opacity:.94},
+  tierText:{fontSize:7,fontWeight:'900',letterSpacing:.35},
 
   packTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 9 },
   packName: { fontSize: 14, lineHeight: 18, fontWeight: '900', minHeight: 36 },
