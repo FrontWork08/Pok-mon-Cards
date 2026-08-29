@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
@@ -7,6 +7,8 @@ import { findPlayers } from '@/services/player';
 import { getMySocial, type SocialPlayer } from '@/services/social';
 import { createTrade, getMyTrades } from '@/services/trades';
 import { gameTheme } from '@/theme/gameTheme';
+import { useAppTheme } from '@/theme/ThemeProvider';
+import { getThemeVisual } from '@/theme/themeCatalog';
 
 const statusLabels: Record<string, string> = {
   pending: 'EM NEGOCIAÇÃO',
@@ -18,6 +20,8 @@ const statusLabels: Record<string, string> = {
 
 export default function TradeScreen() {
   const router = useRouter();
+  const { colors, themeName } = useAppTheme();
+  const themeVisual = getThemeVisual(themeName);
   const [search, setSearch] = useState('');
   const [players, setPlayers] = useState<any[]>([]);
   const [friends, setFriends] = useState<SocialPlayer[]>([]);
@@ -70,19 +74,34 @@ export default function TradeScreen() {
   }
 
   return (
-    <Screen title="Trade" subtitle="Negocie cards com seus amigos com validação segura no servidor.">
+    <Screen title="Trade Center" subtitle="Negocie cards com segurança, histórico transparente e validação no servidor.">
       {notice ? (
         <View style={styles.notice}><Ionicons name="information-circle" size={20} color={gameTheme.colors.yellow} /><Text style={styles.noticeText}>{notice}</Text><Pressable onPress={() => setNotice(null)}><Ionicons name="close" size={18} color="#fff" /></Pressable></View>
       ) : null}
+
+      <View style={[styles.tradeHero,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
+        <View style={[styles.tradeHeroGlow,{backgroundColor:colors.accent}]} />
+        <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.tradeHeroPokemon}/>
+        <View style={styles.tradeHeroCopy}>
+          <Text style={[styles.tradeHeroKicker,{color:colors.yellow}]}>SECURE TRAINER EXCHANGE</Text>
+          <Text style={[styles.tradeHeroTitle,{color:colors.text}]}>Trocas com confirmação dos dois lados.</Text>
+          <Text style={[styles.tradeHeroText,{color:colors.muted}]}>Escolha um treinador, negocie as cartas e deixe o servidor validar o inventário antes da transferência.</Text>
+          <View style={styles.tradeHeroStats}>
+            <View style={[styles.tradeHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.tradeHeroValue,{color:colors.text}]}>{friends.length}</Text><Text style={[styles.tradeHeroLabel,{color:colors.muted}]}>AMIGOS</Text></View>
+            <View style={[styles.tradeHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.tradeHeroValue,{color:colors.yellow}]}>{trades.filter((trade)=>trade.status === 'pending').length}</Text><Text style={[styles.tradeHeroLabel,{color:colors.muted}]}>ABERTAS</Text></View>
+            <View style={[styles.tradeHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.tradeHeroValue,{color:'#65D894'}]}>{trades.filter((trade)=>trade.status === 'completed').length}</Text><Text style={[styles.tradeHeroLabel,{color:colors.muted}]}>CONCLUÍDAS</Text></View>
+          </View>
+        </View>
+      </View>
 
       {friends.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionRow}><View><Text style={styles.kicker}>ATALHO</Text><Text style={styles.sectionTitle}>Trocar com amigos</Text></View><Pressable onPress={() => router.push('/friends')}><Text style={styles.link}>GERENCIAR</Text></Pressable></View>
           <View style={styles.friendGrid}>
             {friends.slice(0, 6).map((friend) => (
-              <Pressable key={friend.id} style={styles.friendCard} onPress={() => startTrade(friend.id)} disabled={creatingId !== null}>
-                <View style={styles.avatar}><Text style={styles.avatarText}>{friend.username.slice(0, 1).toUpperCase()}</Text></View>
-                <View style={{ flex: 1 }}><Text style={styles.friendName}>@{friend.username}</Text><Text style={styles.friendMeta}>Nível {friend.level}</Text></View>
+              <Pressable key={friend.id} style={[styles.friendCard,{backgroundColor:colors.surface,borderColor:colors.border}]} onPress={() => startTrade(friend.id)} disabled={creatingId !== null}>
+                <View style={[styles.avatar,{backgroundColor:colors.accentSoft}]}><Text style={[styles.avatarText,{color:colors.text}]}>{friend.username.slice(0, 1).toUpperCase()}</Text></View>
+                <View style={{ flex: 1 }}><Text style={[styles.friendName,{color:colors.text}]}>@{friend.username}</Text><Text style={[styles.friendMeta,{color:colors.muted}]}>Nível {friend.level}</Text></View>
                 <Ionicons name="swap-horizontal" size={19} color={gameTheme.colors.yellow} />
               </Pressable>
             ))}
@@ -93,8 +112,8 @@ export default function TradeScreen() {
       <View style={styles.searchSection}>
         <Text style={styles.sectionTitle}>Encontrar treinador</Text>
         <View style={styles.searchRow}>
-          <View style={styles.searchBox}><Ionicons name="search" size={19} color="#7186A3" /><TextInput value={search} onChangeText={setSearch} onSubmitEditing={searchPlayers} placeholder="Buscar por username" placeholderTextColor="#71809A" autoCapitalize="none" style={styles.search} /></View>
-          <Pressable style={styles.searchButton} onPress={searchPlayers}><Text style={styles.searchButtonText}>BUSCAR</Text></Pressable>
+          <View style={[styles.searchBox,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="search" size={19} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} onSubmitEditing={searchPlayers} placeholder="Buscar por username" placeholderTextColor={colors.muted} autoCapitalize="none" style={[styles.search,{color:colors.text}]} /></View>
+          <Pressable style={[styles.searchButton,{backgroundColor:colors.accent}]} onPress={searchPlayers}><Text style={styles.searchButtonText}>BUSCAR</Text></Pressable>
         </View>
       </View>
 
@@ -139,6 +158,17 @@ export default function TradeScreen() {
 
 const styles = StyleSheet.create({
   notice: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, borderRadius: 15, backgroundColor: '#2B2818', borderWidth: 1, borderColor: '#5A5125' },
+  tradeHero:{minHeight:190,borderRadius:28,borderWidth:1,padding:17,overflow:'hidden',position:'relative'},
+  tradeHeroGlow:{position:'absolute',right:-70,top:-90,width:280,height:280,borderRadius:999,opacity:.14},
+  tradeHeroPokemon:{position:'absolute',right:-25,bottom:-42,width:205,height:220,opacity:.21,transform:[{rotate:'7deg'}]},
+  tradeHeroCopy:{maxWidth:680,zIndex:2},
+  tradeHeroKicker:{fontSize:9,fontWeight:'900',letterSpacing:1.25},
+  tradeHeroTitle:{fontSize:23,fontWeight:'900',marginTop:3},
+  tradeHeroText:{fontSize:10,lineHeight:15,marginTop:4,maxWidth:480},
+  tradeHeroStats:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:14,paddingRight:95},
+  tradeHeroStat:{minWidth:78,borderRadius:13,borderWidth:1,paddingHorizontal:10,paddingVertical:8},
+  tradeHeroValue:{fontSize:16,fontWeight:'900'},
+  tradeHeroLabel:{fontSize:7,fontWeight:'900',letterSpacing:.6,marginTop:1},
   noticeText: { flex: 1, color: '#F5EAC4', fontWeight: '700', fontSize: 12 },
   section: { gap: 10 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
@@ -146,14 +176,14 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 2 },
   link: { color: gameTheme.colors.blue, fontSize: 9, fontWeight: '900' },
   friendGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  friendCard: { flexGrow: 1, flexBasis: 250, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, backgroundColor: '#101D30', borderWidth: 1, borderColor: '#263E5C' },
+  friendCard: { flexGrow: 1, flexBasis: 250, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 18, borderWidth: 1 },
   avatar: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#17345D' },
   avatarText: { color: '#fff', fontWeight: '900', fontSize: 16 },
   friendName: { color: '#fff', fontSize: 13, fontWeight: '900' },
   friendMeta: { color: '#788DA9', fontSize: 9, marginTop: 2 },
   searchSection: { gap: 9 },
   searchRow: { flexDirection: 'row', gap: 8 },
-  searchBox: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, backgroundColor: '#101D30', borderRadius: 15, borderWidth: 1, borderColor: '#263E5C' },
+  searchBox: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderRadius: 16, borderWidth: 1 },
   search: { flex: 1, height: 50, color: '#fff', fontSize: 13 },
   searchButton: { justifyContent: 'center', paddingHorizontal: 17, borderRadius: 14, backgroundColor: gameTheme.colors.blue },
   searchButtonText: { color: '#fff', fontSize: 10, fontWeight: '900' },
