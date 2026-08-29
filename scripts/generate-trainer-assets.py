@@ -55,7 +55,16 @@ content.putalpha(mask)
 foreground.alpha_composite(content, ((1024 - 760) // 2, (1024 - 760) // 2))
 foreground.save(ASSETS / 'adaptive-icon.png', optimize=True)
 
+# Android notification icon: monochrome white glyph with transparent background.
+# Android tints this white mask using the color configured in expo-notifications.
+notification = Image.new('RGBA', (96, 96), (0, 0, 0, 0))
+ndraw = ImageDraw.Draw(notification)
+ndraw.ellipse((12, 12, 84, 84), outline=(255, 255, 255, 255), width=8)
+ndraw.ellipse((36, 36, 60, 60), fill=(255, 255, 255, 255))
+ndraw.line((18, 48, 78, 48), fill=(255, 255, 255, 255), width=8)
+notification.save(ASSETS / 'notification-icon.png', optimize=True)
+
 print(f'Trainer Collection artwork verified: {source.width}x{source.height} sha256={actual_sha}')
 print('Trainer Collection assets generated:')
-for path in [ASSETS / 'icon.png', ASSETS / 'adaptive-icon.png', ASSETS / 'splash.png', PUBLIC / 'icon.png']:
+for path in [ASSETS / 'icon.png', ASSETS / 'adaptive-icon.png', ASSETS / 'notification-icon.png', ASSETS / 'splash.png', PUBLIC / 'icon.png']:
     print(f' - {path.relative_to(ROOT)} ({path.stat().st_size} bytes)')
