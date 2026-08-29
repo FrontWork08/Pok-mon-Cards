@@ -1,7 +1,6 @@
 -- Lower booster prices while preserving chase-card progression.
 -- Packs remain in Coins below US$ 800 and switch to Diamonds at US$ 800+.
--- Coin tiers are reduced by roughly 30-40%; Diamond tiers are reduced more
--- aggressively because active-player Diamond balances are much lower.
+-- Coin tiers are reduced while Diamond tiers keep the original premium scale.
 
 create or replace function private.refresh_pack_economy()
 returns integer
@@ -28,15 +27,15 @@ begin
         else 'coins'
       end as currency,
       case
-        when max_card_usd >= 5000 then 50
-        when max_card_usd >= 4000 then 45
-        when max_card_usd >= 3000 then 40
-        when max_card_usd >= 2000 then 32
-        when max_card_usd >= 1500 then 24
-        when max_card_usd >= 1250 then 18
-        when max_card_usd >= 1000 then 13
-        when max_card_usd >= 900 then 8
-        when max_card_usd >= 800 then 5
+        when max_card_usd >= 5000 then 100
+        when max_card_usd >= 4000 then 90
+        when max_card_usd >= 3000 then 75
+        when max_card_usd >= 2000 then 60
+        when max_card_usd >= 1500 then 45
+        when max_card_usd >= 1250 then 35
+        when max_card_usd >= 1000 then 25
+        when max_card_usd >= 900 then 15
+        when max_card_usd >= 800 then 10
         when max_card_usd >= 700 then 70000
         when max_card_usd >= 600 then 60000
         when max_card_usd >= 500 then 50000
@@ -77,7 +76,7 @@ set changes = (
   select array_agg(distinct item order by item)
   from unnest(
     changes || array[
-      'Preços de boosters reduzidos novamente: Coins agora vão de 750 a 70.000 e Diamantes de 5 a 50, mantendo progressão pela chase card'
+      'Preços de boosters em Coins reduzidos para 750 a 70.000; preços em Diamantes mantêm a escala premium original de 10 a 100'
     ]::text[]
   ) item
 )
