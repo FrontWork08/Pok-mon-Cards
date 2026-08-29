@@ -356,7 +356,7 @@ export default function PacksScreen() {
           <Text style={[styles.shopHeroKicker, { color: colors.yellow }]}>BOOSTER WALL</Text>
           <Text style={[styles.shopHeroTitle, { color: colors.text }]}>{packs.length || 173} packs para colecionar</Text>
           <Text style={[styles.shopHeroText, { color: colors.muted }]}>
-            Packs abaixo de US$ 800 continuam em Coins, mas ficam progressivamente mais caros conforme a chase card — chegando a centenas de milhares. A partir de US$ 800, passam para Diamantes.
+            Packs abaixo de US$ 800 continuam em Coins e ficam progressivamente mais caros conforme a chase card, chegando a até 🪙100.000. A partir de US$ 800, passam para Diamantes.
           </Text>
         </View>
       </View>
