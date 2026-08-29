@@ -93,11 +93,15 @@ export type AdminReleasePreflight = {
     guildMembers: number;
     selectedCards: number;
     confirmedAccounts: number;
+    automaticCards: number;
+    autoFilledAccounts: number;
+    accountsAwaitingAutoFill: number;
   };
   issues: {
     selectedCardsNotOwned: number;
     submissionCountMismatch: number;
     playersOverCardLimit: number;
+    legacyAutofillIncomplete: number;
     testersMissingAchievement: number;
     guildLeaderMismatch: number;
     ownerCountInvalid: number;
