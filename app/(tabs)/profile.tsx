@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -11,6 +12,7 @@ import { changeUsername } from '@/services/playerActions';
 import { getTrainerRank } from '@/services/ranks';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { getProfileMediaPublicUrl, removeMyProfilePhoto, uploadMyProfilePhoto } from '@/services/profileMedia';
 
 export default function ProfileScreen() {
   const { colors } = useAppTheme();
@@ -23,6 +25,8 @@ export default function ProfileScreen() {
   const [nicknameDraft, setNicknameDraft] = useState('');
   const [nicknameSaving, setNicknameSaving] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [avatarWorking, setAvatarWorking] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -70,6 +74,56 @@ export default function ProfileScreen() {
     }
   }
 
+  async function chooseProfilePhoto() {
+    if (avatarWorking) return;
+    try {
+      setAvatarMenuOpen(false);
+      setAvatarWorking(true);
+      setError(null);
+
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error('Permita acesso às fotos para escolher uma imagem de perfil.');
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+
+      const asset = result.assets?.[0];
+      if (result.canceled || !asset) return;
+
+      await uploadMyProfilePhoto({
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        fileName: asset.fileName,
+      });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível atualizar sua foto.');
+    } finally {
+      setAvatarWorking(false);
+    }
+  }
+
+  async function removeProfilePhoto() {
+    if (avatarWorking) return;
+    try {
+      setAvatarMenuOpen(false);
+      setAvatarWorking(true);
+      setError(null);
+      await removeMyProfilePhoto();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível remover sua foto.');
+    } finally {
+      setAvatarWorking(false);
+    }
+  }
+
   async function handleSignOut() { try { await signOut(); router.replace('/'); } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível sair.'); } }
   const xp = Number(profile?.xp ?? 0);
   const levelXp = xp % 250;
@@ -82,12 +136,13 @@ export default function ProfileScreen() {
   const backgroundDefinition = Array.isArray(profile?.equipped_background) ? profile.equipped_background[0] : profile?.equipped_background;
   const profileFrameColor = frameDefinition?.primary_color ?? colors.accent;
   const profileBackgroundColor = backgroundDefinition?.secondary_color ?? colors.accentSoft;
+  const profilePhotoUrl = getProfileMediaPublicUrl(profile?.avatar_path);
 
   return <Screen title="Trainer Profile" subtitle="Sua identidade, cosméticos, valor de mercado da coleção, ranking global e progresso.">
     {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
     {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={20} color="#FF9FAF" /><Text style={styles.errorText}>{error}</Text></View> : null}
 
-    <View style={[styles.hero, { backgroundColor: profileBackgroundColor, borderColor: profileFrameColor, borderWidth: frameDefinition ? 2 : 1 }]}><TrainerAvatar icon={profile?.profile_icon} color={profileFrameColor} backgroundColor={backgroundDefinition?.primary_color ? backgroundDefinition.primary_color + '22' : colors.surfaceAlt} size={70}/><View style={styles.heroInfo}><Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER ID</Text><View style={styles.usernameRow}><Text style={[styles.rankSymbol, { color: colors.yellow }]}>{trainerRank.symbol}</Text><Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{profile?.username ?? '---'}</Text><Pressable accessibilityLabel="Alterar nickname" onPress={openNicknameEditor} style={[styles.editNameButton, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="pencil" size={14} color={colors.yellow} /></Pressable></View>{equippedDefinition ? <Text style={[styles.equippedTitle, { color: colors.yellow }]}>{equippedDefinition.icon} {equippedDefinition.title}</Text> : null}{frameDefinition || backgroundDefinition ? <Text style={[styles.cosmeticLabel, { color: profileFrameColor }]}>{frameDefinition?.name ?? 'Sem moldura'} • {backgroundDefinition?.name ?? 'Sem background'}</Text> : null}<Text style={[styles.meta, { color: colors.muted }]}>Nível {profile?.level ?? 1} • {xp.toLocaleString('pt-BR')} XP • {trainerRank.displayName} • ELO {profile?.battle_rating ?? 1000}</Text></View><View style={[styles.coinBox, { backgroundColor: colors.surface }]}><Text style={[styles.coinLabel, { color: colors.muted }]}>CARTEIRA</Text><Text style={[styles.coins, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text><Text style={[styles.coins, { color: '#68D9FF' }]}>💎 {Number(profile?.diamonds ?? 0).toLocaleString('pt-BR')}</Text></View></View>
+    <View style={[styles.hero, { backgroundColor: profileBackgroundColor, borderColor: profileFrameColor, borderWidth: frameDefinition ? 2 : 1 }]}><Pressable disabled={avatarWorking} onPress={() => setAvatarMenuOpen(true)} style={styles.avatarButton}><TrainerAvatar icon={profile?.profile_icon} imageUrl={profilePhotoUrl} color={profileFrameColor} backgroundColor={backgroundDefinition?.primary_color ? backgroundDefinition.primary_color + '22' : colors.surfaceAlt} size={70}/><View style={[styles.avatarEditBadge,{backgroundColor:colors.yellow,borderColor:colors.surface}]}>{avatarWorking ? <ActivityIndicator size="small" color="#07111F"/> : <Ionicons name="camera" size={13} color="#07111F"/>}</View></Pressable><View style={styles.heroInfo}><Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER ID</Text><View style={styles.usernameRow}><Text style={[styles.rankSymbol, { color: colors.yellow }]}>{trainerRank.symbol}</Text><Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{profile?.username ?? '---'}</Text><Pressable accessibilityLabel="Alterar nickname" onPress={openNicknameEditor} style={[styles.editNameButton, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="pencil" size={14} color={colors.yellow} /></Pressable></View>{equippedDefinition ? <Text style={[styles.equippedTitle, { color: colors.yellow }]}>{equippedDefinition.icon} {equippedDefinition.title}</Text> : null}{frameDefinition || backgroundDefinition ? <Text style={[styles.cosmeticLabel, { color: profileFrameColor }]}>{frameDefinition?.name ?? 'Sem moldura'} • {backgroundDefinition?.name ?? 'Sem background'}</Text> : null}<Text style={[styles.meta, { color: colors.muted }]}>Nível {profile?.level ?? 1} • {xp.toLocaleString('pt-BR')} XP • {trainerRank.displayName} • ELO {profile?.battle_rating ?? 1000}</Text></View><View style={[styles.coinBox, { backgroundColor: colors.surface }]}><Text style={[styles.coinLabel, { color: colors.muted }]}>CARTEIRA</Text><Text style={[styles.coins, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text><Text style={[styles.coins, { color: '#68D9FF' }]}>💎 {Number(profile?.diamonds ?? 0).toLocaleString('pt-BR')}</Text></View></View>
 
     <View style={[styles.worthPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
       <View style={styles.worthHeader}><View style={{ flex: 1 }}><Text style={[styles.worthKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text><Text style={[styles.worthTotal, { color: colors.text }]}>{formatUsd(collectionMarketValueUsd)}</Text><Text style={[styles.worthHint, { color: colors.muted }]}>Snapshot dos preços TCGplayer em USD</Text></View><View style={[styles.worthIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="cash" size={26} color={colors.yellow} /></View></View>
@@ -112,6 +167,29 @@ export default function ProfileScreen() {
 
     <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.progressTop}><Text style={[styles.progressTitle, { color: colors.text }]}>Progresso do nível</Text><Text style={[styles.progressValue, { color: colors.muted }]}>{levelXp} / 250 XP</Text></View><View style={[styles.track, { backgroundColor: colors.surfaceAlt }]}><View style={[styles.fill, { width: `${Math.min(100, levelXp / 2.5)}%`, backgroundColor: colors.yellow }]} /></View><Text style={[styles.progressHint, { color: colors.muted }]}>Packs dão XP; batalhas dão XP extra e avançam missões.</Text></View>
     <Pressable style={styles.logout} onPress={handleSignOut}><Ionicons name="log-out-outline" size={18} color="#FF8A8A" /><Text style={styles.logoutText}>Sair da conta</Text></Pressable>
+
+    <Modal visible={avatarMenuOpen} transparent animationType="fade" onRequestClose={() => !avatarWorking && setAvatarMenuOpen(false)}>
+      <View style={styles.avatarBackdrop}>
+        <View style={[styles.avatarModal,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+          <View style={styles.avatarModalHeader}>
+            <TrainerAvatar icon={profile?.profile_icon} imageUrl={profilePhotoUrl} color={profileFrameColor} backgroundColor={profileBackgroundColor} size={82}/>
+            <View style={{flex:1}}>
+              <Text style={[styles.avatarModalTitle,{color:colors.text}]}>Foto de perfil</Text>
+              <Text style={[styles.avatarModalHint,{color:colors.muted}]}>A foto aparece dentro da sua moldura e também no perfil visto pelos amigos.</Text>
+            </View>
+            <Pressable disabled={avatarWorking} onPress={() => setAvatarMenuOpen(false)}><Ionicons name="close" size={22} color={colors.muted}/></Pressable>
+          </View>
+          <Pressable disabled={avatarWorking} onPress={() => { void chooseProfilePhoto(); }} style={[styles.avatarAction,{backgroundColor:colors.yellow}]}>
+            <Ionicons name="images" size={19} color="#07111F"/>
+            <Text style={styles.avatarActionPrimary}>ESCOLHER DA GALERIA</Text>
+          </Pressable>
+          {profile?.avatar_path ? <Pressable disabled={avatarWorking} onPress={() => { void removeProfilePhoto(); }} style={[styles.avatarAction,{backgroundColor:colors.surfaceAlt,borderColor:colors.border,borderWidth:1}]}>
+            <Ionicons name="person-circle-outline" size={19} color={colors.text}/>
+            <Text style={[styles.avatarActionSecondary,{color:colors.text}]}>VOLTAR AO ÍCONE</Text>
+          </Pressable> : null}
+        </View>
+      </View>
+    </Modal>
 
     <Modal visible={nicknameOpen} transparent animationType="fade" onRequestClose={() => !nicknameSaving && setNicknameOpen(false)}>
       <View style={styles.nicknameBackdrop}>
@@ -160,10 +238,11 @@ function FeatureLink({ icon, color, title, text, onPress, badge }: { icon: keyof
 
 const styles = StyleSheet.create({
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 12, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' }, errorText: { flex: 1, color: '#FFD7DD', fontWeight: '700', fontSize: 12 },
-  hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24, borderWidth: 1 }, avatar: { width: 70, height: 70, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, avatarText: { fontSize: 30, fontWeight: '900' }, heroInfo: { flex: 1, minWidth: 190 }, rankSymbol: { fontSize: 24, fontWeight: '900' }, equippedTitle: { fontSize: 11, fontWeight: '900', marginTop: 2 }, cosmeticLabel: { fontSize: 8, fontWeight: '900', marginTop: 3, letterSpacing: .4 }, usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }, editNameButton: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 }, username: { flexShrink: 1, fontSize: 25, fontWeight: '900' }, meta: { fontSize: 12, marginTop: 4 }, coinBox: { minWidth: 130, padding: 12, borderRadius: 16 }, coinLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.1 }, coins: { fontSize: 18, fontWeight: '900', marginTop: 3 },
+  hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24, borderWidth: 1 }, avatarButton:{position:'relative'}, avatarEditBadge:{position:'absolute',right:-5,bottom:-5,width:28,height:28,borderRadius:10,borderWidth:2,alignItems:'center',justifyContent:'center'}, avatar: { width: 70, height: 70, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, avatarText: { fontSize: 30, fontWeight: '900' }, heroInfo: { flex: 1, minWidth: 190 }, rankSymbol: { fontSize: 24, fontWeight: '900' }, equippedTitle: { fontSize: 11, fontWeight: '900', marginTop: 2 }, cosmeticLabel: { fontSize: 8, fontWeight: '900', marginTop: 3, letterSpacing: .4 }, usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }, editNameButton: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 }, username: { flexShrink: 1, fontSize: 25, fontWeight: '900' }, meta: { fontSize: 12, marginTop: 4 }, coinBox: { minWidth: 130, padding: 12, borderRadius: 16 }, coinLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.1 }, coins: { fontSize: 18, fontWeight: '900', marginTop: 3 },
   rankPanel: { padding: 15, borderRadius: 20, borderWidth: 1 }, rankPanelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, rankName: { fontSize: 20, fontWeight: '900', marginTop: 3 }, rankPoints: { fontSize: 15, fontWeight: '900' },
   worthPanel: { padding: 16, borderRadius: 22, borderWidth: 1, gap: 12 }, worthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, worthKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, worthTotal: { fontSize: 30, fontWeight: '900', marginTop: 3 }, worthHint: { fontSize: 9, marginTop: 2 }, worthIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, worthDivider: { height: 1 }, worthBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, worthMetric: { flexGrow: 1, flexBasis: 150, minWidth: 130 }, worthMetricLabel: { fontSize: 7, fontWeight: '900', letterSpacing: .9 }, worthMetricText: { fontSize: 14, fontWeight: '900', marginTop: 3 }, worthMetricValue: { fontSize: 9, fontWeight: '900', marginTop: 2 }, topCardRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 8 }, topCardImage: { width: 50, height: 67, borderRadius: 6 }, topCardLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 1 }, topCardName: { fontSize: 13, fontWeight: '900', marginTop: 2 }, topCardMeta: { fontSize: 8, marginTop: 1 }, topCardValue: { fontSize: 10, fontWeight: '900' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, stat: { flexGrow: 1, flexBasis: 145, minWidth: 135, padding: 14, borderRadius: 18, borderWidth: 1 }, statIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 9 }, statValue: { fontSize: 20, fontWeight: '900' }, statLabel: { fontSize: 10, fontWeight: '800', marginTop: 2 },
   featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, feature: { flexGrow: 1, flexBasis: 360, minWidth: 280, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, borderWidth: 1 }, featureIcon: { width: 45, height: 45, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, featureBody: { flex: 1 }, featureTitle: { fontSize: 15, fontWeight: '900' }, featureText: { fontSize: 10, lineHeight: 15, marginTop: 3 }, badge: { minWidth: 28, height: 28, borderRadius: 14, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D84B64' }, badgeText: { color: '#fff', fontWeight: '900', fontSize: 11 },
+  avatarBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.76)',justifyContent:'flex-end',padding:12}, avatarModal:{borderRadius:24,borderWidth:1,padding:16,gap:10,marginBottom:8}, avatarModalHeader:{flexDirection:'row',alignItems:'center',gap:12,marginBottom:4}, avatarModalTitle:{fontSize:18,fontWeight:'900'}, avatarModalHint:{fontSize:9,lineHeight:14,marginTop:3}, avatarAction:{minHeight:50,borderRadius:15,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, avatarActionPrimary:{color:'#07111F',fontSize:10,fontWeight:'900',letterSpacing:.4}, avatarActionSecondary:{fontSize:10,fontWeight:'900',letterSpacing:.4},
   progressCard: { padding: 15, borderRadius: 18, borderWidth: 1 }, progressTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, progressTitle: { fontSize: 14, fontWeight: '900' }, progressValue: { fontSize: 10, fontWeight: '800' }, track: { height: 8, borderRadius: 999, marginTop: 11, overflow: 'hidden' }, fill: { height: '100%', borderRadius: 999 }, progressHint: { fontSize: 9, marginTop: 7 }, logout: { marginTop: 4, borderRadius: 14, borderWidth: 1, borderColor: '#C64E5A', paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }, logoutText: { color: '#FF8A8A', fontWeight: '900', fontSize: 11 }, nicknameBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,.74)', justifyContent: 'flex-end', padding: 12 }, nicknameModal: { borderRadius: 24, borderWidth: 1, padding: 16, gap: 12, marginBottom: 8 }, nicknameHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, nicknameIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, nicknameTitle: { fontSize: 17, fontWeight: '900' }, nicknameHint: { fontSize: 9, lineHeight: 14, marginTop: 2 }, nicknameInputWrap: { minHeight: 52, borderRadius: 15, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 4 }, nicknameAt: { fontSize: 16, fontWeight: '900' }, nicknameInput: { flex: 1, minHeight: 50, fontSize: 15, fontWeight: '800' }, nicknameMetaRow: { flexDirection: 'row', justifyContent: 'flex-end' }, nicknameCount: { fontSize: 9, fontWeight: '800' }, nicknameError: { color: '#FF8A9A', fontSize: 10, fontWeight: '800' }, nicknameSave: { minHeight: 50, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, nicknameSaveText: { color: '#07111F', fontSize: 10, fontWeight: '900', letterSpacing: .4 },
 });
