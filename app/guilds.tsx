@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
@@ -26,10 +26,12 @@ import {
 import { findPlayers } from '@/services/player';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { getThemeVisual } from '@/theme/themeCatalog';
 
 export default function GuildsScreen() {
   const router = useRouter();
-  const { colors } = useAppTheme();
+  const { colors, themeName } = useAppTheme();
+  const themeVisual = getThemeVisual(themeName);
   const [hub, setHub] = useState<GuildHub | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,10 +152,25 @@ export default function GuildsScreen() {
   }
 
   return (
-    <Screen title="Guildas Pokémon" subtitle="Quatro equipes fixas, missões coletivas e ranking pelo valor total das cartas.">
+    <Screen title="Guild HQ" subtitle="Sua base coletiva para missões, ranking, chat, recompensas e Guild Wars.">
       <View style={styles.topRow}>
         <Pressable style={[styles.back, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.text} /><Text style={[styles.backText, { color: colors.text }]}>Voltar</Text></Pressable>
         <Pressable style={[styles.refresh, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={() => void load()}><Ionicons name="refresh" size={17} color={colors.yellow} /><Text style={[styles.refreshText, { color: colors.yellow }]}>ATUALIZAR</Text></Pressable>
+      </View>
+
+      <View style={[styles.guildHero,{backgroundColor:colors.accentSoft,borderColor:selected?.color ?? colors.accent}]}>
+        <View style={[styles.guildHeroGlow,{backgroundColor:selected?.color ?? colors.accent}]} />
+        <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.guildHeroPokemon}/>
+        <View style={styles.guildHeroCopy}>
+          <Text style={[styles.guildHeroKicker,{color:colors.yellow}]}>TRAINER ALLIANCE NETWORK</Text>
+          <Text style={[styles.guildHeroTitle,{color:colors.text}]}>{myMembership && selected ? selected.name : 'Escolha sua equipe'}</Text>
+          <Text style={[styles.guildHeroText,{color:colors.muted}]}>{myMembership && selected ? `Você faz parte desta guilda como ${myMembership.role === 'leader' ? 'Chefe' : myMembership.role === 'officer' ? 'Oficial' : 'Membro'}.` : 'Compare as quatro equipes, entre em uma guilda e evolua junto com outros treinadores.'}</Text>
+          <View style={styles.guildHeroStats}>
+            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:colors.text}]}>{hub?.guilds.length ?? 0}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>GUILDAS</Text></View>
+            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:colors.text}]}>{selected?.memberCount ?? 0}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>MEMBROS</Text></View>
+            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:selected?.color ?? colors.yellow}]}>#{selected?.rank ?? '—'}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>RANK</Text></View>
+          </View>
+        </View>
       </View>
 
       {notice ? <Pressable onPress={() => setNotice(null)} style={[styles.notice, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Ionicons name="checkmark-circle" size={19} color={colors.yellow} /><Text style={[styles.noticeText, { color: colors.text }]}>{notice}</Text><Ionicons name="close" size={18} color={colors.muted} /></Pressable> : null}
@@ -317,6 +334,17 @@ function GuildDetail({
 
 const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
+  guildHero:{minHeight:180,borderRadius:28,borderWidth:1,padding:17,overflow:'hidden',position:'relative'},
+  guildHeroGlow:{position:'absolute',right:-75,top:-95,width:280,height:280,borderRadius:999,opacity:.14},
+  guildHeroPokemon:{position:'absolute',right:-22,bottom:-40,width:205,height:215,opacity:.22,transform:[{rotate:'6deg'}]},
+  guildHeroCopy:{maxWidth:650,zIndex:2},
+  guildHeroKicker:{fontSize:9,fontWeight:'900',letterSpacing:1.25},
+  guildHeroTitle:{fontSize:25,fontWeight:'900',marginTop:3},
+  guildHeroText:{fontSize:10,lineHeight:15,marginTop:4,maxWidth:470},
+  guildHeroStats:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:14,paddingRight:90},
+  guildHeroStat:{minWidth:76,borderRadius:13,borderWidth:1,paddingHorizontal:10,paddingVertical:8},
+  guildHeroStatValue:{fontSize:16,fontWeight:'900'},
+  guildHeroStatLabel:{fontSize:7,fontWeight:'900',letterSpacing:.65,marginTop:1},
   back: { minHeight: 42, borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 7 },
   backText: { fontSize: 11, fontWeight: '900' },
   refresh: { minHeight: 42, borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 7 },
@@ -337,7 +365,7 @@ const styles = StyleSheet.create({
   acceptText: { color: '#fff', fontSize: 8, fontWeight: '900' },
   rankingHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   guildGrid: { gap: 8 },
-  guildCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 18, borderWidth: 1, padding: 11 },
+  guildCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20, borderWidth: 1, padding: 12 },
   rankBubble: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rankText: { color: '#fff', fontSize: 14, fontWeight: '900' },
   guildName: { fontSize: 14, fontWeight: '900' },
@@ -348,7 +376,7 @@ const styles = StyleSheet.create({
   guildValue: { alignItems: 'flex-end' },
   value: { fontSize: 12, fontWeight: '900' },
   membersCount: { fontSize: 8, marginTop: 3 },
-  detail: { borderRadius: 23, borderWidth: 1, padding: 15, gap: 14 },
+  detail: { borderRadius: 26, borderWidth: 1, padding: 16, gap: 14 },
   detailHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 11 },
   shield: { width: 53, height: 53, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   detailName: { fontSize: 21, fontWeight: '900' },
