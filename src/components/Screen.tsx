@@ -20,7 +20,13 @@ export function Screen({ title, subtitle, children }: PropsWithChildren<{ title:
       >
         <View style={styles.inner}>
           <View style={styles.header}>
-            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
+            <View style={styles.brandRow}>
+              <View style={[styles.brandDot, { backgroundColor: colors.yellow }]} />
+              <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER COLLECTION</Text>
+              <View style={[styles.versionPill, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+                <Text style={[styles.versionText, { color: colors.accent }]}>1.0</Text>
+              </View>
+            </View>
             <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
             {subtitle ? <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text> : null}
           </View>
@@ -38,7 +44,11 @@ const styles = StyleSheet.create({
   contentMobile: { paddingBottom: 28 },
   inner: { width: '100%', maxWidth: 1280, alignSelf: 'center', gap: 16 },
   header: { width: '100%', gap: 5, marginBottom: 4 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  brandDot: { width: 7, height: 7, borderRadius: 999 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
+  versionPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+  versionText: { fontSize: 8, fontWeight: '900', letterSpacing: .6 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { fontSize: 15, lineHeight: 21 },
 });
