@@ -1,0 +1,69 @@
+name: Trainer Collection 1.0 Web Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/trainer-collection-1.0
+    paths:
+      - app/**
+      - src/**
+      - assets/**
+      - public/**
+      - app.json
+      - package.json
+      - package-lock.json
+      - .github/workflows/web-preview-1.0.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trainer-collection-1-0-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN is not configured in this repository."
+            exit 1
+          fi
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify project
+        run: npm run verify
+
+      - name: Load Expo preview environment
+        run: eas env:pull --environment preview --path .env.local --non-interactive
+
+      - name: Export web preview
+        run: npx expo export --platform web
+
+      - name: Deploy stable 1.0 preview alias
+        run: eas deploy --alias trainer-collection-1-0 --environment preview --non-interactive
