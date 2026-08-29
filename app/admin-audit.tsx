@@ -44,6 +44,17 @@ function formatNumber(value: unknown) {
   return Number(value ?? 0).toLocaleString('pt-BR');
 }
 
+function currencyIcon(value: unknown) {
+  return value === 'diamonds' ? '💎' : '🪙';
+}
+
+function packDiscountLabel(value: unknown) {
+  if (value === 'admin_abuse_coin_free') return 'Admin Abuse: Coins grátis';
+  if (value === 'admin_abuse_diamond_half') return 'Admin Abuse: 50% OFF';
+  if (value === 'none') return 'Sem desconto';
+  return value ? String(value) : 'Sem desconto';
+}
+
 function hasPermission(access: AdminAccess | null, permission: AdminPermission) {
   return Boolean(access?.isOwner || access?.permissions?.includes(permission));
 }
@@ -743,6 +754,8 @@ function AuditResult({
             <Metric label="MÁX./MINUTO" value={formatNumber(audit.packs?.maxPerMinute)} colors={colors} />
             <Metric label="PREÇO ANTIGO" value={formatNumber(audit.packs?.legacySpecialPricingOpenings)} colors={colors} />
             <Metric label="ADMIN ABUSE" value={formatNumber(audit.packs?.adminAbuseEventOpenings)} colors={colors} />
+            <Metric label="SEM SNAPSHOT" value={formatNumber(audit.packs?.legacyPriceUnknownOpenings)} colors={colors} />
+            <Metric label="DESCONTO SEM MOTIVO" value={formatNumber(audit.packs?.unexplainedDiscountOpenings)} colors={colors} />
           </View>
           {audit.packHistory.map((opening: any) => (
             <View key={String(opening.id)} style={[styles.simpleRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
@@ -751,11 +764,30 @@ function AuditResult({
                 <Text style={[styles.small, { color: colors.muted }]}>
                   {formatDate(opening.openedAt)} • {formatNumber(opening.cardCount)} cartas
                 </Text>
+                {opening.priceSnapshotStatus === 'recorded' ? (
+                  <>
+                    <Text style={[styles.small, { color: colors.text }]}>
+                      Pago: {currencyIcon(opening.currencyAtOpen)} {formatNumber(opening.pricePaid)}
+                      {' • '}Base: {currencyIcon(opening.currencyAtOpen)} {formatNumber(opening.basePriceAtOpen)}
+                    </Text>
+                    <Text style={[styles.small, { color: colors.muted }]}>
+                      {packDiscountLabel(opening.pricingContext?.discountKind)}
+                      {' • '}EV na abertura: {formatUsd(Number(opening.expectedValueUsdAtOpen ?? 0))}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[styles.small, { color: '#D9A441' }]}>
+                    Preço pago não registrado — abertura anterior ao snapshot de cobrança
+                  </Text>
+                )}
                 <Text style={[styles.small, { color: colors.muted }]}>
-                  Preço atual: {opening.currency === 'diamonds' ? '💎 ' : '🪙 '}{formatNumber(opening.currentPackPrice)}
+                  Preço atual: {currencyIcon(opening.currentCurrency)} {formatNumber(opening.currentPackPrice)}
                 </Text>
               </View>
-              <Text style={styles.priceText}>{formatUsd(Number(opening.currentValueUsd ?? 0))}</Text>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.priceText}>{formatUsd(Number(opening.currentValueUsd ?? 0))}</Text>
+                <Text style={[styles.small, { color: colors.muted }]}>valor atual das cartas</Text>
+              </View>
             </View>
           ))}
           {audit.packs?.hasMore ? (
