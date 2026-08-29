@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { CardPickerModal } from '@/components/CardPickerModal';
-import { getMyBag, getMyProfile, type OwnedCardEntry } from '@/services/player';
+import { getMyLegacyCardPool, getMyProfile, type OwnedCardEntry } from '@/services/player';
 import {
   confirmLegacySelection,
   getActiveReleaseCampaign,
@@ -47,7 +47,7 @@ export default function LegacySelectionScreen() {
       try {
         setLoading(true);
         setError('');
-        const [profile, owned] = await Promise.all([getMyProfile(), getMyBag()]);
+        const [profile, owned] = await Promise.all([getMyProfile(), getMyLegacyCardPool()]);
         const result = await getActiveReleaseCampaign(profile.id);
         if (disposed) return;
         setPlayerId(profile.id);
@@ -82,6 +82,11 @@ export default function LegacySelectionScreen() {
 
   const selectedValue = useMemo(
     () => selectedEntries.reduce((sum, entry) => sum + Number(entry.cards?.market_price_usd ?? 0), 0),
+    [selectedEntries],
+  );
+
+  const selectedMarketplaceCards = useMemo(
+    () => selectedEntries.filter((entry) => Number(entry.marketplace_quantity ?? 0) > 0).length,
     [selectedEntries],
   );
 
@@ -185,10 +190,20 @@ export default function LegacySelectionScreen() {
     try {
       setWorking(true);
       setError('');
+      const marketplaceCardsBeforeConfirm = selectedMarketplaceCards;
       const result = await confirmLegacySelection(campaign.id, playerId);
       setSubmission(result);
       setConfirmArmed(false);
-      setNotice(`Legado confirmado: ${result.selected_count} carta(s) protegida(s) para a transição 1.0.`);
+      try {
+        setBag(await getMyLegacyCardPool());
+      } catch {
+        // A confirmação já foi concluída no servidor; a atualização visual pode aguardar a próxima abertura da tela.
+      }
+      setNotice(
+        marketplaceCardsBeforeConfirm > 0
+          ? `Legado confirmado: ${result.selected_count} carta(s) protegida(s). ${marketplaceCardsBeforeConfirm} carta(s) escolhida(s) que estavam anunciadas foram retiradas da loja e devolvidas à Bag.`
+          : `Legado confirmado: ${result.selected_count} carta(s) protegida(s) para a transição 1.0.`,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível confirmar seu legado.');
     } finally {
@@ -228,10 +243,10 @@ export default function LegacySelectionScreen() {
                   ? autoFilledCount > 0
                     ? `Seu legado está fechado. ${autoFilledCount} vaga(s) foram completadas automaticamente com as cartas mais valiosas da sua Bag.`
                     : savedCardIds.length < limit
-                      ? `Suas ${savedCardIds.length} escolha(s) manuais estão protegidas. Na migração, o sistema completará as ${limit - savedCardIds.length} vaga(s) restantes com as cartas mais caras da sua Bag.`
+                      ? `Suas ${savedCardIds.length} escolha(s) manuais estão protegidas. Na migração, o sistema completará as ${limit - savedCardIds.length} vaga(s) restantes com as cartas mais caras da sua coleção.`
                       : 'A seleção está bloqueada. Uma cópia de cada carta confirmada está protegida para a migração.'
                   : selectionOpen
-                    ? 'Escolha as cartas que você mais quer manter. Se deixar vagas livres, a migração completa automaticamente com as cartas mais caras da sua Bag.'
+                    ? 'Escolha as cartas que você mais quer manter. Cartas anunciadas na sua loja também aparecem aqui. Se deixar vagas livres, a migração completa automaticamente com as cartas mais caras da sua coleção.'
                     : 'A fase de escolha ainda não foi liberada. Se você não completar as 10 vagas quando a migração começar, o sistema escolherá as cartas mais caras disponíveis.'}
               </Text>
               <View style={styles.heroStats}>
@@ -258,7 +273,7 @@ export default function LegacySelectionScreen() {
             <View style={{flex:1}}>
               <Text style={[styles.autoRuleTitle,{color:colors.text}]}>Preenchimento automático na migração</Text>
               <Text style={[styles.autoRuleText,{color:colors.muted}]}>
-                Se você tiver menos de {limit} cartas escolhidas, suas escolhas são mantidas primeiro e as vagas restantes são preenchidas pelas cartas com maior valor de mercado da sua Bag. Se alguma carta não tiver preço, o valor interno do jogo é usado como desempate.
+                Se você tiver menos de {limit} cartas escolhidas, suas escolhas são mantidas primeiro e as vagas restantes são preenchidas pelas cartas com maior valor de mercado da sua coleção, incluindo cartas que estejam anunciadas na sua própria loja. Se alguma carta não tiver preço, o valor interno do jogo é usado como desempate.
               </Text>
               {selectionOpen && !locked && recommendedEntries.length ? (
                 <Pressable
@@ -319,7 +334,11 @@ export default function LegacySelectionScreen() {
               <Ionicons name={confirmArmed ? 'warning' : 'lock-closed'} size={22} color={confirmArmed ? '#FF8A9A' : colors.yellow}/>
               <View style={{flex:1}}>
                 <Text style={[styles.confirmTitle,{color:colors.text}]}>{confirmArmed ? 'Confirmação permanente' : 'Pronto para fechar seu legado?'}</Text>
-                <Text style={[styles.confirmHint,{color:colors.muted}]}>{confirmArmed ? `Depois deste botão suas escolhas manuais não poderão ser trocadas. Se houver menos de ${limit}, as vagas restantes serão preenchidas automaticamente pelas cartas mais caras somente na migração. O reset ainda NÃO será executado.` : 'Revise a lista. Vagas livres serão completadas automaticamente na migração.'}</Text>
+                <Text style={[styles.confirmHint,{color:colors.muted}]}>{confirmArmed
+                  ? `Depois deste botão suas escolhas manuais não poderão ser trocadas. Se houver menos de ${limit}, as vagas restantes serão preenchidas automaticamente pelas cartas mais caras somente na migração. ${selectedMarketplaceCards > 0 ? `${selectedMarketplaceCards} carta(s) escolhida(s) estão anunciadas e serão retiradas da loja automaticamente ao confirmar. ` : ''}O reset ainda NÃO será executado.`
+                  : selectedMarketplaceCards > 0
+                    ? `Revise a lista. ${selectedMarketplaceCards} carta(s) escolhida(s) estão na sua loja e sairão dos anúncios ao confirmar o Legado.`
+                    : 'Revise a lista. Vagas livres serão completadas automaticamente na migração.'}</Text>
               </View>
               <Pressable disabled={working} onPress={() => { void confirmSelection(); }} style={[styles.confirmButton,{backgroundColor:confirmArmed ? '#C74658' : colors.yellow}]}>
                 {working ? <ActivityIndicator size="small" color={confirmArmed ? '#fff' : '#07111F'}/> : <Ionicons name={confirmArmed ? 'shield-checkmark' : 'lock-closed'} size={17} color={confirmArmed ? '#fff' : '#07111F'}/>}
@@ -333,7 +352,7 @@ export default function LegacySelectionScreen() {
       <CardPickerModal
         visible={pickerOpen}
         title="Escolha seu legado"
-        subtitle={`Selecione até ${limit} cartas únicas. Se faltarem vagas na migração, o sistema completa com as cartas mais caras da Bag.`}
+        subtitle={`Selecione até ${limit} cartas únicas da Bag ou da sua loja. Cartas anunciadas continuam elegíveis e saem da loja automaticamente quando o Legado é confirmado.`}
         bag={bag}
         mode="quantity"
         selectedMap={draft}
