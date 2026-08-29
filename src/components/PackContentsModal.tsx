@@ -100,20 +100,20 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg, paddingTop: Math.max(insets.top, 8) }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.kicker, { color: colors.yellow }]}>CONTEÚDO DO BOOSTER</Text>
+            <Text style={styles.kicker}>TRAINER COLLECTION • PACK CONTENTS</Text>
             <Text numberOfLines={1} style={[styles.title, { color: colors.text }]}>{pack.name}</Text>
             <Text style={[styles.subtitle, { color: colors.muted }]}>{headerSubtitle}</Text>
-            <Text style={[styles.openHint,{color:colors.accent}]}>Toque em uma carta para ver imagem, preço e estatísticas de batalha antes de comprar.</Text>
+            <Text style={styles.openHint}>Inspecione preço, raridade e detalhes de batalha antes de abrir este booster.</Text>
           </View>
-          <Pressable onPress={onClose} style={[styles.close, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Pressable onPress={onClose} style={styles.close}>
             <Ionicons name="close" size={22} color={colors.text} />
           </Pressable>
         </View>
 
         <View style={[styles.tools,{borderBottomColor:colors.border}]}>
-          <View style={[styles.searchBox,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="search" size={18} color={colors.muted}/><TextInput value={search} onChangeText={setSearch} placeholder="Pesquisar carta neste booster..." placeholderTextColor={colors.muted} autoCapitalize="none" style={[styles.searchInput,{color:colors.text}]}/>{search?<Pressable onPress={()=>setSearch('')}><Ionicons name="close-circle" size={18} color={colors.muted}/></Pressable>:null}</View>
+          <View style={styles.searchBox}><Ionicons name="search" size={18} color={colors.muted}/><TextInput value={search} onChangeText={setSearch} placeholder="Pesquisar carta neste booster..." placeholderTextColor={colors.muted} autoCapitalize="none" style={[styles.searchInput,{color:colors.text}]}/>{search?<Pressable onPress={()=>setSearch('')}><Ionicons name="close-circle" size={18} color={colors.muted}/></Pressable>:null}</View>
           <View style={styles.sortRow}><Pressable onPress={()=>setSort('number')} style={[styles.sortChip,{backgroundColor:sort==='number'?colors.accentSoft:colors.surface,borderColor:sort==='number'?colors.accent:colors.border}]}><Text style={[styles.sortText,{color:sort==='number'?colors.accent:colors.muted}]}>NÚMERO</Text></Pressable><Pressable onPress={()=>setSort('price-high')} style={[styles.sortChip,{backgroundColor:sort==='price-high'?colors.accentSoft:colors.surface,borderColor:sort==='price-high'?colors.accent:colors.border}]}><Ionicons name="cash" size={14} color={sort==='price-high'?colors.yellow:colors.muted}/><Text style={[styles.sortText,{color:sort==='price-high'?colors.yellow:colors.muted}]}>MAIS CARAS</Text></Pressable></View>
         </View>
 
@@ -147,7 +147,7 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
                   onClose();
                   setTimeout(() => router.push(`/card/${cardId}`), 80);
                 }}
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                style={styles.card}
               >
                 {(() => {
                   const candidates = [item.image, item.image_fallback]
@@ -174,9 +174,9 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
                   <Text style={[styles.price, { color: colors.yellow }]}>
                     {item.market_price_usd == null ? 'US$ —' : formatUsd(item.market_price_usd)}
                   </Text>
-                  <View style={[styles.detailsChip,{backgroundColor:colors.accentSoft}]}>
-                    <Ionicons name="eye" size={12} color={colors.accent}/>
-                    <Text style={[styles.detailsText,{color:colors.accent}]}>DETALHES</Text>
+                  <View style={styles.detailsChip}>
+                    <Ionicons name="eye" size={12} color="#D9B24C"/>
+                    <Text style={[styles.detailsText,{color:'#D9B24C'}]}>DETALHES</Text>
                   </View>
                 </View>
               </Pressable>
@@ -193,26 +193,26 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { minHeight: 88, borderBottomWidth: 1, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  kicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.3 },
-  title: { fontSize: 20, fontWeight: '900', marginTop: 2 },
+  header: { minHeight: 94, borderBottomWidth: 1, borderBottomColor:'#3F3520', backgroundColor:'#090E17', paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  kicker: { color:'#D9B24C', fontSize: 7.5, fontWeight: '900', letterSpacing: 1.2 },
+  title: { fontSize: 21, fontWeight: '900', marginTop: 3 },
   subtitle: { fontSize: 10, marginTop: 3 },
-  openHint: { fontSize: 8, lineHeight: 12, fontWeight: '800', marginTop: 5 },
-  close: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  tools:{paddingHorizontal:12,paddingVertical:9,borderBottomWidth:1,gap:8},searchBox:{height:44,borderRadius:13,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',gap:8},searchInput:{flex:1,height:'100%',fontSize:12},sortRow:{flexDirection:'row',gap:7},sortChip:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},sortText:{fontSize:8,fontWeight:'900'},
+  openHint: { color:'#D9B24C', fontSize: 8, lineHeight: 12, fontWeight: '800', marginTop: 5 },
+  close: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, borderColor:'#3C3423', backgroundColor:'#141923', alignItems: 'center', justifyContent: 'center' },
+  tools:{paddingHorizontal:12,paddingVertical:10,borderBottomWidth:1,borderBottomColor:'#252D3A',gap:8,backgroundColor:'#080D15'},searchBox:{height:44,borderRadius:13,borderWidth:1,borderColor:'#303847',backgroundColor:'#101621',paddingHorizontal:11,flexDirection:'row',alignItems:'center',gap:8},searchInput:{flex:1,height:'100%',fontSize:12},sortRow:{flexDirection:'row',gap:7},sortChip:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},sortText:{fontSize:8,fontWeight:'900'},
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 28 },
   loadingText: { fontSize: 11 },
   error: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
   list: { padding: 12, paddingBottom: 34 },
   column: { gap: 10 },
-  card: { flex: 1, minWidth: 0, borderRadius: 16, borderWidth: 1, padding: 8, marginBottom: 10 },
+  card: { flex: 1, minWidth: 0, borderRadius: 17, borderWidth: 1, borderColor:'#2C3544', backgroundColor:'#0D1320', padding: 8, marginBottom: 10 },
   image: { width: '100%', aspectRatio: 0.716 },
   imageFallback: { alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   name: { fontSize: 11, fontWeight: '900', marginTop: 6 },
   rarity: { fontSize: 8, marginTop: 2 },
   cardFooter:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:6,marginTop:5},
   price: { fontSize: 10, fontWeight: '900' },
-  detailsChip:{borderRadius:999,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},
+  detailsChip:{borderRadius:999,borderWidth:1,borderColor:'#5B4A25',backgroundColor:'#1A1710',paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},
   detailsText:{fontSize:7,fontWeight:'900'},
   footerLoader: { marginVertical: 18 },
 });
