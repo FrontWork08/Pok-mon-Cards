@@ -883,7 +883,7 @@ export default function AdminScreen() {
                 <Pressable
                   disabled={working}
                   onPress={confirmLegacySelectionToggle}
-                  style={[styles.legacyToggleButton,{backgroundColor:releaseStatus.legacy_selection_enabled ? '#C74658' : colors.yellow,opacity:working?.55:1}]}
+                  style={[styles.legacyToggleButton,{backgroundColor:releaseStatus.legacy_selection_enabled ? '#C74658' : colors.yellow,opacity: working ? .55 : 1}]}
                 >
                   <Ionicons name={releaseStatus.legacy_selection_enabled ? 'pause' : 'play'} size={18} color={releaseStatus.legacy_selection_enabled ? '#fff' : '#07111F'}/>
                   <Text style={[styles.legacyToggleText,{color:releaseStatus.legacy_selection_enabled ? '#fff' : '#07111F'}]}>{releaseStatus.legacy_selection_enabled ? 'PAUSAR ESCOLHA' : 'LIBERAR ESCOLHA'}</Text>
