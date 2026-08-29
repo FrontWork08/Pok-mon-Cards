@@ -7,11 +7,12 @@ import { Screen } from '@/components/Screen';
 import { signOut } from '@/services/auth';
 import { getMyProfile, getMyProfileStats, type PlayerProfile } from '@/services/player';
 import { getMySocial } from '@/services/social';
-import { formatUsd } from '@/services/market';
+import { formatUsd, isCurrentUserAdmin } from '@/services/market';
 import { changeUsername } from '@/services/playerActions';
 import { getTrainerRank } from '@/services/ranks';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { TrainerIdentityCard } from '@/components/TrainerIdentityCard';
 import { getProfileMediaPublicUrl, removeMyProfilePhoto, uploadMyProfilePhoto } from '@/services/profileMedia';
 
 export default function ProfileScreen() {
@@ -27,18 +28,21 @@ export default function ProfileScreen() {
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [avatarWorking, setAvatarWorking] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setLoading(true); setError(null);
-      const [p, s, social] = await Promise.all([
+      const [p, s, social, admin] = await Promise.all([
         getMyProfile(),
         getMyProfileStats(),
         getMySocial(),
+        isCurrentUserAdmin().catch(() => false),
       ]);
       setProfile(p);
       setStats(s);
       setFriendCount(social.friends.length);
+      setIsAdmin(admin);
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível atualizar seu perfil.'); }
     finally { setLoading(false); }
   }, []);
@@ -142,7 +146,60 @@ export default function ProfileScreen() {
     {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
     {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={20} color="#FF9FAF" /><Text style={styles.errorText}>{error}</Text></View> : null}
 
-    <View style={[styles.hero, { backgroundColor: profileBackgroundColor, borderColor: profileFrameColor, borderWidth: frameDefinition ? 2 : 1 }]}><Pressable disabled={avatarWorking} onPress={() => setAvatarMenuOpen(true)} style={styles.avatarButton}><TrainerAvatar icon={profile?.profile_icon} imageUrl={profilePhotoUrl} color={profileFrameColor} backgroundColor={backgroundDefinition?.primary_color ? backgroundDefinition.primary_color + '22' : colors.surfaceAlt} size={70}/><View style={[styles.avatarEditBadge,{backgroundColor:colors.yellow,borderColor:colors.surface}]}>{avatarWorking ? <ActivityIndicator size="small" color="#07111F"/> : <Ionicons name="camera" size={13} color="#07111F"/>}</View></Pressable><View style={styles.heroInfo}><Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER ID</Text><View style={styles.usernameRow}><Text style={[styles.rankSymbol, { color: colors.yellow }]}>{trainerRank.symbol}</Text><Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{profile?.username ?? '---'}</Text><Pressable accessibilityLabel="Alterar nickname" onPress={openNicknameEditor} style={[styles.editNameButton, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="pencil" size={14} color={colors.yellow} /></Pressable></View>{equippedDefinition ? <Text style={[styles.equippedTitle, { color: colors.yellow }]}>{equippedDefinition.icon} {equippedDefinition.title}</Text> : null}{frameDefinition || backgroundDefinition ? <Text style={[styles.cosmeticLabel, { color: profileFrameColor }]}>{frameDefinition?.name ?? 'Sem moldura'} • {backgroundDefinition?.name ?? 'Sem background'}</Text> : null}<Text style={[styles.meta, { color: colors.muted }]}>Nível {profile?.level ?? 1} • {xp.toLocaleString('pt-BR')} XP • {trainerRank.displayName} • ELO {profile?.battle_rating ?? 1000}</Text></View><View style={[styles.coinBox, { backgroundColor: colors.surface }]}><Text style={[styles.coinLabel, { color: colors.muted }]}>CARTEIRA</Text><Text style={[styles.coins, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text><Text style={[styles.coins, { color: '#68D9FF' }]}>💎 {Number(profile?.diamonds ?? 0).toLocaleString('pt-BR')}</Text></View></View>
+    <TrainerIdentityCard
+      profile={profile}
+      collectionValueUsd={collectionMarketValueUsd}
+      isAdmin={isAdmin}
+    />
+
+    <View style={styles.identityActions}>
+      <Pressable
+        disabled={avatarWorking}
+        onPress={() => setAvatarMenuOpen(true)}
+        style={[styles.identityAction,{backgroundColor:colors.surface,borderColor:colors.border}]}
+      >
+        <View style={[styles.identityActionIcon,{backgroundColor:colors.accentSoft}]}>
+          {avatarWorking
+            ? <ActivityIndicator size="small" color={colors.yellow}/>
+            : <Ionicons name="images" size={20} color={colors.yellow}/>}
+        </View>
+        <View style={styles.identityActionCopy}>
+          <Text style={[styles.identityActionTitle,{color:colors.text}]}>Foto de perfil</Text>
+          <Text style={[styles.identityActionHint,{color:colors.muted}]}>Galeria, corte quadrado e moldura equipada.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.muted}/>
+      </Pressable>
+
+      <Pressable
+        onPress={openNicknameEditor}
+        style={[styles.identityAction,{backgroundColor:colors.surface,borderColor:colors.border}]}
+      >
+        <View style={[styles.identityActionIcon,{backgroundColor:colors.accentSoft}]}>
+          <Ionicons name="pencil" size={20} color={colors.accent}/>
+        </View>
+        <View style={styles.identityActionCopy}>
+          <Text style={[styles.identityActionTitle,{color:colors.text}]}>Nickname</Text>
+          <Text style={[styles.identityActionHint,{color:colors.muted}]}>@{profile?.username ?? 'trainer'}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.muted}/>
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.push('/cosmetics')}
+        style={[styles.identityAction,{backgroundColor:colors.surface,borderColor:colors.border}]}
+      >
+        <View style={[styles.identityActionIcon,{backgroundColor:colors.accentSoft}]}>
+          <Ionicons name="color-wand" size={20} color={profileFrameColor}/>
+        </View>
+        <View style={styles.identityActionCopy}>
+          <Text style={[styles.identityActionTitle,{color:colors.text}]}>Moldura & background</Text>
+          <Text numberOfLines={1} style={[styles.identityActionHint,{color:colors.muted}]}>
+            {frameDefinition?.name ?? 'Sem moldura'} • {backgroundDefinition?.name ?? 'Sem background'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.muted}/>
+      </Pressable>
+    </View>
 
     <View style={[styles.worthPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
       <View style={styles.worthHeader}><View style={{ flex: 1 }}><Text style={[styles.worthKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text><Text style={[styles.worthTotal, { color: colors.text }]}>{formatUsd(collectionMarketValueUsd)}</Text><Text style={[styles.worthHint, { color: colors.muted }]}>Snapshot dos preços TCGplayer em USD</Text></View><View style={[styles.worthIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="cash" size={26} color={colors.yellow} /></View></View>
@@ -237,7 +294,7 @@ function Stat({ icon, value, label }: { icon: keyof typeof Ionicons.glyphMap; va
 function FeatureLink({ icon, color, title, text, onPress, badge }: { icon: keyof typeof Ionicons.glyphMap; color: string; title: string; text: string; onPress: () => void; badge?: number }) { const { colors } = useAppTheme(); return <Pressable style={[styles.feature, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onPress}><View style={[styles.featureIcon, { backgroundColor: colors.surfaceAlt }]}><Ionicons name={icon} size={23} color={color} /></View><View style={styles.featureBody}><Text style={[styles.featureTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.featureText, { color: colors.muted }]}>{text}</Text></View>{badge ? <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View> : <Ionicons name="chevron-forward" size={20} color={colors.muted} />}</Pressable>; }
 
 const styles = StyleSheet.create({
-  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 12, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' }, errorText: { flex: 1, color: '#FFD7DD', fontWeight: '700', fontSize: 12 },
+  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 12, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' }, errorText: { flex: 1, color: '#FFD7DD', fontWeight: '700', fontSize: 12 }, identityActions:{flexDirection:'row',flexWrap:'wrap',gap:9}, identityAction:{flexGrow:1,flexBasis:250,minWidth:240,minHeight:76,borderRadius:17,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:10}, identityActionIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'}, identityActionCopy:{flex:1,minWidth:0}, identityActionTitle:{fontSize:11,fontWeight:'900'}, identityActionHint:{fontSize:8,lineHeight:12,marginTop:2},
   hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24, borderWidth: 1 }, avatarButton:{position:'relative'}, avatarEditBadge:{position:'absolute',right:-5,bottom:-5,width:28,height:28,borderRadius:10,borderWidth:2,alignItems:'center',justifyContent:'center'}, avatar: { width: 70, height: 70, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, avatarText: { fontSize: 30, fontWeight: '900' }, heroInfo: { flex: 1, minWidth: 190 }, rankSymbol: { fontSize: 24, fontWeight: '900' }, equippedTitle: { fontSize: 11, fontWeight: '900', marginTop: 2 }, cosmeticLabel: { fontSize: 8, fontWeight: '900', marginTop: 3, letterSpacing: .4 }, usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }, editNameButton: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 }, username: { flexShrink: 1, fontSize: 25, fontWeight: '900' }, meta: { fontSize: 12, marginTop: 4 }, coinBox: { minWidth: 130, padding: 12, borderRadius: 16 }, coinLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.1 }, coins: { fontSize: 18, fontWeight: '900', marginTop: 3 },
   rankPanel: { padding: 15, borderRadius: 20, borderWidth: 1 }, rankPanelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, rankName: { fontSize: 20, fontWeight: '900', marginTop: 3 }, rankPoints: { fontSize: 15, fontWeight: '900' },
   worthPanel: { padding: 16, borderRadius: 22, borderWidth: 1, gap: 12 }, worthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, worthKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, worthTotal: { fontSize: 30, fontWeight: '900', marginTop: 3 }, worthHint: { fontSize: 9, marginTop: 2 }, worthIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, worthDivider: { height: 1 }, worthBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, worthMetric: { flexGrow: 1, flexBasis: 150, minWidth: 130 }, worthMetricLabel: { fontSize: 7, fontWeight: '900', letterSpacing: .9 }, worthMetricText: { fontSize: 14, fontWeight: '900', marginTop: 3 }, worthMetricValue: { fontSize: 9, fontWeight: '900', marginTop: 2 }, topCardRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 8 }, topCardImage: { width: 50, height: 67, borderRadius: 6 }, topCardLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 1 }, topCardName: { fontSize: 13, fontWeight: '900', marginTop: 2 }, topCardMeta: { fontSize: 8, marginTop: 1 }, topCardValue: { fontSize: 10, fontWeight: '900' },
