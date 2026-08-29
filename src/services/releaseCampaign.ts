@@ -116,7 +116,7 @@ function legacySelectionError(error: any): Error {
   if (message.includes('LEGACY_SELECTION_CLOSED')) return new Error('A escolha das cartas de legado ainda não está aberta.');
   if (message.includes('LEGACY_SELECTION_LOCKED')) return new Error('Seu legado já foi confirmado e não pode mais ser alterado.');
   if (message.includes('LEGACY_LIMIT_REACHED')) return new Error('Você atingiu o limite de cartas que podem ser preservadas.');
-  if (message.includes('LEGACY_CARD_NOT_OWNED')) return new Error('Uma das cartas escolhidas não está mais na sua Bag.');
+  if (message.includes('LEGACY_CARD_NOT_OWNED')) return new Error('Uma das cartas escolhidas não está mais na sua Bag nem em uma oferta ativa da sua loja.');
   if (message.includes('LEGACY_SELECT_AT_LEAST_ONE')) return new Error('Escolha pelo menos uma carta antes de confirmar seu legado.');
   if (message.includes('LEGACY_NOT_AUTHORIZED')) return new Error('Esta seleção não pertence à sua conta.');
   return error instanceof Error ? error : new Error(message || 'Não foi possível atualizar suas cartas de legado.');
