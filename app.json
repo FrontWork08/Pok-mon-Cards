@@ -18,7 +18,15 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir que Trainer Collection acesse suas fotos para escolher uma foto de perfil.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "android": {
       "package": "com.frontwork.pokemoncards",
