@@ -1681,9 +1681,8 @@ export default function AdminScreen() {
 
                     </CollapsibleSection>
           ) : null}
-          {testerHub?.isOwner ? (
-            {Boolean(adminAccess?.isOwner) ? (
-          <CollapsibleSection title="Títulos de Tester">
+          {testerHub?.isOwner && adminAccess?.isOwner ? (
+            <CollapsibleSection title="Títulos de Tester">
               <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#7D5CFF' }]}>
                 <View style={styles.moderationHeader}>
                   <View style={[styles.moderationIcon, { backgroundColor: '#211B3A' }]}>
@@ -1769,7 +1768,6 @@ export default function AdminScreen() {
                 />
               </View>
             </CollapsibleSection>
-          ) : null}
           ) : null}
           {hasAdminPermission('battlepass_grant') ? (
           <CollapsibleSection title="VIP do Passe de Batalha">
