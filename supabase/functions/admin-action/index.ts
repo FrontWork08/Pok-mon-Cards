@@ -139,6 +139,149 @@ Deno.serve(async (req: Request) => {
       return json({ data: { ...campaign, selections: selections ?? 0, submissions: submissions ?? 0 } });
     }
 
+    if (body.action === "release_legacy_progress") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+
+      const { data: campaign, error: campaignError } = await admin
+        .from("release_campaigns")
+        .select("id,phase,legacy_card_limit,legacy_selection_enabled,updated_at")
+        .eq("code", "trainer_collection_1_0_beta_transition")
+        .eq("active", true)
+        .maybeSingle();
+      if (campaignError) throw campaignError;
+      if (!campaign) return json({ error: "RELEASE_CAMPAIGN_NOT_FOUND" }, 404);
+
+      const [playersResult, selectionsResult, submissionsResult] = await Promise.all([
+        admin
+          .from("players")
+          .select("id,username,account_status,created_at")
+          .order("username", { ascending: true }),
+        admin
+          .from("release_campaign_legacy_selections")
+          .select("player_id,selection_source,selected_at")
+          .eq("campaign_id", campaign.id),
+        admin
+          .from("release_campaign_legacy_submissions")
+          .select("player_id,selected_count,confirmed_at,auto_filled_count")
+          .eq("campaign_id", campaign.id),
+      ]);
+
+      if (playersResult.error) throw playersResult.error;
+      if (selectionsResult.error) throw selectionsResult.error;
+      if (submissionsResult.error) throw submissionsResult.error;
+
+      const selectionByPlayer = new Map<string, {
+        selectedCount: number;
+        manualCount: number;
+        automaticCount: number;
+        lastSelectedAt: string | null;
+      }>();
+
+      for (const row of selectionsResult.data ?? []) {
+        const playerId = String(row.player_id ?? "");
+        if (!playerId) continue;
+        const current = selectionByPlayer.get(playerId) ?? {
+          selectedCount: 0,
+          manualCount: 0,
+          automaticCount: 0,
+          lastSelectedAt: null,
+        };
+        current.selectedCount += 1;
+        if (row.selection_source === "automatic") current.automaticCount += 1;
+        else current.manualCount += 1;
+        if (
+          row.selected_at &&
+          (!current.lastSelectedAt || new Date(row.selected_at).getTime() > new Date(current.lastSelectedAt).getTime())
+        ) {
+          current.lastSelectedAt = row.selected_at;
+        }
+        selectionByPlayer.set(playerId, current);
+      }
+
+      const submissionByPlayer = new Map(
+        (submissionsResult.data ?? []).map((row) => [String(row.player_id), row]),
+      );
+      const limit = Math.max(0, Number(campaign.legacy_card_limit ?? 10));
+
+      const players = (playersResult.data ?? []).map((player) => {
+        const selection = selectionByPlayer.get(String(player.id)) ?? {
+          selectedCount: 0,
+          manualCount: 0,
+          automaticCount: 0,
+          lastSelectedAt: null,
+        };
+        const submission = submissionByPlayer.get(String(player.id)) as any;
+        const confirmed = Boolean(submission?.confirmed_at);
+        const completedTen = limit > 0 && selection.selectedCount >= limit;
+
+        const status = completedTen && confirmed
+          ? "complete_confirmed"
+          : completedTen
+            ? "complete_unconfirmed"
+            : confirmed
+              ? "confirmed_partial"
+              : selection.selectedCount > 0
+                ? "in_progress"
+                : "not_started";
+
+        return {
+          playerId: player.id,
+          username: player.username,
+          accountStatus: player.account_status,
+          selectedCount: selection.selectedCount,
+          manualCount: selection.manualCount,
+          automaticCount: selection.automaticCount,
+          remainingCount: Math.max(0, limit - selection.selectedCount),
+          confirmed,
+          confirmedAt: submission?.confirmed_at ?? null,
+          submissionSelectedCount: submission?.selected_count == null ? null : Number(submission.selected_count),
+          autoFilledCount: Number(submission?.auto_filled_count ?? 0),
+          lastSelectedAt: selection.lastSelectedAt,
+          status,
+        };
+      });
+
+      const statusOrder: Record<string, number> = {
+        complete_confirmed: 0,
+        complete_unconfirmed: 1,
+        confirmed_partial: 2,
+        in_progress: 3,
+        not_started: 4,
+      };
+      players.sort((a, b) =>
+        (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99) ||
+        String(a.username).localeCompare(String(b.username), "pt-BR", { sensitivity: "base" })
+      );
+
+      const summary = {
+        totalPlayers: players.length,
+        selectedTen: players.filter((row) => row.selectedCount >= limit && limit > 0).length,
+        confirmedTen: players.filter((row) => row.selectedCount >= limit && limit > 0 && row.confirmed).length,
+        tenAwaitingConfirmation: players.filter((row) => row.selectedCount >= limit && limit > 0 && !row.confirmed).length,
+        confirmedPartial: players.filter((row) => row.confirmed && row.selectedCount < limit).length,
+        inProgress: players.filter((row) => !row.confirmed && row.selectedCount > 0 && row.selectedCount < limit).length,
+        notStarted: players.filter((row) => row.selectedCount === 0).length,
+        selectedCards: players.reduce((sum, row) => sum + row.selectedCount, 0),
+        manualCards: players.reduce((sum, row) => sum + row.manualCount, 0),
+        automaticCards: players.reduce((sum, row) => sum + row.automaticCount, 0),
+      };
+
+      return json({
+        data: {
+          generatedAt: new Date().toISOString(),
+          campaign: {
+            id: campaign.id,
+            phase: campaign.phase,
+            legacyCardLimit: limit,
+            legacySelectionEnabled: Boolean(campaign.legacy_selection_enabled),
+            updatedAt: campaign.updated_at,
+          },
+          summary,
+          players,
+        },
+      });
+    }
+
     if (body.action === "set_release_download_url") {
       if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
 
