@@ -260,6 +260,63 @@ const TCGCSV_GROUPS: Record<string, number> = {
   me5: 24688,
 };
 
+const TCGCSV_GROUP_NAMES: Record<string, string> = {
+  mcd14: "McDonald's Promos 2014",
+  mcd15: "McDonald's Promos 2015",
+  mcd17: "McDonald's Promos 2017",
+  mcd18: "McDonald's Promos 2018",
+  tk1a: "EX Trainer Kit 1: Latias & Latios",
+  tk1b: "EX Trainer Kit 1: Latias & Latios",
+  tk2a: "EX Trainer Kit 2: Plusle & Minun",
+  tk2b: "EX Trainer Kit 2: Plusle & Minun",
+  bwp: "BW Promos",
+  ecard2: "Aquapolis",
+};
+
+let tcgcsvGroupsPromise: Promise<any[]> | null = null;
+
+function normalizeName(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function namesRoughlyMatch(localName: unknown, productName: unknown) {
+  const local = normalizeName(localName);
+  const product = normalizeName(productName);
+  if (!local || !product) return false;
+  return product === local || product.startsWith(local + " ") || local.startsWith(product + " ");
+}
+
+async function resolveTcgcsvGroupId(setId: string) {
+  if (TCGCSV_GROUPS[setId]) return TCGCSV_GROUPS[setId];
+  const expectedName = TCGCSV_GROUP_NAMES[setId];
+  if (!expectedName) return null;
+
+  if (!tcgcsvGroupsPromise) {
+    tcgcsvGroupsPromise = fetch("https://tcgcsv.com/tcgplayer/3/groups", {
+      headers: { "User-Agent": "Pokemon-Cards-Price-Sync/1.3" },
+      signal: AbortSignal.timeout(20_000),
+    }).then(async (response) => {
+      if (!response.ok) throw new UpstreamError(`TCGCSV_GROUPS_HTTP_${response.status}`, response.status);
+      const payload = await response.json();
+      return Array.isArray(payload?.results) ? payload.results : [];
+    }).catch((error) => {
+      tcgcsvGroupsPromise = null;
+      throw error;
+    });
+  }
+
+  const groups = await tcgcsvGroupsPromise;
+  const expected = normalizeName(expectedName);
+  const group = groups.find((item: any) => normalizeName(item?.name) === expected);
+  const groupId = Number(group?.groupId);
+  return Number.isFinite(groupId) ? groupId : null;
+}
+
 function normalizeCollectorNumber(value: unknown) {
   const raw = String(value ?? "").trim().split("/")[0] ?? "";
   if (!raw) return "";
@@ -281,7 +338,7 @@ function tcgcsvVariantKey(subTypeName: unknown) {
 }
 
 async function fetchTcgcsvSet(admin: any, setId: string) {
-  const groupId = TCGCSV_GROUPS[setId];
+  const groupId = await resolveTcgcsvGroupId(setId);
   if (!groupId) return null;
 
   const headers = { "User-Agent": "Pokemon-Cards-Price-Sync/1.2" };
@@ -317,7 +374,7 @@ async function fetchTcgcsvSet(admin: any, setId: string) {
     pricesByProduct.set(productId, list);
   }
 
-  const productsByNumber = new Map<string, any>();
+  const productsByNumber = new Map<string, any[]>();
   for (const product of products) {
     const extended = Array.isArray(product?.extendedData) ? product.extendedData : [];
     const numberField = extended.find((item: any) =>
@@ -343,23 +400,31 @@ async function fetchTcgcsvSet(admin: any, setId: string) {
     }
     if (!Object.keys(prices).length) continue;
 
-    productsByNumber.set(collectorNumber, {
+    const candidate = {
       productId: Number(product.productId),
+      productName: product.name,
       prices,
       source: "tcgcsv",
       groupId,
-    });
+    };
+    const list = productsByNumber.get(collectorNumber) ?? [];
+    list.push(candidate);
+    productsByNumber.set(collectorNumber, list);
   }
 
   const { data: localCards, error } = await admin
     .from("cards")
-    .select("id,card_number,rarity")
+    .select("id,card_number,rarity,pokemon_name")
     .eq("set_id", setId);
   if (error) throw new UpstreamError(`LOCAL_SET_LOOKUP_FAILED: ${error.message}`);
 
   return (localCards ?? []).map((card: any) => {
     const collectorNumber = normalizeCollectorNumber(card.card_number);
-    const tcgplayer = productsByNumber.get(collectorNumber) ?? null;
+    const candidates = productsByNumber.get(collectorNumber) ?? [];
+    let tcgplayer =
+      candidates.find((item: any) => namesRoughlyMatch(card.pokemon_name, item.productName))
+      ?? (candidates.length === 1 ? candidates[0] : null);
+
     return {
       id: card.id,
       rarity: card.rarity,
@@ -370,7 +435,7 @@ async function fetchTcgcsvSet(admin: any, setId: string) {
 }
 
 async function enrichWithTcgcsvFallback(admin: any, setId: string, cards: any[]) {
-  if (!TCGCSV_GROUPS[setId]) return cards;
+  if (!TCGCSV_GROUPS[setId] && !TCGCSV_GROUP_NAMES[setId]) return cards;
   const tcgcsvCards = await fetchTcgcsvSet(admin, setId);
   if (!tcgcsvCards) return cards;
 
@@ -454,7 +519,7 @@ Deno.serve(async (request: Request) => {
         enrichedCards = await enrichWithTcgcsvFallback(admin, setId, enrichedCards);
       } catch (primaryError) {
         let fallbackCards: any[] | null = null;
-        if (TCGCSV_GROUPS[setId]) {
+        if (TCGCSV_GROUPS[setId] || TCGCSV_GROUP_NAMES[setId]) {
           fallbackCards = await fetchTcgcsvSet(admin, setId);
         }
         if (!fallbackCards || !fallbackCards.some((card: any) => hasUsableTcgplayer(card.tcgplayer))) {
@@ -464,7 +529,7 @@ Deno.serve(async (request: Request) => {
         results.push({
           ok: true,
           setId,
-          fallback: TCGCSV_GROUPS[setId] ? "tcgcsv-set" : "tcgdex-set",
+          fallback: (TCGCSV_GROUPS[setId] || TCGCSV_GROUP_NAMES[setId]) ? "tcgcsv-set" : "tcgdex-set",
           primaryError: primaryError instanceof Error ? primaryError.message : "UNKNOWN_PRIMARY_ERROR",
         });
       }
