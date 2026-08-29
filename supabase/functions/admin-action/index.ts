@@ -85,6 +85,15 @@ Deno.serve(async (req: Request) => {
       return json({ data: access });
     }
 
+    if (body.action === "release_preflight") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const { data, error } = await admin.rpc("server_release_preflight", {
+        p_actor_id: user.id,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
     if (body.action === "release_campaign_status") {
       const { data: campaign, error: campaignError } = await admin
         .from("release_campaigns")
