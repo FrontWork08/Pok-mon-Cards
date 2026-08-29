@@ -42,6 +42,7 @@ import {
   getAdminReleaseCampaignStatus,
   runAdminReleasePreflight,
   getAdminReleaseResetPreview,
+  getAdminReleaseReadiness,
   setLegacySelectionEnabled,
   type AdminAccess,
   type AdminPermission,
@@ -56,6 +57,7 @@ import {
   type AdminReleaseCampaignStatus,
   type AdminReleasePreflight,
   type AdminReleaseResetPreview,
+  type AdminReleaseReadiness,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
@@ -110,6 +112,7 @@ export default function AdminScreen() {
   const [releaseStatus, setReleaseStatus] = useState<AdminReleaseCampaignStatus | null>(null);
   const [releasePreflight, setReleasePreflight] = useState<AdminReleasePreflight | null>(null);
   const [releaseResetPreview, setReleaseResetPreview] = useState<AdminReleaseResetPreview | null>(null);
+  const [releaseReadiness, setReleaseReadiness] = useState<AdminReleaseReadiness | null>(null);
   const [maintenanceMessage, setMaintenanceMessage] = useState('Estamos aplicando uma atualização importante. O jogo voltará em breve.');
   const [gameEvents, setGameEvents] = useState<AdminGameEvent[]>([]);
   const [eventType, setEventType] = useState<'double_xp'|'rare_boost'|'featured_set'>('double_xp');
@@ -838,6 +841,28 @@ export default function AdminScreen() {
   }
 
 
+  async function loadReleaseReadiness() {
+    if (working || !adminAccess?.isOwner) return;
+    try {
+      setWorking(true);
+      setError(null);
+      const result = await getAdminReleaseReadiness();
+      setReleaseReadiness(result);
+      setReleaseResetPreview(result.preview);
+      setReleasePreflight(result.preview.preflight);
+      setNotice(
+        result.readyToReset
+          ? 'Checklist 1.0 concluído: todas as travas técnicas estão prontas. Nenhum reset foi executado.'
+          : 'Checklist 1.0 atualizado. As pendências continuam bloqueando qualquer reset.',
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível atualizar o checklist da 1.0.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+
   return (
     <Screen title="Admin Command Center" subtitle="Controle privado de usuários, economia, eventos, segurança e saúde da Trainer Collection.">
       <View style={styles.topRow}>
@@ -956,6 +981,50 @@ export default function AdminScreen() {
                       </View>
                     ))}
                   </View>
+                ) : null}
+              </View>
+
+              <View style={[styles.releaseChecklist,{backgroundColor:colors.surfaceAlt,borderColor:releaseReadiness?.readyToReset ? '#2F9E68' : colors.border}]}>
+                <View style={styles.resetPreviewHead}>
+                  <View style={[styles.resetPreviewIcon,{backgroundColor:colors.accentSoft}]}>
+                    <Ionicons name="checkmark-done-outline" size={20} color={colors.yellow}/>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={[styles.resetPreviewTitle,{color:colors.text}]}>CHECKLIST DE LANÇAMENTO 1.0</Text>
+                    <Text style={[styles.resetPreviewText,{color:colors.muted}]}>Mostra as travas obrigatórias sem executar freeze, snapshot ou reset.</Text>
+                  </View>
+                  <Pressable disabled={working} onPress={() => { void loadReleaseReadiness(); }} style={[styles.preflightButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent,opacity:working ? .55 : 1}]}>
+                    <Ionicons name="refresh" size={16} color={colors.accent}/>
+                    <Text style={[styles.preflightButtonText,{color:colors.accent}]}>ATUALIZAR</Text>
+                  </Pressable>
+                </View>
+                {releaseReadiness ? (
+                  <>
+                    <View style={styles.checklistGrid}>
+                      {[
+                        ['APK / LINK',releaseReadiness.downloadUrlReady,'Link da versão 1.0 configurado'],
+                        ['FREEZE',releaseReadiness.economyFrozen,'Economia congelada'],
+                        ['MANUTENÇÃO',releaseReadiness.maintenanceEnabled,'Jogadores bloqueados'],
+                        ['PRÉ-CHECK',releaseReadiness.preflightReady,'Auditoria aprovada'],
+                        ['AUTO LEGADO',releaseReadiness.accountsAwaitingAutoFill === 0,`${releaseReadiness.accountsAwaitingAutoFill} conta(s) com vagas`],
+                        ['FILAS',releaseReadiness.activeOperations === 0,`${releaseReadiness.activeOperations} operação(ões) ativa(s)`],
+                        ['SNAPSHOT',releaseReadiness.snapshotPrepared,'Backup privado preparado'],
+                      ].map(([label,ok,hint]) => (
+                        <View key={String(label)} style={[styles.checklistItem,{borderColor:Boolean(ok) ? '#2F9E68' : colors.border}]}>
+                          <View style={[styles.checklistDot,{backgroundColor:Boolean(ok) ? '#65D894' : '#66758A'}]}/>
+                          <View style={{flex:1}}>
+                            <Text style={[styles.checklistLabel,{color:colors.text}]}>{String(label)}</Text>
+                            <Text style={[styles.checklistHint,{color:colors.muted}]}>{String(hint)}</Text>
+                          </View>
+                          <Ionicons name={Boolean(ok) ? 'checkmark-circle' : 'lock-closed'} size={16} color={Boolean(ok) ? '#65D894' : colors.muted}/>
+                        </View>
+                      ))}
+                    </View>
+                    <View style={[styles.resetReadyBadge,{backgroundColor:releaseReadiness.readyToReset ? '#153426' : '#2C2730',borderColor:releaseReadiness.readyToReset ? '#2F9E68' : colors.border}]}>
+                      <Ionicons name={releaseReadiness.readyToReset ? 'checkmark-circle' : 'shield-outline'} size={16} color={releaseReadiness.readyToReset ? '#65D894' : colors.muted}/>
+                      <Text style={[styles.resetReadyText,{color:releaseReadiness.readyToReset ? '#9CEFC1' : colors.muted}]}>{releaseReadiness.readyToReset ? 'TODAS AS TRAVAS PRONTAS — RESET CONTINUA MANUAL E NÃO EXECUTADO' : `FASE ATUAL: ${releaseReadiness.phase.toUpperCase()} • RESET BLOQUEADO`}</Text>
+                    </View>
+                  </>
                 ) : null}
               </View>
 
@@ -2215,6 +2284,12 @@ const styles = StyleSheet.create({
   issueItem:{flexGrow:1,flexBasis:105,minWidth:95,borderRadius:11,borderWidth:1,paddingHorizontal:9,paddingVertical:7},
   issueValue:{fontSize:13,fontWeight:'900'},
   issueLabel:{fontSize:6,fontWeight:'900',letterSpacing:.45,marginTop:1},
+  releaseChecklist:{borderRadius:17,borderWidth:1,padding:11,gap:9},
+  checklistGrid:{flexDirection:'row',flexWrap:'wrap',gap:6},
+  checklistItem:{flexGrow:1,flexBasis:190,minWidth:170,borderRadius:11,borderWidth:1,paddingHorizontal:9,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:7},
+  checklistDot:{width:7,height:7,borderRadius:999},
+  checklistLabel:{fontSize:8,fontWeight:'900',letterSpacing:.4},
+  checklistHint:{fontSize:6.5,lineHeight:10,marginTop:1},
   resetPreviewBox:{borderRadius:17,borderWidth:1,padding:11,gap:9},
   resetPreviewHead:{flexDirection:'row',alignItems:'center',gap:9,flexWrap:'wrap'},
   resetPreviewIcon:{width:40,height:40,borderRadius:13,alignItems:'center',justifyContent:'center'},
