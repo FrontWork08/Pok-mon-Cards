@@ -14,6 +14,28 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="PokéCards" />
     <meta name="format-detection" content="telephone=no" />
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var returnTo = params.get('preview_return');
+          if (!returnTo) return;
+
+          var target = new URL(returnTo);
+          var allowedHost = 'pokemon-cards-frontwork--trainer-collection-v1-preview.expo.app';
+          if (target.protocol !== 'https:' || target.hostname !== allowedHost) return;
+
+          params.delete('preview_return');
+          var remaining = params.toString();
+          var destination = target.origin + target.pathname;
+          if (remaining) destination += '?' + remaining;
+          destination += window.location.hash || '';
+          window.location.replace(destination);
+        } catch (_) {
+          // Never block the Beta if the bridge parameters are invalid.
+        }
+      })();
+    </script>
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" href="/icon.png" />
     <link rel="apple-touch-icon" href="/icon.png" />
