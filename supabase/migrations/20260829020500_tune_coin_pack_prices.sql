@@ -36,16 +36,16 @@ begin
         when max_card_usd >= 1000 then 25
         when max_card_usd >= 900 then 15
         when max_card_usd >= 800 then 10
-        when max_card_usd >= 700 then 40000
-        when max_card_usd >= 600 then 32000
-        when max_card_usd >= 500 then 25000
-        when max_card_usd >= 400 then 20000
-        when max_card_usd >= 300 then 15000
-        when max_card_usd >= 200 then 10000
-        when max_card_usd >= 150 then 7500
-        when max_card_usd >= 100 then 5000
-        when max_card_usd >= 50 then 2500
-        when max_card_usd >= 25 then 1200
+        when max_card_usd >= 700 then 35000
+        when max_card_usd >= 600 then 28000
+        when max_card_usd >= 500 then 22000
+        when max_card_usd >= 400 then 18000
+        when max_card_usd >= 300 then 13000
+        when max_card_usd >= 200 then 9000
+        when max_card_usd >= 150 then 6500
+        when max_card_usd >= 100 then 4500
+        when max_card_usd >= 50 then 2200
+        when max_card_usd >= 25 then 1000
         else 500
       end::bigint as price
     from pack_values
@@ -76,7 +76,7 @@ set changes = (
   select array_agg(distinct item order by item)
   from unnest(
     changes || array[
-      'Preços de boosters em Coins reduzidos novamente para 500 a 40.000; preços em Diamantes permanecem inalterados na escala premium de 10 a 100'
+      'Preços de boosters em Coins reduzidos levemente novamente para 500 a 35.000; preços em Diamantes permanecem inalterados na escala premium de 10 a 100'
     ]::text[]
   ) item
 )
