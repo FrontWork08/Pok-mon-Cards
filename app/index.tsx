@@ -24,7 +24,10 @@ export default function AuthScreen() {
       });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) router.replace('/(tabs)');
+      if (!session?.user) return;
+      // Defer navigation too: mounting authenticated screens can start
+      // Supabase queries, which must not happen inside the auth callback.
+      setTimeout(() => router.replace('/(tabs)'), 0);
     });
 
     return () => {
