@@ -49,6 +49,8 @@ function getDaysLeft(value: string) {
   return Math.max(0, Math.ceil((target.getTime() - today.getTime()) / 86_400_000));
 }
 
+const WEB_APP_URL = 'https://pokemon-cards-frontwork.expo.app';
+
 export function ReleaseCampaignNotice() {
   const { colors } = useAppTheme();
   const router = useRouter();
@@ -83,7 +85,9 @@ export function ReleaseCampaignNotice() {
         const legacySelectionOpen = result.campaign.phase === 'legacy_selection'
           && result.campaign.legacy_selection_enabled;
 
-        if (alreadyOnTarget && !result.campaign.force_update && !legacySelectionOpen) {
+        // force_update is a minimum-version gate. Players already on the
+        // target version must never be blocked by the download prompt.
+        if (alreadyOnTarget && !legacySelectionOpen) {
           setCampaign(null);
           setVote(result.vote);
           setVisible(false);
@@ -141,7 +145,9 @@ export function ReleaseCampaignNotice() {
 
   const activeCampaign = campaign;
   const activeUserId = userId;
-  const forced = activeCampaign.force_update && Boolean(activeCampaign.download_url);
+  const installedVersion = Constants.expoConfig?.version ?? '0.0.0';
+  const needsNativeUpgrade = compareVersions(installedVersion, activeCampaign.target_version) < 0;
+  const forced = needsNativeUpgrade && activeCampaign.force_update && Boolean(activeCampaign.download_url);
   const answered = Boolean(vote);
 
   async function respond(nextVote: -1 | 1) {
@@ -165,6 +171,10 @@ export function ReleaseCampaignNotice() {
   async function openDownload() {
     if (!activeCampaign.download_url) return;
     await Linking.openURL(activeCampaign.download_url);
+  }
+
+  async function openWebApp() {
+    await Linking.openURL(WEB_APP_URL);
   }
 
   return (
@@ -383,6 +393,14 @@ export function ReleaseCampaignNotice() {
                 >
                   <Ionicons name="download-outline" size={19} color="#090A0F" />
                   <Text style={styles.primaryButtonText}>BAIXAR NOVA VERSÃO</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => { void openWebApp(); }}
+                  style={[styles.webButton, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]}
+                >
+                  <Ionicons name="globe-outline" size={18} color={colors.accent} />
+                  <Text style={[styles.webButtonText, { color: colors.text }]}>ABRIR VERSÃO WEB</Text>
                 </Pressable>
               </>
             )}
@@ -740,5 +758,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 17,
     fontWeight: '700',
+  },
+  webButton: {
+    minHeight: 50,
+    borderRadius: 15,
+    borderWidth: 1,
+    marginTop: 8,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webButtonText: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: .45,
   },
 });
