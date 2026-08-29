@@ -73,9 +73,9 @@ export default function SettingsScreen() {
       </View>
 
       <View style={[styles.section,{backgroundColor:colors.surface,borderColor:colors.border}]}>
-        <Text style={[styles.kicker,{color:colors.yellow}]}>ÍCONE DO PERFIL</Text>
-        <Text style={[styles.title,{color:colors.text}]}>Seu símbolo de treinador</Text>
-        <Text style={[styles.helper,{color:colors.muted}]}>Aparece no perfil e nas áreas sociais sem enviar foto ou pesar o aplicativo.</Text>
+        <Text style={[styles.kicker,{color:colors.yellow}]}>ÍCONE DE FALLBACK</Text>
+        <Text style={[styles.title,{color:colors.text}]}>Avatar quando não houver foto</Text>
+        <Text style={[styles.helper,{color:colors.muted}]}>Se você não usar uma foto, este símbolo aparece no Trainer Card e nas áreas sociais.</Text>
         <View style={styles.iconGrid}>{profileIcons.map((item)=><Pressable key={item.id} onPress={()=>{void chooseProfileIcon(item.id);}} style={[styles.iconChoice,{backgroundColor:colors.surfaceAlt,borderColor:profileIcon===item.id?colors.accent:colors.border}]}><TrainerAvatar icon={item.id} size={44} color={profileIcon===item.id?colors.yellow:colors.accent} backgroundColor={colors.surface}/><Text style={[styles.iconName,{color:colors.text}]}>{item.name}</Text>{profileIcon===item.id?<Ionicons name="checkmark-circle" size={16} color={colors.accent}/>:null}</Pressable>)}</View>
       </View>
 
