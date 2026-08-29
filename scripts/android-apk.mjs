@@ -56,7 +56,7 @@ async function writeDownloadReleaseMetadata({ build, url, bytes }) {
   );
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   const release = {
-    appName: 'Pokémon Cards',
+    appName: 'Trainer Collection',
     version,
     buildVersion,
     downloadUrl: url,
@@ -124,7 +124,7 @@ async function downloadLatestApk() {
   }
 
   const version = buildVersionLabel(build);
-  const fileName = `PokemonCard-v${version}.apk`;
+  const fileName = `TrainerCollection-v${version}.apk`;
   const destination = path.join(outputDir, fileName);
 
   console.log(`⬇️  Baixando ${fileName}...`);
