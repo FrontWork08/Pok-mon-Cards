@@ -53,15 +53,15 @@ with check (
   and exists (
     select 1
     from public.player_cards pc
-    where pc.player_id = player_id
-      and pc.card_id = card_id
+    where pc.player_id = release_campaign_legacy_selections.player_id
+      and pc.card_id = release_campaign_legacy_selections.card_id
       and pc.quantity > 0
   )
   and not exists (
     select 1
     from public.release_campaign_legacy_submissions s
-    where s.campaign_id = campaign_id
-      and s.player_id = player_id
+    where s.campaign_id = release_campaign_legacy_selections.campaign_id
+      and s.player_id = release_campaign_legacy_selections.player_id
   )
 );
 
