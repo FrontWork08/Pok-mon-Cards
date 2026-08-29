@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -55,12 +56,14 @@ import { getMaintenanceStatus, type AppRuntimeStatus } from '@/services/maintena
 import { adminSetGuildLeader, getGuildHub, type GuildHub } from '@/services/guilds';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { getThemeVisual } from '@/theme/themeCatalog';
 
 const QUICK_AMOUNTS = [1000, 5000, 10000, 50000, 100000];
 
 export default function AdminScreen() {
   const router = useRouter();
-  const { colors } = useAppTheme();
+  const { colors, themeName } = useAppTheme();
+  const themeVisual = getThemeVisual(themeName);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [adminAccess, setAdminAccessState] = useState<AdminAccess | null>(null);
   const [players, setPlayers] = useState<AdminPlayer[]>([]);
@@ -738,7 +741,7 @@ export default function AdminScreen() {
 
 
   return (
-    <Screen title="Admin Center" subtitle="Painel privado de economia, usuários, mercado e saúde do jogo.">
+    <Screen title="Admin Command Center" subtitle="Controle privado de usuários, economia, eventos, segurança e saúde da Trainer Collection.">
       <View style={styles.topRow}>
         <Pressable
           style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -776,16 +779,23 @@ export default function AdminScreen() {
 
       {!loading && overview ? (
         <>
-          <View style={[styles.adminHero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+          <View style={[styles.adminHero, { backgroundColor: colors.accentSoft, borderColor: maintenanceStatus?.maintenance_enabled ? '#FF6475' : colors.accent }]}>
+            <View style={[styles.adminHeroGlow,{backgroundColor:maintenanceStatus?.maintenance_enabled ? '#FF6475' : colors.accent}]} />
+            <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.adminHeroPokemon}/>
             <View style={[styles.adminIcon, { backgroundColor: colors.surface }]}>
               <Ionicons name="shield-checkmark" size={27} color={colors.yellow} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.heroKicker, { color: colors.yellow }]}>ACESSO ADMINISTRATIVO</Text>
-              <Text style={[styles.heroTitle, { color: colors.text }]}>Controle privado ativado</Text>
+            <View style={styles.adminHeroCopy}>
+              <Text style={[styles.heroKicker, { color: colors.yellow }]}>TRAINER COLLECTION CONTROL ROOM</Text>
+              <Text style={[styles.heroTitle, { color: colors.text }]}>{maintenanceStatus?.maintenance_enabled ? 'Aplicativo em manutenção' : 'Controle privado ativado'}</Text>
               <Text style={[styles.heroText, { color: colors.muted }]}>
-                Toda alteração de moedas é feita no servidor e registrada no histórico administrativo.
+                Economia, moderação, eventos e operações críticas ficam centralizadas neste painel com histórico administrativo.
               </Text>
+              <View style={styles.adminHeroStats}>
+                <View style={[styles.adminHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.adminHeroStatValue,{color:colors.text}]}>{overview.users.total.toLocaleString('pt-BR')}</Text><Text style={[styles.adminHeroStatLabel,{color:colors.muted}]}>USUÁRIOS</Text></View>
+                <View style={[styles.adminHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.adminHeroStatValue,{color:colors.text}]}>{overview.battles.active.toLocaleString('pt-BR')}</Text><Text style={[styles.adminHeroStatLabel,{color:colors.muted}]}>BATALHAS ATIVAS</Text></View>
+                <View style={[styles.adminHeroStat,{backgroundColor:colors.surface,borderColor:maintenanceStatus?.maintenance_enabled ? '#FF6475' : '#2F9E68'}]}><Text style={[styles.adminHeroStatValue,{color:maintenanceStatus?.maintenance_enabled ? '#FF8290' : '#65D894'}]}>{maintenanceStatus?.maintenance_enabled ? 'PAUSADO' : 'ONLINE'}</Text><Text style={[styles.adminHeroStatLabel,{color:colors.muted}]}>RUNTIME</Text></View>
+              </View>
             </View>
           </View>
 
@@ -1933,18 +1943,25 @@ const styles = StyleSheet.create({
   noticeText: { flex: 1, fontSize: 11, fontWeight: '700', lineHeight: 16 },
   error: { borderRadius: 15, borderWidth: 1, borderColor: '#683243', backgroundColor: '#351A24', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 9 },
   errorText: { flex: 1, color: '#FFD7DD', fontSize: 11, fontWeight: '700' },
-  adminHero: { borderRadius: 22, borderWidth: 1, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  adminHero: { borderRadius: 28, borderWidth: 1, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center', overflow:'hidden', position:'relative', minHeight:185 },
+  adminHeroGlow:{position:'absolute',right:-75,top:-95,width:290,height:290,borderRadius:999,opacity:.13},
+  adminHeroPokemon:{position:'absolute',right:-24,bottom:-46,width:205,height:220,opacity:.18,transform:[{rotate:'6deg'}]},
+  adminHeroCopy:{flex:1,zIndex:2,paddingRight:72},
+  adminHeroStats:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:13},
+  adminHeroStat:{minWidth:84,borderRadius:13,borderWidth:1,paddingHorizontal:10,paddingVertical:8},
+  adminHeroStatValue:{fontSize:14,fontWeight:'900'},
+  adminHeroStatLabel:{fontSize:7,fontWeight:'900',letterSpacing:.55,marginTop:1},
   auditLaunch: { minHeight: 78, borderRadius: 19, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 10 },
   auditLaunchIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   auditLaunchTitle: { fontSize: 14, fontWeight: '900' },
   auditLaunchText: { fontSize: 9, lineHeight: 14, marginTop: 3 },
-  adminIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  adminIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center', zIndex:2 },
   heroKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   heroTitle: { fontSize: 18, fontWeight: '900', marginTop: 2 },
   heroText: { fontSize: 10, lineHeight: 15, marginTop: 3 },
   sectionTitle: { flex: 1, fontSize: 16, fontWeight: '900' },
   collapsibleSection: { gap: 8 },
-  collapsibleHeader: { minHeight: 58, borderRadius: 17, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  collapsibleHeader: { minHeight: 58, borderRadius: 19, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   collapsibleChevron: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   collapsibleBody: { gap: 10 },
   correctionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
@@ -1981,7 +1998,7 @@ const styles = StyleSheet.create({
   marketText: { fontSize: 9, lineHeight: 14, marginTop: 2 },
   marketButton: { minHeight: 48, borderRadius: 14, marginTop: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   marketButtonText: { color: '#07111F', fontSize: 10, fontWeight: '900', letterSpacing: .4 },
-  grantPanel: { borderRadius: 20, borderWidth: 1, padding: 14, gap: 10 },
+  grantPanel: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 10 },
   fieldLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   friendChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   friendChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
