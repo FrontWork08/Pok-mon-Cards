@@ -85,6 +85,57 @@ Deno.serve(async (req: Request) => {
       return json({ data: access });
     }
 
+    if (body.action === "release_campaign_status") {
+      const { data: campaign, error: campaignError } = await admin
+        .from("release_campaigns")
+        .select("id,code,title,target_version,release_date,phase,active,reward_coins,reward_diamonds,legacy_card_limit,legacy_selection_enabled,economy_frozen,force_update,download_url,updated_at")
+        .eq("code", "trainer_collection_1_0_beta_transition")
+        .maybeSingle();
+      if (campaignError) throw campaignError;
+      if (!campaign) return json({ data: null });
+
+      const [{ count: selections, error: selectionsError }, { count: submissions, error: submissionsError }] = await Promise.all([
+        admin.from("release_campaign_legacy_selections").select("*", { count: "exact", head: true }).eq("campaign_id", campaign.id),
+        admin.from("release_campaign_legacy_submissions").select("*", { count: "exact", head: true }).eq("campaign_id", campaign.id),
+      ]);
+      if (selectionsError) throw selectionsError;
+      if (submissionsError) throw submissionsError;
+      return json({ data: { ...campaign, selections: selections ?? 0, submissions: submissions ?? 0 } });
+    }
+
+    if (body.action === "set_legacy_selection") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const enabled = body.enabled === true;
+      const { data: current, error: currentError } = await admin
+        .from("release_campaigns")
+        .select("id,phase,legacy_selection_enabled")
+        .eq("code", "trainer_collection_1_0_beta_transition")
+        .maybeSingle();
+      if (currentError) throw currentError;
+      if (!current) return json({ error: "RELEASE_CAMPAIGN_NOT_FOUND" }, 404);
+      if (!["notice", "legacy_selection"].includes(String(current.phase))) {
+        return json({ error: "RELEASE_PHASE_LOCKED" }, 409);
+      }
+
+      const patch = enabled
+        ? { phase: "legacy_selection", legacy_selection_enabled: true, updated_at: new Date().toISOString() }
+        : { legacy_selection_enabled: false, updated_at: new Date().toISOString() };
+
+      const { data: campaign, error } = await admin
+        .from("release_campaigns")
+        .update(patch)
+        .eq("id", current.id)
+        .select("id,code,title,target_version,release_date,phase,active,reward_coins,reward_diamonds,legacy_card_limit,legacy_selection_enabled,economy_frozen,force_update,download_url,updated_at")
+        .single();
+      if (error) throw error;
+
+      const [{ count: selections }, { count: submissions }] = await Promise.all([
+        admin.from("release_campaign_legacy_selections").select("*", { count: "exact", head: true }).eq("campaign_id", current.id),
+        admin.from("release_campaign_legacy_submissions").select("*", { count: "exact", head: true }).eq("campaign_id", current.id),
+      ]);
+      return json({ data: { ...campaign, selections: selections ?? 0, submissions: submissions ?? 0 } });
+    }
+
     if (body.action === "account_audit") {
       if (!can("audit_users")) return json({ error: "FORBIDDEN_PERMISSION:audit_users" }, 403);
       const targetId = typeof body.targetId === "string" ? body.targetId : "";
