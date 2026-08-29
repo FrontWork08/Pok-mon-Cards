@@ -95,3 +95,119 @@ export async function submitReleaseCampaignVote(
 
   throw error;
 }
+
+
+export type LegacySelectionSubmission = {
+  campaign_id: string;
+  player_id: string;
+  selected_count: number;
+  confirmed_at: string;
+};
+
+export type LegacySelectionState = {
+  cardIds: string[];
+  submission: LegacySelectionSubmission | null;
+};
+
+function legacySelectionError(error: any): Error {
+  const message = String(error?.message ?? error ?? '');
+  if (message.includes('LEGACY_SELECTION_CLOSED')) return new Error('A escolha das cartas de legado ainda não está aberta.');
+  if (message.includes('LEGACY_SELECTION_LOCKED')) return new Error('Seu legado já foi confirmado e não pode mais ser alterado.');
+  if (message.includes('LEGACY_LIMIT_REACHED')) return new Error('Você atingiu o limite de cartas que podem ser preservadas.');
+  if (message.includes('LEGACY_CARD_NOT_OWNED')) return new Error('Uma das cartas escolhidas não está mais na sua Bag.');
+  if (message.includes('LEGACY_SELECT_AT_LEAST_ONE')) return new Error('Escolha pelo menos uma carta antes de confirmar seu legado.');
+  if (message.includes('LEGACY_NOT_AUTHORIZED')) return new Error('Esta seleção não pertence à sua conta.');
+  return error instanceof Error ? error : new Error(message || 'Não foi possível atualizar suas cartas de legado.');
+}
+
+export async function getLegacySelection(
+  campaignId: string,
+  playerId: string,
+): Promise<LegacySelectionState> {
+  const [{ data: rows, error: rowsError }, { data: submission, error: submissionError }] = await Promise.all([
+    supabase
+      .from('release_campaign_legacy_selections')
+      .select('card_id,selected_at')
+      .eq('campaign_id', campaignId)
+      .eq('player_id', playerId)
+      .order('selected_at', { ascending: true }),
+    supabase
+      .from('release_campaign_legacy_submissions')
+      .select('campaign_id,player_id,selected_count,confirmed_at')
+      .eq('campaign_id', campaignId)
+      .eq('player_id', playerId)
+      .maybeSingle(),
+  ]);
+
+  if (rowsError) throw legacySelectionError(rowsError);
+  if (submissionError) throw legacySelectionError(submissionError);
+
+  return {
+    cardIds: (rows ?? []).map((row) => String(row.card_id)),
+    submission: (submission as LegacySelectionSubmission | null) ?? null,
+  };
+}
+
+export async function saveLegacySelection(
+  campaignId: string,
+  playerId: string,
+  cardIds: string[],
+): Promise<LegacySelectionState> {
+  const desired = [...new Set(cardIds.filter(Boolean))];
+  const current = await getLegacySelection(campaignId, playerId);
+  if (current.submission) throw new Error('Seu legado já foi confirmado e não pode mais ser alterado.');
+
+  const currentSet = new Set(current.cardIds);
+  const desiredSet = new Set(desired);
+  const removeIds = current.cardIds.filter((id) => !desiredSet.has(id));
+  const addIds = desired.filter((id) => !currentSet.has(id));
+
+  try {
+    if (removeIds.length) {
+      const { error } = await supabase
+        .from('release_campaign_legacy_selections')
+        .delete()
+        .eq('campaign_id', campaignId)
+        .eq('player_id', playerId)
+        .in('card_id', removeIds);
+      if (error) throw error;
+    }
+
+    if (addIds.length) {
+      const { error } = await supabase
+        .from('release_campaign_legacy_selections')
+        .insert(addIds.map((cardId) => ({
+          campaign_id: campaignId,
+          player_id: playerId,
+          card_id: cardId,
+        })));
+      if (error) throw error;
+    }
+  } catch (error) {
+    throw legacySelectionError(error);
+  }
+
+  return getLegacySelection(campaignId, playerId);
+}
+
+export async function confirmLegacySelection(
+  campaignId: string,
+  playerId: string,
+): Promise<LegacySelectionSubmission> {
+  try {
+    const { data, error } = await supabase
+      .from('release_campaign_legacy_submissions')
+      .insert({
+        campaign_id: campaignId,
+        player_id: playerId,
+        selected_count: 1,
+      })
+      .select('campaign_id,player_id,selected_count,confirmed_at')
+      .single();
+
+    if (error) throw error;
+    return data as LegacySelectionSubmission;
+  } catch (error) {
+    throw legacySelectionError(error);
+  }
+}
