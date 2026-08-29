@@ -1,70 +1,471 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
-import { getMyBag, getMyProfile } from '@/services/player';
+import { TrainerIdentityCard } from '@/components/TrainerIdentityCard';
+import { getMyProfile, getMyProfileStats, type PlayerProfile } from '@/services/player';
 import { claimDailyReward } from '@/services/playerActions';
-import { getMyTrades } from '@/services/trades';
 import { useAppTheme } from '@/theme/ThemeProvider';
-import { getBattlePass, type BattlePassReward, type BattlePassState } from '@/services/battlePass';
+import { getBattlePass, type BattlePassState } from '@/services/battlePass';
+import { formatUsd, isCurrentUserAdmin } from '@/services/market';
 import { GlobalChatHomeCard } from '@/components/GlobalChatHomeCard';
 import { UpdateLogHomeCard } from '@/components/UpdateLogHomeCard';
+
+type HomeStats = Awaited<ReturnType<typeof getMyProfileStats>>;
 
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, isLight } = useAppTheme();
-  const [profile,setProfile]=useState<any>(null);const[bag,setBag]=useState<any[]>([]);const[trades,setTrades]=useState<any[]>([]);const[battlePass,setBattlePass]=useState<BattlePassState|null>(null);const[loading,setLoading]=useState(true);const[claiming,setClaiming]=useState(false);const[notice,setNotice]=useState<string|null>(null);
-  const load=useCallback(async()=>{try{setLoading(true);const[p,b,t,pass]=await Promise.all([getMyProfile(),getMyBag(),getMyTrades(),getBattlePass().catch(()=>null)]);setProfile(p);setBag(b??[]);setTrades(t??[]);setBattlePass(pass);}finally{setLoading(false);}},[]);
-  useFocusEffect(useCallback(()=>{load();},[load]));
-  const stats=useMemo(()=>{const totalCards=bag.reduce((sum,item)=>sum+Number(item.quantity??0),0);const species=new Set(bag.map((item)=>item.cards?.pokedex_numbers?.[0]).filter((v)=>typeof v==='number')).size;const completedTrades=trades.filter((trade)=>trade.status==='completed').length;return{totalCards,species,completedTrades};},[bag,trades]);
-  const canClaimDaily=useMemo(()=>!profile?.last_daily_claim_at||Date.now()-new Date(profile.last_daily_claim_at).getTime()>=24*60*60*1000,[profile?.last_daily_claim_at]);
-  const battlePassPreview=useMemo(()=>{
-    if(!battlePass)return[];
-    const start=Math.max(1,battlePass.progress.level);
-    const end=Math.min(battlePass.season.maxLevel,start+3);
-    return Array.from({length:end-start+1},(_,index)=>{
-      const level=start+index;
-      return{
-        level,
-        free:battlePass.rewards.find((reward)=>reward.level===level&&reward.track==='free')??null,
-        vip:battlePass.rewards.find((reward)=>reward.level===level&&reward.track==='vip')??null,
-      };
-    });
-  },[battlePass]);
-  async function claimDaily(){if(!canClaimDaily||claiming)return;try{setClaiming(true);const reward=await claimDailyReward();setNotice(`Recompensa recebida: +${reward.rewardCoins} moedas e +${reward.rewardXp} XP.`);await load();}catch(err){setNotice(err instanceof Error?err.message:'Não foi possível receber a recompensa.');}finally{setClaiming(false);}}
-  return <Screen title={`Olá, ${profile?.username??'Trainer'}`} subtitle="Sua coleção, seus boosters e suas trocas em um só lugar.">
-    {loading?<ActivityIndicator color={colors.yellow} size="large"/>:null}
-    {notice?<View style={[styles.notice,{backgroundColor:isLight?'#FFF7D6':'#2B2818',borderColor:isLight?'#E5C95E':'#5A5125'}]}><Ionicons name="gift" size={20} color={colors.yellow}/><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Pressable onPress={()=>setNotice(null)}><Ionicons name="close" size={18} color={colors.text}/></Pressable></View>:null}
-    <View style={[styles.hero,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
-      <View style={styles.heroTop}><View style={[styles.coinBadge,{backgroundColor:colors.surface}]}><Ionicons name="sparkles" color={colors.yellow} size={16}/><Text style={[styles.coinText,{color:colors.yellow}]}>{Number(profile?.coins??0).toLocaleString('pt-BR')}</Text></View><Text style={[styles.level,{color:colors.accent}]}>LV. {profile?.level??1}</Text></View>
-      <Text style={[styles.heroEyebrow,{color:colors.accent}]}>PRÓXIMO PULL PODE SER O RARO</Text><Text style={[styles.heroTitle,{color:colors.text}]}>Abra um booster e aumente sua coleção.</Text><Text style={[styles.heroText,{color:colors.muted}]}>Todos os resultados são sorteados e registrados pelo servidor.</Text>
-      <View style={styles.heroActions}><Pressable style={[styles.primaryButton,{backgroundColor:colors.yellow}]} onPress={()=>router.push('/(tabs)/packs')}><Ionicons name="cube" color="#07111F" size={19}/><Text style={styles.primaryButtonText}>IR PARA OS PACKS</Text></Pressable><Pressable style={[styles.dailyButton,{backgroundColor:canClaimDaily?colors.accent:colors.surfaceAlt}]} onPress={claimDaily} disabled={!canClaimDaily||claiming}><Ionicons name="gift-outline" color={canClaimDaily?'#fff':colors.muted} size={18}/><Text style={[styles.dailyText,{color:canClaimDaily?'#fff':colors.muted}]}>{claiming?'RECEBENDO...':canClaimDaily?'RECOMPENSA DIÁRIA':'VOLTE AMANHÃ'}</Text></Pressable><Pressable style={[styles.dailyButton,{backgroundColor:colors.surface}]} onPress={()=>router.push('/missions')}><Ionicons name="checkbox-outline" color={colors.accent} size={18}/><Text style={[styles.dailyText,{color:colors.text}]}>MISSÕES</Text></Pressable></View>
-    </View>
-    <View style={styles.statsGrid}><Stat icon="albums" label="Cards" value={stats.totalCards.toLocaleString('pt-BR')} onPress={()=>router.push('/(tabs)/bag')}/><Stat icon="paw" label="Pokédex" value={String(stats.species)} onPress={()=>router.push('/pokedex')}/><Stat icon="swap-horizontal" label="Trocas" value={String(stats.completedTrades)} onPress={()=>router.push('/(tabs)/trade')}/><Stat icon="flash" label="XP" value={Number(profile?.xp??0).toLocaleString('pt-BR')}/></View>
-    <GlobalChatHomeCard />
-    {battlePass?<View style={[styles.passCard,{backgroundColor:colors.surface,borderColor:colors.yellow}]}>
-      <Pressable onPress={()=>router.push('/battle-pass')} style={styles.passHeader}>
-        <View style={[styles.passIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="ribbon" size={25} color={colors.yellow}/></View>
-        <View style={styles.passHeaderText}>
-          <Text style={[styles.sectionKicker,{color:colors.yellow}]}>PASSE DE BATALHA</Text>
-          <Text style={[styles.passTitle,{color:colors.text}]}>{battlePass.season.name}</Text>
-          <Text style={[styles.passSub,{color:colors.muted}]}>Nível {battlePass.progress.level}/{battlePass.season.maxLevel} • veja o que você ganha agora e nos próximos níveis.</Text>
+  const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [stats, setStats] = useState<HomeStats | null>(null);
+  const [battlePass, setBattlePass] = useState<BattlePassState | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [claiming, setClaiming] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [nextProfile, nextStats, nextPass, nextAdmin] = await Promise.all([
+        getMyProfile(),
+        getMyProfileStats(),
+        getBattlePass().catch(() => null),
+        isCurrentUserAdmin().catch(() => false),
+      ]);
+      setProfile(nextProfile);
+      setStats(nextStats);
+      setBattlePass(nextPass);
+      setIsAdmin(nextAdmin);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível atualizar a Home.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    void load();
+  }, [load]));
+
+  const canClaimDaily = useMemo(
+    () => !profile?.last_daily_claim_at
+      || Date.now() - new Date(profile.last_daily_claim_at).getTime() >= 24 * 60 * 60 * 1000,
+    [profile?.last_daily_claim_at],
+  );
+
+  const passProgress = useMemo(() => {
+    if (!battlePass) return 0;
+    if (battlePass.progress.level >= battlePass.season.maxLevel) return 100;
+    if (!battlePass.progress.xpForNextLevel) return 0;
+    return Math.min(
+      100,
+      battlePass.progress.xpIntoLevel / battlePass.progress.xpForNextLevel * 100,
+    );
+  }, [battlePass]);
+
+  async function claimDaily() {
+    if (!canClaimDaily || claiming) return;
+    try {
+      setClaiming(true);
+      const reward = await claimDailyReward();
+      setNotice(
+        `Recompensa recebida: +🪙 ${Number(reward.rewardCoins).toLocaleString('pt-BR')} e +${reward.rewardXp} XP.`,
+      );
+      await load();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível receber a recompensa.');
+    } finally {
+      setClaiming(false);
+    }
+  }
+
+  const topCard = stats?.mostValuableMarketCard ?? stats?.mostValuableCard ?? null;
+
+  return (
+    <Screen
+      title="Trainer Collection"
+      subtitle={`Bem-vindo de volta, @${profile?.username ?? 'trainer'}. Sua jornada começa aqui.`}
+    >
+      {loading ? <ActivityIndicator color={colors.yellow} size="large" /> : null}
+
+      {notice ? (
+        <View
+          style={[
+            styles.notice,
+            {
+              backgroundColor: isLight ? '#FFF7D6' : '#252115',
+              borderColor: colors.yellow,
+            },
+          ]}
+        >
+          <Ionicons name="sparkles" size={19} color={colors.yellow} />
+          <Text style={[styles.noticeText, { color: colors.text }]}>{notice}</Text>
+          <Pressable onPress={() => setNotice(null)}>
+            <Ionicons name="close" size={18} color={colors.muted} />
+          </Pressable>
         </View>
-        <Ionicons name="chevron-forward" size={21} color={colors.muted}/>
-      </Pressable>
-      <View style={styles.passProgressRow}><Text style={[styles.passProgressText,{color:colors.text}]}>XP do passe</Text><Text style={[styles.passProgressText,{color:colors.yellow}]}>{battlePass.progress.level>=battlePass.season.maxLevel?'CONCLUÍDO':`${battlePass.progress.xpIntoLevel.toLocaleString('pt-BR')} / ${battlePass.progress.xpForNextLevel.toLocaleString('pt-BR')}`}</Text></View>
-      <View style={[styles.passTrack,{backgroundColor:colors.surfaceAlt}]}><View style={[styles.passFill,{backgroundColor:colors.yellow,width:`${battlePass.progress.level>=battlePass.season.maxLevel?100:Math.min(100,battlePass.progress.xpForNextLevel>0?battlePass.progress.xpIntoLevel/battlePass.progress.xpForNextLevel*100:0)}%`}]}/></View>
-      <View style={styles.passLegend}><View style={styles.passLegendItem}><Ionicons name="gift" size={14} color={colors.accent}/><Text style={[styles.passLegendText,{color:colors.muted}]}>GRÁTIS</Text></View><View style={styles.passLegendItem}><Ionicons name="diamond" size={14} color={colors.yellow}/><Text style={[styles.passLegendText,{color:colors.muted}]}>VIP {battlePass.progress.vipUnlocked?'ATIVO':`• 💎 ${battlePass.season.vipPriceDiamonds}`}</Text></View></View>
-      <View style={styles.passPreviewList}>{battlePassPreview.map((row)=><BattlePassPreviewRow key={row.level} level={row.level} currentLevel={battlePass.progress.level} vipUnlocked={battlePass.progress.vipUnlocked} free={row.free} vip={row.vip}/>)}</View>
-      <Pressable onPress={()=>router.push('/battle-pass')} style={[styles.passButton,{backgroundColor:colors.yellow}]}><Ionicons name="eye" size={18} color="#07111F"/><Text style={styles.passButtonText}>VER TODOS OS 50 NÍVEIS E MISSÕES</Text></Pressable>
-    </View>:null}
-    <View style={styles.sectionHeader}><View><Text style={[styles.sectionKicker,{color:colors.yellow}]}>JORNADA</Text><Text style={[styles.sectionTitle,{color:colors.text}]}>Seu progresso</Text></View></View>
-    <View style={[styles.progressCard,{backgroundColor:colors.surface,borderColor:colors.border}]}><View style={[styles.progressIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="trophy" size={24} color={colors.yellow}/></View><View style={styles.progressBody}><Text style={[styles.progressTitle,{color:colors.text}]}>Colecionador nível {profile?.level??1}</Text><Text style={[styles.progressText,{color:colors.muted}]}>Packs, missões e batalhas concedem XP para sua conta.</Text><View style={[styles.progressTrack,{backgroundColor:colors.surfaceAlt}]}><View style={[styles.progressFill,{backgroundColor:colors.yellow,width:`${Math.min(100,(Number(profile?.xp??0)%250)/2.5)}%`}]}/></View><Text style={[styles.progressMeta,{color:colors.muted}]}>{Number(profile?.xp??0)%250} / 250 XP para o próximo nível</Text></View></View>
-    <UpdateLogHomeCard />
-  </Screen>
+      ) : null}
+
+      <TrainerIdentityCard
+        profile={profile}
+        collectionValueUsd={Number(stats?.collectionMarketValueUsd ?? 0)}
+        isAdmin={isAdmin}
+        onPress={() => router.push('/(tabs)/profile')}
+      />
+
+      <View style={styles.quickGrid}>
+        <QuickAction
+          icon="cube"
+          title="ABRIR PACKS"
+          subtitle="Buscar novas cartas"
+          accent={colors.yellow}
+          onPress={() => router.push('/(tabs)/packs')}
+          primary
+        />
+        <QuickAction
+          icon="albums"
+          title="MINHA BAG"
+          subtitle={`${Number(stats?.totalCards ?? 0).toLocaleString('pt-BR')} cartas`}
+          accent={colors.accent}
+          onPress={() => router.push('/(tabs)/bag')}
+        />
+        <QuickAction
+          icon="game-controller"
+          title="BATALHAR"
+          subtitle={`${profile?.battle_rating ?? 1000} ELO`}
+          accent="#FF8E76"
+          onPress={() => router.push('/(tabs)/battles')}
+        />
+        <QuickAction
+          icon="swap-horizontal"
+          title="TROCAR"
+          subtitle="Negocie com amigos"
+          accent="#72D9C2"
+          onPress={() => router.push('/(tabs)/trade')}
+        />
+      </View>
+
+      <View style={styles.sectionHeading}>
+        <View>
+          <Text style={[styles.sectionKicker, { color: colors.yellow }]}>COLEÇÃO</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Seu pulso de colecionador</Text>
+        </View>
+        <Pressable onPress={() => router.push('/collection-ranking')} style={styles.sectionLink}>
+          <Text style={[styles.sectionLinkText, { color: colors.yellow }]}>RANKING</Text>
+          <Ionicons name="chevron-forward" size={15} color={colors.yellow} />
+        </Pressable>
+      </View>
+
+      <View style={[styles.collectionPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.collectionMetrics}>
+          <CollectionMetric
+            label="VALOR"
+            value={formatUsd(Number(stats?.collectionMarketValueUsd ?? 0))}
+            icon="diamond"
+          />
+          <CollectionMetric
+            label="DIFERENTES"
+            value={Number(stats?.uniqueCards ?? 0).toLocaleString('pt-BR')}
+            icon="grid"
+          />
+          <CollectionMetric
+            label="POKÉDEX"
+            value={Number(stats?.species ?? 0).toLocaleString('pt-BR')}
+            icon="paw"
+          />
+          <CollectionMetric
+            label="PACKS"
+            value={Number(stats?.packsOpened ?? 0).toLocaleString('pt-BR')}
+            icon="cube"
+          />
+        </View>
+
+        {topCard ? (
+          <Pressable
+            onPress={() => router.push(`/card/${topCard.id}`)}
+            style={[styles.topPull, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+          >
+            {topCard.image_small ? (
+              <Image
+                source={{ uri: topCard.image_small }}
+                resizeMode="contain"
+                fadeDuration={0}
+                style={styles.topPullImage}
+              />
+            ) : (
+              <View style={[styles.topPullImage, { backgroundColor: colors.surface }]} />
+            )}
+
+            <View style={styles.topPullCopy}>
+              <Text style={[styles.topPullKicker, { color: colors.yellow }]}>DESTAQUE DA COLEÇÃO</Text>
+              <Text numberOfLines={1} style={[styles.topPullName, { color: colors.text }]}>
+                {topCard.pokemon_name}
+              </Text>
+              <Text numberOfLines={1} style={[styles.topPullMeta, { color: colors.muted }]}>
+                {topCard.rarity ?? 'Sem raridade'} • {topCard.set_name}
+              </Text>
+              <Text style={[styles.topPullValue, { color: colors.yellow }]}>
+                {topCard.market_price_usd == null
+                  ? 'Sem cotação'
+                  : formatUsd(Number(topCard.market_price_usd))}
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.splitRow}>
+        <Pressable
+          disabled={!canClaimDaily || claiming}
+          onPress={() => { void claimDaily(); }}
+          style={[
+            styles.rewardCard,
+            {
+              backgroundColor: canClaimDaily ? '#292113' : colors.surface,
+              borderColor: canClaimDaily ? colors.yellow : colors.border,
+              opacity: claiming ? .72 : 1,
+            },
+          ]}
+        >
+          <View style={[styles.rewardIcon, { backgroundColor: canClaimDaily ? '#493A18' : colors.surfaceAlt }]}>
+            {claiming ? (
+              <ActivityIndicator size="small" color={colors.yellow} />
+            ) : (
+              <Ionicons name="gift" size={24} color={canClaimDaily ? colors.yellow : colors.muted} />
+            )}
+          </View>
+          <View style={styles.rewardCopy}>
+            <Text style={[styles.rewardKicker, { color: canClaimDaily ? colors.yellow : colors.muted }]}>
+              RECOMPENSA DIÁRIA
+            </Text>
+            <Text style={[styles.rewardTitle, { color: colors.text }]}>
+              {canClaimDaily ? 'Sua recompensa está pronta' : 'Recompensa já recebida'}
+            </Text>
+            <Text style={[styles.rewardHint, { color: colors.muted }]}>
+              {canClaimDaily ? 'Toque para coletar agora.' : 'Volte quando completar 24 horas.'}
+            </Text>
+          </View>
+          <Ionicons name={canClaimDaily ? 'gift-outline' : 'checkmark-circle'} size={19} color={canClaimDaily ? colors.yellow : '#65D894'} />
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/missions')}
+          style={[styles.rewardCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <View style={[styles.rewardIcon, { backgroundColor: colors.accentSoft }]}>
+            <Ionicons name="checkbox" size={24} color={colors.accent} />
+          </View>
+          <View style={styles.rewardCopy}>
+            <Text style={[styles.rewardKicker, { color: colors.accent }]}>MISSÕES</Text>
+            <Text style={[styles.rewardTitle, { color: colors.text }]}>Objetivos do treinador</Text>
+            <Text style={[styles.rewardHint, { color: colors.muted }]}>
+              Complete tarefas diárias e semanais.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={19} color={colors.muted} />
+        </Pressable>
+      </View>
+
+      {battlePass ? (
+        <Pressable
+          onPress={() => router.push('/battle-pass')}
+          style={[styles.passCard, { backgroundColor: colors.surface, borderColor: colors.yellow }]}
+        >
+          <View style={[styles.passIcon, { backgroundColor: colors.accentSoft }]}>
+            <Ionicons name="ribbon" size={25} color={colors.yellow} />
+          </View>
+          <View style={styles.passCopy}>
+            <View style={styles.passTop}>
+              <Text style={[styles.passKicker, { color: colors.yellow }]}>PASSE DE BATALHA</Text>
+              <Text style={[styles.passLevel, { color: colors.text }]}>
+                NV {battlePass.progress.level}/{battlePass.season.maxLevel}
+              </Text>
+            </View>
+            <Text style={[styles.passTitle, { color: colors.text }]}>{battlePass.season.name}</Text>
+            <View style={[styles.passTrack, { backgroundColor: colors.surfaceAlt }]}>
+              <View style={[styles.passFill, { backgroundColor: colors.yellow, width: `${passProgress}%` }]} />
+            </View>
+            <Text style={[styles.passHint, { color: colors.muted }]}>
+              {battlePass.progress.vipUnlocked ? 'VIP ativo • ' : ''}
+              {battlePass.progress.level >= battlePass.season.maxLevel
+                ? 'Passe concluído'
+                : `${battlePass.progress.xpIntoLevel.toLocaleString('pt-BR')} / ${battlePass.progress.xpForNextLevel.toLocaleString('pt-BR')} XP`}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.yellow} />
+        </Pressable>
+      ) : null}
+
+      <GlobalChatHomeCard />
+      <UpdateLogHomeCard />
+    </Screen>
+  );
 }
-function BattlePassPreviewRow({level,currentLevel,vipUnlocked,free,vip}:{level:number;currentLevel:number;vipUnlocked:boolean;free:BattlePassReward|null;vip:BattlePassReward|null}){const{colors}=useAppTheme();return <View style={[styles.passRewardRow,{backgroundColor:colors.surfaceAlt,borderColor:level<=currentLevel?colors.accent:colors.border}]}><View style={[styles.passLevelBadge,{backgroundColor:level<=currentLevel?colors.accentSoft:colors.surface}]}><Text style={[styles.passLevelText,{color:level<=currentLevel?colors.yellow:colors.muted}]}>NV {level}</Text></View><PassRewardMini reward={free} levelLocked={level>currentLevel} vipLocked={false}/><View style={[styles.passDivider,{backgroundColor:colors.border}]}/><PassRewardMini reward={vip} levelLocked={level>currentLevel} vipLocked={!vipUnlocked}/></View>}
-function PassRewardMini({reward,levelLocked,vipLocked}:{reward:BattlePassReward|null;levelLocked:boolean;vipLocked:boolean}){const{colors}=useAppTheme();if(!reward)return <View style={styles.passRewardMini}/>;const locked=levelLocked||vipLocked;return <View style={styles.passRewardMini}><View style={styles.passRewardTop}><Ionicons name={reward.reward.titleId?'ribbon':reward.track==='vip'?'diamond':'gift'} size={13} color={reward.track==='vip'?colors.yellow:colors.accent}/><Text style={[styles.passRewardTrack,{color:reward.track==='vip'?colors.yellow:colors.accent}]}>{reward.track==='vip'?'VIP':'GRÁTIS'}</Text></View><Text numberOfLines={2} style={[styles.passRewardLabel,{color:locked?colors.muted:colors.text}]}>{reward.label}</Text><View style={styles.passRewardStatus}>{reward.claimed?<Ionicons name="checkmark-circle" size={14} color="#65D894"/>:locked?<Ionicons name="lock-closed" size={14} color={colors.muted}/>:<Ionicons name="gift-outline" size={14} color={colors.yellow}/>}<Text style={[styles.passRewardStatusText,{color:reward.claimed?'#65D894':locked?colors.muted:colors.yellow}]}>{reward.claimed?'GANHO':locked?'BLOQUEADO':'DISPONÍVEL'}</Text></View></View>}
-function Stat({icon,label,value,onPress}:{icon:keyof typeof Ionicons.glyphMap;label:string;value:string;onPress?:()=>void}){const{colors}=useAppTheme();const content=<><View style={[styles.statIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name={icon} size={19} color={colors.accent}/></View><Text style={[styles.statValue,{color:colors.text}]}>{value}</Text><View style={styles.statBottom}><Text style={[styles.statLabel,{color:colors.muted}]}>{label}</Text>{onPress?<Ionicons name="chevron-forward" size={14} color={colors.muted}/>:null}</View></>;const style=[styles.statCard,{backgroundColor:colors.surface,borderColor:colors.border}] as any;return onPress?<Pressable onPress={onPress} style={style}>{content}</Pressable>:<View style={style}>{content}</View>}
-const styles=StyleSheet.create({passCard:{borderRadius:24,borderWidth:1,padding:15,gap:12},passHeader:{flexDirection:'row',alignItems:'center',gap:11},passIcon:{width:48,height:48,borderRadius:16,alignItems:'center',justifyContent:'center'},passHeaderText:{flex:1,minWidth:0},passTitle:{fontSize:18,fontWeight:'900',marginTop:2},passSub:{fontSize:10,lineHeight:15,marginTop:2},passProgressRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:10},passProgressText:{fontSize:9,fontWeight:'900'},passTrack:{height:8,borderRadius:999,overflow:'hidden'},passFill:{height:'100%',borderRadius:999},passLegend:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:10},passLegendItem:{flexDirection:'row',alignItems:'center',gap:5},passLegendText:{fontSize:8,fontWeight:'900'},passPreviewList:{gap:8},passRewardRow:{minHeight:92,borderRadius:16,borderWidth:1,padding:8,flexDirection:'row',alignItems:'stretch',gap:7},passLevelBadge:{width:42,borderRadius:12,alignItems:'center',justifyContent:'center'},passLevelText:{fontSize:9,fontWeight:'900'},passRewardMini:{flex:1,minWidth:0,justifyContent:'center',gap:4},passRewardTop:{flexDirection:'row',alignItems:'center',gap:4},passRewardTrack:{fontSize:7,fontWeight:'900'},passRewardLabel:{fontSize:10,lineHeight:14,fontWeight:'900'},passRewardStatus:{flexDirection:'row',alignItems:'center',gap:4},passRewardStatusText:{fontSize:7,fontWeight:'900'},passDivider:{width:1,marginVertical:4},passButton:{minHeight:44,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},passButtonText:{color:'#07111F',fontSize:9,fontWeight:'900'},notice:{flexDirection:'row',alignItems:'center',gap:9,borderRadius:15,padding:12,borderWidth:1},noticeText:{flex:1,fontWeight:'700',fontSize:12},hero:{borderRadius:26,padding:20,borderWidth:1,gap:10,overflow:'hidden'},heroTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},coinBadge:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:11,paddingVertical:8,borderRadius:999},coinText:{fontWeight:'900',fontSize:14},level:{fontWeight:'900',fontSize:12},heroEyebrow:{fontSize:10,fontWeight:'900',letterSpacing:1.4,marginTop:6},heroTitle:{fontSize:25,lineHeight:30,fontWeight:'900',maxWidth:410},heroText:{lineHeight:20,fontSize:14},heroActions:{marginTop:6,flexDirection:'row',flexWrap:'wrap',gap:9},primaryButton:{flexDirection:'row',gap:8,alignItems:'center',paddingHorizontal:16,paddingVertical:12,borderRadius:14},primaryButtonText:{color:'#07111F',fontWeight:'900',fontSize:12,letterSpacing:.4},dailyButton:{flexDirection:'row',gap:8,alignItems:'center',paddingHorizontal:16,paddingVertical:12,borderRadius:14},dailyText:{fontWeight:'900',fontSize:11},statsGrid:{flexDirection:'row',flexWrap:'wrap',gap:10},statCard:{width:'48.5%',borderRadius:20,padding:15,borderWidth:1},statIcon:{width:34,height:34,borderRadius:12,alignItems:'center',justifyContent:'center',marginBottom:13},statValue:{fontSize:23,fontWeight:'900'},statBottom:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},statLabel:{fontSize:12,fontWeight:'700',marginTop:2},sectionHeader:{flexDirection:'row',alignItems:'flex-end',justifyContent:'space-between',marginTop:4},sectionKicker:{fontSize:10,fontWeight:'900',letterSpacing:1.3},sectionTitle:{fontSize:21,fontWeight:'900',marginTop:2},progressCard:{flexDirection:'row',gap:14,padding:16,borderRadius:20,borderWidth:1},progressIcon:{width:48,height:48,borderRadius:16,alignItems:'center',justifyContent:'center'},progressBody:{flex:1},progressTitle:{fontSize:16,fontWeight:'900'},progressText:{fontSize:12,lineHeight:18,marginTop:4},progressTrack:{height:7,borderRadius:999,marginTop:12,overflow:'hidden'},progressFill:{height:'100%',borderRadius:999},progressMeta:{fontSize:9,fontWeight:'800',marginTop:5}});
+
+function QuickAction({
+  icon,
+  title,
+  subtitle,
+  accent,
+  onPress,
+  primary = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  accent: string;
+  onPress: () => void;
+  primary?: boolean;
+}) {
+  const { colors } = useAppTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.quickAction,
+        {
+          backgroundColor: primary ? '#2A2314' : colors.surface,
+          borderColor: primary ? accent : colors.border,
+          opacity: pressed ? .75 : 1,
+        },
+      ]}
+    >
+      <View style={[styles.quickIcon, { backgroundColor: accent + '20', borderColor: accent + '55' }]}>
+        <Ionicons name={icon} size={22} color={accent} />
+      </View>
+      <Text style={[styles.quickTitle, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.quickSubtitle, { color: colors.muted }]}>{subtitle}</Text>
+      <Ionicons name="arrow-forward" size={16} color={accent} style={styles.quickArrow} />
+    </Pressable>
+  );
+}
+
+function CollectionMetric({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}) {
+  const { colors } = useAppTheme();
+  return (
+    <View style={styles.collectionMetric}>
+      <View style={styles.collectionMetricTop}>
+        <Ionicons name={icon} size={14} color={colors.yellow} />
+        <Text style={[styles.collectionMetricLabel, { color: colors.muted }]}>{label}</Text>
+      </View>
+      <Text numberOfLines={1} style={[styles.collectionMetricValue, { color: colors.text }]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  notice: {
+    minHeight: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  noticeText: { flex: 1, fontSize: 10, lineHeight: 15, fontWeight: '800' },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  quickAction: {
+    flexGrow: 1,
+    flexBasis: 150,
+    minWidth: 145,
+    minHeight: 132,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+    position: 'relative',
+  },
+  quickIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickTitle: { fontSize: 12, fontWeight: '900', marginTop: 11 },
+  quickSubtitle: { fontSize: 8.5, lineHeight: 13, marginTop: 3, paddingRight: 18 },
+  quickArrow: { position: 'absolute', right: 12, bottom: 12 },
+  sectionHeading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    gap: 10,
+    marginTop: 2,
+  },
+  sectionKicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.25 },
+  sectionTitle: { fontSize: 20, lineHeight: 25, fontWeight: '900', marginTop: 2 },
+  sectionLink: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 5 },
+  sectionLinkText: { fontSize: 8, fontWeight: '900', letterSpacing: .7 },
+  collectionPanel: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 12 },
+  collectionMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  collectionMetric: { flexGrow: 1, flexBasis: 120, minWidth: 110 },
+  collectionMetricTop: { flexDirection: 'row', gap: 5, alignItems: 'center' },
+  collectionMetricLabel: { fontSize: 7, fontWeight: '900', letterSpacing: .75 },
+  collectionMetricValue: { fontSize: 17, fontWeight: '900', marginTop: 4 },
+  topPull: {
+    minHeight: 102,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 8,
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  topPullImage: { width: 62, height: 84, borderRadius: 8 },
+  topPullCopy: { flex: 1, minWidth: 0 },
+  topPullKicker: { fontSize: 7, fontWeight: '900', letterSpacing: .9 },
+  topPullName: { fontSize: 14, fontWeight: '900', marginTop: 3 },
+  topPullMeta: { fontSize: 8, marginTop: 2 },
+  topPullValue: { fontSize: 10, fontWeight: '900', marginTop: 5 },
+  splitRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  rewardCard: {
+    flexGrow: 1,
+    flexBasis: 270,
+    minWidth: 250,
+    minHeight: 95,
+    borderRadius: 19,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  rewardIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  rewardCopy: { flex: 1, minWidth: 0 },
+  rewardKicker: { fontSize: 7, fontWeight: '900', letterSpacing: .9 },
+  rewardTitle: { fontSize: 12, fontWeight: '900', marginTop: 3 },
+  rewardHint: { fontSize: 8, lineHeight: 12, marginTop: 2 },
+  passCard: {
+    minHeight: 112,
+    borderRadius: 21,
+    borderWidth: 1,
+    padding: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  passIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  passCopy: { flex: 1, minWidth: 0 },
+  passTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  passKicker: { fontSize: 7, fontWeight: '900', letterSpacing: .9 },
+  passLevel: { fontSize: 8, fontWeight: '900' },
+  passTitle: { fontSize: 15, fontWeight: '900', marginTop: 3 },
+  passTrack: { height: 6, borderRadius: 999, marginTop: 8, overflow: 'hidden' },
+  passFill: { height: '100%', borderRadius: 999 },
+  passHint: { fontSize: 8, marginTop: 5 },
+});
