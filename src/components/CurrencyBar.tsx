@@ -21,7 +21,7 @@ export function CurrencyBar({ compact = false }: { compact?: boolean }) {
     await Share.share({
       message:
         `Olá! Quero adicionar 🪙 ${item.coins.toLocaleString('pt-BR')} Coins ` +
-        `(${item.price}) na minha conta do Pokémon Cards. Vou enviar o Pix e o comprovante.`,
+        `(${item.price}) na minha conta do Trainer Collection. Vou enviar o Pix e o comprovante.`,
     }).catch(() => null);
   }
 
