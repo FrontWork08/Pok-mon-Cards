@@ -53,6 +53,7 @@ export default function PlayerShowcaseScreen() {
   const winRate = winTotal ? Math.round(Number(player?.battleWins ?? 0) / winTotal * 100) : 0;
   const frameColor = player?.frame?.primaryColor ?? player?.guild?.color ?? colors.accent;
   const backgroundColor = player?.background?.secondaryColor ?? colors.accentSoft;
+  const avatarUrl = getProfileAvatarUrl(player?.avatarPath ?? null);
 
   async function updateFriendship(action: 'send' | 'accept') {
     if (!player || friendWorking) return;
