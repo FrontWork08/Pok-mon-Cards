@@ -5,15 +5,56 @@ alter table public.players
   add column if not exists avatar_path text,
   add column if not exists avatar_updated_at timestamptz;
 
-grant update (avatar_path, avatar_updated_at) on public.players to authenticated;
-
 drop policy if exists "players update own avatar" on public.players;
-create policy "players update own avatar"
-on public.players
-for update
-to authenticated
-using ((select auth.uid()) = id)
-with check ((select auth.uid()) = id);
+
+create or replace function private.set_my_profile_avatar(p_avatar_path text)
+returns text
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_player uuid := auth.uid();
+begin
+  if v_player is null then
+    raise exception 'UNAUTHORIZED';
+  end if;
+
+  if p_avatar_path is not null then
+    if char_length(p_avatar_path) > 240 then
+      raise exception 'INVALID_AVATAR_PATH';
+    end if;
+    if p_avatar_path !~ ('^' || v_player::text || '/avatar-[0-9]+\.(jpg|jpeg|png|webp)$') then
+      raise exception 'INVALID_AVATAR_PATH';
+    end if;
+  end if;
+
+  update public.players
+  set avatar_path=p_avatar_path,
+      avatar_updated_at=now()
+  where id=v_player;
+
+  return p_avatar_path;
+end;
+$$;
+
+revoke all on function private.set_my_profile_avatar(text)
+from public,anon,authenticated;
+grant execute on function private.set_my_profile_avatar(text)
+to authenticated,service_role;
+
+create or replace function public.set_my_profile_avatar(p_avatar_path text)
+returns text
+language sql
+set search_path=''
+as $$
+  select private.set_my_profile_avatar(p_avatar_path);
+$$;
+
+revoke all on function public.set_my_profile_avatar(text)
+from public,anon,authenticated;
+grant execute on function public.set_my_profile_avatar(text)
+to authenticated,service_role;
 
 insert into storage.buckets (
   id,name,public,file_size_limit,allowed_mime_types
