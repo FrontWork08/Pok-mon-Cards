@@ -35,7 +35,7 @@ export default function HomeScreen() {
     });
   },[battlePass]);
   async function claimDaily(){if(!canClaimDaily||claiming)return;try{setClaiming(true);const reward=await claimDailyReward();setNotice(`Recompensa recebida: +${reward.rewardCoins} moedas e +${reward.rewardXp} XP.`);await load();}catch(err){setNotice(err instanceof Error?err.message:'Não foi possível receber a recompensa.');}finally{setClaiming(false);}}
-  return <Screen title={`Olá, ${profile?.username??'Trainer'}`} subtitle="Sua coleção, seus boosters e suas trocas em um só lugar.">
+  return <Screen title={`Olá, ${profile?.username??'Trainer'}`} subtitle="Seu hub de coleção, packs, batalhas, amigos e progresso.">
     {loading?<ActivityIndicator color={colors.yellow} size="large"/>:null}
     {notice?<View style={[styles.notice,{backgroundColor:isLight?'#FFF7D6':'#2B2818',borderColor:isLight?'#E5C95E':'#5A5125'}]}><Ionicons name="gift" size={20} color={colors.yellow}/><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Pressable onPress={()=>setNotice(null)}><Ionicons name="close" size={18} color={colors.text}/></Pressable></View>:null}
     <View style={[styles.hero,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
