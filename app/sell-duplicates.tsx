@@ -15,7 +15,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import {
-  coinsForDuplicateMarketPrice,
   getDuplicateCardsForSale,
   sellDuplicateCards,
   type DuplicateSaleCard,
@@ -66,7 +65,7 @@ export default function SellDuplicatesScreen() {
     let estimatedCoins = 0;
     for (const entry of cards) {
       const available = Math.max(0, Number(entry.quantity ?? 0) - 1);
-      const unit = coinsForDuplicateMarketPrice(entry.cards?.market_price_usd);
+      const unit = Number(entry.sale?.unitCoins ?? 0);
       copies += available;
       estimatedCoins += available * unit;
     }
@@ -76,7 +75,7 @@ export default function SellDuplicatesScreen() {
   const confirmSale = useCallback((entry: DuplicateSaleCard, quantity: number) => {
     const card = entry.cards;
     if (!card || quantity < 1 || sellingCardId) return;
-    const unitCoins = coinsForDuplicateMarketPrice(card.market_price_usd);
+    const unitCoins = Number(entry.sale?.unitCoins ?? 0);
     if (unitCoins <= 0) {
       Alert.alert('Sem cotação', 'Esta carta ainda não possui preço de mercado e não pode ser vendida.');
       return;
@@ -154,7 +153,7 @@ export default function SellDuplicatesScreen() {
               <View style={styles.ruleText}>
                 <Text style={[styles.ruleTitle, { color: colors.text }]}>Valor baseado no mercado</Text>
                 <Text style={[styles.ruleBody, { color: colors.muted }]}>
-                  US$ 0,50 = 🪙50 • US$ 1 = 🪙100 • US$ 10 = 🪙500. Cartas muito caras continuam valendo mais, mas a recompensa cresce mais devagar e não tem teto fixo.
+                  O servidor combina valor de mercado + raridade + chance real de pull. Quanto mais difícil for conseguir outra cópia, maior pode ser o valor em Coins.
                 </Text>
               </View>
             </View>
@@ -196,7 +195,7 @@ export default function SellDuplicatesScreen() {
           const card = item.cards;
           if (!card) return null;
           const available = Math.max(0, Number(item.quantity ?? 0) - 1);
-          const unitCoins = coinsForDuplicateMarketPrice(card.market_price_usd);
+          const unitCoins = Number(item.sale?.unitCoins ?? 0);
           const selling = sellingCardId === card.id;
           return (
             <View style={[styles.cardRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -229,6 +228,11 @@ export default function SellDuplicatesScreen() {
 
                 <Text style={[styles.protectedText, { color: colors.muted }]}>
                   {available} repetida(s) disponível(is) • 1 cópia protegida
+                </Text>
+                <Text style={[styles.saleDetails, { color: colors.muted }]}>
+                  Tier {item.sale.rarityTier} • raridade ×{item.sale.rarityMultiplier.toFixed(2)}
+                  {item.sale.dropChancePct != null ? ` • chance ~${item.sale.dropChancePct < 0.1 ? item.sale.dropChancePct.toFixed(3) : item.sale.dropChancePct.toFixed(2)}%` : ''}
+                  {item.sale.dropMultiplier !== 1 ? ` • drop ×${item.sale.dropMultiplier.toFixed(2)}` : ''}
                 </Text>
 
                 <View style={styles.actions}>
@@ -317,6 +321,7 @@ const styles = StyleSheet.create({
   marketPrice: { fontSize: 10, fontWeight: '700' },
   coinPrice: { fontSize: 11, fontWeight: '900' },
   protectedText: { fontSize: 9, marginTop: 5 },
+  saleDetails: { fontSize: 8, lineHeight: 12, marginTop: 3 },
   actions: { flexDirection: 'row', gap: 7, marginTop: 10 },
   secondaryButton: { flex: 1, minHeight: 40, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   secondaryText: { fontSize: 8, fontWeight: '900' },
