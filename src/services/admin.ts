@@ -73,6 +73,37 @@ export type AdminReleaseCampaignStatus = {
   submissions: number;
 };
 
+export type AdminReleasePreflight = {
+  ready: boolean;
+  generatedAt: string;
+  campaign: {
+    id: string;
+    phase: string;
+    legacySelectionEnabled: boolean;
+    legacyCardLimit: number;
+    economyFrozen: boolean;
+    forceUpdate: boolean;
+  };
+  counts: {
+    players: number;
+    admins: number;
+    owners: number;
+    activeTesters: number;
+    guilds: number;
+    guildMembers: number;
+    selectedCards: number;
+    confirmedAccounts: number;
+  };
+  issues: {
+    selectedCardsNotOwned: number;
+    submissionCountMismatch: number;
+    playersOverCardLimit: number;
+    testersMissingAchievement: number;
+    guildLeaderMismatch: number;
+    ownerCountInvalid: number;
+  };
+};
+
 export type AdminPermission =
   | 'audit_users'
   | 'moderate_users'
@@ -213,6 +244,9 @@ export async function setMaintenanceMode(enabled: boolean, message: string) { re
 
 export async function getAdminReleaseCampaignStatus() {
   return invokeAdmin({ action: 'release_campaign_status' }) as Promise<AdminReleaseCampaignStatus | null>;
+}
+export async function runAdminReleasePreflight() {
+  return invokeAdmin({ action: 'release_preflight' }) as Promise<AdminReleasePreflight>;
 }
 export async function setLegacySelectionEnabled(enabled: boolean) {
   return invokeAdmin({ action: 'set_legacy_selection', enabled }) as Promise<AdminReleaseCampaignStatus>;
