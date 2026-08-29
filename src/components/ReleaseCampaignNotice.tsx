@@ -165,12 +165,9 @@ export function ReleaseCampaignNotice() {
                   <View style={[styles.column, { borderColor: '#4ECBA0' }]}>
                     <Text style={styles.keepTitle}>✓ SERÁ PRESERVADO</Text>
                     <Text style={[styles.columnText, { color: colors.muted }]}>
-                      Conta e login{'
-'}
-                      Tester e cargos Admin{'
-'}
-                      Dono da guilda{'
-'}
+                      Conta e login{'\n'}
+                      Tester e cargos Admin{'\n'}
+                      Dono da guilda{'\n'}
                       Até {campaign.legacy_card_limit} cartas escolhidas
                     </Text>
                   </View>
@@ -178,12 +175,9 @@ export function ReleaseCampaignNotice() {
                   <View style={[styles.column, { borderColor: '#FF8D79' }]}>
                     <Text style={styles.resetTitle}>↻ NOVO COMEÇO</Text>
                     <Text style={[styles.columnText, { color: colors.muted }]}>
-                      Economia e saldos normais{'
-'}
-                      Coleção restante{'
-'}
-                      Progressão e rankings{'
-'}
+                      Economia e saldos normais{'\n'}
+                      Coleção restante{'\n'}
+                      Progressão e rankings{'\n'}
                       Temporada da versão 1.0
                     </Text>
                   </View>
