@@ -187,18 +187,36 @@ async function updateRows(admin: any, rows: any[]) {
 
   for (const chunk of chunks) {
     await Promise.all(chunk.map(async (row) => {
-      await admin
-        .from("cards")
-        .update({
-          market_price_usd: row.market_price_usd,
-          market_price_low_usd: row.market_price_low_usd,
-          market_price_high_usd: row.market_price_high_usd,
-          market_price_variant: row.market_price_variant,
-          market_price_source: row.market_price_source,
-          market_price_data: row.market_price_data,
-          market_price_updated_at: row.market_price_updated_at,
-        })
-        .eq("id", row.id);
+      const nextPrice = numeric(row.market_price_usd);
+      const previousPrice = numeric(row.previous_market_price_usd);
+
+      // A temporary upstream miss must never erase a quote that was already valid.
+      // When no new quote is available, keep every existing price field intact.
+      const patch = nextPrice !== null
+        ? {
+            market_price_usd: nextPrice,
+            market_price_low_usd: row.market_price_low_usd,
+            market_price_high_usd: row.market_price_high_usd,
+            market_price_variant: row.market_price_variant,
+            market_price_source: row.market_price_source,
+            market_price_data: row.market_price_data,
+            market_price_updated_at: row.market_price_updated_at,
+          }
+        : previousPrice !== null
+          ? {
+              market_price_updated_at: row.market_price_updated_at,
+            }
+          : {
+              market_price_usd: null,
+              market_price_low_usd: null,
+              market_price_high_usd: null,
+              market_price_variant: null,
+              market_price_source: row.market_price_source,
+              market_price_data: row.market_price_data,
+              market_price_updated_at: row.market_price_updated_at,
+            };
+
+      await admin.from("cards").update(patch).eq("id", row.id);
     }));
   }
 }
@@ -314,6 +332,7 @@ Deno.serve(async (req: Request) => {
         for (const card of targetCards) {
           results.push({
             id: card.id,
+            previous_market_price_usd: card.market_price_usd,
             market_price_usd: null,
             market_price_low_usd: null,
             market_price_high_usd: null,
@@ -361,6 +380,7 @@ Deno.serve(async (req: Request) => {
 
         results.push({
           id: card.id,
+          previous_market_price_usd: card.market_price_usd,
           market_price_usd: picked?.market ?? null,
           market_price_low_usd: picked?.low ?? null,
           market_price_high_usd: picked?.high ?? null,
