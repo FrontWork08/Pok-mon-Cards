@@ -6,7 +6,8 @@ export const GOOGLE_OAUTH_REDIRECT = 'pokemoncards://auth/callback';
 
 function getAuthRedirectUrl() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return `${window.location.origin}/`;
+    const previewReturn = encodeURIComponent(`${window.location.origin}/`);
+    return `https://pokemon-cards-frontwork.expo.app/?preview_return=${previewReturn}`;
   }
   return GOOGLE_OAUTH_REDIRECT;
 }
