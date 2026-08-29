@@ -1,11 +1,28 @@
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
-import { Screen } from '@/components/Screen';
-import { getMyPackHistory } from '@/services/collections';
+import { PremiumBackground } from '@/components/PremiumBackground';
+import {
+  getMyPackHistoryPage,
+  type PackHistoryEntry,
+} from '@/services/collections';
 import { gameTheme } from '@/theme/gameTheme';
+import { useAppTheme } from '@/theme/ThemeProvider';
+
+const PAGE_SIZE = 25;
 
 function rarityScore(rarity?: string | null) {
   const value = (rarity ?? '').toLowerCase();
@@ -16,57 +33,239 @@ function rarityScore(rarity?: string | null) {
   return 1;
 }
 
+function cardValue(card: any) {
+  const value = Number(card?.marketPriceUsd ?? 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function openingBestCard(opening: PackHistoryEntry) {
+  const cards = Array.isArray(opening.cards_received) ? opening.cards_received : [];
+  if (!cards.length) return null;
+
+  let best = cards[0];
+  let bestValue = cardValue(best);
+  for (let index = 1; index < cards.length; index += 1) {
+    const card = cards[index];
+    const value = cardValue(card);
+    if (
+      value > bestValue
+      || (value === bestValue && rarityScore(card?.rarity) > rarityScore(best?.rarity))
+    ) {
+      best = card;
+      bestValue = value;
+    }
+  }
+  return best;
+}
+
+const HistoryRow = memo(function HistoryRow({ opening }: { opening: PackHistoryEntry }) {
+  const pack = Array.isArray(opening.packs) ? opening.packs[0] : opening.packs;
+  const cards = Array.isArray(opening.cards_received) ? opening.cards_received : [];
+  const best = openingBestCard(opening);
+
+  return (
+    <View style={styles.row}>
+      <View style={styles.packIcon}>
+        {pack?.image_url ? (
+          <Image
+            source={{ uri: pack.image_url }}
+            style={styles.packImage}
+            resizeMode="contain"
+            fadeDuration={Platform.OS === 'android' ? 0 : undefined}
+          />
+        ) : (
+          <Ionicons name="cube" size={24} color="#7594BD" />
+        )}
+      </View>
+      <View style={styles.rowBody}>
+        <Text numberOfLines={1} style={styles.packName}>{pack?.name ?? 'Booster'}</Text>
+        <Text style={styles.meta}>
+          {new Date(opening.opened_at).toLocaleString('pt-BR')} • {cards.length} cards
+        </Text>
+        {best ? (
+          <Text numberOfLines={1} style={styles.pull}>
+            Melhor pull: {best.name ?? 'Carta'} • {best.rarity ?? 'Comum'}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.cardsPreview}>
+        {cards.slice(0, 3).map((card: any, index: number) => card?.image ? (
+          <Image
+            key={`${card.id ?? 'card'}-${index}`}
+            source={{ uri: card.image }}
+            style={[styles.miniCard, { marginLeft: index ? -13 : 0 }]}
+            resizeMode="cover"
+            fadeDuration={Platform.OS === 'android' ? 0 : undefined}
+          />
+        ) : null)}
+      </View>
+    </View>
+  );
+});
+
 export default function HistoryScreen() {
   const router = useRouter();
-  const [history, setHistory] = useState<any[]>([]);
+  const { colors } = useAppTheme();
+  const [history, setHistory] = useState<PackHistoryEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
 
-  const load = useCallback(async () => {
+  const loadFirstPage = useCallback(async () => {
     try {
       setLoading(true);
-      setHistory(await getMyPackHistory());
+      const result = await getMyPackHistoryPage(0, PAGE_SIZE);
+      setHistory(result.rows);
+      setTotal(result.total);
+      setPage(0);
+      setHasMore(result.hasMore);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void loadFirstPage();
+  }, [loadFirstPage]));
 
-  const bestPulls = useMemo(() => history.flatMap((opening) => Array.isArray(opening.cards_received) ? opening.cards_received : []).sort((a, b) => rarityScore(b.rarity) - rarityScore(a.rarity)).slice(0, 3), [history]);
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loading || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const result = await getMyPackHistoryPage(nextPage, PAGE_SIZE);
+      setHistory((current) => {
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...result.rows.filter((item) => !known.has(item.id))];
+      });
+      setPage(nextPage);
+      setTotal(result.total);
+      setHasMore(result.hasMore);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [hasMore, loading, page]);
 
-  return (
-    <Screen title="Histórico de Packs" subtitle="Reveja boosters abertos e seus melhores pulls.">
-      <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color="#A9BDD7" /><Text style={styles.backText}>Voltar</Text></Pressable>
+  const bestPulls = useMemo(() => {
+    const cards = history
+      .slice(0, PAGE_SIZE)
+      .flatMap((opening) => Array.isArray(opening.cards_received) ? opening.cards_received : []);
 
-      <View style={styles.hero}><View><Text style={styles.heroKicker}>TOTAL ABERTO</Text><Text style={styles.heroValue}>{history.length}</Text><Text style={styles.heroText}>boosters registrados</Text></View><View style={styles.heroIcon}><Ionicons name="time" size={28} color={gameTheme.colors.yellow} /></View></View>
+    return cards
+      .map((card) => ({ card, value: cardValue(card), rarity: rarityScore(card?.rarity) }))
+      .sort((a, b) => b.value - a.value || b.rarity - a.rarity)
+      .slice(0, 3)
+      .map((item) => item.card);
+  }, [history]);
+
+  const header = useMemo(() => (
+    <View style={styles.headerStack}>
+      <View style={styles.header}>
+        <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Histórico de Packs</Text>
+        <Text style={[styles.subtitle, { color: colors.muted }]}>
+          Reveja boosters abertos e seus melhores pulls.
+        </Text>
+      </View>
+
+      <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}>
+        <Ionicons name="arrow-back" size={18} color="#A9BDD7" />
+        <Text style={styles.backText}>Voltar</Text>
+      </Pressable>
+
+      <View style={styles.hero}>
+        <View>
+          <Text style={styles.heroKicker}>TOTAL ABERTO</Text>
+          <Text style={styles.heroValue}>{total.toLocaleString('pt-BR')}</Text>
+          <Text style={styles.heroText}>boosters registrados</Text>
+        </View>
+        <View style={styles.heroIcon}>
+          <Ionicons name="time" size={28} color={gameTheme.colors.yellow} />
+        </View>
+      </View>
 
       {bestPulls.length > 0 ? (
-        <View style={styles.bestSection}><Text style={styles.sectionTitle}>Melhores pulls recentes</Text><View style={styles.bestGrid}>{bestPulls.map((card, index) => <View key={`${card.id}-${index}`} style={styles.bestCard}>{card.image ? <Image source={{ uri: card.image }} style={styles.bestImage} resizeMode="contain" /> : <View style={styles.bestImage} />}<Text numberOfLines={1} style={styles.bestName}>{card.name}</Text><Text numberOfLines={1} style={styles.bestRarity}>{card.rarity ?? 'Comum'}</Text></View>)}</View></View>
+        <View style={styles.bestSection}>
+          <Text style={styles.sectionTitle}>Melhores pulls recentes</Text>
+          <View style={styles.bestGrid}>
+            {bestPulls.map((card: any, index) => (
+              <View key={`${card.id ?? 'card'}-${index}`} style={styles.bestCard}>
+                {card.image ? (
+                  <Image
+                    source={{ uri: card.image }}
+                    style={styles.bestImage}
+                    resizeMode="contain"
+                    fadeDuration={Platform.OS === 'android' ? 0 : undefined}
+                  />
+                ) : <View style={styles.bestImage} />}
+                <Text numberOfLines={1} style={styles.bestName}>{card.name ?? 'Carta'}</Text>
+                <Text numberOfLines={1} style={styles.bestRarity}>{card.rarity ?? 'Comum'}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
       ) : null}
 
-      <View style={styles.sectionRow}><Text style={styles.sectionTitle}>Aberturas</Text><Text style={styles.count}>{history.length}</Text></View>
-      {loading ? <ActivityIndicator size="large" color={gameTheme.colors.yellow} /> : null}
-      {!loading && history.length === 0 ? <View style={styles.empty}><Ionicons name="cube-outline" size={34} color="#627C9D" /><Text style={styles.emptyTitle}>Nenhum pack aberto</Text><Text style={styles.emptyText}>Suas próximas aberturas aparecerão aqui.</Text></View> : null}
-
-      <View style={styles.list}>
-        {history.map((opening) => {
-          const pack = Array.isArray(opening.packs) ? opening.packs[0] : opening.packs;
-          const cards = Array.isArray(opening.cards_received) ? opening.cards_received : [];
-          const best = [...cards].sort((a, b) => rarityScore(b.rarity) - rarityScore(a.rarity))[0];
-          return (
-            <View key={opening.id} style={styles.row}>
-              <View style={styles.packIcon}>{pack?.image_url ? <Image source={{ uri: pack.image_url }} style={styles.packImage} resizeMode="contain" /> : <Ionicons name="cube" size={24} color="#7594BD" />}</View>
-              <View style={styles.rowBody}><Text numberOfLines={1} style={styles.packName}>{pack?.name ?? 'Booster'}</Text><Text style={styles.meta}>{new Date(opening.opened_at).toLocaleString('pt-BR')} • {cards.length} cards</Text>{best ? <Text numberOfLines={1} style={styles.pull}>Melhor pull: {best.name} • {best.rarity ?? 'Comum'}</Text> : null}</View>
-              <View style={styles.cardsPreview}>{cards.slice(0, 3).map((card: any, index: number) => card.image ? <Image key={`${card.id}-${index}`} source={{ uri: card.image }} style={[styles.miniCard, { marginLeft: index ? -13 : 0 }]} resizeMode="cover" /> : null)}</View>
-            </View>
-          );
-        })}
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionTitle}>Aberturas</Text>
+        <Text style={styles.count}>{history.length}/{total}</Text>
       </View>
-    </Screen>
+    </View>
+  ), [bestPulls, colors.muted, colors.text, colors.yellow, history.length, router, total]);
+
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<PackHistoryEntry>) => <HistoryRow opening={item} />,
+    [],
+  );
+
+  return (
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
+      <PremiumBackground />
+      <FlatList
+        data={history}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListHeaderComponent={header}
+        ListEmptyComponent={!loading ? (
+          <View style={styles.empty}>
+            <Ionicons name="cube-outline" size={34} color="#627C9D" />
+            <Text style={styles.emptyTitle}>Nenhum pack aberto</Text>
+            <Text style={styles.emptyText}>Suas próximas aberturas aparecerão aqui.</Text>
+          </View>
+        ) : null}
+        ListFooterComponent={loadingMore ? (
+          <ActivityIndicator style={styles.footerLoader} color={gameTheme.colors.yellow} />
+        ) : null}
+        contentContainerStyle={styles.content}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        onEndReached={() => { void loadMore(); }}
+        onEndReachedThreshold={0.55}
+        initialNumToRender={6}
+        maxToRenderPerBatch={8}
+        updateCellsBatchingPeriod={45}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
+        showsVerticalScrollIndicator={false}
+        refreshing={loading}
+        onRefresh={() => { void loadFirstPage(); }}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, overflow: 'hidden' },
+  content: { width: '100%', maxWidth: 1280, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 36 },
+  headerStack: { gap: 16, marginBottom: 8 },
+  header: { width: '100%', gap: 5, marginBottom: 4 },
+  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
+  title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
+  subtitle: { fontSize: 15, lineHeight: 21 },
   backRow: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7 },
   backText: { color: '#A9BDD7', fontSize: 12, fontWeight: '800' },
   hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderRadius: 22, backgroundColor: '#10284B', borderWidth: 1, borderColor: '#285A9A' },
@@ -83,11 +282,11 @@ const styles = StyleSheet.create({
   bestImage: { width: '100%', aspectRatio: 0.72, borderRadius: 9, backgroundColor: '#091524' },
   bestName: { color: '#fff', fontSize: 10, fontWeight: '900', marginTop: 5 },
   bestRarity: { color: gameTheme.colors.yellow, fontSize: 8, marginTop: 2 },
-  empty: { alignItems: 'center', padding: 26, gap: 7, borderRadius: 18, backgroundColor: '#0E1A2B', borderWidth: 1, borderColor: '#203650' },
+  empty: { alignItems: 'center', padding: 26, gap: 7, borderRadius: 18, backgroundColor: '#0E1A2B', borderWidth: 1, borderColor: '#203650', marginTop: 10 },
   emptyTitle: { color: '#fff', fontSize: 15, fontWeight: '900' },
   emptyText: { color: '#7E92AD', fontSize: 10 },
-  list: { gap: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, backgroundColor: '#101D30', borderWidth: 1, borderColor: '#263E5C' },
+  separator: { height: 8 },
+  row: { minHeight: 90, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, backgroundColor: '#101D30', borderWidth: 1, borderColor: '#263E5C' },
   packIcon: { width: 55, height: 68, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#091524', overflow: 'hidden' },
   packImage: { width: '90%', height: '90%' },
   rowBody: { flex: 1, minWidth: 0 },
@@ -96,4 +295,5 @@ const styles = StyleSheet.create({
   pull: { color: '#AFC2DA', fontSize: 9, marginTop: 5, fontWeight: '700' },
   cardsPreview: { flexDirection: 'row', alignItems: 'center', paddingLeft: 6 },
   miniCard: { width: 34, height: 47, borderRadius: 4, borderWidth: 1, borderColor: '#263E5C' },
+  footerLoader: { marginVertical: 18 },
 });
