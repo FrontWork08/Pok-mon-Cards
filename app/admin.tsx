@@ -41,6 +41,7 @@ import {
   setMaintenanceMode,
   getAdminReleaseCampaignStatus,
   runAdminReleasePreflight,
+  getAdminReleaseResetPreview,
   setLegacySelectionEnabled,
   type AdminAccess,
   type AdminPermission,
@@ -54,6 +55,7 @@ import {
   type TesterTitleHub,
   type AdminReleaseCampaignStatus,
   type AdminReleasePreflight,
+  type AdminReleaseResetPreview,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
@@ -107,6 +109,7 @@ export default function AdminScreen() {
   const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
   const [releaseStatus, setReleaseStatus] = useState<AdminReleaseCampaignStatus | null>(null);
   const [releasePreflight, setReleasePreflight] = useState<AdminReleasePreflight | null>(null);
+  const [releaseResetPreview, setReleaseResetPreview] = useState<AdminReleaseResetPreview | null>(null);
   const [maintenanceMessage, setMaintenanceMessage] = useState('Estamos aplicando uma atualização importante. O jogo voltará em breve.');
   const [gameEvents, setGameEvents] = useState<AdminGameEvent[]>([]);
   const [eventType, setEventType] = useState<'double_xp'|'rare_boost'|'featured_set'>('double_xp');
@@ -815,6 +818,26 @@ export default function AdminScreen() {
   }
 
 
+  async function loadReleaseResetPreview() {
+    if (working || !adminAccess?.isOwner) return;
+    try {
+      setWorking(true);
+      setError(null);
+      const result = await getAdminReleaseResetPreview();
+      setReleaseResetPreview(result);
+      setNotice(
+        result.readyToReset
+          ? 'Impacto calculado. O ambiente está tecnicamente pronto para o reset, mas nenhuma alteração foi executada.'
+          : 'Impacto calculado em modo somente leitura. O reset continua bloqueado até o freeze e o pré-check final.',
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível calcular o impacto do reset.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+
   return (
     <Screen title="Admin Command Center" subtitle="Controle privado de usuários, economia, eventos, segurança e saúde da Trainer Collection.">
       <View style={styles.topRow}>
@@ -933,6 +956,56 @@ export default function AdminScreen() {
                       </View>
                     ))}
                   </View>
+                ) : null}
+              </View>
+
+              <View style={[styles.resetPreviewBox,{backgroundColor:colors.surfaceAlt,borderColor:releaseResetPreview?.readyToReset ? '#2F9E68' : colors.border}]}>
+                <View style={styles.resetPreviewHead}>
+                  <View style={[styles.resetPreviewIcon,{backgroundColor:colors.accentSoft}]}>
+                    <Ionicons name="calculator" size={20} color={colors.yellow}/>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={[styles.resetPreviewTitle,{color:colors.text}]}>IMPACTO DO RESET 1.0</Text>
+                    <Text style={[styles.resetPreviewText,{color:colors.muted}]}>
+                      {releaseResetPreview
+                        ? `${releaseResetPreview.preserve.accounts} contas preservadas • ${releaseResetPreview.preserve.legacyCardRows} cartas de Legado • ${releaseResetPreview.activeOperations} operação(ões) ainda ativa(s)`
+                        : 'Calcula o que será preservado e reiniciado sem modificar nenhuma conta.'}
+                    </Text>
+                  </View>
+                  <Pressable disabled={working} onPress={() => { void loadReleaseResetPreview(); }} style={[styles.preflightButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent,opacity: working ? .55 : 1}]}>
+                    <Ionicons name="calculator-outline" size={16} color={colors.accent}/>
+                    <Text style={[styles.preflightButtonText,{color:colors.accent}]}>CALCULAR</Text>
+                  </Pressable>
+                </View>
+                {releaseResetPreview ? (
+                  <>
+                    <View style={styles.resetPreviewGrid}>
+                      <View style={[styles.resetPreviewMetric,{borderColor:colors.border}]}>
+                        <Text style={[styles.resetPreviewValue,{color:'#65D894'}]}>{releaseResetPreview.preserve.legacyCardRows.toLocaleString('pt-BR')}</Text>
+                        <Text style={[styles.resetPreviewLabel,{color:colors.muted}]}>CARTAS PRESERVADAS</Text>
+                      </View>
+                      <View style={[styles.resetPreviewMetric,{borderColor:colors.border}]}>
+                        <Text style={[styles.resetPreviewValue,{color:'#FF8A9A'}]}>{releaseResetPreview.reset.cardRowsRemoved.toLocaleString('pt-BR')}</Text>
+                        <Text style={[styles.resetPreviewLabel,{color:colors.muted}]}>CARTAS REMOVIDAS</Text>
+                      </View>
+                      <View style={[styles.resetPreviewMetric,{borderColor:colors.border}]}>
+                        <Text style={[styles.resetPreviewValue,{color:colors.yellow}]}>{releaseResetPreview.reset.decks.toLocaleString('pt-BR')}</Text>
+                        <Text style={[styles.resetPreviewLabel,{color:colors.muted}]}>DECKS REINICIADOS</Text>
+                      </View>
+                      <View style={[styles.resetPreviewMetric,{borderColor:colors.border}]}>
+                        <Text style={[styles.resetPreviewValue,{color:colors.text}]}>{releaseResetPreview.reset.achievementsExceptTester.toLocaleString('pt-BR')}</Text>
+                        <Text style={[styles.resetPreviewLabel,{color:colors.muted}]}>CONQUISTAS RESET</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.resetEconomyRow,{borderColor:colors.border}]}>
+                      <Text style={[styles.resetEconomyText,{color:colors.muted}]}>Economia atual: 🪙 {releaseResetPreview.economy.coinsBefore.toLocaleString('pt-BR')} • 💎 {releaseResetPreview.economy.diamondsBefore.toLocaleString('pt-BR')}</Text>
+                      <Text style={[styles.resetEconomyText,{color:colors.text}]}>Após recompensa veterana: 🪙 {releaseResetPreview.economy.coinsAfterVeteranReward.toLocaleString('pt-BR')} • 💎 {releaseResetPreview.economy.diamondsAfterVeteranReward.toLocaleString('pt-BR')}</Text>
+                    </View>
+                    <View style={[styles.resetReadyBadge,{backgroundColor:releaseResetPreview.readyToReset ? '#153426' : '#2C2730',borderColor:releaseResetPreview.readyToReset ? '#2F9E68' : colors.border}]}>
+                      <Ionicons name={releaseResetPreview.readyToReset ? 'checkmark-circle' : 'lock-closed'} size={16} color={releaseResetPreview.readyToReset ? '#65D894' : colors.muted}/>
+                      <Text style={[styles.resetReadyText,{color:releaseResetPreview.readyToReset ? '#9CEFC1' : colors.muted}]}>{releaseResetPreview.readyToReset ? 'PRONTO TECNICAMENTE — RESET AINDA NÃO EXECUTADO' : 'RESET BLOQUEADO — SOMENTE PREVIEW'}</Text>
+                    </View>
+                  </>
                 ) : null}
               </View>
 
@@ -2142,6 +2215,19 @@ const styles = StyleSheet.create({
   issueItem:{flexGrow:1,flexBasis:105,minWidth:95,borderRadius:11,borderWidth:1,paddingHorizontal:9,paddingVertical:7},
   issueValue:{fontSize:13,fontWeight:'900'},
   issueLabel:{fontSize:6,fontWeight:'900',letterSpacing:.45,marginTop:1},
+  resetPreviewBox:{borderRadius:17,borderWidth:1,padding:11,gap:9},
+  resetPreviewHead:{flexDirection:'row',alignItems:'center',gap:9,flexWrap:'wrap'},
+  resetPreviewIcon:{width:40,height:40,borderRadius:13,alignItems:'center',justifyContent:'center'},
+  resetPreviewTitle:{fontSize:10,fontWeight:'900',letterSpacing:.45},
+  resetPreviewText:{fontSize:8,lineHeight:12,marginTop:2},
+  resetPreviewGrid:{flexDirection:'row',flexWrap:'wrap',gap:6},
+  resetPreviewMetric:{flexGrow:1,flexBasis:105,minWidth:95,borderRadius:11,borderWidth:1,paddingHorizontal:9,paddingVertical:8},
+  resetPreviewValue:{fontSize:14,fontWeight:'900'},
+  resetPreviewLabel:{fontSize:6,fontWeight:'900',letterSpacing:.45,marginTop:2},
+  resetEconomyRow:{borderTopWidth:1,paddingTop:8,gap:3},
+  resetEconomyText:{fontSize:8,fontWeight:'800'},
+  resetReadyBadge:{borderRadius:12,borderWidth:1,paddingHorizontal:9,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:6},
+  resetReadyText:{fontSize:7,fontWeight:'900',letterSpacing:.35},
   heroKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   heroTitle: { fontSize: 18, fontWeight: '900', marginTop: 2 },
   heroText: { fontSize: 10, lineHeight: 15, marginTop: 3 },
