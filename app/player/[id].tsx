@@ -11,6 +11,7 @@ import { runFriendAction } from '@/services/playerActions';
 import { getRelationshipWith, type PublicRelationshipState } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { getProfileMediaPublicUrl } from '@/services/profileMedia';
 
 export default function PlayerShowcaseScreen() {
   const router = useRouter();
@@ -50,6 +51,7 @@ export default function PlayerShowcaseScreen() {
   const winRate = winTotal ? Math.round(Number(player?.battleWins ?? 0) / winTotal * 100) : 0;
   const frameColor = player?.frame?.primaryColor ?? player?.guild?.color ?? colors.accent;
   const backgroundColor = player?.background?.secondaryColor ?? colors.accentSoft;
+  const avatarUrl = getProfileMediaPublicUrl(player?.avatarPath);
 
   async function updateFriendship(action: 'send' | 'accept') {
     if (!player || friendWorking) return;
@@ -85,7 +87,7 @@ export default function PlayerShowcaseScreen() {
 
       {player && collection ? <>
         <View style={[styles.hero, { backgroundColor, borderColor: frameColor, borderWidth: player.frame ? 2 : 1 }]}>
-          <TrainerAvatar icon={player.profileIcon} color={frameColor} backgroundColor={player.background?.primaryColor ? player.background.primaryColor + '22' : colors.surfaceAlt} size={66} />
+          <TrainerAvatar icon={player.profileIcon} imageUrl={avatarUrl} color={frameColor} backgroundColor={player.background?.primaryColor ? player.background.primaryColor + '22' : colors.surfaceAlt} size={66} />
           <View style={styles.heroInfo}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER SHOWCASE</Text>
             <Text style={[styles.username, { color: colors.text }]}>@{player.username}</Text>
