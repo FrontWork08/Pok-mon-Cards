@@ -73,6 +73,53 @@ export type AdminReleaseCampaignStatus = {
   submissions: number;
 };
 
+export type AdminLegacyProgressStatus =
+  | 'complete_confirmed'
+  | 'complete_unconfirmed'
+  | 'confirmed_partial'
+  | 'in_progress'
+  | 'not_started';
+
+export type AdminLegacyProgressPlayer = {
+  playerId: string;
+  username: string;
+  accountStatus: 'active' | 'suspended' | 'banned';
+  selectedCount: number;
+  manualCount: number;
+  automaticCount: number;
+  remainingCount: number;
+  confirmed: boolean;
+  confirmedAt: string | null;
+  submissionSelectedCount: number | null;
+  autoFilledCount: number;
+  lastSelectedAt: string | null;
+  status: AdminLegacyProgressStatus;
+};
+
+export type AdminLegacyProgress = {
+  generatedAt: string;
+  campaign: {
+    id: string;
+    phase: string;
+    legacyCardLimit: number;
+    legacySelectionEnabled: boolean;
+    updatedAt: string;
+  };
+  summary: {
+    totalPlayers: number;
+    selectedTen: number;
+    confirmedTen: number;
+    tenAwaitingConfirmation: number;
+    confirmedPartial: number;
+    inProgress: number;
+    notStarted: number;
+    selectedCards: number;
+    manualCards: number;
+    automaticCards: number;
+  };
+  players: AdminLegacyProgressPlayer[];
+};
+
 export type AdminReleasePreflight = {
   ready: boolean;
   generatedAt: string;
@@ -316,6 +363,9 @@ export async function setMaintenanceMode(enabled: boolean, message: string) { re
 
 export async function getAdminReleaseCampaignStatus() {
   return invokeAdmin({ action: 'release_campaign_status' }) as Promise<AdminReleaseCampaignStatus | null>;
+}
+export async function getAdminLegacyProgress() {
+  return invokeAdmin({ action: 'release_legacy_progress' }) as Promise<AdminLegacyProgress>;
 }
 export async function runAdminReleasePreflight() {
   return invokeAdmin({ action: 'release_preflight' }) as Promise<AdminReleasePreflight>;
