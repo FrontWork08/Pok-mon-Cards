@@ -53,7 +53,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Pokemon-Cards-Android
+          name: Trainer-Collection-Android
           path: builds/*.apk
           if-no-files-found: error
           retention-days: 14
