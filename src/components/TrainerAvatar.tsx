@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 export type ProfileIcon = 'pokeball' | 'trainer' | 'electric' | 'fire' | 'water' | 'leaf' | 'ghost' | 'dragon' | 'diamond';
 
@@ -20,16 +20,27 @@ export function TrainerAvatar({
   color,
   backgroundColor,
   size = 66,
+  avatarUrl,
 }: {
   icon?: ProfileIcon | string | null;
   color: string;
   backgroundColor: string;
   size?: number;
+  avatarUrl?: string | null;
 }) {
   const safeIcon = icon && icon in ICONS ? icon as ProfileIcon : 'pokeball';
+  const innerRadius = Math.max(8, size * .28);
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size * .31, borderColor: color, backgroundColor }]}>
-      <Ionicons name={ICONS[safeIcon]} size={Math.round(size * .45)} color={color} />
+      {avatarUrl ? (
+        <Image
+          source={{ uri: avatarUrl }}
+          resizeMode="cover"
+          style={{ width: '100%', height: '100%', borderRadius: innerRadius }}
+        />
+      ) : (
+        <Ionicons name={ICONS[safeIcon]} size={Math.round(size * .45)} color={color} />
+      )}
     </View>
   );
 }
