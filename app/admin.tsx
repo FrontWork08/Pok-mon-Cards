@@ -894,6 +894,43 @@ export default function AdminScreen() {
   }
 
 
+  async function importReleaseDownloadUrlFromSite() {
+    if (working || !adminAccess?.isOwner) return;
+    try {
+      setWorking(true);
+      setError(null);
+      const response = await fetch(
+        `https://pokemon-cards-frontwork.expo.app/download/release.json?t=${Date.now()}`,
+      );
+      if (!response.ok) throw new Error('RELEASE_METADATA_UNAVAILABLE');
+      const release = await response.json() as {
+        version?: string;
+        downloadUrl?: string;
+        status?: string;
+      };
+      if (
+        release.status !== 'ready'
+        || release.version !== '1.0.0'
+        || typeof release.downloadUrl !== 'string'
+        || !release.downloadUrl.trim()
+      ) {
+        throw new Error('RELEASE_METADATA_NOT_READY');
+      }
+      setReleaseDownloadUrlInput(release.downloadUrl.trim());
+      setNotice('APK 1.0 encontrado no site oficial. Revise a URL e toque em SALVAR APK.');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '';
+      setError(
+        message.includes('NOT_READY')
+          ? 'O site ainda não publicou um APK 1.0 válido. Gere o build Android primeiro.'
+          : 'Não foi possível importar o metadata do APK agora.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+
   return (
     <Screen title="Admin Command Center" subtitle="Controle privado de usuários, economia, eventos, segurança e saúde da Trainer Collection.">
       <View style={styles.topRow}>
@@ -1044,14 +1081,24 @@ export default function AdminScreen() {
                     />
                     <Text style={[styles.releaseUrlHint,{color:colors.muted}]}>Aceita somente HTTPS oficial do Expo/GitHub terminando em .apk. Salvar o link não executa a migração.</Text>
                   </View>
-                  <Pressable
-                    disabled={working}
-                    onPress={() => { void saveReleaseDownloadUrl(); }}
-                    style={[styles.releaseUrlButton,{backgroundColor:colors.yellow,opacity:working ? .55 : 1}]}
-                  >
-                    <Ionicons name="link" size={16} color="#07111F"/>
-                    <Text style={styles.releaseUrlButtonText}>SALVAR APK</Text>
-                  </Pressable>
+                  <View style={styles.releaseUrlActions}>
+                    <Pressable
+                      disabled={working}
+                      onPress={() => { void importReleaseDownloadUrlFromSite(); }}
+                      style={[styles.releaseUrlImportButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent,opacity:working ? .55 : 1}]}
+                    >
+                      <Ionicons name="cloud-download-outline" size={16} color={colors.accent}/>
+                      <Text style={[styles.releaseUrlImportText,{color:colors.accent}]}>IMPORTAR DO SITE</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={working}
+                      onPress={() => { void saveReleaseDownloadUrl(); }}
+                      style={[styles.releaseUrlButton,{backgroundColor:colors.yellow,opacity:working ? .55 : 1}]}
+                    >
+                      <Ionicons name="link" size={16} color="#07111F"/>
+                      <Text style={styles.releaseUrlButtonText}>SALVAR APK</Text>
+                    </Pressable>
+                  </View>
                 </View>
 
                 {releaseReadiness ? (
@@ -2350,6 +2397,9 @@ const styles = StyleSheet.create({
   releaseUrlLabel:{fontSize:7,fontWeight:'900',letterSpacing:.6},
   releaseUrlInput:{minHeight:42,borderRadius:11,borderWidth:1,paddingHorizontal:10,fontSize:9,marginTop:5},
   releaseUrlHint:{fontSize:6.5,lineHeight:10,marginTop:4},
+  releaseUrlActions:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},
+  releaseUrlImportButton:{minHeight:42,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
+  releaseUrlImportText:{fontSize:7,fontWeight:'900'},
   releaseUrlButton:{minHeight:42,borderRadius:11,paddingHorizontal:11,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
   releaseUrlButtonText:{fontSize:7,fontWeight:'900',color:'#07111F'},
   resetPreviewBox:{borderRadius:17,borderWidth:1,padding:11,gap:9},
