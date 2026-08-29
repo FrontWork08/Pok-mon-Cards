@@ -67,3 +67,22 @@ jobs:
 
       - name: Deploy stable 1.0 preview alias
         run: eas deploy --alias trainer-collection-v1-preview --environment preview --non-interactive
+
+      - name: Verify preview host isolation
+        run: |
+          set -e
+          ALIAS_URL="https://pokemon-cards-frontwork--trainer-collection-v1-preview.expo.app"
+          EFFECTIVE_URL="$(curl -LsS -o /tmp/preview.html -w '%{url_effective}' "$ALIAS_URL")"
+          echo "Alias requested: $ALIAS_URL"
+          echo "Effective URL: $EFFECTIVE_URL"
+          echo "HTTP title:"
+          grep -o '<title>[^<]*</title>' /tmp/preview.html | head -1 || true
+          case "$EFFECTIVE_URL" in
+            https://pokemon-cards-frontwork--trainer-collection-v1-preview.expo.app/*|https://pokemon-cards-frontwork--trainer-collection-v1-preview.expo.app)
+              echo "Preview host stayed isolated."
+              ;;
+            *)
+              echo "Preview escaped to another host."
+              exit 1
+              ;;
+          esac
