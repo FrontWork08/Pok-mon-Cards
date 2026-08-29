@@ -202,8 +202,7 @@ export function ReleaseCampaignNotice() {
                       Conta e login{'\n'}
                       Tester e cargos Admin{'\n'}
                       Dono da guilda{'\n'}
-                      Até {campaign.legacy_card_limit} cartas preservadas{'
-'}
+                      Até {campaign.legacy_card_limit} cartas preservadas{'\n'}
                       Vagas não escolhidas: cartas mais caras da Bag
                     </Text>
                   </View>
