@@ -27,7 +27,23 @@ export type DuplicateSaleResult = {
 export function coinsForDuplicateMarketPrice(priceUsd?: number | null) {
   const value = Number(priceUsd ?? 0);
   if (!Number.isFinite(value) || value <= 0) return 0;
-  return Math.max(10, Math.round((value * 200) / 10) * 10);
+
+  const round10 = (amount: number) => Math.round(amount / 10) * 10;
+  const lerp = (x: number, x0: number, y0: number, x1: number, y1: number) =>
+    y0 + ((x - x0) / (x1 - x0)) * (y1 - y0);
+
+  if (value <= 0.5) return Math.max(10, round10((value / 0.5) * 50));
+  if (value <= 1) return round10(lerp(value, 0.5, 50, 1, 100));
+  if (value <= 2) return round10(lerp(value, 1, 100, 2, 150));
+  if (value <= 5) return round10(lerp(value, 2, 150, 5, 300));
+  if (value <= 10) return round10(lerp(value, 5, 300, 10, 500));
+  if (value <= 20) return round10(lerp(value, 10, 500, 20, 750));
+  if (value <= 50) return round10(lerp(value, 20, 750, 50, 1250));
+  if (value <= 100) return round10(lerp(value, 50, 1250, 100, 2000));
+  if (value <= 200) return round10(lerp(value, 100, 2000, 200, 3000));
+  if (value <= 500) return round10(lerp(value, 200, 3000, 500, 5000));
+
+  return Math.round((5000 + 1500 * Math.log2(value / 500)) / 50) * 50;
 }
 
 export async function getDuplicateCardsForSale(): Promise<DuplicateSaleCard[]> {
