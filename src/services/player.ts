@@ -132,6 +132,7 @@ function base64ToArrayBuffer(value: string) {
 
 export async function uploadMyProfileAvatar(input: {
   base64: string;
+  mimeType?: string | null;
   previousPath?: string | null;
 }) {
   const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -145,10 +146,18 @@ export async function uploadMyProfileAvatar(input: {
     throw new Error('A foto precisa ter no máximo 5 MB.');
   }
 
-  const path = `${playerId}/avatar-${Date.now()}.jpg`;
+  const normalizedMime = String(input.mimeType ?? 'image/jpeg').toLowerCase();
+  const mimeMap: Record<string, { mime: string; ext: string }> = {
+    'image/jpeg': { mime: 'image/jpeg', ext: 'jpg' },
+    'image/jpg': { mime: 'image/jpeg', ext: 'jpg' },
+    'image/png': { mime: 'image/png', ext: 'png' },
+    'image/webp': { mime: 'image/webp', ext: 'webp' },
+  };
+  const selectedType = mimeMap[normalizedMime] ?? mimeMap['image/jpeg'];
+  const path = `${playerId}/avatar-${Date.now()}.${selectedType.ext}`;
   const storage = supabase.storage.from(PROFILE_MEDIA_BUCKET);
   const { error: uploadError } = await storage.upload(path, body, {
-    contentType: 'image/jpeg',
+    contentType: selectedType.mime,
     cacheControl: '3600',
     upsert: false,
   });
