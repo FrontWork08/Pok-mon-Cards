@@ -275,7 +275,7 @@ export default function PacksScreen() {
           <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
           <Text style={[styles.title, { color: colors.text }]}>Pack Shop</Text>
           <Text style={[styles.subtitle, { color: colors.muted }]}>
-            Preços balanceados pelo valor da carta mais valiosa do set; packs com 5+ anos usam Diamantes.
+            Preços consideram o valor do set e, nos packs especiais, a concentração de cartas raras.
           </Text>
         </View>
       </View>
