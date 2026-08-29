@@ -397,7 +397,7 @@ function AppStack() {
   return (
     <View style={[styles.appShell,{backgroundColor:colors.bg}]}>
       <StatusBar style={isLight ? 'dark' : 'light'} />
-      {showChrome ? <View style={[styles.appChrome,{backgroundColor:colors.bg,borderBottomColor:colors.border,paddingTop:Math.max(insets.top,6)}]}><TrainerNavigation /></View> : null}
+      {showChrome ? <View style={[styles.appChrome,{paddingTop:Math.max(insets.top,6)}]}><TrainerNavigation /></View> : null}
       <View style={styles.stackHost}><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} /></View>
       {showChrome ? <GlobalBottomNavigation /> : null}
       <UpdatePrompt />
@@ -518,7 +518,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   appShell:{flex:1},
   stackHost:{flex:1,minHeight:0},
-  appChrome:{zIndex:1500,paddingHorizontal:12,paddingBottom:7,borderBottomWidth:1},
+  appChrome:{zIndex:1500,paddingHorizontal:0,paddingBottom:7,borderBottomWidth:1,borderBottomColor:'#4A3B1E',backgroundColor:'#070A12'},
   maintenanceBlocker: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 7000,
