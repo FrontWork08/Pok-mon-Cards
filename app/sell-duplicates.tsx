@@ -154,7 +154,7 @@ export default function SellDuplicatesScreen() {
               <View style={styles.ruleText}>
                 <Text style={[styles.ruleTitle, { color: colors.text }]}>Valor baseado no mercado</Text>
                 <Text style={[styles.ruleBody, { color: colors.muted }]}>
-                  US$ 0,50 ≈ 🪙100 • US$ 1,00 = 🪙200 • o valor continua proporcional ao preço atual da carta.
+                  US$ 0,50 = 🪙50 • US$ 1 = 🪙100 • US$ 10 = 🪙500. Cartas muito caras continuam valendo mais, mas a recompensa cresce mais devagar e não tem teto fixo.
                 </Text>
               </View>
             </View>
