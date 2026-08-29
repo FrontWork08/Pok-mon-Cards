@@ -202,7 +202,9 @@ export function ReleaseCampaignNotice() {
                       Conta e login{'\n'}
                       Tester e cargos Admin{'\n'}
                       Dono da guilda{'\n'}
-                      Até {campaign.legacy_card_limit} cartas escolhidas
+                      Até {campaign.legacy_card_limit} cartas preservadas{'
+'}
+                      Vagas não escolhidas: cartas mais caras da Bag
                     </Text>
                   </View>
 
@@ -223,7 +225,7 @@ export function ReleaseCampaignNotice() {
                     🪙 {campaign.reward_coins.toLocaleString('pt-BR')} + 💎 {campaign.reward_diamonds}
                   </Text>
                   <Text style={[styles.rewardHint, { color: colors.muted }]}>
-                    A escolha das {campaign.legacy_card_limit} cartas será liberada antes da atualização.
+                    A escolha será liberada antes da atualização. Se você não preencher as {campaign.legacy_card_limit} vagas, o sistema completa automaticamente com as cartas mais caras da sua Bag.
                   </Text>
                 </View>
 
@@ -294,7 +296,7 @@ export function ReleaseCampaignNotice() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.legacyTitle}>ESCOLHA DE LEGADO LIBERADA</Text>
                         <Text style={[styles.legacyText, { color: colors.muted }]}>
-                          Selecione e confirme até {campaign.legacy_card_limit} cartas antes do fechamento da economia Beta.
+                          Selecione e confirme até {campaign.legacy_card_limit} cartas. Se deixar vagas livres, elas serão preenchidas automaticamente pelas cartas mais caras da sua Bag quando a migração começar.
                         </Text>
                       </View>
                     </View>
