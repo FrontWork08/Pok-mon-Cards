@@ -101,11 +101,13 @@ export type LegacySelectionSubmission = {
   campaign_id: string;
   player_id: string;
   selected_count: number;
+  auto_filled_count: number;
   confirmed_at: string;
 };
 
 export type LegacySelectionState = {
   cardIds: string[];
+  sources: Record<string, 'manual' | 'automatic'>;
   submission: LegacySelectionSubmission | null;
 };
 
@@ -127,13 +129,13 @@ export async function getLegacySelection(
   const [{ data: rows, error: rowsError }, { data: submission, error: submissionError }] = await Promise.all([
     supabase
       .from('release_campaign_legacy_selections')
-      .select('card_id,selected_at')
+      .select('card_id,selected_at,selection_source')
       .eq('campaign_id', campaignId)
       .eq('player_id', playerId)
       .order('selected_at', { ascending: true }),
     supabase
       .from('release_campaign_legacy_submissions')
-      .select('campaign_id,player_id,selected_count,confirmed_at')
+      .select('campaign_id,player_id,selected_count,auto_filled_count,confirmed_at')
       .eq('campaign_id', campaignId)
       .eq('player_id', playerId)
       .maybeSingle(),
@@ -144,6 +146,10 @@ export async function getLegacySelection(
 
   return {
     cardIds: (rows ?? []).map((row) => String(row.card_id)),
+    sources: Object.fromEntries((rows ?? []).map((row) => [
+      String(row.card_id),
+      row.selection_source === 'automatic' ? 'automatic' : 'manual',
+    ])),
     submission: (submission as LegacySelectionSubmission | null) ?? null,
   };
 }
@@ -202,7 +208,7 @@ export async function confirmLegacySelection(
         player_id: playerId,
         selected_count: 1,
       })
-      .select('campaign_id,player_id,selected_count,confirmed_at')
+      .select('campaign_id,player_id,selected_count,auto_filled_count,confirmed_at')
       .single();
 
     if (error) throw error;
