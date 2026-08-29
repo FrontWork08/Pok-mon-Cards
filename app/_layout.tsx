@@ -84,7 +84,10 @@ function AppStack() {
     // push registration happens before the user is authenticated.
     registerPush();
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) registerPush();
+      if (!session?.user) return;
+      // supabase-js can deadlock if another Supabase call starts inside
+      // onAuthStateChange. Always defer follow-up work to the next tick.
+      setTimeout(registerPush, 0);
     });
 
     import('expo-notifications').then((Notifications) => {
@@ -135,8 +138,10 @@ function AppStack() {
 
     void attachRealtime();
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user?.id) void attachRealtime(session.user.id);
-      else {
+      if (session?.user?.id) {
+        const nextUserId = session.user.id;
+        setTimeout(() => { void attachRealtime(nextUserId); }, 0);
+      } else {
         clearRealtime();
         setLiveNotification(null);
       }
@@ -189,8 +194,12 @@ function AppStack() {
     }).catch(() => null);
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user?.id) lastUserId = null;
-      else void claimFor(session.user.id);
+      if (!session?.user?.id) {
+        lastUserId = null;
+      } else {
+        const nextUserId = session.user.id;
+        setTimeout(() => { void claimFor(nextUserId); }, 0);
+      }
     });
 
     return () => {
@@ -239,7 +248,8 @@ function AppStack() {
     }).catch(() => null);
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      void attach(session?.user?.id ?? null);
+      const nextUserId = session?.user?.id ?? null;
+      setTimeout(() => { void attach(nextUserId); }, 0);
     });
 
     return () => {
@@ -305,7 +315,8 @@ function AppStack() {
     }).catch(() => null);
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      void attach(session?.user?.id ?? null);
+      const nextUserId = session?.user?.id ?? null;
+      setTimeout(() => { void attach(nextUserId); }, 0);
     });
 
     return () => {
