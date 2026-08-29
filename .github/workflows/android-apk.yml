@@ -1,7 +1,7 @@
 name: Build Android APK
 
 # APK builds are release-controlled.
-# Day-to-day app changes still ship through Expo Updates on the preview channel.
+# Day-to-day app changes ship through Expo Updates; public APK releases use the production channel.
 # The assistant triggers native releases by advancing the dedicated apk-release branch.
 on:
   workflow_dispatch:
@@ -53,7 +53,7 @@ jobs:
           python -m pip install --disable-pip-version-check pillow
           python scripts/generate-trainer-assets.py
 
-      - name: Build and download preview APK
+      - name: Build and download release APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: npm run apk
