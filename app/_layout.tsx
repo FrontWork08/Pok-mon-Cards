@@ -7,7 +7,7 @@ import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { GlobalAnnouncementOverlay } from '@/components/GlobalAnnouncement';
 import { ReleaseCampaignNotice } from '@/components/ReleaseCampaignNotice';
 import { ThemeProvider, useAppTheme } from '@/theme/ThemeProvider';
-import { registerPushNotifications, subscribeToMyNotifications } from '@/services/notifications';
+import { registerPushNotifications, resolveNotificationRoute, subscribeToMyNotifications } from '@/services/notifications';
 import { playBattleSound } from '@/services/battleEffects';
 import { completeOAuthFromUrl, isOAuthCallbackUrl } from '@/services/auth';
 import { getMyProfile, type PlayerProfile } from '@/services/player';
@@ -91,14 +91,20 @@ function AppStack() {
       setTimeout(registerPush, 0);
     });
 
-    import('expo-notifications').then((Notifications) => {
+    import('expo-notifications').then(async (Notifications) => {
       if (disposed) return;
-      notificationSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data as Record<string, any>;
-        if (data?.battleId) router.push(`/battle/${data.battleId}`);
-        else if (data?.senderId) router.push(`/chat/${data.senderId}`);
-        else router.push('/inbox');
-      });
+
+      const openResponse = (response: any) => {
+        const data = response?.notification?.request?.content?.data as Record<string, any> | undefined;
+        router.push(resolveNotificationRoute(data) as never);
+      };
+
+      notificationSubscription = Notifications.addNotificationResponseReceivedListener(openResponse);
+
+      const lastResponse = await Notifications.getLastNotificationResponseAsync().catch(() => null);
+      const responseDate = Number(lastResponse?.notification?.date ?? 0);
+      const recentEnough = responseDate > 0 && Date.now() - responseDate < 2 * 60 * 1000;
+      if (!disposed && lastResponse && recentEnough) openResponse(lastResponse);
     }).catch(() => null);
 
     return () => {
@@ -158,12 +164,12 @@ function AppStack() {
 
   function openLiveNotification() {
     if (!liveNotification) return;
-    const data = (liveNotification.metadata ?? {}) as Record<string, any>;
+    const data = {
+      ...((liveNotification.metadata ?? {}) as Record<string, any>),
+      type: liveNotification.type,
+    };
     setLiveNotification(null);
-    if (data?.battleId) router.push(`/battle/${data.battleId}`);
-    else if (data?.senderId) router.push(`/chat/${data.senderId}`);
-    else if (data?.route) router.push(data.route as never);
-    else router.push('/inbox');
+    router.push(resolveNotificationRoute(data) as never);
   }
 
   useEffect(() => {
