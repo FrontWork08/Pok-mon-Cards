@@ -118,6 +118,14 @@ async function downloadLatestApk() {
     throw new Error('Nenhum build Android preview concluído foi encontrado no EAS.');
   }
 
+  const expectedAppVersion = await getAppVersion();
+  const actualAppVersion = String(build?.appVersion ?? '').trim();
+  if (!actualAppVersion || actualAppVersion !== expectedAppVersion) {
+    throw new Error(
+      `Build recusado: o último APK preview é da versão ${actualAppVersion || 'desconhecida'}, mas o app atual exige ${expectedAppVersion}. Nenhum metadata de download foi publicado.`,
+    );
+  }
+
   const url = findArtifactUrl(build);
   if (!url) {
     throw new Error('O EAS não retornou uma URL de APK para o último build.');
