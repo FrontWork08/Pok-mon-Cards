@@ -63,7 +63,7 @@ async function writeDownloadReleaseMetadata({ build, url, bytes }) {
     sha256,
     sizeBytes: bytes.length,
     publishedAt: new Date().toISOString(),
-    channel: 'preview',
+    channel: 'production',
     status: 'ready',
   };
 
@@ -92,7 +92,7 @@ function buildVersionLabel(build) {
 }
 
 async function downloadLatestApk() {
-  console.log('\n🔎 Procurando o último APK preview concluído...');
+  console.log('\n🔎 Procurando o último APK de lançamento concluído...');
 
   const raw = runEas(
     [
@@ -100,7 +100,7 @@ async function downloadLatestApk() {
       '--platform',
       'android',
       '--profile',
-      'preview',
+      'release-apk',
       '--status',
       'finished',
       '--limit',
@@ -115,14 +115,14 @@ async function downloadLatestApk() {
   const build = Array.isArray(builds) ? builds[0] : builds?.builds?.[0];
 
   if (!build) {
-    throw new Error('Nenhum build Android preview concluído foi encontrado no EAS.');
+    throw new Error('Nenhum build Android release-apk concluído foi encontrado no EAS.');
   }
 
   const expectedAppVersion = await getAppVersion();
   const actualAppVersion = String(build?.appVersion ?? '').trim();
   if (!actualAppVersion || actualAppVersion !== expectedAppVersion) {
     throw new Error(
-      `Build recusado: o último APK preview é da versão ${actualAppVersion || 'desconhecida'}, mas o app atual exige ${expectedAppVersion}. Nenhum metadata de download foi publicado.`,
+      `Build recusado: o último APK de lançamento é da versão ${actualAppVersion || 'desconhecida'}, mas o app atual exige ${expectedAppVersion}. Nenhum metadata de download foi publicado.`,
     );
   }
 
@@ -158,13 +158,13 @@ async function main() {
   }
 
   if (mode === 'build') {
-    console.log('🚀 Gerando APK preview no EAS...');
+    console.log('🚀 Gerando APK de lançamento no EAS...');
     runEas([
       'build',
       '--platform',
       'android',
       '--profile',
-      'preview',
+      'release-apk',
       '--non-interactive',
     ]);
   }
