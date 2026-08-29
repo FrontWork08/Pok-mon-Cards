@@ -94,7 +94,9 @@ export function GlobalAnnouncementOverlay() {
         clearAnnouncement();
         return;
       }
-      void connect();
+      // Defer Supabase work: starting it inside onAuthStateChange can lock
+      // the auth client and leave signInWithPassword pending forever.
+      setTimeout(() => { void connect(); }, 0);
     });
 
     return () => {
