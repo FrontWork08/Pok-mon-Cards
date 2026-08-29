@@ -4,7 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { signOut } from '@/services/auth';
-import { getMyProfile, getMyProfileStats, type PlayerProfile } from '@/services/player';
+import {
+  getMyProfile,
+  getMyProfileStats,
+  getProfileAvatarUrl,
+  uploadMyProfileAvatar,
+  removeMyProfileAvatar,
+  type PlayerProfile,
+} from '@/services/player';
 import { getMySocial } from '@/services/social';
 import { formatUsd } from '@/services/market';
 import { changeUsername } from '@/services/playerActions';
@@ -25,6 +32,7 @@ export default function ProfileScreen() {
   const [nicknameDraft, setNicknameDraft] = useState('');
   const [nicknameSaving, setNicknameSaving] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -72,6 +80,78 @@ export default function ProfileScreen() {
     }
   }
 
+  async function chooseProfilePhoto(source: 'library' | 'camera') {
+    if (avatarSaving) return;
+
+    try {
+      setAvatarSaving(true);
+      setError(null);
+      const ImagePicker = await import('expo-image-picker');
+
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) throw new Error('Permita o acesso à câmera para tirar sua foto de perfil.');
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) throw new Error('Permita o acesso às fotos para escolher sua foto de perfil.');
+      }
+
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: .82,
+            base64: true,
+            cameraType: ImagePicker.CameraType.front,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: .82,
+            base64: true,
+          });
+
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset?.base64) throw new Error('Não foi possível preparar a imagem selecionada.');
+
+      const uploaded = await uploadMyProfileAvatar({
+        base64: asset.base64,
+        previousPath: profile?.avatar_path,
+      });
+
+      setProfile((current) => current ? {
+        ...current,
+        avatar_path: uploaded.path,
+        avatar_updated_at: uploaded.updatedAt,
+      } : current);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível atualizar sua foto de perfil.');
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
+
+  async function clearProfilePhoto() {
+    if (avatarSaving || !profile?.avatar_path) return;
+    try {
+      setAvatarSaving(true);
+      setError(null);
+      const result = await removeMyProfileAvatar(profile.avatar_path);
+      setProfile((current) => current ? {
+        ...current,
+        avatar_path: result.path,
+        avatar_updated_at: result.updatedAt,
+      } : current);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível remover sua foto de perfil.');
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
+
   async function handleSignOut() { try { await signOut(); router.replace('/'); } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível sair.'); } }
   const xp = Number(profile?.xp ?? 0);
   const levelXp = xp % 250;
@@ -84,12 +164,34 @@ export default function ProfileScreen() {
   const backgroundDefinition = Array.isArray(profile?.equipped_background) ? profile.equipped_background[0] : profile?.equipped_background;
   const profileFrameColor = frameDefinition?.primary_color ?? colors.accent;
   const profileBackgroundColor = backgroundDefinition?.secondary_color ?? colors.accentSoft;
+  const avatarUrl = getProfileAvatarUrl(profile?.avatar_path, profile?.avatar_updated_at);
 
   return <Screen title="Trainer Card" subtitle="Sua identidade na Trainer Collection: coleção, ranking, cosméticos e progresso.">
     {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
     {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={20} color="#FF9FAF" /><Text style={styles.errorText}>{error}</Text></View> : null}
 
-    <View style={[styles.hero, { backgroundColor: profileBackgroundColor, borderColor: profileFrameColor, borderWidth: frameDefinition ? 2 : 1 }]}><View style={[styles.heroGlow,{backgroundColor:profileFrameColor}]} /><Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/><TrainerAvatar icon={profile?.profile_icon} color={profileFrameColor} backgroundColor={backgroundDefinition?.primary_color ? backgroundDefinition.primary_color + '22' : colors.surfaceAlt} size={70}/><View style={styles.heroInfo}><Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER CARD • 1.0</Text><View style={styles.usernameRow}><Text style={[styles.rankSymbol, { color: colors.yellow }]}>{trainerRank.symbol}</Text><Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{profile?.username ?? '---'}</Text><Pressable accessibilityLabel="Alterar nickname" onPress={openNicknameEditor} style={[styles.editNameButton, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="pencil" size={14} color={colors.yellow} /></Pressable></View>{equippedDefinition ? <Text style={[styles.equippedTitle, { color: colors.yellow }]}>{equippedDefinition.icon} {equippedDefinition.title}</Text> : null}{frameDefinition || backgroundDefinition ? <Text style={[styles.cosmeticLabel, { color: profileFrameColor }]}>{frameDefinition?.name ?? 'Sem moldura'} • {backgroundDefinition?.name ?? 'Sem background'}</Text> : null}<Text style={[styles.meta, { color: colors.muted }]}>Nível {profile?.level ?? 1} • {xp.toLocaleString('pt-BR')} XP • {trainerRank.displayName} • ELO {profile?.battle_rating ?? 1000}</Text></View><View style={[styles.coinBox, { backgroundColor: colors.surface }]}><Text style={[styles.coinLabel, { color: colors.muted }]}>CARTEIRA</Text><Text style={[styles.coins, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text><Text style={[styles.coins, { color: '#68D9FF' }]}>💎 {Number(profile?.diamonds ?? 0).toLocaleString('pt-BR')}</Text></View></View>
+    <View style={[styles.hero, { backgroundColor: profileBackgroundColor, borderColor: profileFrameColor, borderWidth: frameDefinition ? 2 : 1 }]}><View style={[styles.heroGlow,{backgroundColor:profileFrameColor}]} /><Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/><View style={styles.avatarEditor}><TrainerAvatar icon={profile?.profile_icon} avatarUrl={avatarUrl} color={profileFrameColor} backgroundColor={backgroundDefinition?.primary_color ? backgroundDefinition.primary_color + '22' : colors.surfaceAlt} size={70}/>{avatarSaving ? <View style={styles.avatarLoading}><ActivityIndicator size="small" color="#fff"/></View> : null}</View><View style={styles.heroInfo}><Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER CARD • 1.0</Text><View style={styles.usernameRow}><Text style={[styles.rankSymbol, { color: colors.yellow }]}>{trainerRank.symbol}</Text><Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{profile?.username ?? '---'}</Text><Pressable accessibilityLabel="Alterar nickname" onPress={openNicknameEditor} style={[styles.editNameButton, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="pencil" size={14} color={colors.yellow} /></Pressable></View>{equippedDefinition ? <Text style={[styles.equippedTitle, { color: colors.yellow }]}>{equippedDefinition.icon} {equippedDefinition.title}</Text> : null}{frameDefinition || backgroundDefinition ? <Text style={[styles.cosmeticLabel, { color: profileFrameColor }]}>{frameDefinition?.name ?? 'Sem moldura'} • {backgroundDefinition?.name ?? 'Sem background'}</Text> : null}<Text style={[styles.meta, { color: colors.muted }]}>Nível {profile?.level ?? 1} • {xp.toLocaleString('pt-BR')} XP • {trainerRank.displayName} • ELO {profile?.battle_rating ?? 1000}</Text></View><View style={[styles.coinBox, { backgroundColor: colors.surface }]}><Text style={[styles.coinLabel, { color: colors.muted }]}>CARTEIRA</Text><Text style={[styles.coins, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text><Text style={[styles.coins, { color: '#68D9FF' }]}>💎 {Number(profile?.diamonds ?? 0).toLocaleString('pt-BR')}</Text></View></View>
+
+    <View style={[styles.avatarControls,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+      <View style={styles.avatarControlsCopy}>
+        <Text style={[styles.avatarControlsTitle,{color:colors.text}]}>Foto do Trainer</Text>
+        <Text style={[styles.avatarControlsHint,{color:colors.muted}]}>Opcional. O ícone de treinador continua como fallback se você remover a foto.</Text>
+      </View>
+      <View style={styles.avatarButtons}>
+        <Pressable disabled={avatarSaving} onPress={() => { void chooseProfilePhoto('library'); }} style={[styles.avatarButton,{borderColor:colors.border,backgroundColor:colors.surfaceAlt,opacity: avatarSaving ? .5 : 1}]}>
+          <Ionicons name="images-outline" size={16} color={colors.accent}/>
+          <Text style={[styles.avatarButtonText,{color:colors.text}]}>GALERIA</Text>
+        </Pressable>
+        <Pressable disabled={avatarSaving} onPress={() => { void chooseProfilePhoto('camera'); }} style={[styles.avatarButton,{borderColor:colors.border,backgroundColor:colors.surfaceAlt,opacity: avatarSaving ? .5 : 1}]}>
+          <Ionicons name="camera-outline" size={16} color={colors.yellow}/>
+          <Text style={[styles.avatarButtonText,{color:colors.text}]}>CÂMERA</Text>
+        </Pressable>
+        {profile?.avatar_path ? <Pressable disabled={avatarSaving} onPress={() => { void clearProfilePhoto(); }} style={[styles.avatarButton,{borderColor:'#6C3540',backgroundColor:'#351A24',opacity: avatarSaving ? .5 : 1}]}>
+          <Ionicons name="trash-outline" size={16} color="#FF9FAF"/>
+          <Text style={[styles.avatarButtonText,{color:'#FFB6C1'}]}>REMOVER</Text>
+        </Pressable> : null}
+      </View>
+    </View>
 
     <View style={[styles.worthPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
       <View style={styles.worthHeader}><View style={{ flex: 1 }}><Text style={[styles.worthKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text><Text style={[styles.worthTotal, { color: colors.text }]}>{formatUsd(collectionMarketValueUsd)}</Text><Text style={[styles.worthHint, { color: colors.muted }]}>Snapshot dos preços TCGplayer em USD</Text></View><View style={[styles.worthIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="cash" size={26} color={colors.yellow} /></View></View>
@@ -164,7 +266,17 @@ const styles = StyleSheet.create({
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 12, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' }, errorText: { flex: 1, color: '#FFD7DD', fontWeight: '700', fontSize: 12 },
   hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: 18, borderRadius: 28, borderWidth: 1, overflow:'hidden', position:'relative', minHeight:150 },
   heroGlow:{position:'absolute',right:-65,top:-85,width:250,height:250,borderRadius:999,opacity:.13},
-  heroPokemon:{position:'absolute',right:-18,bottom:-45,width:190,height:205,opacity:.19,transform:[{rotate:'6deg'}]}, avatar: { width: 70, height: 70, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, avatarText: { fontSize: 30, fontWeight: '900' }, heroInfo: { flex: 1, minWidth: 190, zIndex:2 }, rankSymbol: { fontSize: 24, fontWeight: '900' }, equippedTitle: { fontSize: 11, fontWeight: '900', marginTop: 2 }, cosmeticLabel: { fontSize: 8, fontWeight: '900', marginTop: 3, letterSpacing: .4 }, usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }, editNameButton: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 }, username: { flexShrink: 1, fontSize: 25, fontWeight: '900' }, meta: { fontSize: 12, marginTop: 4 }, coinBox: { minWidth: 130, padding: 12, borderRadius: 16, zIndex:2, borderWidth:1, borderColor:'rgba(255,255,255,.08)' }, coinLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.1 }, coins: { fontSize: 18, fontWeight: '900', marginTop: 3 },
+  heroPokemon:{position:'absolute',right:-18,bottom:-45,width:190,height:205,opacity:.19,transform:[{rotate:'6deg'}]},
+  avatarEditor:{position:'relative',zIndex:2},
+  avatarLoading:{...StyleSheet.absoluteFillObject,borderRadius:22,backgroundColor:'rgba(0,0,0,.48)',alignItems:'center',justifyContent:'center'},
+  avatarControls:{borderRadius:18,borderWidth:1,padding:12,flexDirection:'row',alignItems:'center',gap:12,flexWrap:'wrap'},
+  avatarControlsCopy:{flex:1,minWidth:190},
+  avatarControlsTitle:{fontSize:12,fontWeight:'900'},
+  avatarControlsHint:{fontSize:8,lineHeight:12,marginTop:2},
+  avatarButtons:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'},
+  avatarButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
+  avatarButtonText:{fontSize:7,fontWeight:'900',letterSpacing:.35},
+  avatar: { width: 70, height: 70, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, avatarText: { fontSize: 30, fontWeight: '900' }, heroInfo: { flex: 1, minWidth: 190, zIndex:2 }, rankSymbol: { fontSize: 24, fontWeight: '900' }, equippedTitle: { fontSize: 11, fontWeight: '900', marginTop: 2 }, cosmeticLabel: { fontSize: 8, fontWeight: '900', marginTop: 3, letterSpacing: .4 }, usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }, editNameButton: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 }, username: { flexShrink: 1, fontSize: 25, fontWeight: '900' }, meta: { fontSize: 12, marginTop: 4 }, coinBox: { minWidth: 130, padding: 12, borderRadius: 16, zIndex:2, borderWidth:1, borderColor:'rgba(255,255,255,.08)' }, coinLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.1 }, coins: { fontSize: 18, fontWeight: '900', marginTop: 3 },
   rankPanel: { padding: 15, borderRadius: 20, borderWidth: 1 }, rankPanelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, rankName: { fontSize: 20, fontWeight: '900', marginTop: 3 }, rankPoints: { fontSize: 15, fontWeight: '900' },
   worthPanel: { padding: 16, borderRadius: 22, borderWidth: 1, gap: 12 }, worthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, worthKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, worthTotal: { fontSize: 30, fontWeight: '900', marginTop: 3 }, worthHint: { fontSize: 9, marginTop: 2 }, worthIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, worthDivider: { height: 1 }, worthBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, worthMetric: { flexGrow: 1, flexBasis: 150, minWidth: 130 }, worthMetricLabel: { fontSize: 7, fontWeight: '900', letterSpacing: .9 }, worthMetricText: { fontSize: 14, fontWeight: '900', marginTop: 3 }, worthMetricValue: { fontSize: 9, fontWeight: '900', marginTop: 2 }, topCardRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 8 }, topCardImage: { width: 50, height: 67, borderRadius: 6 }, topCardLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 1 }, topCardName: { fontSize: 13, fontWeight: '900', marginTop: 2 }, topCardMeta: { fontSize: 8, marginTop: 1 }, topCardValue: { fontSize: 10, fontWeight: '900' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, stat: { flexGrow: 1, flexBasis: 145, minWidth: 135, padding: 14, borderRadius: 18, borderWidth: 1 }, statIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 9 }, statValue: { fontSize: 20, fontWeight: '900' }, statLabel: { fontSize: 10, fontWeight: '800', marginTop: 2 },
