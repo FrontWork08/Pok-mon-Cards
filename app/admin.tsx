@@ -40,6 +40,7 @@ import {
   stopGameEvent,
   setMaintenanceMode,
   getAdminReleaseCampaignStatus,
+  runAdminReleasePreflight,
   setLegacySelectionEnabled,
   type AdminAccess,
   type AdminPermission,
@@ -52,6 +53,7 @@ import {
   type GlobalAnnouncement,
   type TesterTitleHub,
   type AdminReleaseCampaignStatus,
+  type AdminReleasePreflight,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
@@ -104,6 +106,7 @@ export default function AdminScreen() {
   const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
   const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
   const [releaseStatus, setReleaseStatus] = useState<AdminReleaseCampaignStatus | null>(null);
+  const [releasePreflight, setReleasePreflight] = useState<AdminReleasePreflight | null>(null);
   const [maintenanceMessage, setMaintenanceMessage] = useState('Estamos aplicando uma atualização importante. O jogo voltará em breve.');
   const [gameEvents, setGameEvents] = useState<AdminGameEvent[]>([]);
   const [eventType, setEventType] = useState<'double_xp'|'rare_boost'|'featured_set'>('double_xp');
@@ -792,6 +795,26 @@ export default function AdminScreen() {
   }
 
 
+  async function runReleasePreflightCheck() {
+    if (working || !adminAccess?.isOwner) return;
+    try {
+      setWorking(true);
+      setError(null);
+      const result = await runAdminReleasePreflight();
+      setReleasePreflight(result);
+      setNotice(
+        result.ready
+          ? 'Pré-check da transição concluído: nenhuma inconsistência crítica encontrada.'
+          : 'Pré-check concluído com pendências. O reset não deve ser executado enquanto houver alertas.',
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível executar o pré-check da transição.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+
   return (
     <Screen title="Admin Command Center" subtitle="Controle privado de usuários, economia, eventos, segurança e saúde da Trainer Collection.">
       <View style={styles.topRow}>
@@ -877,6 +900,39 @@ export default function AdminScreen() {
                 <View style={[styles.legacyAdminStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.legacyAdminValue,{color:colors.text}]}>{releaseStatus.selections.toLocaleString('pt-BR')}</Text><Text style={[styles.legacyAdminLabel,{color:colors.muted}]}>CARTAS SALVAS</Text></View>
                 <View style={[styles.legacyAdminStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.legacyAdminValue,{color:'#65D894'}]}>{releaseStatus.submissions.toLocaleString('pt-BR')}</Text><Text style={[styles.legacyAdminLabel,{color:colors.muted}]}>CONTAS CONFIRMADAS</Text></View>
                 <View style={[styles.legacyAdminStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.legacyAdminValue,{color:colors.yellow}]}>{releaseStatus.phase.toUpperCase()}</Text><Text style={[styles.legacyAdminLabel,{color:colors.muted}]}>FASE</Text></View>
+              </View>
+
+              <View style={[styles.preflightBox,{backgroundColor:colors.surfaceAlt,borderColor:releasePreflight ? (releasePreflight.ready ? '#2F9E68' : '#A84250') : colors.border}]}>
+                <View style={styles.preflightHeader}>
+                  <View style={[styles.preflightIcon,{backgroundColor:releasePreflight?.ready ? '#153426' : releasePreflight ? '#351A24' : colors.accentSoft}]}>
+                    <Ionicons name={releasePreflight?.ready ? 'checkmark-done' : releasePreflight ? 'warning' : 'shield-outline'} size={20} color={releasePreflight?.ready ? '#65D894' : releasePreflight ? '#FF8A9A' : colors.yellow}/>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={[styles.preflightTitle,{color:colors.text}]}>{releasePreflight ? (releasePreflight.ready ? 'PRÉ-CHECK APROVADO' : 'PRÉ-CHECK COM PENDÊNCIAS') : 'AUDITORIA PRÉ-RESET'}</Text>
+                    <Text style={[styles.preflightText,{color:colors.muted}]}>{releasePreflight ? `${releasePreflight.counts.players} contas • ${releasePreflight.counts.activeTesters} testers • ${releasePreflight.counts.guilds} guildas • ${releasePreflight.counts.confirmedAccounts} legados confirmados` : 'Verifica cartas, owner, Tester e liderança de guildas sem alterar nenhum dado.'}</Text>
+                  </View>
+                  <Pressable disabled={working} onPress={() => { void runReleasePreflightCheck(); }} style={[styles.preflightButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent,opacity: working ? .55 : 1}]}>
+                    <Ionicons name="scan" size={16} color={colors.accent}/>
+                    <Text style={[styles.preflightButtonText,{color:colors.accent}]}>EXECUTAR</Text>
+                  </Pressable>
+                </View>
+                {releasePreflight ? (
+                  <View style={styles.issueGrid}>
+                    {[
+                      ['CARTAS AUSENTES',releasePreflight.issues.selectedCardsNotOwned],
+                      ['CONTAGEM DIVERGENTE',releasePreflight.issues.submissionCountMismatch],
+                      ['ACIMA DO LIMITE',releasePreflight.issues.playersOverCardLimit],
+                      ['TESTER INCONSISTENTE',releasePreflight.issues.testersMissingAchievement],
+                      ['LÍDER DE GUILDA',releasePreflight.issues.guildLeaderMismatch],
+                      ['OWNER',releasePreflight.issues.ownerCountInvalid],
+                    ].map(([label,value]) => (
+                      <View key={String(label)} style={[styles.issueItem,{borderColor:Number(value) ? '#A84250' : colors.border}]}>
+                        <Text style={[styles.issueValue,{color:Number(value) ? '#FF8A9A' : '#65D894'}]}>{Number(value)}</Text>
+                        <Text style={[styles.issueLabel,{color:colors.muted}]}>{String(label)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
 
               <View style={styles.legacyAdminActions}>
@@ -2074,6 +2130,17 @@ const styles = StyleSheet.create({
   legacyPreviewButton:{minHeight:45,borderRadius:13,borderWidth:1,paddingHorizontal:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
   legacyPreviewText:{fontSize:8,fontWeight:'900'},
   legacySafety:{fontSize:8,lineHeight:12},
+  preflightBox:{borderRadius:17,borderWidth:1,padding:11,gap:9},
+  preflightHeader:{flexDirection:'row',alignItems:'center',gap:9,flexWrap:'wrap'},
+  preflightIcon:{width:40,height:40,borderRadius:13,alignItems:'center',justifyContent:'center'},
+  preflightTitle:{fontSize:10,fontWeight:'900',letterSpacing:.45},
+  preflightText:{fontSize:8,lineHeight:12,marginTop:2},
+  preflightButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},
+  preflightButtonText:{fontSize:7,fontWeight:'900'},
+  issueGrid:{flexDirection:'row',flexWrap:'wrap',gap:6},
+  issueItem:{flexGrow:1,flexBasis:105,minWidth:95,borderRadius:11,borderWidth:1,paddingHorizontal:9,paddingVertical:7},
+  issueValue:{fontSize:13,fontWeight:'900'},
+  issueLabel:{fontSize:6,fontWeight:'900',letterSpacing:.45,marginTop:1},
   heroKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   heroTitle: { fontSize: 18, fontWeight: '900', marginTop: 2 },
   heroText: { fontSize: 10, lineHeight: 15, marginTop: 3 },
