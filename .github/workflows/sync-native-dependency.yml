@@ -25,6 +25,9 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Install existing dependencies
+        run: npm ci
+
       - name: Install Expo image picker
         run: npx expo install expo-image-picker
 
