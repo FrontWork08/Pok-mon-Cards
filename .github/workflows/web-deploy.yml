@@ -12,6 +12,7 @@ on:
       - app.json
       - package.json
       - package-lock.json
+      - scripts/generate-trainer-assets.py
       - .github/workflows/web-deploy.yml
 
 permissions:
@@ -53,6 +54,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Prepare Trainer Collection artwork
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/generate-trainer-assets.py
 
       - name: TypeScript check
         run: npx tsc --noEmit
