@@ -420,7 +420,13 @@ async function fetchTcgcsvSet(admin: any, setId: string) {
 
   return (localCards ?? []).map((card: any) => {
     const collectorNumber = normalizeCollectorNumber(card.card_number);
-    const candidates = productsByNumber.get(collectorNumber) ?? [];
+    const candidates =
+      setId === "ecard2" && collectorNumber === "103"
+        ? [
+            ...(productsByNumber.get("103A") ?? []),
+            ...(productsByNumber.get("103B") ?? []),
+          ]
+        : (productsByNumber.get(collectorNumber) ?? []);
     let tcgplayer =
       candidates.find((item: any) => namesRoughlyMatch(card.pokemon_name, item.productName))
       ?? (candidates.length === 1 ? candidates[0] : null);
