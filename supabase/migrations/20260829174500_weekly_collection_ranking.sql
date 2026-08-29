@@ -1,5 +1,6 @@
 -- Weekly collection competition layered on top of the permanent global ranking.
 -- The global leaderboard is unchanged. Weekly scoring uses card value at acquisition time.
+-- The first partial week starts at feature activation; historical openings are not retroactively scored.
 
 alter table public.pack_openings
   add column if not exists collection_value_usd_at_open numeric(14,2);
@@ -609,7 +610,8 @@ set changes=(
     'Ranking de Coleções agora possui Semanal e Global; a página abre sempre no Semanal e o Global continua permanente',
     'A coleção nunca reseta: somente o placar semanal zera toda segunda-feira às 00:00',
     'Ranking semanal conta o valor das cartas no momento da abertura oficial, sem pontos extras por oscilação posterior de preço ou transferências',
-    'Top 3 semanal recebe automaticamente 15.000, 10.000 e 5.000 Coins; o ranking Global não possui recompensa'
+    'Top 3 semanal recebe automaticamente 15.000, 10.000 e 5.000 Coins; o ranking Global não possui recompensa',
+    'A primeira semana começou na ativação do sistema para não premiar retroativamente aberturas feitas com economias antigas'
   ]::text[]) item
 )
 where version='0.1.1 • OTA 28/08';
