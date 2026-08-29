@@ -40,6 +40,7 @@ import {
   stopGameEvent,
   setMaintenanceMode,
   getAdminReleaseCampaignStatus,
+  getAdminLegacyProgress,
   runAdminReleasePreflight,
   getAdminReleaseResetPreview,
   getAdminReleaseReadiness,
@@ -56,6 +57,7 @@ import {
   type GlobalAnnouncement,
   type TesterTitleHub,
   type AdminReleaseCampaignStatus,
+  type AdminLegacyProgress,
   type AdminReleasePreflight,
   type AdminReleaseResetPreview,
   type AdminReleaseReadiness,
@@ -111,6 +113,10 @@ export default function AdminScreen() {
   const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
   const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
   const [releaseStatus, setReleaseStatus] = useState<AdminReleaseCampaignStatus | null>(null);
+  const [legacyProgress, setLegacyProgress] = useState<AdminLegacyProgress | null>(null);
+  const [legacyProgressSearch, setLegacyProgressSearch] = useState('');
+  const [legacyProgressFilter, setLegacyProgressFilter] = useState<'all' | 'complete' | 'incomplete' | 'not_started'>('all');
+  const [legacyProgressLoading, setLegacyProgressLoading] = useState(false);
   const [releasePreflight, setReleasePreflight] = useState<AdminReleasePreflight | null>(null);
   const [releaseResetPreview, setReleaseResetPreview] = useState<AdminReleaseResetPreview | null>(null);
   const [releaseReadiness, setReleaseReadiness] = useState<AdminReleaseReadiness | null>(null);
@@ -181,6 +187,15 @@ export default function AdminScreen() {
       setTesterHub(testerState);
       setReleaseStatus(releaseState);
       setReleaseDownloadUrlInput(releaseState?.download_url ?? '');
+      if (accessState.isOwner) {
+        try {
+          setLegacyProgress(await getAdminLegacyProgress());
+        } catch {
+          setLegacyProgress(null);
+        }
+      } else {
+        setLegacyProgress(null);
+      }
       setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
@@ -227,6 +242,14 @@ export default function AdminScreen() {
       void supabase.removeChannel(channel);
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!adminAccess?.isOwner) return;
+    const timer = setInterval(() => {
+      void getAdminLegacyProgress().then(setLegacyProgress).catch(() => {});
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [adminAccess?.isOwner]);
 
   useEffect(() => {
     if (!activeEvent) return;
@@ -290,6 +313,20 @@ export default function AdminScreen() {
     return players.filter((player) => player.username.toLowerCase().includes(query));
   }, [guildLeaderSearch, players]);
 
+  const visibleLegacyProgressPlayers = useMemo(() => {
+    const rows = legacyProgress?.players ?? [];
+    const query = legacyProgressSearch.trim().toLowerCase();
+    const limit = legacyProgress?.campaign.legacyCardLimit ?? 10;
+
+    return rows.filter((row) => {
+      if (query && !row.username.toLowerCase().includes(query)) return false;
+      if (legacyProgressFilter === 'complete') return limit > 0 && row.selectedCount >= limit;
+      if (legacyProgressFilter === 'incomplete') return row.selectedCount > 0 && row.selectedCount < limit;
+      if (legacyProgressFilter === 'not_started') return row.selectedCount === 0;
+      return true;
+    });
+  }, [legacyProgress, legacyProgressFilter, legacyProgressSearch]);
+
   const activeEventRemaining = useMemo(() => {
     if (!activeEvent) return '';
     const seconds = Math.max(0, Math.ceil((new Date(activeEvent.ends_at).getTime() - clock) / 1000));
@@ -299,6 +336,19 @@ export default function AdminScreen() {
       ? String(minutes) + 'm ' + String(rest).padStart(2, '0') + 's'
       : String(rest) + 's';
   }, [activeEvent, clock]);
+
+  async function refreshLegacyProgress() {
+    if (legacyProgressLoading || !adminAccess?.isOwner) return;
+    try {
+      setLegacyProgressLoading(true);
+      setError(null);
+      setLegacyProgress(await getAdminLegacyProgress());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível atualizar o acompanhamento do Legado.');
+    } finally {
+      setLegacyProgressLoading(false);
+    }
+  }
 
   async function activateGameEvent() {
     if (working) return;
@@ -1176,6 +1226,145 @@ export default function AdminScreen() {
                     <View style={[styles.resetReadyBadge,{backgroundColor:releaseResetPreview.readyToReset ? '#153426' : '#2C2730',borderColor:releaseResetPreview.readyToReset ? '#2F9E68' : colors.border}]}>
                       <Ionicons name={releaseResetPreview.readyToReset ? 'checkmark-circle' : 'lock-closed'} size={16} color={releaseResetPreview.readyToReset ? '#65D894' : colors.muted}/>
                       <Text style={[styles.resetReadyText,{color:releaseResetPreview.readyToReset ? '#9CEFC1' : colors.muted}]}>{releaseResetPreview.readyToReset ? 'PRONTO TECNICAMENTE — RESET AINDA NÃO EXECUTADO' : 'RESET BLOQUEADO — SOMENTE PREVIEW'}</Text>
+                    </View>
+                  </>
+                ) : null}
+              </View>
+
+              <View style={[styles.legacyProgressBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                <View style={styles.legacyProgressHeader}>
+                  <View style={[styles.legacyProgressIcon,{backgroundColor:colors.accentSoft}]}>
+                    <Ionicons name="people-circle-outline" size={21} color={colors.yellow}/>
+                  </View>
+                  <View style={{flex:1,minWidth:190}}>
+                    <Text style={[styles.legacyProgressTitle,{color:colors.text}]}>ACOMPANHAMENTO DAS 10 CARTAS</Text>
+                    <Text style={[styles.legacyProgressText,{color:colors.muted}]}>
+                      {legacyProgress
+                        ? `Atualizado ${new Date(legacyProgress.generatedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} • atualização automática a cada 15s`
+                        : 'Carregando o progresso individual dos jogadores.'}
+                    </Text>
+                  </View>
+                  <Pressable
+                    disabled={legacyProgressLoading}
+                    onPress={() => { void refreshLegacyProgress(); }}
+                    style={[styles.legacyProgressRefresh,{borderColor:colors.border,backgroundColor:colors.surface,opacity: legacyProgressLoading ? .55 : 1}]}
+                  >
+                    {legacyProgressLoading
+                      ? <ActivityIndicator size="small" color={colors.accent}/>
+                      : <Ionicons name="refresh" size={16} color={colors.accent}/>}
+                    <Text style={[styles.legacyProgressRefreshText,{color:colors.accent}]}>ATUALIZAR</Text>
+                  </Pressable>
+                </View>
+
+                {legacyProgress ? (
+                  <>
+                    <View style={styles.legacyProgressSummary}>
+                      {[
+                        ['10/10 ESCOLHIDAS',legacyProgress.summary.selectedTen,'#65D894'],
+                        ['10/10 CONFIRMADAS',legacyProgress.summary.confirmedTen,'#8CEFB5'],
+                        ['INCOMPLETOS',legacyProgress.summary.confirmedPartial + legacyProgress.summary.inProgress,colors.yellow],
+                        ['NÃO COMEÇARAM',legacyProgress.summary.notStarted,'#8A98AA'],
+                      ].map(([label,value,tone])=>(
+                        <View key={String(label)} style={[styles.legacyProgressMetric,{borderColor:colors.border,backgroundColor:colors.surface}]}>
+                          <Text style={[styles.legacyProgressMetricValue,{color:String(tone)}]}>{Number(value).toLocaleString('pt-BR')}</Text>
+                          <Text style={[styles.legacyProgressMetricLabel,{color:colors.muted}]}>{String(label)}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <View style={styles.legacyProgressControls}>
+                      <View style={[styles.legacyProgressSearchWrap,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+                        <Ionicons name="search" size={15} color={colors.muted}/>
+                        <TextInput
+                          value={legacyProgressSearch}
+                          onChangeText={setLegacyProgressSearch}
+                          placeholder="Buscar nickname"
+                          placeholderTextColor={colors.muted}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          style={[styles.legacyProgressSearch,{color:colors.text}]}
+                        />
+                      </View>
+                      <View style={styles.legacyProgressFilters}>
+                        {[
+                          ['all','TODOS'],
+                          ['complete','10/10'],
+                          ['incomplete','INCOMPLETOS'],
+                          ['not_started','NÃO COMEÇARAM'],
+                        ].map(([id,label])=>(
+                          <Pressable
+                            key={id}
+                            onPress={()=>setLegacyProgressFilter(id as 'all'|'complete'|'incomplete'|'not_started')}
+                            style={[
+                              styles.legacyProgressFilter,
+                              {
+                                backgroundColor:legacyProgressFilter===id?colors.accentSoft:colors.surface,
+                                borderColor:legacyProgressFilter===id?colors.accent:colors.border,
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.legacyProgressFilterText,{color:legacyProgressFilter===id?colors.accent:colors.muted}]}>{label}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={styles.legacyProgressList}>
+                      {visibleLegacyProgressPlayers.map((row)=>{
+                        const complete = row.selectedCount >= legacyProgress.campaign.legacyCardLimit && legacyProgress.campaign.legacyCardLimit > 0;
+                        const statusColor = row.status==='complete_confirmed'
+                          ? '#65D894'
+                          : row.status==='complete_unconfirmed'
+                            ? '#FFD447'
+                            : row.status==='confirmed_partial'
+                              ? '#7EC8FF'
+                              : row.status==='in_progress'
+                                ? '#E8B75A'
+                                : '#8491A3';
+                        const statusLabel = row.status==='complete_confirmed'
+                          ? '10/10 CONFIRMADO'
+                          : row.status==='complete_unconfirmed'
+                            ? '10/10 • FALTA CONFIRMAR'
+                            : row.status==='confirmed_partial'
+                              ? `CONFIRMOU ${row.selectedCount}/${legacyProgress.campaign.legacyCardLimit}`
+                              : row.status==='in_progress'
+                                ? `ESCOLHENDO ${row.selectedCount}/${legacyProgress.campaign.legacyCardLimit}`
+                                : 'NÃO COMEÇOU';
+                        return (
+                          <Pressable
+                            key={row.playerId}
+                            onPress={()=>router.push(`/player/${row.playerId}`)}
+                            style={[styles.legacyProgressRow,{backgroundColor:colors.surface,borderColor:complete?statusColor:colors.border}]}
+                          >
+                            <View style={[styles.legacyProgressAvatar,{backgroundColor:colors.accentSoft,borderColor:statusColor}]}>
+                              <Text style={[styles.legacyProgressAvatarText,{color:colors.text}]}>{row.username.slice(0,2).toUpperCase()}</Text>
+                            </View>
+                            <View style={styles.legacyProgressPlayerCopy}>
+                              <View style={styles.legacyProgressNameRow}>
+                                <Text numberOfLines={1} style={[styles.legacyProgressName,{color:colors.text}]}>@{row.username}</Text>
+                                {row.accountStatus!=='active' ? <Text style={[styles.legacyProgressAccount,{color:'#FF9FAF'}]}>{row.accountStatus.toUpperCase()}</Text> : null}
+                              </View>
+                              <Text style={[styles.legacyProgressMeta,{color:colors.muted}]}>
+                                Manual {row.manualCount} • Auto {row.automaticCount}
+                                {row.confirmedAt ? ` • confirmado ${new Date(row.confirmedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}` : row.lastSelectedAt ? ` • última escolha ${new Date(row.lastSelectedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}` : ''}
+                              </Text>
+                            </View>
+                            <View style={styles.legacyProgressRight}>
+                              <Text style={[styles.legacyProgressCount,{color:statusColor}]}>{row.selectedCount}/{legacyProgress.campaign.legacyCardLimit}</Text>
+                              <View style={[styles.legacyProgressStatus,{backgroundColor:statusColor+'1C',borderColor:statusColor}]}>
+                                <Text style={[styles.legacyProgressStatusText,{color:statusColor}]}>{statusLabel}</Text>
+                              </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={16} color={colors.muted}/>
+                          </Pressable>
+                        );
+                      })}
+                      {visibleLegacyProgressPlayers.length===0 ? (
+                        <View style={[styles.legacyProgressEmpty,{borderColor:colors.border}]}>
+                          <Ionicons name="search-outline" size={18} color={colors.muted}/>
+                          <Text style={[styles.legacyProgressEmptyText,{color:colors.muted}]}>Nenhum jogador corresponde a este filtro.</Text>
+                        </View>
+                      ) : null}
                     </View>
                   </>
                 ) : null}
@@ -2376,6 +2565,38 @@ const styles = StyleSheet.create({
   legacyPreviewButton:{minHeight:45,borderRadius:13,borderWidth:1,paddingHorizontal:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
   legacyPreviewText:{fontSize:8,fontWeight:'900'},
   legacySafety:{fontSize:8,lineHeight:12},
+  legacyProgressBox:{borderRadius:17,borderWidth:1,padding:11,gap:10},
+  legacyProgressHeader:{flexDirection:'row',alignItems:'center',gap:9,flexWrap:'wrap'},
+  legacyProgressIcon:{width:40,height:40,borderRadius:13,alignItems:'center',justifyContent:'center'},
+  legacyProgressTitle:{fontSize:10,fontWeight:'900',letterSpacing:.45},
+  legacyProgressText:{fontSize:7,lineHeight:11,marginTop:2},
+  legacyProgressRefresh:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
+  legacyProgressRefreshText:{fontSize:7,fontWeight:'900'},
+  legacyProgressSummary:{flexDirection:'row',flexWrap:'wrap',gap:6},
+  legacyProgressMetric:{flexGrow:1,flexBasis:115,minWidth:105,borderRadius:11,borderWidth:1,paddingHorizontal:9,paddingVertical:8},
+  legacyProgressMetricValue:{fontSize:15,fontWeight:'900'},
+  legacyProgressMetricLabel:{fontSize:6,fontWeight:'900',letterSpacing:.45,marginTop:2},
+  legacyProgressControls:{gap:7},
+  legacyProgressSearchWrap:{minHeight:42,borderRadius:12,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},
+  legacyProgressSearch:{flex:1,minHeight:40,fontSize:10,fontWeight:'800'},
+  legacyProgressFilters:{flexDirection:'row',flexWrap:'wrap',gap:6},
+  legacyProgressFilter:{minHeight:32,borderRadius:10,borderWidth:1,paddingHorizontal:9,alignItems:'center',justifyContent:'center'},
+  legacyProgressFilterText:{fontSize:6.5,fontWeight:'900',letterSpacing:.35},
+  legacyProgressList:{gap:6},
+  legacyProgressRow:{minHeight:62,borderRadius:13,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},
+  legacyProgressAvatar:{width:38,height:38,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  legacyProgressAvatarText:{fontSize:11,fontWeight:'900'},
+  legacyProgressPlayerCopy:{flex:1,minWidth:120},
+  legacyProgressNameRow:{flexDirection:'row',alignItems:'center',gap:6},
+  legacyProgressName:{fontSize:10,fontWeight:'900',flexShrink:1},
+  legacyProgressAccount:{fontSize:5.5,fontWeight:'900',letterSpacing:.35},
+  legacyProgressMeta:{fontSize:6.5,lineHeight:10,marginTop:2},
+  legacyProgressRight:{alignItems:'flex-end',gap:3},
+  legacyProgressCount:{fontSize:12,fontWeight:'900'},
+  legacyProgressStatus:{borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:3},
+  legacyProgressStatusText:{fontSize:5.5,fontWeight:'900',letterSpacing:.3},
+  legacyProgressEmpty:{minHeight:48,borderRadius:12,borderWidth:1,borderStyle:'dashed',alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6,padding:9},
+  legacyProgressEmptyText:{fontSize:7,fontWeight:'800'},
   preflightBox:{borderRadius:17,borderWidth:1,padding:11,gap:9},
   preflightHeader:{flexDirection:'row',alignItems:'center',gap:9,flexWrap:'wrap'},
   preflightIcon:{width:40,height:40,borderRadius:13,alignItems:'center',justifyContent:'center'},
