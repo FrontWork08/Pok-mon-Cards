@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: eas-update-preview-${{ github.ref }}
+  group: eas-update-production-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,7 +60,7 @@ jobs:
       - name: Verify OTA/native integrity
         run: npm run verify
 
-      - name: Publish Android update to preview
+      - name: Publish Android update to production
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --channel preview --platform android --environment preview --message "GitHub ${GITHUB_SHA:0:7}" --non-interactive
+        run: eas update --channel production --platform android --environment production --message "GitHub ${GITHUB_SHA:0:7}" --non-interactive
