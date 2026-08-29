@@ -20,7 +20,7 @@ export function Screen({ title, subtitle, children }: PropsWithChildren<{ title:
       >
         <View style={styles.inner}>
           <View style={styles.header}>
-            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
+            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER COLLECTION</Text>
             <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
             {subtitle ? <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text> : null}
           </View>
