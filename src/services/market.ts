@@ -10,12 +10,43 @@ export type CollectionRankEntry = {
   price_coverage_pct: number;
 };
 
+export type WeeklyCollectionRankEntry = {
+  weekly_rank: number;
+  player_id: string;
+  username: string;
+  weekly_value_usd: number;
+  cards_gained: number;
+  packs_opened: number;
+  reward_coins: number;
+  week_start: string;
+  score_start: string;
+  week_end: string;
+};
+
 export function formatUsd(value: number | null | undefined) {
   const amount = Number(value ?? 0);
   return `US$ ${amount.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+export async function getCollectionWeeklyLeaderboard(limit = 100) {
+  const { data, error } = await supabase.rpc('get_collection_weekly_leaderboard', {
+    p_limit: limit,
+  });
+  if (error) throw error;
+  return (data ?? []).map((entry: any) => ({
+    ...entry,
+    weekly_rank: Number(entry.weekly_rank ?? 0),
+    weekly_value_usd: Number(entry.weekly_value_usd ?? 0),
+    cards_gained: Number(entry.cards_gained ?? 0),
+    packs_opened: Number(entry.packs_opened ?? 0),
+    reward_coins: Number(entry.reward_coins ?? 0),
+    week_start: String(entry.week_start ?? ''),
+    score_start: String(entry.score_start ?? ''),
+    week_end: String(entry.week_end ?? ''),
+  })) as WeeklyCollectionRankEntry[];
 }
 
 export async function getCollectionValueLeaderboard(limit = 100) {
