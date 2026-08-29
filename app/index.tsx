@@ -83,7 +83,7 @@ export default function AuthScreen() {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#FFD447" />
+        <ActivityIndicator size="large" color="#D9B24C" />
         <Text style={styles.loadingText}>Preparando sua conta...</Text>
       </View>
     );
@@ -92,7 +92,7 @@ export default function AuthScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.brandMark}><Ionicons name="flash" size={24} color="#050505" /></View>
-      <Text style={styles.logo}>Pokémon Cards</Text>
+      <Text style={styles.logo}>Trainer Collection</Text>
       <Text style={styles.subtitle}>Abra boosters, complete sua Bag e jogue com seus amigos.</Text>
 
       <Pressable style={[styles.googleButton, googleLoading && styles.disabled]} onPress={handleGoogle} disabled={googleLoading}>
@@ -151,27 +151,27 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#050505', paddingHorizontal: 24, justifyContent: 'center', alignItems: 'stretch' },
+  container: { flex: 1, backgroundColor: '#070A12', paddingHorizontal: 24, justifyContent: 'center', alignItems: 'stretch' },
   loading: { flex: 1, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { color: '#9A9A9A', fontSize: 12, fontWeight: '700' },
-  brandMark: { width: 52, height: 52, borderRadius: 17, backgroundColor: '#FFD447', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 14 },
+  brandMark: { width: 52, height: 52, borderRadius: 17, backgroundColor: '#D9B24C', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 14 },
   logo: { color: '#F7F7F7', fontSize: 34, fontWeight: '900', textAlign: 'center' },
   subtitle: { color: '#9A9A9A', fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 8, marginBottom: 26 },
   googleButton: { minHeight: 54, borderRadius: 15, backgroundColor: '#F7F7F7', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11, borderWidth: 1, borderColor: '#DADADA' },
   googleMark: { width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E0E0E0' },
   googleLetter: { color: '#4285F4', fontSize: 16, fontWeight: '900' },
-  googleText: { color: '#242424', fontSize: 11, fontWeight: '900', letterSpacing: .45 },
+  googleText: { color: '#2A3345', fontSize: 11, fontWeight: '900', letterSpacing: .45 },
   disabled: { opacity: .6 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 19 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#252525' },
   dividerText: { color: '#666', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
-  switcher: { flexDirection: 'row', gap: 7, marginBottom: 15, backgroundColor: '#0D0D0D', padding: 4, borderRadius: 14, borderWidth: 1, borderColor: '#242424' },
+  switcher: { flexDirection: 'row', gap: 7, marginBottom: 15, backgroundColor: '#0D1320', padding: 4, borderRadius: 14, borderWidth: 1, borderColor: '#2A3345' },
   switchButton: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  switchActive: { backgroundColor: '#1A1A1A' },
+  switchActive: { backgroundColor: '#151D2B' },
   switchText: { color: '#777', fontWeight: '800' },
   switchTextActive: { color: '#F7F7F7' },
-  input: { backgroundColor: '#0D0D0D', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: '#F7F7F7', marginBottom: 10, borderWidth: 1, borderColor: '#282828' },
-  primaryButton: { backgroundColor: '#FFD447', minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 5 },
+  input: { backgroundColor: '#0D1320', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: '#F7F7F7', marginBottom: 10, borderWidth: 1, borderColor: '#2A3345' },
+  primaryButton: { backgroundColor: '#D9B24C', minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 5 },
   primaryText: { color: '#050505', fontWeight: '900', fontSize: 12, letterSpacing: .55 },
   accountHint: { color: '#6F6F6F', fontSize: 9, lineHeight: 14, textAlign: 'center', marginTop: 15, paddingHorizontal: 12 },
 });
