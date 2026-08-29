@@ -4,6 +4,76 @@ import { supabase } from '@/lib/supabase';
 
 let notificationHandlerConfigured = false;
 
+const ALLOWED_NOTIFICATION_ROUTES = [
+  '/inbox',
+  '/friends',
+  '/guilds',
+  '/guild-wars',
+  '/marketplace',
+  '/market-offers',
+  '/tournaments',
+  '/battle-pass',
+  '/missions',
+  '/season',
+  '/wishlist',
+  '/legacy-selection',
+  '/(tabs)',
+  '/(tabs)/battles',
+  '/(tabs)/trade',
+  '/(tabs)/bag',
+  '/(tabs)/packs',
+  '/(tabs)/profile',
+];
+
+const ALLOWED_NOTIFICATION_PREFIXES = [
+  '/battle/',
+  '/chat/',
+  '/trade/',
+  '/card/',
+  '/player/',
+  '/deck/',
+  '/set/',
+  '/pokemon/',
+];
+
+function safeSegment(value: unknown) {
+  return encodeURIComponent(String(value ?? '').trim());
+}
+
+function safeExplicitRoute(value: unknown) {
+  if (typeof value !== 'string') return null;
+  const route = value.trim();
+  if (!route.startsWith('/') || route.includes('://')) return null;
+  if (ALLOWED_NOTIFICATION_ROUTES.includes(route)) return route;
+  if (ALLOWED_NOTIFICATION_PREFIXES.some((prefix) => route.startsWith(prefix))) return route;
+  return null;
+}
+
+export function resolveNotificationRoute(data?: Record<string, any> | null) {
+  const value = data ?? {};
+  const explicit = safeExplicitRoute(value.route);
+  if (explicit) return explicit;
+
+  if (value.battleId) return `/battle/${safeSegment(value.battleId)}`;
+  if (value.tradeId) return `/trade/${safeSegment(value.tradeId)}`;
+  if (value.senderId) return `/chat/${safeSegment(value.senderId)}`;
+  if (value.cardId) return `/card/${safeSegment(value.cardId)}`;
+  if (value.playerId) return `/player/${safeSegment(value.playerId)}`;
+  if (value.deckId) return `/deck/${safeSegment(value.deckId)}`;
+
+  const type = String(value.type ?? value.notificationType ?? '').toLowerCase();
+  if (type.includes('battle') || type.includes('match')) return '/(tabs)/battles';
+  if (type.includes('trade')) return '/(tabs)/trade';
+  if (type.includes('market') || type.includes('listing') || type.includes('offer')) return '/marketplace';
+  if (type.includes('friend') || type.includes('social')) return '/friends';
+  if (type.includes('guild')) return '/guilds';
+  if (type.includes('mission')) return '/missions';
+  if (type.includes('season') || type.includes('streak')) return '/season';
+  if (type.includes('wishlist')) return '/wishlist';
+
+  return '/inbox';
+}
+
 async function getNativeNotifications() {
   if (Platform.OS === 'web') return null;
   const Notifications = await import('expo-notifications');
@@ -64,12 +134,36 @@ export async function registerPushNotifications() {
   if (status !== 'granted') return null;
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Pokémon Cards',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 180, 90, 180],
-      sound: 'default',
-    });
+    await Promise.all([
+      Notifications.setNotificationChannelAsync('default', {
+        name: 'Trainer Collection',
+        description: 'Avisos gerais da sua conta Trainer Collection.',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 180, 90, 180],
+        sound: 'default',
+      }),
+      Notifications.setNotificationChannelAsync('battles', {
+        name: 'Batalhas',
+        description: 'Desafios, matchmaking e resultados de batalha.',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 220, 100, 220],
+        sound: 'default',
+      }),
+      Notifications.setNotificationChannelAsync('social', {
+        name: 'Amigos e Guilda',
+        description: 'Mensagens, amizades e atividades da guilda.',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 160],
+        sound: 'default',
+      }),
+      Notifications.setNotificationChannelAsync('trades', {
+        name: 'Trocas e Mercado',
+        description: 'Ofertas, trocas e movimentações do mercado.',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 160],
+        sound: 'default',
+      }),
+    ]);
   }
 
   const projectId = Constants.easConfig?.projectId ?? (Constants.expoConfig?.extra as any)?.eas?.projectId;
