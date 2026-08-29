@@ -252,6 +252,141 @@ async function fetchLocalSetFromTcgdex(admin: any, setId: string, eurUsd: number
   return cards;
 }
 
+
+const TCGCSV_GROUPS: Record<string, number> = {
+  me2pt5: 24541,
+  me3: 24587,
+  me4: 24655,
+  me5: 24688,
+};
+
+function normalizeCollectorNumber(value: unknown) {
+  const raw = String(value ?? "").trim().split("/")[0] ?? "";
+  if (!raw) return "";
+  return /^\d+$/.test(raw) ? String(Number(raw)) : raw.toUpperCase();
+}
+
+function tcgcsvVariantKey(subTypeName: unknown) {
+  const key = String(subTypeName ?? "").trim().toLowerCase();
+  const map: Record<string, string> = {
+    "normal": "normal",
+    "holofoil": "holofoil",
+    "reverse holofoil": "reverseHolofoil",
+    "1st edition normal": "1stEditionNormal",
+    "1st edition holofoil": "1stEditionHolofoil",
+    "unlimited": "normal",
+    "unlimited holofoil": "holofoil",
+  };
+  return map[key] ?? key.replace(/[^a-z0-9]+(.)/g, (_, c) => String(c).toUpperCase());
+}
+
+async function fetchTcgcsvSet(admin: any, setId: string) {
+  const groupId = TCGCSV_GROUPS[setId];
+  if (!groupId) return null;
+
+  const headers = { "User-Agent": "Pokemon-Cards-Price-Sync/1.2" };
+  const [productsResponse, pricesResponse] = await Promise.all([
+    fetch(`https://tcgcsv.com/tcgplayer/3/${groupId}/products`, {
+      headers,
+      signal: AbortSignal.timeout(20_000),
+    }),
+    fetch(`https://tcgcsv.com/tcgplayer/3/${groupId}/prices`, {
+      headers,
+      signal: AbortSignal.timeout(20_000),
+    }),
+  ]);
+
+  if (!productsResponse.ok || !pricesResponse.ok) {
+    throw new UpstreamError(
+      `TCGCSV_HTTP_${productsResponse.status}_${pricesResponse.status}`,
+      !productsResponse.ok ? productsResponse.status : pricesResponse.status,
+    );
+  }
+
+  const productsPayload = await productsResponse.json();
+  const pricesPayload = await pricesResponse.json();
+  const products = Array.isArray(productsPayload?.results) ? productsPayload.results : [];
+  const priceRows = Array.isArray(pricesPayload?.results) ? pricesPayload.results : [];
+
+  const pricesByProduct = new Map<number, any[]>();
+  for (const row of priceRows) {
+    const productId = Number(row?.productId);
+    if (!Number.isFinite(productId)) continue;
+    const list = pricesByProduct.get(productId) ?? [];
+    list.push(row);
+    pricesByProduct.set(productId, list);
+  }
+
+  const productsByNumber = new Map<string, any>();
+  for (const product of products) {
+    const extended = Array.isArray(product?.extendedData) ? product.extendedData : [];
+    const numberField = extended.find((item: any) =>
+      String(item?.name ?? "").toLowerCase() === "number"
+    );
+    const collectorNumber = normalizeCollectorNumber(numberField?.value);
+    if (!collectorNumber) continue;
+
+    const rows = pricesByProduct.get(Number(product.productId)) ?? [];
+    const prices: Record<string, any> = {};
+    for (const row of rows) {
+      const market = numeric(row?.marketPrice);
+      const mid = numeric(row?.midPrice);
+      const low = numeric(row?.lowPrice);
+      if (!market && !mid && !low) continue;
+      prices[tcgcsvVariantKey(row?.subTypeName)] = {
+        market,
+        mid,
+        low,
+        high: numeric(row?.highPrice),
+        directLow: numeric(row?.directLowPrice),
+      };
+    }
+    if (!Object.keys(prices).length) continue;
+
+    productsByNumber.set(collectorNumber, {
+      productId: Number(product.productId),
+      prices,
+      source: "tcgcsv",
+      groupId,
+    });
+  }
+
+  const { data: localCards, error } = await admin
+    .from("cards")
+    .select("id,card_number,rarity")
+    .eq("set_id", setId);
+  if (error) throw new UpstreamError(`LOCAL_SET_LOOKUP_FAILED: ${error.message}`);
+
+  return (localCards ?? []).map((card: any) => {
+    const collectorNumber = normalizeCollectorNumber(card.card_number);
+    const tcgplayer = productsByNumber.get(collectorNumber) ?? null;
+    return {
+      id: card.id,
+      rarity: card.rarity,
+      tcgplayer,
+      pricing_source: tcgplayer ? "tcgcsv" : "tcgcsv-unmatched",
+    };
+  });
+}
+
+async function enrichWithTcgcsvFallback(admin: any, setId: string, cards: any[]) {
+  if (!TCGCSV_GROUPS[setId]) return cards;
+  const tcgcsvCards = await fetchTcgcsvSet(admin, setId);
+  if (!tcgcsvCards) return cards;
+
+  const byId = new Map(tcgcsvCards.map((card: any) => [String(card.id), card]));
+  return cards.map((card) => {
+    if (hasUsableTcgplayer(card?.tcgplayer)) return card;
+    const fallback: any = byId.get(String(card.id));
+    if (!fallback || !hasUsableTcgplayer(fallback.tcgplayer)) return card;
+    return {
+      ...card,
+      tcgplayer: fallback.tcgplayer,
+      pricing_source: "tcgcsv",
+    };
+  });
+}
+
 async function fetchPage(setId: string, page: number) {
   const query = encodeURIComponent(`set.id:${setId}`);
   const apiKey = Deno.env.get("POKEMON_TCG_API_KEY");
@@ -316,13 +451,20 @@ Deno.serve(async (request: Request) => {
       try {
         const cards = await fetchSet(setId);
         enrichedCards = await enrichWithTcgdexFallback(cards, eurUsd);
+        enrichedCards = await enrichWithTcgcsvFallback(admin, setId, enrichedCards);
       } catch (primaryError) {
-        const fallbackCards = await fetchLocalSetFromTcgdex(admin, setId, eurUsd);
+        let fallbackCards: any[] | null = null;
+        if (TCGCSV_GROUPS[setId]) {
+          fallbackCards = await fetchTcgcsvSet(admin, setId);
+        }
+        if (!fallbackCards || !fallbackCards.some((card: any) => hasUsableTcgplayer(card.tcgplayer))) {
+          fallbackCards = await fetchLocalSetFromTcgdex(admin, setId, eurUsd);
+        }
         enrichedCards = fallbackCards;
         results.push({
           ok: true,
           setId,
-          fallback: "tcgdex-set",
+          fallback: TCGCSV_GROUPS[setId] ? "tcgcsv-set" : "tcgdex-set",
           primaryError: primaryError instanceof Error ? primaryError.message : "UNKNOWN_PRIMARY_ERROR",
         });
       }
