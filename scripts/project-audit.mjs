@@ -36,6 +36,8 @@ assert(!/branches:\s*\n\s*-\s*main\b/m.test(apkWorkflow), 'Workflow do APK não 
 assert(otaWorkflow.includes('- app/**'), 'OTA não observa alterações em app/**.');
 assert(otaWorkflow.includes('- src/**'), 'OTA não observa alterações em src/**.');
 assert(otaWorkflow.includes('- assets/**'), 'OTA não observa alterações em assets/**.');
+assert(otaWorkflow.includes('--channel production'), 'OTA público deixou de publicar no canal production.');
+assert(otaWorkflow.includes('--environment production'), 'OTA público deixou de usar o ambiente production.');
 
 assert(envExample.includes('EXPO_PUBLIC_SUPABASE_URL='), '.env.example não documenta EXPO_PUBLIC_SUPABASE_URL.');
 assert(envExample.includes('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY='), '.env.example não documenta EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.');
