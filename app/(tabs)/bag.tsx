@@ -163,38 +163,41 @@ export default function BagScreen() {
 
   const header = (
     <View style={styles.headerContent}>
-<View style={styles.pageHeaderRow}>
-        <View style={styles.pageHeader}>
-          <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Pokémon Bag</Text>
-          <Text style={[styles.subtitle, { color: colors.muted }]}>Coleção rápida, paginada e com carregamento sob demanda.</Text>
+<View style={styles.collectionHero}>
+        <View style={styles.collectionHeroIcon}>
+          <Ionicons name="albums" size={28} color="#080B13"/>
+        </View>
+        <View style={styles.collectionHeroCopy}>
+          <Text style={styles.eyebrow}>TRAINER COLLECTION • COLLECTION VAULT</Text>
+          <Text style={[styles.title,{color:colors.text}]}>Sua coleção, organizada para competir.</Text>
+          <Text style={[styles.subtitle,{color:colors.muted}]}>Filtre por valor, HP, dano, raridade, geração e set. Toque em qualquer carta para abrir todos os detalhes.</Text>
         </View>
       </View>
 
-      <View style={[styles.summary, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+      <View style={styles.summary}>
         <View style={styles.summaryMain}>
-          <Text style={[styles.summaryKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text>
-          <Text style={[styles.summaryValue, { color: colors.yellow }]}>{formatUsd(overview?.collectionValueUsd)}</Text>
+          <Text style={styles.summaryKicker}>VALOR DE MERCADO DA COLEÇÃO</Text>
+          <Text style={styles.summaryValue}>{formatUsd(overview?.collectionValueUsd)}</Text>
           <Text style={[styles.summaryLabel, { color: colors.muted }]}>{Number(overview?.totalCards ?? 0).toLocaleString('pt-BR')} cards • {Number(overview?.uniqueCards ?? 0).toLocaleString('pt-BR')} diferentes</Text>
         </View>
         <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
         <View style={styles.summarySide}>
           <Text style={[styles.sideLabel, { color: colors.muted }]}>MAIS RARA/VALIOSA</Text>
           <Text numberOfLines={1} style={[styles.sideName, { color: colors.text }]}>{overview?.mostValuable?.pokemon_name ?? '—'}</Text>
-          <Text style={[styles.sideValue, { color: colors.yellow }]}>{overview?.mostValuable?.market_price_usd != null ? formatUsd(overview.mostValuable.market_price_usd) : '—'}</Text>
+          <Text style={styles.sideValue}>{overview?.mostValuable?.market_price_usd != null ? formatUsd(overview.mostValuable.market_price_usd) : '—'}</Text>
         </View>
       </View>
 
       <View style={styles.collectionActions}>
-        <Pressable style={[styles.actionButton, { backgroundColor: colors.accent }]} onPress={() => router.push('/decks')}><Ionicons name="albums" size={17} color="#fff" /><Text style={styles.actionText}>MEUS DECKS</Text></Pressable>
+        <Pressable style={[styles.actionButton,styles.actionPrimary]} onPress={() => router.push('/decks')}><Ionicons name="albums" size={17} color="#080B13" /><Text style={[styles.actionText,{color:'#080B13'}]}>MEUS DECKS</Text></Pressable>
         <Pressable style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => router.push('/sets')}><Ionicons name="layers" size={17} color={colors.accent} /><Text style={[styles.actionText, { color: colors.text }]}>SETS</Text></Pressable>
-        <Pressable style={[styles.actionButton, { backgroundColor: colors.yellow, borderColor: colors.yellow, borderWidth: 1 }]} onPress={() => router.push('/sell-duplicates')}><Ionicons name="cash-outline" size={17} color="#07111F" /><Text style={[styles.actionText, { color: '#07111F' }]}>VENDER REPETIDAS</Text></Pressable>
-        <Pressable style={[styles.actionButton, { backgroundColor: sortMode === 'value' ? colors.yellow : colors.surface, borderColor: sortMode === 'value' ? colors.yellow : colors.border, borderWidth: 1 }]} onPress={() => setSortMode('value')}><Ionicons name="cash" size={17} color={sortMode === 'value' ? '#07111F' : colors.yellow} /><Text style={[styles.actionText, { color: sortMode === 'value' ? '#07111F' : colors.text }]}>MAIS CARAS</Text></Pressable>
-        <Pressable style={[styles.actionButton, { backgroundColor: sortMode === 'damage' ? colors.yellow : colors.surface, borderColor: sortMode === 'damage' ? colors.yellow : colors.border, borderWidth: 1 }]} onPress={() => setSortMode('damage')}><Ionicons name="flash" size={17} color={sortMode === 'damage' ? '#07111F' : '#FFB06A'} /><Text style={[styles.actionText, { color: sortMode === 'damage' ? '#07111F' : colors.text }]}>MAIOR DANO</Text></Pressable>
-        <Pressable style={[styles.actionButton, { backgroundColor: sortMode === 'hp' ? colors.yellow : colors.surface, borderColor: sortMode === 'hp' ? colors.yellow : colors.border, borderWidth: 1 }]} onPress={() => setSortMode('hp')}><Ionicons name="heart" size={17} color={sortMode === 'hp' ? '#07111F' : '#FF7D90'} /><Text style={[styles.actionText, { color: sortMode === 'hp' ? '#07111F' : colors.text }]}>MAIOR HP</Text></Pressable>
+        <Pressable style={[styles.actionButton, { backgroundColor: colors.yellow, borderColor: colors.yellow, borderWidth: 1 }]} onPress={() => router.push('/sell-duplicates')}><Ionicons name="cash-outline" size={17} color="#080B13" /><Text style={[styles.actionText, { color: '#080B13' }]}>VENDER REPETIDAS</Text></Pressable>
+        <Pressable style={[styles.actionButton, { backgroundColor: sortMode === 'value' ? '#D9B24C' : '#111827', borderColor: sortMode === 'value' ? '#F2D46E' : '#303847', borderWidth: 1 }]} onPress={() => setSortMode('value')}><Ionicons name="cash" size={17} color={sortMode === 'value' ? '#080B13' : colors.yellow} /><Text style={[styles.actionText, { color: sortMode === 'value' ? '#080B13' : colors.text }]}>MAIS CARAS</Text></Pressable>
+        <Pressable style={[styles.actionButton, { backgroundColor: sortMode === 'damage' ? '#D9B24C' : '#111827', borderColor: sortMode === 'damage' ? '#F2D46E' : '#303847', borderWidth: 1 }]} onPress={() => setSortMode('damage')}><Ionicons name="flash" size={17} color={sortMode === 'damage' ? '#080B13' : '#FFB06A'} /><Text style={[styles.actionText, { color: sortMode === 'damage' ? '#080B13' : colors.text }]}>MAIOR DANO</Text></Pressable>
+        <Pressable style={[styles.actionButton, { backgroundColor: sortMode === 'hp' ? '#D9B24C' : '#111827', borderColor: sortMode === 'hp' ? '#F2D46E' : '#303847', borderWidth: 1 }]} onPress={() => setSortMode('hp')}><Ionicons name="heart" size={17} color={sortMode === 'hp' ? '#080B13' : '#FF7D90'} /><Text style={[styles.actionText, { color: sortMode === 'hp' ? '#080B13' : colors.text }]}>MAIOR HP</Text></Pressable>
       </View>
 
-      <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.searchBox}>
         <Ionicons name="search" size={20} color={colors.muted} />
         <TextInput value={search} onChangeText={setSearch} placeholder="Buscar Pokémon, set ou número..." placeholderTextColor={colors.muted} style={[styles.search, { color: colors.text }]} />
         {search ? <Pressable onPress={() => setSearch('')}><Ionicons name="close-circle" size={20} color={colors.muted} /></Pressable> : null}
@@ -207,7 +210,7 @@ export default function BagScreen() {
         <FilterChip active={showAdvanced} label="Filtros" icon="options" onPress={() => setShowAdvanced((value) => !value)} />
       </View>
 
-      {showAdvanced ? <View style={[styles.advancedPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {showAdvanced ? <View style={styles.advancedPanel}>
         <FilterGroup title="TIPO"><SmallChip label="Todos" active={typeFilter === null} onPress={() => setTypeFilter(null)} />{(overview?.types ?? []).map((type) => <SmallChip key={type} label={type} active={typeFilter === type} onPress={() => setTypeFilter(type)} />)}</FilterGroup>
         <FilterGroup title="RARIDADE"><SmallChip label="Todas" active={rarityFilter === null} onPress={() => setRarityFilter(null)} />{(overview?.rarities ?? []).map((rarity) => <SmallChip key={rarity} label={rarity} active={rarityFilter === rarity} onPress={() => setRarityFilter(rarity)} />)}</FilterGroup>
         <FilterGroup title="GERAÇÃO"><SmallChip label="Todas" active={generation === null} onPress={() => setGeneration(null)} />{[1,2,3,4,5,6,7,8,9].map((gen) => <SmallChip key={gen} label={`Gen ${gen}`} active={generation === gen} onPress={() => setGeneration(gen)} />)}</FilterGroup>
@@ -276,8 +279,8 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
   if (!card) return null;
   const combat = getBattleCardPreview(card);
   return (
-    <Pressable onPress={() => onOpen(card.id)} style={[styles.card, { width, backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.imageWrap, { backgroundColor: isLight ? '#E6EDF6' : colors.surfaceAlt }]}>
+    <Pressable onPress={() => onOpen(card.id)} style={[styles.card,{width}]}>
+      <View style={[styles.imageWrap,{backgroundColor:isLight?'#E6EDF6':'#080D15'}]}>
         {card.image_small ? <Image source={{ uri: card.image_small }} style={styles.cardImage} resizeMode="contain" resizeMethod="resize" fadeDuration={0} /> : <View style={styles.cardPlaceholder}><Ionicons name="image-outline" size={28} color={colors.muted} /></View>}
         <View style={styles.valueBadge}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
         <View style={styles.damageBadge}>
@@ -285,52 +288,55 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
           <Text style={styles.damageBadgeText}>{combat.maxDamage.toLocaleString('pt-BR')} DANO</Text>
         </View>
         {entry.favorite ? <View style={styles.favoriteBadge}><Ionicons name="heart" size={13} color="#fff" /></View> : null}
-        {Number(entry.quantity ?? 0) > 1 ? <View style={[styles.quantityBadge, { backgroundColor: colors.yellow }]}><Text style={styles.quantityText}>×{entry.quantity}</Text></View> : null}
+        {Number(entry.quantity ?? 0) > 1 ? <View style={styles.quantityBadge}><Text style={styles.quantityText}>×{entry.quantity}</Text></View> : null}
       </View>
       <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>{card.pokemon_name}</Text>
       <Text style={[styles.setName, { color: colors.muted }]} numberOfLines={1}>{card.set_name}</Text>
       <View style={styles.combatLine}>
-        <Text style={[styles.combatPwr,{color:colors.yellow}]}>⚔ PWR {combat.battleRating}</Text>
+        <Text style={styles.combatPwr}>⚔ PWR {combat.battleRating}</Text>
         <Text style={[styles.combatMeta,{color:colors.muted}]}>HP {combat.hp} • ⚡ {combat.bestEnergy} • VEL {combat.speedScore}</Text>
       </View>
-      <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={[styles.totalValue, { color: colors.yellow }]}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : card.market_price_source === 'unreleased:no_english_market' ? 'Não lançada' : 'Sem preço'}</Text></View>
+      <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={styles.totalValue}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : card.market_price_source === 'unreleased:no_english_market' ? 'Não lançada' : 'Sem preço'}</Text></View>
     </Pressable>
   );
 });
 
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) { const { colors } = useAppTheme(); return <View style={styles.filterGroup}><Text style={[styles.filterTitle, { color: colors.muted }]}>{title}</Text><View style={styles.smallChips}>{children}</View></View>; }
 function SmallChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) { const { colors } = useAppTheme(); return <Pressable onPress={onPress} style={[styles.smallChip, { backgroundColor: active ? colors.accentSoft : colors.surfaceAlt, borderColor: active ? colors.accent : colors.border }]}><Text style={[styles.smallChipText, { color: active ? colors.text : colors.muted }]}>{label}</Text></Pressable>; }
-function FilterChip({ active, label, icon, onPress }: { active: boolean; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }) { const { colors } = useAppTheme(); return <Pressable onPress={onPress} style={[styles.filterChip, { backgroundColor: active ? colors.yellow : colors.surface, borderColor: active ? colors.yellow : colors.border }]}><Ionicons name={icon} size={14} color={active ? '#07111F' : colors.muted} /><Text style={[styles.filterText, { color: active ? '#07111F' : colors.muted }]}>{label}</Text></Pressable>; }
+function FilterChip({ active, label, icon, onPress }: { active: boolean; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }) { const { colors } = useAppTheme(); return <Pressable onPress={onPress} style={[styles.filterChip, active && styles.filterChipActive]}><Ionicons name={icon} size={14} color={active ? '#080B13' : colors.muted} /><Text style={[styles.filterText, { color: active ? '#080B13' : colors.muted }]}>{label}</Text></Pressable>; }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, overflow: 'hidden' },
   scrollTopButton:{position:'absolute',right:18,bottom:18,width:52,height:52,borderRadius:26,borderWidth:1.5,alignItems:'center',justifyContent:'center',elevation:12,shadowColor:'#000',shadowOpacity:.28,shadowRadius:10,shadowOffset:{width:0,height:5}},
   content: { width: '100%', maxWidth: 1280, alignSelf: 'center', paddingTop: 12, paddingBottom: 36 },
   headerContent: { gap: 16, marginBottom: 12 },
-  pageHeaderRow: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
-  pageHeader: { flex:1, minWidth:230, gap: 5, marginBottom: 4 },
-  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
-  title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
-  subtitle: { fontSize: 15, lineHeight: 21 },
-  summary: { flexDirection: 'row', borderRadius: 24, padding: 18, borderWidth: 1, alignItems: 'stretch' },
+  collectionHero:{borderRadius:25,borderWidth:1,borderColor:'#5B4926',backgroundColor:'#0A101A',padding:17,flexDirection:'row',alignItems:'flex-start',gap:13},
+  collectionHeroIcon:{width:56,height:56,borderRadius:18,backgroundColor:'#D9B24C',alignItems:'center',justifyContent:'center'},
+  collectionHeroCopy:{flex:1,minWidth:0},
+  eyebrow: { color:'#D9B24C',fontSize: 8, fontWeight: '900', letterSpacing: 1.25 },
+  title: { fontSize: 28, lineHeight: 33, fontWeight: '900', letterSpacing: -0.6, marginTop:4 },
+  subtitle: { fontSize: 11, lineHeight: 17, marginTop:5, maxWidth:850 },
+  summary: { flexDirection: 'row', borderRadius: 22, padding: 17, borderWidth: 1, borderColor:'#3D3421', backgroundColor:'#11151D', alignItems: 'stretch' },
   summaryMain: { flex: 1, justifyContent: 'center' },
-  summaryKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
-  summaryValue: { fontSize: 29, fontWeight: '900', marginTop: 4 },
+  summaryKicker: { color:'#D9B24C',fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
+  summaryValue: { color:'#F2CF69',fontSize: 30, fontWeight: '900', marginTop: 4 },
   summaryLabel: { fontSize: 10, marginTop: 2 },
   summaryDivider: { width: 1, marginHorizontal: 15 },
   summarySide: { width: 120, justifyContent: 'center' },
   sideLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 1 },
   sideName: { fontSize: 13, fontWeight: '900', marginTop: 4 },
-  sideValue: { fontSize: 12, fontWeight: '900', marginTop: 3 },
+  sideValue: { color:'#F2CF69',fontSize: 12, fontWeight: '900', marginTop: 3 },
   collectionActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   actionButton: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12 },
+  actionPrimary:{backgroundColor:'#D9B24C',borderWidth:1,borderColor:'#F2D46E'},
   actionText: { color: '#fff', fontSize: 9, fontWeight: '900' },
-  searchBox: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 17, borderWidth: 1, paddingHorizontal: 14 },
+  searchBox: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 17, borderWidth: 1, borderColor:'#303847', backgroundColor:'#101621', paddingHorizontal: 14 },
   search: { flex: 1, height: '100%', fontSize: 14 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 9 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor:'#303847', backgroundColor:'#101621', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 9 },
+  filterChipActive:{backgroundColor:'#D9B24C',borderColor:'#F2D46E'},
   filterText: { fontWeight: '800', fontSize: 11 },
-  advancedPanel: { gap: 14, padding: 15, borderRadius: 19, borderWidth: 1 },
+  advancedPanel: { gap: 14, padding: 15, borderRadius: 19, borderWidth: 1, borderColor:'#303847', backgroundColor:'#0D1320' },
   filterGroup: { gap: 8 },
   filterTitle: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   smallChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
@@ -345,24 +351,24 @@ const styles = StyleSheet.create({
   error: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 11, borderRadius: 14, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' },
   errorText: { flex: 1, color: '#FFD7DD', fontSize: 10, fontWeight: '700' },
   column: { gap: 10 },
-  card: { borderRadius: 18, padding: 8, borderWidth: 1, marginBottom: 10 },
+  card: { borderRadius: 19, padding: 8, borderWidth: 1, borderColor:'#2B3442', backgroundColor:'#0D1320', marginBottom: 10, shadowColor:'#000', shadowOpacity:.2, shadowRadius:12, shadowOffset:{width:0,height:6}, elevation:6 },
   imageWrap: { width: '100%', aspectRatio: .72, borderRadius: 13, overflow: 'hidden', position: 'relative' },
   cardImage: { width: '100%', height: '100%' },
   cardPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   cardName: { fontWeight: '900', marginTop: 9, fontSize: 14 },
   setName: { fontSize: 10, fontWeight: '700', marginTop: 2 },
   combatLine: { marginTop: 6, gap: 2 },
-  combatPwr: { fontSize: 9, fontWeight: '900' },
+  combatPwr: { color:'#D9B24C',fontSize: 9, fontWeight: '900' },
   combatMeta: { fontSize: 7, fontWeight: '800' },
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginTop: 7 },
   cardMeta: { fontSize: 9, flex: 1 },
-  totalValue: { fontSize: 8, fontWeight: '900' },
-  valueBadge: { position: 'absolute', left: 7, bottom: 7, backgroundColor: '#050505E6', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 4 },
+  totalValue: { color:'#F2CF69',fontSize: 8, fontWeight: '900' },
+  valueBadge: { position: 'absolute', left: 7, bottom: 7, backgroundColor: '#080C15ED', borderRadius: 999, borderWidth:1, borderColor:'#4B3F23', paddingHorizontal: 7, paddingVertical: 4 },
   valueBadgeText: { fontSize: 9, fontWeight: '900' },
   damageBadge: { position: 'absolute', right: 7, bottom: 7, backgroundColor: '#2D160FEF', borderRadius: 999, borderWidth: 1, borderColor: '#8A4027', paddingHorizontal: 7, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 },
   damageBadgeText: { color: '#FFD2AE', fontSize: 8, fontWeight: '900' },
-  quantityBadge: { position: 'absolute', right: 7, top: 7, borderRadius: 999, minWidth: 30, paddingHorizontal: 7, paddingVertical: 4, alignItems: 'center' },
-  quantityText: { color: '#07111F', fontWeight: '900', fontSize: 11 },
+  quantityBadge: { position: 'absolute', right: 7, top: 7, borderRadius: 999, minWidth: 30, paddingHorizontal: 7, paddingVertical: 4, alignItems: 'center', backgroundColor:'#D9B24C', borderWidth:1, borderColor:'#F2D46E' },
+  quantityText: { color: '#080B13', fontWeight: '900', fontSize: 11 },
   favoriteBadge: { position: 'absolute', left: 7, top: 7, width: 27, height: 27, borderRadius: 999, backgroundColor: '#E34D65', alignItems: 'center', justifyContent: 'center' },
   empty: { borderRadius: 20, padding: 26, alignItems: 'center', gap: 8, borderWidth: 1, marginBottom: 12 },
   emptyTitle: { fontWeight: '900', fontSize: 18 },
