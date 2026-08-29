@@ -75,6 +75,7 @@ function duplicateSaleError(message: string) {
     ['CARD_NOT_OWNED', 'Esta carta não está mais na sua Bag.'],
     ['PLAYER_NOT_AVAILABLE', 'Sua conta não está disponível para esta operação.'],
     ['INVALID_SALE', 'Quantidade inválida para venda.'],
+    ['LEGACY_CARD_LOCKED', 'A última cópia desta carta está protegida pelo seu Legado Beta até a migração 1.0.'],
   ];
   return new Error(known.find(([key]) => message.includes(key))?.[1] ?? message);
 }
