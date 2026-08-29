@@ -909,7 +909,7 @@ export default function AdminScreen() {
                   </View>
                   <View style={{flex:1}}>
                     <Text style={[styles.preflightTitle,{color:colors.text}]}>{releasePreflight ? (releasePreflight.ready ? 'PRÉ-CHECK APROVADO' : 'PRÉ-CHECK COM PENDÊNCIAS') : 'AUDITORIA PRÉ-RESET'}</Text>
-                    <Text style={[styles.preflightText,{color:colors.muted}]}>{releasePreflight ? `${releasePreflight.counts.players} contas • ${releasePreflight.counts.activeTesters} testers • ${releasePreflight.counts.guilds} guildas • ${releasePreflight.counts.confirmedAccounts} legados confirmados` : 'Verifica cartas, owner, Tester e liderança de guildas sem alterar nenhum dado.'}</Text>
+                    <Text style={[styles.preflightText,{color:colors.muted}]}>{releasePreflight ? `${releasePreflight.counts.players} contas • ${releasePreflight.counts.confirmedAccounts} legados confirmados • ${releasePreflight.counts.automaticCards} cartas automáticas • ${releasePreflight.counts.accountsAwaitingAutoFill} conta(s) ainda com vagas` : 'Verifica cartas, preenchimento automático, owner, Tester e liderança de guildas sem alterar nenhum dado.'}</Text>
                   </View>
                   <Pressable disabled={working} onPress={() => { void runReleasePreflightCheck(); }} style={[styles.preflightButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent,opacity: working ? .55 : 1}]}>
                     <Ionicons name="scan" size={16} color={colors.accent}/>
@@ -922,6 +922,7 @@ export default function AdminScreen() {
                       ['CARTAS AUSENTES',releasePreflight.issues.selectedCardsNotOwned],
                       ['CONTAGEM DIVERGENTE',releasePreflight.issues.submissionCountMismatch],
                       ['ACIMA DO LIMITE',releasePreflight.issues.playersOverCardLimit],
+                      ['AUTO INCOMPLETO',releasePreflight.issues.legacyAutofillIncomplete],
                       ['TESTER INCONSISTENTE',releasePreflight.issues.testersMissingAchievement],
                       ['LÍDER DE GUILDA',releasePreflight.issues.guildLeaderMismatch],
                       ['OWNER',releasePreflight.issues.ownerCountInvalid],
