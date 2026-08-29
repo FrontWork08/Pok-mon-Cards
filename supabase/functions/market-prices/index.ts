@@ -399,7 +399,9 @@ Deno.serve(async (req: Request) => {
 
   await updateRows(admin, results);
 
-  const priced = results.filter((row) => row.market_price_usd !== null).length;
+  const priced = results.filter(
+    (row) => numeric(row.market_price_usd) !== null || numeric(row.previous_market_price_usd) !== null,
+  ).length;
 
   return json({
     data: {
