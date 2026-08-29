@@ -26,13 +26,15 @@ import type { OwnedCardEntry } from '@/services/player';
 import { formatUsd, refreshOwnedMarketPrices } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { getThemeVisual } from '@/theme/themeCatalog';
 
 const PAGE_SIZE = 48;
 
 export default function BagScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { colors } = useAppTheme();
+  const { colors, themeName } = useAppTheme();
+  const themeVisual = getThemeVisual(themeName);
   const [search, setSearch] = useState('');
   const [setQuery, setSetQuery] = useState('');
   const [cards, setCards] = useState<OwnedCardEntry[]>([]);
@@ -165,23 +167,36 @@ export default function BagScreen() {
     <View style={styles.headerContent}>
 <View style={styles.pageHeaderRow}>
         <View style={styles.pageHeader}>
-          <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Pokémon Bag</Text>
-          <Text style={[styles.subtitle, { color: colors.muted }]}>Coleção rápida, paginada e com carregamento sob demanda.</Text>
+          <View style={styles.brandRow}>
+            <View style={[styles.brandDot,{backgroundColor:colors.yellow}]} />
+            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER COLLECTION</Text>
+            <View style={[styles.versionPill,{backgroundColor:colors.accentSoft,borderColor:colors.border}]}><Text style={[styles.versionText,{color:colors.accent}]}>1.0</Text></View>
+          </View>
+          <Text style={[styles.title, { color: colors.text }]}>Collection Vault</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>Sua Bag organizada como uma coleção de treinador: valor, combate, raridade e sets.</Text>
         </View>
       </View>
 
       <View style={[styles.summary, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+        <View style={[styles.summaryGlow,{backgroundColor:colors.accent}]} />
+        <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.summaryPokemon} />
         <View style={styles.summaryMain}>
           <Text style={[styles.summaryKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text>
           <Text style={[styles.summaryValue, { color: colors.yellow }]}>{formatUsd(overview?.collectionValueUsd)}</Text>
-          <Text style={[styles.summaryLabel, { color: colors.muted }]}>{Number(overview?.totalCards ?? 0).toLocaleString('pt-BR')} cards • {Number(overview?.uniqueCards ?? 0).toLocaleString('pt-BR')} diferentes</Text>
+          <Text style={[styles.summaryLabel, { color: colors.muted }]}>Seu cofre acompanha preço, raridade e força de batalha.</Text>
+          <View style={styles.summaryStats}>
+            <View style={[styles.summaryStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.summaryStatValue,{color:colors.text}]}>{Number(overview?.totalCards ?? 0).toLocaleString('pt-BR')}</Text><Text style={[styles.summaryStatLabel,{color:colors.muted}]}>CARDS</Text></View>
+            <View style={[styles.summaryStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.summaryStatValue,{color:colors.text}]}>{Number(overview?.uniqueCards ?? 0).toLocaleString('pt-BR')}</Text><Text style={[styles.summaryStatLabel,{color:colors.muted}]}>ÚNICOS</Text></View>
+            <View style={[styles.summaryStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.summaryStatValue,{color:colors.text}]}>{Math.max(0,Number(overview?.totalCards ?? 0)-Number(overview?.uniqueCards ?? 0)).toLocaleString('pt-BR')}</Text><Text style={[styles.summaryStatLabel,{color:colors.muted}]}>REPETIDOS</Text></View>
+          </View>
         </View>
-        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
         <View style={styles.summarySide}>
-          <Text style={[styles.sideLabel, { color: colors.muted }]}>MAIS RARA/VALIOSA</Text>
-          <Text numberOfLines={1} style={[styles.sideName, { color: colors.text }]}>{overview?.mostValuable?.pokemon_name ?? '—'}</Text>
-          <Text style={[styles.sideValue, { color: colors.yellow }]}>{overview?.mostValuable?.market_price_usd != null ? formatUsd(overview.mostValuable.market_price_usd) : '—'}</Text>
+          <View style={[styles.rarePanel,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+            <Ionicons name="diamond" size={18} color={colors.yellow}/>
+            <Text style={[styles.sideLabel, { color: colors.muted }]}>DESTAQUE DO COFRE</Text>
+            <Text numberOfLines={1} style={[styles.sideName, { color: colors.text }]}>{overview?.mostValuable?.pokemon_name ?? '—'}</Text>
+            <Text style={[styles.sideValue, { color: colors.yellow }]}>{overview?.mostValuable?.market_price_usd != null ? formatUsd(overview.mostValuable.market_price_usd) : '—'}</Text>
+          </View>
         </View>
       </View>
 
@@ -309,16 +324,27 @@ const styles = StyleSheet.create({
   headerContent: { gap: 16, marginBottom: 12 },
   pageHeaderRow: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
   pageHeader: { flex:1, minWidth:230, gap: 5, marginBottom: 4 },
+  brandRow:{flexDirection:'row',alignItems:'center',gap:7},
+  brandDot:{width:7,height:7,borderRadius:999},
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
+  versionPill:{borderWidth:1,borderRadius:999,paddingHorizontal:7,paddingVertical:2},
+  versionText:{fontSize:8,fontWeight:'900',letterSpacing:.6},
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { fontSize: 15, lineHeight: 21 },
-  summary: { flexDirection: 'row', borderRadius: 24, padding: 18, borderWidth: 1, alignItems: 'stretch' },
-  summaryMain: { flex: 1, justifyContent: 'center' },
+  summary: { flexDirection: 'row', borderRadius: 28, padding: 18, borderWidth: 1, alignItems: 'stretch', overflow:'hidden', position:'relative', minHeight:190 },
+  summaryGlow:{position:'absolute',right:-70,top:-90,width:270,height:270,borderRadius:999,opacity:.13},
+  summaryPokemon:{position:'absolute',right:-28,bottom:-30,width:190,height:210,opacity:.22,transform:[{rotate:'5deg'}]},
+  summaryMain: { flex: 1, justifyContent: 'center', zIndex:2, paddingRight:8 },
   summaryKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
   summaryValue: { fontSize: 29, fontWeight: '900', marginTop: 4 },
-  summaryLabel: { fontSize: 10, marginTop: 2 },
+  summaryLabel: { fontSize: 10, marginTop: 2, maxWidth:460 },
+  summaryStats:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:13},
+  summaryStat:{minWidth:76,borderRadius:13,borderWidth:1,paddingHorizontal:10,paddingVertical:8},
+  summaryStatValue:{fontSize:15,fontWeight:'900'},
+  summaryStatLabel:{fontSize:7,fontWeight:'900',letterSpacing:.7,marginTop:1},
   summaryDivider: { width: 1, marginHorizontal: 15 },
-  summarySide: { width: 120, justifyContent: 'center' },
+  summarySide: { width: 138, justifyContent: 'flex-end', zIndex:2 },
+  rarePanel:{borderRadius:16,borderWidth:1,padding:11,gap:3},
   sideLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 1 },
   sideName: { fontSize: 13, fontWeight: '900', marginTop: 4 },
   sideValue: { fontSize: 12, fontWeight: '900', marginTop: 3 },
@@ -345,8 +371,8 @@ const styles = StyleSheet.create({
   error: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 11, borderRadius: 14, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' },
   errorText: { flex: 1, color: '#FFD7DD', fontSize: 10, fontWeight: '700' },
   column: { gap: 10 },
-  card: { borderRadius: 18, padding: 8, borderWidth: 1, marginBottom: 10 },
-  imageWrap: { width: '100%', aspectRatio: .72, borderRadius: 13, overflow: 'hidden', position: 'relative' },
+  card: { borderRadius: 20, padding: 8, borderWidth: 1, marginBottom: 10, overflow:'hidden' },
+  imageWrap: { width: '100%', aspectRatio: .72, borderRadius: 14, overflow: 'hidden', position: 'relative', borderWidth:1, borderColor:'rgba(255,255,255,.06)' },
   cardImage: { width: '100%', height: '100%' },
   cardPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   cardName: { fontWeight: '900', marginTop: 9, fontSize: 14 },
