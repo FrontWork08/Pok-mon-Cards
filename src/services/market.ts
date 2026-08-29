@@ -18,6 +18,7 @@ export type WeeklyCollectionRankEntry = {
   cards_gained: number;
   packs_opened: number;
   reward_coins: number;
+  reward_diamonds: number;
   week_start: string;
   score_start: string;
   week_end: string;
@@ -43,6 +44,7 @@ export async function getCollectionWeeklyLeaderboard(limit = 100) {
     cards_gained: Number(entry.cards_gained ?? 0),
     packs_opened: Number(entry.packs_opened ?? 0),
     reward_coins: Number(entry.reward_coins ?? 0),
+    reward_diamonds: Number(entry.reward_diamonds ?? 0),
     week_start: String(entry.week_start ?? ''),
     score_start: String(entry.score_start ?? ''),
     week_end: String(entry.week_end ?? ''),
