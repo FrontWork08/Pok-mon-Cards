@@ -118,16 +118,36 @@ export function getProfileAvatarUrl(avatarPath?: string | null, updatedAt?: stri
 }
 
 function base64ToArrayBuffer(value: string) {
-  const clean = value.replace(/^data:[^;]+;base64,/, '');
-  const decoder = (globalThis as any).atob as ((input: string) => string) | undefined;
-  if (!decoder) throw new Error('Este dispositivo não conseguiu processar a imagem selecionada.');
+  const clean = value
+    .replace(/^data:[^;]+;base64,/, '')
+    .replace(/\s+/g, '');
 
-  const binary = decoder(clean);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
+  if (!clean || clean.length % 4 !== 0) {
+    throw new Error('A imagem selecionada está em um formato inválido.');
   }
-  return bytes.buffer as ArrayBuffer;
+
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const padding = clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0;
+  const bytes = new Uint8Array((clean.length / 4) * 3 - padding);
+  let offset = 0;
+
+  for (let index = 0; index < clean.length; index += 4) {
+    const a = alphabet.indexOf(clean[index]);
+    const b = alphabet.indexOf(clean[index + 1]);
+    const c = clean[index + 2] === '=' ? 0 : alphabet.indexOf(clean[index + 2]);
+    const d = clean[index + 3] === '=' ? 0 : alphabet.indexOf(clean[index + 3]);
+
+    if (a < 0 || b < 0 || c < 0 || d < 0) {
+      throw new Error('A imagem selecionada está em um formato inválido.');
+    }
+
+    const chunk = (a << 18) | (b << 12) | (c << 6) | d;
+    if (offset < bytes.length) bytes[offset++] = (chunk >> 16) & 0xff;
+    if (offset < bytes.length) bytes[offset++] = (chunk >> 8) & 0xff;
+    if (offset < bytes.length) bytes[offset++] = chunk & 0xff;
+  }
+
+  return bytes.buffer;
 }
 
 export async function uploadMyProfileAvatar(input: {
