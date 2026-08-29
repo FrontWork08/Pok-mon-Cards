@@ -26,7 +26,7 @@
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#07111F"
       }
     },
     "extra": {
@@ -36,6 +36,7 @@
     },
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "backgroundColor": "#07111F"
   }
 }
