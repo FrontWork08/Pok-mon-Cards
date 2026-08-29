@@ -69,6 +69,7 @@ export default function CardDetailScreen() {
   const combat = getBattleCardPreview(card ?? null);
   const unitValue = Number(card?.game_value ?? 0);
   const marketPriceUsd = card?.market_price_usd == null ? null : Number(card.market_price_usd);
+  const isUnreleasedWithoutMarket = card?.market_price_source === 'unreleased:no_english_market';
   const totalMarketValueUsd = !entry?.owned || marketPriceUsd == null ? null : marketPriceUsd * Number(entry.quantity ?? 0);
   const historyMin = priceHistory.length ? Math.min(...priceHistory.map((point) => point.priceUsd)) : 0;
   const historyMax = priceHistory.length ? Math.max(...priceHistory.map((point) => point.priceUsd)) : 0;
@@ -94,7 +95,7 @@ export default function CardDetailScreen() {
             <Text style={[styles.rarity, { color: colors.muted }]}>{card.rarity ?? 'Sem raridade informada'}</Text>
             {!entry.owned ? <View style={[styles.previewBadge,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name="eye" size={15} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.previewBadgeTitle,{color:colors.text}]}>PRÉVIA DA CARTA</Text><Text style={[styles.previewBadgeText,{color:colors.muted}]}>Você ainda não possui esta carta. Veja as estatísticas antes de tentar obtê-la em um booster.</Text></View></View> : null}
 
-            <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR DE MERCADO EM USD</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? 'Preço TCGplayer indisponível para esta carta.' : 'Snapshot de mercado TCGplayer'}</Text></View></View>
+            <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR DE MERCADO EM USD</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? (isUnreleasedWithoutMarket ? 'Sem cotação — esta versão inglesa nunca foi lançada fisicamente.' : 'Preço TCGplayer indisponível para esta carta.') : 'Snapshot de mercado TCGplayer'}</Text></View></View>
 
             <View style={[styles.battlePanel,{backgroundColor:colors.surfaceAlt,borderColor:colors.accent}]}>
               <View style={styles.battlePanelHead}>
