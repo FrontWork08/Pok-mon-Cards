@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CardPickerModal } from '@/components/CardPickerModal';
@@ -9,6 +9,7 @@ import { getMyBag, getMyProfile, type OwnedCardEntry } from '@/services/player';
 import { getTrainerRank } from '@/services/ranks';
 import { getMySocial, type SocialPlayer } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { getThemeVisual } from '@/theme/themeCatalog';
 import { cancelMatchmaking, getMyMatchmakingState, joinMatchmaking, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
 import { isFunctionErrorCode } from '@/services/functionErrors';
 
@@ -26,7 +27,8 @@ const COIN_WAGERS = [100, 500, 1000, 5000];
 
 export default function BattlesHubScreen() {
   const router = useRouter();
-  const { colors } = useAppTheme();
+  const { colors, themeName } = useAppTheme();
+  const themeVisual = getThemeVisual(themeName);
   const [profile, setProfile] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -187,7 +189,7 @@ export default function BattlesHubScreen() {
     }
   }
 
-  return <Screen title="Batalhas" subtitle="Desafie amigos, acompanhe seu ELO e dispute o ranking.">
+  return <Screen title="Battle Arena" subtitle="Ranqueadas, desafios entre amigos, histórico, regras e matchmaking competitivo.">
     {notice ? <Pressable style={styles.notice} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={18} color={colors.yellow}/><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
     {loading ? <ActivityIndicator size="large" color={colors.yellow}/> : null}
 
@@ -318,7 +320,17 @@ export default function BattlesHubScreen() {
     </View>
 
     <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
-      <View><Text style={[styles.kicker, { color: colors.yellow }]}>RANKED RATING</Text><Text style={[styles.rating, { color: colors.text }]}>{profile?.battle_rating ?? 1000}</Text><Text style={[styles.rankLabel, { color: colors.muted }]}>{myRank.symbol} {myRank.displayName}</Text></View>
+      <View style={[styles.arenaGlow,{backgroundColor:colors.accent}]} />
+      <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.arenaPokemon}/>
+      <View style={styles.arenaMain}>
+        <Text style={[styles.kicker, { color: colors.yellow }]}>RANKED ARENA • SEASON</Text>
+        <Text style={[styles.rating, { color: colors.text }]}>{profile?.battle_rating ?? 1000}</Text>
+        <Text style={[styles.rankLabel, { color: colors.muted }]}>{myRank.symbol} {myRank.displayName}</Text>
+        <View style={[styles.arenaStatus,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+          <View style={[styles.arenaStatusDot,{backgroundColor:queueState?.status === 'waiting' ? colors.yellow : '#65D894'}]} />
+          <Text style={[styles.arenaStatusText,{color:colors.text}]}>{queueState?.status === 'waiting' ? 'MATCHMAKING ATIVO' : 'PRONTO PARA BATALHAR'}</Text>
+        </View>
+      </View>
       <View style={styles.heroStats}><Mini value={profile?.battle_wins ?? wins} label="Vitórias"/><Mini value={profile?.battle_losses ?? losses} label="Derrotas"/><Mini value={`${winRate}%`} label="Win rate"/><Mini value={profile?.best_battle_streak ?? 0} label="Melhor streak"/></View>
     </View>
 
@@ -387,7 +399,7 @@ const styles = StyleSheet.create({
   resisted: { color: '#FFB16A', fontSize: 8, fontWeight: '900' },
   matchupText: { color: '#D5D8DE', fontSize: 8, lineHeight: 12, marginTop: 2 },
   rulesFootnote: { fontSize: 8, lineHeight: 13, fontWeight: '700' },
-  rankedPanel: { borderRadius:22, borderWidth:1, padding:15, gap:12 },
+  rankedPanel: { borderRadius:26, borderWidth:1, padding:16, gap:12 },
   rankedHead: { flexDirection:'row', alignItems:'center', gap:10 },
   rankedIcon: { width:46, height:46, borderRadius:15, alignItems:'center', justifyContent:'center' },
   rankedTitle: { fontSize:18, fontWeight:'900' },
@@ -404,9 +416,16 @@ const styles = StyleSheet.create({
   findMatchText: { color:'#07111F', fontSize:10, fontWeight:'900', letterSpacing:.4 },
   seasonLink: { alignSelf:'flex-start', flexDirection:'row', alignItems:'center', gap:6, paddingVertical:3 },
   seasonLinkText: { fontSize:8, fontWeight:'900' }, noticeText: { flex: 1, color: '#F8EFCB', fontSize: 11, fontWeight: '700' },
-  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', padding: 18, borderRadius: 22, borderWidth: 1 }, kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, rating: { fontSize: 38, fontWeight: '900' }, rankLabel: { fontSize: 10 }, heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 }, miniValue: { fontSize: 17, fontWeight: '900' }, miniLabel: { fontSize: 8, fontWeight: '800' },
+  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', padding: 18, borderRadius: 28, borderWidth: 1, overflow:'hidden', position:'relative', minHeight:190 },
+  arenaGlow:{position:'absolute',right:-70,top:-100,width:300,height:300,borderRadius:999,opacity:.14},
+  arenaPokemon:{position:'absolute',right:-24,bottom:-48,width:215,height:230,opacity:.22,transform:[{rotate:'7deg'}]},
+  arenaMain:{zIndex:2,minWidth:180},
+  arenaStatus:{alignSelf:'flex-start',marginTop:10,borderWidth:1,borderRadius:999,paddingHorizontal:10,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:6},
+  arenaStatusDot:{width:7,height:7,borderRadius:999},
+  arenaStatusText:{fontSize:7,fontWeight:'900',letterSpacing:.55},
+  kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, rating: { fontSize: 38, fontWeight: '900' }, rankLabel: { fontSize: 10 }, heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, zIndex:2, paddingRight:85 }, miniValue: { fontSize: 17, fontWeight: '900' }, miniLabel: { fontSize: 8, fontWeight: '800' },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }, sectionTitle: { fontSize: 20, fontWeight: '900' }, sectionDescription: { fontSize: 9, marginTop: 2 }, sectionMeta: { fontSize: 9, fontWeight: '900' }, sectionLink: { fontSize: 9, fontWeight: '900' },
-  friendList: { gap: 9, paddingRight: 8 }, friend: { width: 145, borderRadius: 17, borderWidth: 1, padding: 11, alignItems: 'flex-start' }, friendAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, friendName: { width: '100%', fontSize: 12, fontWeight: '900', marginTop: 8 }, friendLevel: { fontSize: 8, marginTop: 2 }, challengeTag: { marginTop: 10, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }, challengeTagText: { color: '#07111F', fontSize: 7, fontWeight: '900' },
+  friendList: { gap: 9, paddingRight: 8 }, friend: { width: 150, borderRadius: 19, borderWidth: 1, padding: 12, alignItems: 'flex-start' }, friendAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, friendName: { width: '100%', fontSize: 12, fontWeight: '900', marginTop: 8 }, friendLevel: { fontSize: 8, marginTop: 2 }, challengeTag: { marginTop: 10, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }, challengeTagText: { color: '#07111F', fontSize: 7, fontWeight: '900' },
   list: { gap: 8 }, rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, borderWidth: 1 }, position: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, positionText: { fontWeight: '900' }, grow: { flex: 1, minWidth: 0 }, name: { fontSize: 12, fontWeight: '900' }, sub: { fontSize: 9, marginTop: 3 }, elo: { fontSize: 16, fontWeight: '900' },
   battleRow: { borderRadius: 17, borderWidth: 1, overflow: 'hidden' }, battleBody: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11 }, resultIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, rematch: { alignSelf: 'flex-end', marginRight: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1 }, rematchText: { fontSize: 8, fontWeight: '900' },
   empty: { padding: 24, borderRadius: 18, borderWidth: 1, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 15, fontWeight: '900' }, emptyText: { fontSize: 10, textAlign: 'center' }, findFriends: { marginTop: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
