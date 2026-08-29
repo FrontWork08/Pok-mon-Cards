@@ -78,9 +78,9 @@ export default function CollectionRankingScreen() {
   const rowsCount = mode === 'weekly' ? weeklyRows.length : globalRows.length;
 
   const rewardSummary = useMemo(() => [
-    { place: '🥇 1º', reward: '🪙 15.000' },
-    { place: '🥈 2º', reward: '🪙 10.000' },
-    { place: '🥉 3º', reward: '🪙 5.000' },
+    { place: '🥇 1º', reward: '🪙 15.000 + 💎 5' },
+    { place: '🥈 2º', reward: '🪙 10.000 + 💎 3' },
+    { place: '🥉 3º', reward: '🪙 5.000 + 💎 1' },
   ], []);
 
   return (
@@ -260,9 +260,9 @@ export default function CollectionRankingScreen() {
                   <Text style={[styles.coverage, { color: colors.muted }]}>
                     +{row.cards_gained.toLocaleString('pt-BR')} cartas • {row.packs_opened.toLocaleString('pt-BR')} packs
                   </Text>
-                  {row.reward_coins > 0 ? (
+                  {row.reward_coins > 0 || row.reward_diamonds > 0 ? (
                     <Text style={[styles.projectedReward, { color: colors.yellow }]}>
-                      prêmio atual: 🪙 {row.reward_coins.toLocaleString('pt-BR')}
+                      prêmio atual: 🪙 {row.reward_coins.toLocaleString('pt-BR')} + 💎 {row.reward_diamonds.toLocaleString('pt-BR')}
                     </Text>
                   ) : null}
                 </View>
