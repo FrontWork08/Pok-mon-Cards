@@ -356,7 +356,7 @@ export default function PacksScreen() {
           <Text style={[styles.shopHeroKicker, { color: colors.yellow }]}>BOOSTER WALL</Text>
           <Text style={[styles.shopHeroTitle, { color: colors.text }]}>{packs.length || 173} packs para colecionar</Text>
           <Text style={[styles.shopHeroText, { color: colors.muted }]}>
-            Packs recentes partem de 🪙500. Os mais valiosos sobem de forma moderada; vintages chegam no máximo a 💎100.
+            Packs com chase card abaixo de US$ 800 ficam em Coins. A partir de US$ 800, o preço passa para Diamantes e escala até 💎100 nos sets mais valiosos.
           </Text>
         </View>
       </View>
