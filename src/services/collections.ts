@@ -87,19 +87,62 @@ export async function getSetCards(setId: string, force = false): Promise<SetCard
   }
 }
 
-export async function getMyPackHistory() {
+export type PackHistoryEntry = {
+  id: string;
+  opened_at: string;
+  cards_received: Array<{
+    id?: string;
+    name?: string;
+    rarity?: string | null;
+    image?: string | null;
+    marketPriceUsd?: number | null;
+  }>;
+  packs:
+    | { id?: string; name?: string; set_id?: string; image_url?: string | null; price?: number | null }
+    | Array<{ id?: string; name?: string; set_id?: string; image_url?: string | null; price?: number | null }>
+    | null;
+};
+
+export type PackHistoryPage = {
+  rows: PackHistoryEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+export async function getMyPackHistoryPage(page = 0, pageSize = 25): Promise<PackHistoryPage> {
+  const safePage = Math.max(0, Math.floor(page));
+  const safePageSize = Math.max(10, Math.min(40, Math.floor(pageSize)));
+  const from = safePage * safePageSize;
+  const to = from + safePageSize - 1;
+
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
   const user = userData.user;
   if (!user) throw new Error('Usuário não autenticado.');
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from('pack_openings')
-    .select('id,opened_at,cards_received,packs(id,name,set_id,image_url,price)')
+    .select('id,opened_at,cards_received,packs(id,name,set_id,image_url,price)', { count: 'exact' })
     .eq('player_id', user.id)
     .order('opened_at', { ascending: false })
-    .limit(100);
+    .range(from, to);
 
   if (error) throw error;
-  return data ?? [];
+
+  const rows = (data ?? []) as unknown as PackHistoryEntry[];
+  const total = Number(count ?? rows.length);
+  return {
+    rows,
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    hasMore: from + rows.length < total,
+  };
+}
+
+// Compatibilidade para chamadas antigas: retorna somente a primeira página.
+export async function getMyPackHistory() {
+  return (await getMyPackHistoryPage(0, 25)).rows;
 }
