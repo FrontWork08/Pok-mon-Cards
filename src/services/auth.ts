@@ -133,3 +133,16 @@ export async function getCurrentSession() {
   if (error) throw new Error(authErrorMessage(error.message));
   return data.session;
 }
+
+
+export async function resendSignUpConfirmation(email: string) {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim().toLowerCase(),
+    options: {
+      emailRedirectTo: getAuthRedirectUrl(),
+    },
+  });
+
+  if (error) throw new Error(authErrorMessage(error.message));
+}
