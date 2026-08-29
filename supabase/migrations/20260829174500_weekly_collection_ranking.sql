@@ -25,6 +25,15 @@ alter table private.collection_weekly_config enable row level security;
 revoke all on private.collection_weekly_config from public,anon,authenticated;
 grant select,insert,update on private.collection_weekly_config to service_role;
 
+drop policy if exists collection_weekly_config_service_role
+  on private.collection_weekly_config;
+create policy collection_weekly_config_service_role
+  on private.collection_weekly_config
+  for all
+  to service_role
+  using (true)
+  with check (true);
+
 insert into private.collection_weekly_config(
   id,activated_at,first_reward_coins,second_reward_coins,third_reward_coins
 )
@@ -50,6 +59,15 @@ create index if not exists collection_weekly_rewards_player_idx
 alter table private.collection_weekly_rewards enable row level security;
 revoke all on private.collection_weekly_rewards from public,anon,authenticated;
 grant select,insert on private.collection_weekly_rewards to service_role;
+
+drop policy if exists collection_weekly_rewards_service_role
+  on private.collection_weekly_rewards;
+create policy collection_weekly_rewards_service_role
+  on private.collection_weekly_rewards
+  for all
+  to service_role
+  using (true)
+  with check (true);
 
 CREATE OR REPLACE FUNCTION private.collection_week_start(p_at timestamp with time zone DEFAULT now())
  RETURNS timestamp with time zone
