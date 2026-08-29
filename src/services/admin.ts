@@ -108,6 +108,57 @@ export type AdminReleasePreflight = {
   };
 };
 
+export type AdminReleaseResetPreview = {
+  readyToReset: boolean;
+  campaign: {
+    phase: string;
+    legacyCardLimit: number;
+    rewardCoinsPerVeteran: number;
+    rewardDiamondsPerVeteran: number;
+    economyFrozen: boolean;
+    maintenanceEnabled: boolean;
+  };
+  preserve: {
+    accounts: number;
+    admins: number;
+    activeTesters: number;
+    guilds: number;
+    guildMembers: number;
+    friendships: number;
+    settings: number;
+    cosmetics: number;
+    legacyCardRows: number;
+    legacyCardCopies: number;
+  };
+  reset: {
+    cardRowsRemoved: number;
+    cardCopiesRemoved: number;
+    decks: number;
+    deckCards: number;
+    achievementsExceptTester: number;
+    dailyMissions: number;
+    missionsV2: number;
+    loginStreaks: number;
+    playerSeasons: number;
+    milestoneClaims: number;
+    battlePassProgress: number;
+    battlePassMissionProgress: number;
+    battlePassClaims: number;
+    guildWarPoints: number;
+    guildWeeklyClaims: number;
+    guildBoosterClaims: number;
+    showcaseSlotsAtRisk: number;
+  };
+  economy: {
+    coinsBefore: number;
+    diamondsBefore: number;
+    coinsAfterVeteranReward: number;
+    diamondsAfterVeteranReward: number;
+  };
+  activeOperations: number;
+  preflight: AdminReleasePreflight;
+};
+
 export type AdminPermission =
   | 'audit_users'
   | 'moderate_users'
@@ -251,6 +302,9 @@ export async function getAdminReleaseCampaignStatus() {
 }
 export async function runAdminReleasePreflight() {
   return invokeAdmin({ action: 'release_preflight' }) as Promise<AdminReleasePreflight>;
+}
+export async function getAdminReleaseResetPreview() {
+  return invokeAdmin({ action: 'release_reset_preview' }) as Promise<AdminReleaseResetPreview>;
 }
 export async function setLegacySelectionEnabled(enabled: boolean) {
   return invokeAdmin({ action: 'set_legacy_selection', enabled }) as Promise<AdminReleaseCampaignStatus>;
