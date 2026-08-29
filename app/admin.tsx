@@ -13,6 +13,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import {
+  getMyAdminAccess,
   getAdminOverview,
   getAdminPlayers,
   getCurrencyAdjustmentHistory,
@@ -37,6 +38,8 @@ import {
   startGameEvent,
   stopGameEvent,
   setMaintenanceMode,
+  type AdminAccess,
+  type AdminPermission,
   type AdminGameEvent,
   type AdminModerationAction,
   type AdminOverview,
@@ -59,6 +62,7 @@ export default function AdminScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
   const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [adminAccess, setAdminAccessState] = useState<AdminAccess | null>(null);
   const [players, setPlayers] = useState<AdminPlayer[]>([]);
   const [selfId, setSelfId] = useState('');
   const [history, setHistory] = useState<AdminCurrencyAdjustmentHistory[]>([]);
@@ -133,7 +137,8 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [status, grants, events, guildState, codes, runtime, announcements, testerState] = await Promise.all([
+      const [accessState, status, grants, events, guildState, codes, runtime, announcements, testerState] = await Promise.all([
+        getMyAdminAccess(),
         getAdminOverview(),
         getCurrencyAdjustmentHistory(),
         getAdminEvents(),
@@ -144,6 +149,7 @@ export default function AdminScreen() {
         getTesterTitleHub(),
         syncPlayers(),
       ]);
+      setAdminAccessState(accessState);
       setOverview(status);
       setHistory(grants);
       setActiveEvent(events.find((event) => event.event_type === 'free_boosters') ?? null);
@@ -207,6 +213,13 @@ export default function AdminScreen() {
     const expiryTimer = setTimeout(() => { void load(); }, delay);
     return () => clearTimeout(expiryTimer);
   }, [activeEvent, load]);
+
+  const hasAdminPermission = useCallback(
+    (permission: AdminPermission) => Boolean(
+      adminAccess?.isOwner || adminAccess?.permissions?.includes(permission)
+    ),
+    [adminAccess],
+  );
 
   const amountNumber = useMemo(() => {
     const parsed = Number(amount.replace(/[^0-9]/g, ''));
@@ -776,6 +789,7 @@ export default function AdminScreen() {
             </View>
           </View>
 
+          {hasAdminPermission('audit_users') ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/admin-audit')}
@@ -792,7 +806,10 @@ export default function AdminScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.yellow} />
           </Pressable>
+          ) : null}
 
+
+          {hasAdminPermission('maintenance_manage') ? (
           <CollapsibleSection title="Modo Manutenção">
           <View
             style={[
@@ -899,6 +916,8 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
+          {hasAdminPermission('guilds_manage') ? (
           <CollapsibleSection title="Liderança das Guildas">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: selectedGuild?.color ?? colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>ESCOLHA UMA DAS 4 GUILDAS</Text>
@@ -977,6 +996,7 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
           <CollapsibleSection title="Visão geral">
           <View style={styles.metricGrid}>
             <Metric icon="people" label="USUÁRIOS" value={overview.users.total} hint={`+${overview.users.created24h} em 24h`} />
@@ -1024,6 +1044,7 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          {hasAdminPermission('announcements_manage') ? (
           <CollapsibleSection title="Anúncio global em tempo real">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.emptyText, { color: colors.muted }]}>
@@ -1151,6 +1172,8 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
+          {hasAdminPermission('events_manage') ? (
           <CollapsibleSection title="Admin Abuse">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {activeEvent ? (
@@ -1219,6 +1242,8 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
+          {hasAdminPermission('moderate_users') ? (
           <CollapsibleSection title="Moderação de usuários">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#A84250' }]}>
             <View style={styles.moderationHeader}>
@@ -1388,6 +1413,8 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
+          {hasAdminPermission('events_manage') ? (
           <CollapsibleSection title="Eventos ao vivo">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#9B7BFF' }]}>
             <Text style={[styles.emptyText, { color: colors.muted }]}>
@@ -1420,6 +1447,8 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
+          {hasAdminPermission('economy_grant') ? (
           <CollapsibleSection title="Adicionar moedas">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>
@@ -1538,6 +1567,8 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
+          {hasAdminPermission('economy_grant') ? (
           <CollapsibleSection title="Adicionar Diamantes">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#68D9FF' }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>
@@ -1551,6 +1582,8 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
+          {hasAdminPermission('economy_remove') ? (
           <CollapsibleSection title="Correção de saldo">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#A84250' }]}>
             <View style={styles.moderationHeader}>
@@ -1647,8 +1680,10 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
           {testerHub?.isOwner ? (
-            <CollapsibleSection title="Títulos de Tester">
+            {Boolean(adminAccess?.isOwner) ? (
+          <CollapsibleSection title="Títulos de Tester">
               <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: '#7D5CFF' }]}>
                 <View style={styles.moderationHeader}>
                   <View style={[styles.moderationIcon, { backgroundColor: '#211B3A' }]}>
@@ -1735,6 +1770,8 @@ export default function AdminScreen() {
               </View>
             </CollapsibleSection>
           ) : null}
+          ) : null}
+          {hasAdminPermission('battlepass_grant') ? (
           <CollapsibleSection title="VIP do Passe de Batalha">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
             <View style={styles.moderationHeader}>
@@ -1767,6 +1804,8 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
+          {hasAdminPermission('codes_manage') ? (
           <CollapsibleSection title="Códigos de resgate">
           <View style={[styles.grantPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.emptyText,{color:colors.muted}]}>Cada conta pode usar cada código uma única vez. A recompensa é aplicada e registrada pelo servidor.</Text>
@@ -1791,6 +1830,7 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          ) : null}
           <CollapsibleSection title="Histórico administrativo">
           <View style={styles.historyList}>
             {history.length === 0 ? (
