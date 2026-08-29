@@ -292,7 +292,7 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
         <Text style={[styles.combatPwr,{color:colors.yellow}]}>⚔ PWR {combat.battleRating}</Text>
         <Text style={[styles.combatMeta,{color:colors.muted}]}>HP {combat.hp} • ⚡ {combat.bestEnergy} • VEL {combat.speedScore}</Text>
       </View>
-      <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={[styles.totalValue, { color: colors.yellow }]}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : 'Sem preço'}</Text></View>
+      <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={[styles.totalValue, { color: colors.yellow }]}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : card.market_price_source === 'unreleased:no_english_market' ? 'Não lançada' : 'Sem preço'}</Text></View>
     </Pressable>
   );
 });
