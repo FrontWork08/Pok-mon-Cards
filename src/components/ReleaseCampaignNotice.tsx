@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
@@ -19,6 +20,19 @@ import {
   type ReleaseCampaign,
   type ReleaseCampaignVote,
 } from '@/services/releaseCampaign';
+
+function compareVersions(a: string, b: string) {
+  const left = a.split('.').map((part) => Number(part.replace(/\D.*/, '')) || 0);
+  const right = b.split('.').map((part) => Number(part.replace(/\D.*/, '')) || 0);
+  const max = Math.max(left.length, right.length);
+  for (let i = 0; i < max; i += 1) {
+    const l = left[i] ?? 0;
+    const r = right[i] ?? 0;
+    if (l > r) return 1;
+    if (l < r) return -1;
+  }
+  return 0;
+}
 
 function formatDate(value: string) {
   const [year, month, day] = value.split('-');
@@ -56,6 +70,19 @@ export function ReleaseCampaignNotice() {
     getActiveReleaseCampaign(userId)
       .then((result) => {
         if (disposed || !result.campaign) return;
+        const installedVersion = Constants.expoConfig?.version ?? '0.0.0';
+        const alreadyOnTarget = compareVersions(
+          installedVersion,
+          result.campaign.target_version,
+        ) >= 0;
+
+        if (alreadyOnTarget && !result.campaign.force_update) {
+          setCampaign(null);
+          setVote(result.vote);
+          setVisible(false);
+          return;
+        }
+
         setCampaign(result.campaign);
         setVote(result.vote);
         setVisible(true);
