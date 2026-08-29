@@ -71,6 +71,8 @@ export default function LegacySelectionScreen() {
     return () => { disposed = true; };
   }, []);
 
+  const limit = Math.max(1, Number(campaign?.legacy_card_limit ?? 10));
+
   const selectedEntries = useMemo(
     () => savedCardIds
       .map((cardId) => bag.find((entry) => entry.cards?.id === cardId))
@@ -83,7 +85,32 @@ export default function LegacySelectionScreen() {
     [selectedEntries],
   );
 
-  const limit = Math.max(1, Number(campaign?.legacy_card_limit ?? 10));
+  const recommendedEntries = useMemo(
+    () => [...bag]
+      .filter((entry): entry is OwnedCardEntry & { cards: NonNullable<OwnedCardEntry['cards']> } => Boolean(entry.cards) && entry.quantity > 0)
+      .sort((a, b) => {
+        const marketA = Number(a.cards.market_price_usd ?? -1);
+        const marketB = Number(b.cards.market_price_usd ?? -1);
+        if (marketA !== marketB) return marketB - marketA;
+
+        const gameA = Number(a.cards.game_value ?? 0);
+        const gameB = Number(b.cards.game_value ?? 0);
+        if (gameA !== gameB) return gameB - gameA;
+
+        const obtainedA = new Date(a.first_obtained_at).getTime() || 0;
+        const obtainedB = new Date(b.first_obtained_at).getTime() || 0;
+        if (obtainedA !== obtainedB) return obtainedA - obtainedB;
+
+        return a.cards.id.localeCompare(b.cards.id);
+      })
+      .slice(0, limit),
+    [bag, limit],
+  );
+
+  const recommendedValue = useMemo(
+    () => recommendedEntries.reduce((sum, entry) => sum + Number(entry.cards.market_price_usd ?? 0), 0),
+    [recommendedEntries],
+  );
   const selectionOpen = Boolean(
     campaign?.active
     && campaign.phase === 'legacy_selection'
@@ -97,6 +124,16 @@ export default function LegacySelectionScreen() {
     if (!selectionOpen || locked) return;
     setDraft(toSelectionMap(savedCardIds));
     setNotice('');
+    setError('');
+    setConfirmArmed(false);
+    setPickerOpen(true);
+  }
+
+  function useRecommendedSelection() {
+    if (!selectionOpen || locked || !recommendedEntries.length) return;
+    const recommendedIds = recommendedEntries.map((entry) => entry.cards.id);
+    setDraft(toSelectionMap(recommendedIds));
+    setNotice(`Pré-selecionamos ${recommendedIds.length} carta(s) com a mesma regra de valor usada no preenchimento automático. Revise antes de salvar.`);
     setError('');
     setConfirmArmed(false);
     setPickerOpen(true);
@@ -223,6 +260,21 @@ export default function LegacySelectionScreen() {
               <Text style={[styles.autoRuleText,{color:colors.muted}]}>
                 Se você tiver menos de {limit} cartas escolhidas, suas escolhas são mantidas primeiro e as vagas restantes são preenchidas pelas cartas com maior valor de mercado da sua Bag. Se alguma carta não tiver preço, o valor interno do jogo é usado como desempate.
               </Text>
+              {selectionOpen && !locked && recommendedEntries.length ? (
+                <Pressable
+                  onPress={useRecommendedSelection}
+                  style={[styles.recommendedButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}
+                >
+                  <Ionicons name="sparkles" size={15} color={colors.accent}/>
+                  <View style={{flex:1}}>
+                    <Text style={[styles.recommendedButtonTitle,{color:colors.accent}]}>PRÉ-SELECIONAR AS MAIS VALIOSAS</Text>
+                    <Text style={[styles.recommendedButtonHint,{color:colors.muted}]}>
+                      {recommendedEntries.length}/{limit} cartas • {formatUsd(recommendedValue)} em valor de mercado conhecido
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.accent}/>
+                </Pressable>
+              ) : null}
             </View>
           </View>
 
@@ -320,6 +372,10 @@ const styles = StyleSheet.create({
   autoRuleIcon:{width:45,height:45,borderRadius:14,alignItems:'center',justifyContent:'center'},
   autoRuleTitle:{fontSize:12,fontWeight:'900'},
   autoRuleText:{fontSize:8.5,lineHeight:13,marginTop:3},
+  recommendedButton:{minHeight:46,borderRadius:13,borderWidth:1,paddingHorizontal:10,paddingVertical:8,marginTop:9,flexDirection:'row',alignItems:'center',gap:7},
+  recommendedButtonTitle:{fontSize:7.5,fontWeight:'900',letterSpacing:.35},
+  recommendedButtonHint:{fontSize:7,lineHeight:10,marginTop:2},
+
   rewardIcon:{width:45,height:45,borderRadius:14,alignItems:'center',justifyContent:'center'},
   rewardTitle:{fontSize:13,fontWeight:'900'},
   rewardValue:{fontSize:16,fontWeight:'900',marginTop:2},
