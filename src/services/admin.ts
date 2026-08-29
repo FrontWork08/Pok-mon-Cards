@@ -329,6 +329,9 @@ export async function getAdminReleaseReadiness() {
 export async function setLegacySelectionEnabled(enabled: boolean) {
   return invokeAdmin({ action: 'set_legacy_selection', enabled }) as Promise<AdminReleaseCampaignStatus>;
 }
+export async function setReleaseDownloadUrl(downloadUrl: string) {
+  return invokeAdmin({ action: 'set_release_download_url', downloadUrl: downloadUrl.trim() }) as Promise<AdminReleaseCampaignStatus>;
+}
 
 export async function getTesterTitleHub() { return invokeAdmin({ action: 'tester_title_hub' }) as Promise<TesterTitleHub>; }
 export async function grantTesterTitle(targetId: string, note?: string) { return invokeAdmin({ action: 'grant_tester_title', targetId, note: note?.trim() || null }) as Promise<TesterTitleGrantResult>; }
