@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -49,6 +50,7 @@ function getDaysLeft(value: string) {
 
 export function ReleaseCampaignNotice() {
   const { colors } = useAppTheme();
+  const router = useRouter();
   const { userId } = useWallet();
   const insets = useSafeAreaInsets();
   const [campaign, setCampaign] = useState<ReleaseCampaign | null>(null);
@@ -76,7 +78,10 @@ export function ReleaseCampaignNotice() {
           result.campaign.target_version,
         ) >= 0;
 
-        if (alreadyOnTarget && !result.campaign.force_update) {
+        const legacySelectionOpen = result.campaign.phase === 'legacy_selection'
+          && result.campaign.legacy_selection_enabled;
+
+        if (alreadyOnTarget && !result.campaign.force_update && !legacySelectionOpen) {
           setCampaign(null);
           setVote(result.vote);
           setVisible(false);
@@ -281,6 +286,30 @@ export function ReleaseCampaignNotice() {
                     <Text style={styles.errorText}>{errorText}</Text>
                   ) : null}
                 </View>
+
+                {campaign.phase === 'legacy_selection' && campaign.legacy_selection_enabled ? (
+                  <View style={styles.legacyBox}>
+                    <View style={styles.legacyHead}>
+                      <View style={styles.legacyIcon}><Ionicons name="albums" size={22} color="#0B0D14" /></View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.legacyTitle}>ESCOLHA DE LEGADO LIBERADA</Text>
+                        <Text style={[styles.legacyText, { color: colors.muted }]}>
+                          Selecione e confirme até {campaign.legacy_card_limit} cartas antes do fechamento da economia Beta.
+                        </Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        setVisible(false);
+                        router.push('/legacy-selection');
+                      }}
+                      style={styles.legacyButton}
+                    >
+                      <Ionicons name="shield-checkmark" size={18} color="#07111F" />
+                      <Text style={styles.legacyButtonText}>ESCOLHER MINHAS CARTAS</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
 
                 <Pressable
                   onPress={() => setVisible(false)}
@@ -557,6 +586,54 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     textAlign: 'center',
     marginTop: 9,
+  },
+  legacyBox: {
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#3B8F70',
+    backgroundColor: '#142D25',
+    padding: 13,
+    marginTop: 10,
+    gap: 10,
+  },
+  legacyHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  legacyIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#70DCBA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legacyTitle: {
+    color: '#9BF0D1',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: .65,
+  },
+  legacyText: {
+    fontSize: 9,
+    lineHeight: 14,
+    marginTop: 2,
+  },
+  legacyButton: {
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: '#70DCBA',
+    flexDirection: 'row',
+    gap: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legacyButtonText: {
+    color: '#07111F',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: .45,
   },
   primaryButton: {
     minHeight: 54,
