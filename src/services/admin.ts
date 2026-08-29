@@ -115,6 +115,8 @@ export type AdminAccountAudit = {
     maxPerMinute: number;
     legacySpecialPricingOpenings: number;
     adminAbuseEventOpenings: number;
+    legacyPriceUnknownOpenings: number;
+    unexplainedDiscountOpenings: number;
     offset: number;
     limit: number;
     hasMore: boolean;
