@@ -83,8 +83,8 @@ using (
   and not exists (
     select 1
     from public.release_campaign_legacy_submissions s
-    where s.campaign_id = campaign_id
-      and s.player_id = player_id
+    where s.campaign_id = release_campaign_legacy_selections.campaign_id
+      and s.player_id = release_campaign_legacy_selections.player_id
   )
 );
 
