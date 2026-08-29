@@ -17,6 +17,7 @@ export type PublicPlayerProfile = {
     id: string;
     username: string;
     profileIcon: string;
+    avatarPath: string | null;
     level: number;
     battleWins: number;
     battleLosses: number;
@@ -55,6 +56,7 @@ export async function getPublicPlayerProfile(playerId: string): Promise<PublicPl
   return {
     player: {
       ...value.player,
+      avatarPath: value.player?.avatarPath ?? null,
       level: Number(value.player?.level ?? 1),
       battleWins: Number(value.player?.battleWins ?? 0),
       battleLosses: Number(value.player?.battleLosses ?? 0),
