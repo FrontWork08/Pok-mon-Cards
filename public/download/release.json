@@ -1,11 +1,11 @@
 {
   "appName": "Trainer Collection",
   "version": "1.0.0",
-  "buildVersion": null,
-  "downloadUrl": "",
-  "sha256": "",
-  "sizeBytes": null,
-  "publishedAt": null,
+  "buildVersion": "6",
+  "downloadUrl": "https://expo.dev/artifacts/eas/CFOfQwCuHY9IXTIfblRYVDnOM-WtlVa56yafaiBpjg8.apk",
+  "sha256": "e567f4afa15f8db3a295022daab5c3a7504075e22e5cd5fc84856eae8e5f5ae3",
+  "sizeBytes": 79899976,
+  "publishedAt": "2026-08-29T23:09:56.593Z",
   "channel": "preview",
-  "status": "awaiting_build"
+  "status": "ready"
 }
