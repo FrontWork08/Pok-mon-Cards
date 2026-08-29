@@ -1,15 +1,33 @@
 from pathlib import Path
+from io import BytesIO
+import base64
+import hashlib
+
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'assets' / 'trainer-collection-poster.jpg'
+SOURCE_PARTS = ROOT / 'assets' / 'trainer-poster-base64'
 ASSETS = ROOT / 'assets'
 PUBLIC = ROOT / 'public'
+EXPECTED_SHA256 = '11dcca38815f6e93f264ad7828d711afd65929bb5b9ec5f4b4e1d63b0017dbdd'
 
-if not SOURCE.exists():
-    raise SystemExit(f'Missing Trainer Collection artwork: {SOURCE}')
+parts = sorted(SOURCE_PARTS.glob('part-*.txt'))
+if not parts:
+    raise SystemExit(f'Missing Trainer Collection artwork source parts: {SOURCE_PARTS}')
 
-source = Image.open(SOURCE).convert('RGB')
+encoded = ''.join(path.read_text('utf8').strip() for path in parts)
+try:
+    raw = base64.b64decode(encoded, validate=True)
+except Exception as exc:
+    raise SystemExit(f'Invalid Trainer Collection artwork base64: {exc}') from exc
+
+actual_sha = hashlib.sha256(raw).hexdigest()
+if actual_sha != EXPECTED_SHA256:
+    raise SystemExit(
+        f'Trainer Collection artwork integrity check failed: {actual_sha} != {EXPECTED_SHA256}'
+    )
+
+source = Image.open(BytesIO(raw)).convert('RGB')
 
 # Native splash: full 9:16 poster composition.
 splash = ImageOps.fit(source, (1080, 1920), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
@@ -37,6 +55,7 @@ content.putalpha(mask)
 foreground.alpha_composite(content, ((1024 - 760) // 2, (1024 - 760) // 2))
 foreground.save(ASSETS / 'adaptive-icon.png', optimize=True)
 
+print(f'Trainer Collection artwork verified: {source.width}x{source.height} sha256={actual_sha}')
 print('Trainer Collection assets generated:')
 for path in [ASSETS / 'icon.png', ASSETS / 'adaptive-icon.png', ASSETS / 'splash.png', PUBLIC / 'icon.png']:
     print(f' - {path.relative_to(ROOT)} ({path.stat().st_size} bytes)')
