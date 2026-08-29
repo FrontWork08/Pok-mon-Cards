@@ -119,6 +119,7 @@ export default function ProfileScreen() {
 
       const uploaded = await uploadMyProfileAvatar({
         base64: asset.base64,
+        mimeType: asset.mimeType,
         previousPath: profile?.avatar_path,
       });
 
