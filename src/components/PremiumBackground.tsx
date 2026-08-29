@@ -43,8 +43,18 @@ export const PremiumBackground = memo(function PremiumBackground() {
 
   return (
     <View style={[styles.layer, { backgroundColor: colors.bg }, webTexture]}>
-      <Image source={{uri:visual.image}} resizeMode="contain" style={[styles.themePokemonRight,{opacity:isLight?.08:.13}]} />
-      <Image source={{uri:visual.image}} resizeMode="contain" style={[styles.themePokemonLeft,{opacity:isLight?.045:.07}]} />
+      <View style={[styles.pokemonGlowRight, { backgroundColor: colors.accent, opacity: isLight ? .07 : .12 }]} />
+      <View style={[styles.pokemonGlowLeft, { backgroundColor: colors.yellow, opacity: isLight ? .04 : .07 }]} />
+      <Image
+        source={{ uri: visual.image }}
+        resizeMode="contain"
+        style={[styles.themePokemonRight, { opacity: isLight ? .13 : .20 }]}
+      />
+      <Image
+        source={{ uri: visual.image }}
+        resizeMode="contain"
+        style={[styles.themePokemonLeft, { opacity: isLight ? .055 : .09 }]}
+      />
       <View style={[styles.landMass, { backgroundColor: colors.accent, opacity: isLight ? .045 : .08 }]} />
       <View style={[styles.landMassTwo, { backgroundColor: colors.yellow, opacity: isLight ? .035 : .055 }]} />
       {Platform.OS !== 'web' ? (
@@ -66,8 +76,10 @@ export const PremiumBackground = memo(function PremiumBackground() {
 
 const styles = StyleSheet.create({
   layer: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', pointerEvents: 'none' } as any,
-  themePokemonRight:{position:'absolute',right:-52,top:'8%',width:240,height:320,transform:[{rotate:'8deg'}]},
-  themePokemonLeft:{position:'absolute',left:-80,bottom:'3%',width:260,height:350,transform:[{rotate:'-10deg'}]},
+  pokemonGlowRight: { position:'absolute', right:-90, top:'3%', width:330, height:330, borderRadius:999 },
+  pokemonGlowLeft: { position:'absolute', left:-100, bottom:'-3%', width:280, height:280, borderRadius:999 },
+  themePokemonRight:{position:'absolute',right:-38,top:'2%',width:300,height:370,transform:[{rotate:'6deg'}]},
+  themePokemonLeft:{position:'absolute',left:-70,bottom:'-3%',width:245,height:320,transform:[{rotate:'-8deg'}]},
   orb: { position: 'absolute', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   orbLine: { position: 'absolute', left: 0, right: 0, height: 3 },
   orbCenter: { borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
