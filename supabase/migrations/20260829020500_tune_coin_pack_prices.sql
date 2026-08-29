@@ -35,12 +35,12 @@ begin
         when max_card_usd >= 1250 then 35
         when max_card_usd >= 1000 then 25
         when max_card_usd >= 980 then 15
-        when max_card_usd > 700 then 4000
-        when max_card_usd > 650 then 3500
-        when max_card_usd > 550 then 2500
-        when max_card_usd > 450 then 2000
-        when max_card_usd > 300 then 1500
-        when max_card_usd > 100 then 1000
+        when max_card_usd >= 800 then 4000
+        when max_card_usd >= 700 then 3500
+        when max_card_usd >= 600 then 2500
+        when max_card_usd >= 500 then 2000
+        when max_card_usd >= 400 then 1500
+        when max_card_usd >= 200 then 1000
         else 500
       end::bigint as price
     from pack_values
@@ -71,7 +71,7 @@ set changes = (
   select array_agg(distinct item order by item)
   from unnest(
     changes || array[
-      'Nova tabela de boosters: até US$ 100 = 500 Coins; até US$ 300 = 1.000; até US$ 450 = 1.500; até US$ 550 = 2.000; até US$ 650 = 2.500; até US$ 700 = 3.500; abaixo de US$ 980 = 4.000; US$ 980+ usa Diamantes'
+      'Tabela de boosters por faixas: US$ 0-199 = 500 Coins; 200-399 = 1.000; 400-499 = 1.500; 500-599 = 2.000; 600-699 = 2.500; 700-799 = 3.500; 800-979 = 4.000; US$ 980+ usa Diamantes'
     ]::text[]
   ) item
 )
