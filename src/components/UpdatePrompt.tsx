@@ -117,7 +117,7 @@ export function UpdatePrompt() {
           </View>
 
           <Text style={[styles.eyebrow, { color: colors.yellow }]}>ATUALIZAÇÃO DISPONÍVEL</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Tem novidade no Pokémon Cards.</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Tem novidade no Trainer Collection.</Text>
           <Text style={[styles.body, { color: colors.muted }]}>
             Baixe a versão mais recente agora. O app vai reiniciar automaticamente quando terminar.
           </Text>
