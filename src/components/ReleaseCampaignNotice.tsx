@@ -17,6 +17,7 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import {
   getActiveReleaseCampaign,
+  getLegacySelection,
   submitReleaseCampaignVote,
   type ReleaseCampaign,
   type ReleaseCampaignVote,
@@ -58,6 +59,7 @@ export function ReleaseCampaignNotice() {
   const [visible, setVisible] = useState(false);
   const [submitting, setSubmitting] = useState<-1 | 0 | 1>(0);
   const [errorText, setErrorText] = useState('');
+  const [legacyProgress, setLegacyProgress] = useState<{ count: number; confirmed: boolean; automatic: number } | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -100,6 +102,35 @@ export function ReleaseCampaignNotice() {
       disposed = true;
     };
   }, [userId]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    if (
+      !campaign
+      || !userId
+      || campaign.phase !== 'legacy_selection'
+      || !campaign.legacy_selection_enabled
+    ) {
+      setLegacyProgress(null);
+      return () => { disposed = true; };
+    }
+
+    getLegacySelection(campaign.id, userId)
+      .then((legacy) => {
+        if (disposed) return;
+        setLegacyProgress({
+          count: legacy.cardIds.length,
+          confirmed: Boolean(legacy.submission),
+          automatic: Number(legacy.submission?.auto_filled_count ?? 0),
+        });
+      })
+      .catch(() => {
+        if (!disposed) setLegacyProgress(null);
+      });
+
+    return () => { disposed = true; };
+  }, [campaign?.id, campaign?.phase, campaign?.legacy_selection_enabled, userId]);
 
   const daysLeft = useMemo(
     () => (campaign ? getDaysLeft(campaign.release_date) : 0),
@@ -297,6 +328,20 @@ export function ReleaseCampaignNotice() {
                         <Text style={[styles.legacyText, { color: colors.muted }]}>
                           Selecione e confirme até {campaign.legacy_card_limit} cartas. Se deixar vagas livres, elas serão preenchidas automaticamente pelas cartas mais caras da sua Bag quando a migração começar.
                         </Text>
+                        {legacyProgress ? (
+                          <View style={styles.legacyProgressRow}>
+                            <View style={[styles.legacyProgressBadge, legacyProgress.confirmed ? styles.legacyProgressDone : styles.legacyProgressPending]}>
+                              <Ionicons
+                                name={legacyProgress.confirmed ? 'checkmark-circle' : 'time-outline'}
+                                size={13}
+                                color={legacyProgress.confirmed ? '#9BF0D1' : '#FFE0A2'}
+                              />
+                              <Text style={[styles.legacyProgressText, { color: legacyProgress.confirmed ? '#9BF0D1' : '#FFE0A2' }]}>
+                                {legacyProgress.count}/{campaign.legacy_card_limit} • {legacyProgress.confirmed ? 'CONFIRMADO' : 'PENDENTE'}
+                              </Text>
+                            </View>
+                          </View>
+                        ) : null}
                       </View>
                     </View>
                     <Pressable
@@ -307,7 +352,9 @@ export function ReleaseCampaignNotice() {
                       style={styles.legacyButton}
                     >
                       <Ionicons name="shield-checkmark" size={18} color="#07111F" />
-                      <Text style={styles.legacyButtonText}>ESCOLHER MINHAS CARTAS</Text>
+                      <Text style={styles.legacyButtonText}>
+                        {legacyProgress?.confirmed ? 'VER MEU LEGADO' : legacyProgress?.count ? 'CONTINUAR MINHA ESCOLHA' : 'ESCOLHER MINHAS CARTAS'}
+                      </Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -620,6 +667,32 @@ const styles = StyleSheet.create({
     fontSize: 9,
     lineHeight: 14,
     marginTop: 2,
+  },
+  legacyProgressRow: {
+    flexDirection: 'row',
+    marginTop: 7,
+  },
+  legacyProgressBadge: {
+    minHeight: 28,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legacyProgressDone: {
+    backgroundColor: '#173A2F',
+    borderColor: '#3AA87E',
+  },
+  legacyProgressPending: {
+    backgroundColor: '#3A301B',
+    borderColor: '#8D7334',
+  },
+  legacyProgressText: {
+    fontSize: 7,
+    fontWeight: '900',
+    letterSpacing: .35,
   },
   legacyButton: {
     minHeight: 48,
