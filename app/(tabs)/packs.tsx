@@ -355,9 +355,6 @@ export default function PacksScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.shopHeroKicker, { color: colors.yellow }]}>BOOSTER WALL</Text>
           <Text style={[styles.shopHeroTitle, { color: colors.text }]}>{packs.length || 173} packs para colecionar</Text>
-          <Text style={[styles.shopHeroText, { color: colors.muted }]}>
-            Packs usam faixas por valor da chase card: US$0–199 = 🪙500, US$200–399 = 🪙1.000, US$400–499 = 🪙1.500, US$500–599 = 🪙2.000, US$600–699 = 🪙2.500, US$700–799 = 🪙3.500 e US$800–979 = 🪙4.000. A partir de US$980, passam para Diamantes.
-          </Text>
         </View>
       </View>
 
