@@ -1,5 +1,6 @@
 -- Record immutable pricing snapshots for pack openings and price Coin packs by expected pull value.
 -- Historical openings are intentionally marked legacy instead of guessing what they paid.
+-- Existing rare-dense pack floors are preserved; expected-value pricing is an additional floor.
 
 alter table public.pack_openings
   add column if not exists price_paid bigint,
@@ -112,8 +113,15 @@ begin
   with pack_values as (
     select
       p.id,
+      p.cards_per_pack,
       coalesce(max(c.market_price_usd),0)::numeric as max_card_usd,
-      private.pack_expected_value_usd(p.set_id,p.cards_per_pack) as expected_value_usd
+      private.pack_expected_value_usd(p.set_id,p.cards_per_pack) as expected_value_usd,
+      coalesce(avg(c.market_price_usd) filter(where c.market_price_usd>0),0)::numeric as avg_card_usd,
+      count(c.*)::numeric as total_cards,
+      count(*) filter(
+        where public.rarity_tier(c.rarity)>=3
+           or lower(coalesce(c.rarity,'')) like '%classic collection%'
+      )::numeric as rare_like_cards
     from public.packs p
     left join public.cards c on c.set_id=p.set_id
     where p.active
@@ -121,9 +129,7 @@ begin
   ),
   standard as (
     select
-      id,
-      max_card_usd,
-      expected_value_usd,
+      *,
       case when max_card_usd>=980 then 'diamonds' else 'coins' end as currency,
       case
         when max_card_usd>=5000 then 100
@@ -148,14 +154,18 @@ begin
     select
       id,
       currency,
-      expected_value_usd,
       case
         when currency='diamonds' then standard_price
         else least(
           100000::bigint,
           greatest(
             standard_price,
-            (ceil((coalesce(expected_value_usd,0)*25)/500.0)*500)::bigint
+            (ceil((coalesce(expected_value_usd,0)*25)/500.0)*500)::bigint,
+            case
+              when total_cards>0 and rare_like_cards/nullif(total_cards,0)>=0.80
+              then (ceil((avg_card_usd*cards_per_pack*0.75*25)/500.0)*500)::bigint
+              else 0::bigint
+            end
           )
         )
       end::bigint as price
@@ -1028,7 +1038,7 @@ set changes=(
   from unnest(changes || array[
     'Aberturas de boosters agora registram preço-base, preço realmente pago, moeda, valor esperado e snapshot de eventos/descontos',
     'Aberturas antigas sem preço histórico confiável são marcadas como legacy e não contam automaticamente como abuso',
-    'Boosters de Coins agora têm piso adicional baseado no valor esperado das cartas entregues pelo algoritmo de pull',
+    'Boosters de Coins agora têm piso adicional baseado no valor esperado das cartas entregues pelo algoritmo de pull, sem reduzir os pisos especiais já existentes',
     'Auditoria de conta mostra cobrança histórica do booster e alerta descontos sem evento registrado'
   ]::text[]) item
 )
