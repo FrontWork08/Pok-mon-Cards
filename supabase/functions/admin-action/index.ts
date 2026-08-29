@@ -13,6 +13,38 @@ function getSecretKey() {
   return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 }
 
+const WRITE_PERMISSION_BY_ACTION: Record<string, string> = {
+  set_maintenance: "maintenance_manage",
+  grant_coins: "economy_grant",
+  grant_coins_batch: "economy_grant",
+  grant_diamonds_batch: "economy_grant",
+  remove_coins_batch: "economy_remove",
+  remove_diamonds_batch: "economy_remove",
+  grant_battle_pass_vip: "battlepass_grant",
+  create_redeem_code: "codes_manage",
+  set_redeem_code_active: "codes_manage",
+  moderate: "moderate_users",
+  announce: "announcements_manage",
+  stop_announcement: "announcements_manage",
+  start_game_event: "events_manage",
+  stop_game_event: "events_manage",
+  start_free_boosters: "events_manage",
+  stop_free_boosters: "events_manage",
+};
+
+const ALLOWED_DELEGATED_PERMISSIONS = new Set([
+  "audit_users",
+  "moderate_users",
+  "economy_grant",
+  "economy_remove",
+  "battlepass_grant",
+  "codes_manage",
+  "announcements_manage",
+  "events_manage",
+  "maintenance_manage",
+  "guilds_manage",
+]);
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -30,7 +62,76 @@ Deno.serve(async (req: Request) => {
   if (!adminRow) return json({ error: "FORBIDDEN" }, 403);
   const body = await req.json().catch(() => ({}));
 
+  const { data: access, error: accessError } = await admin.rpc("server_admin_access", {
+    p_actor_id: user.id,
+  });
+  if (accessError) return json({ error: accessError.message }, 500);
+
+  const isOwner = access?.role === "owner";
+  const permissions = new Set(
+    Array.isArray(access?.permissions)
+      ? access.permissions.filter((value: unknown): value is string => typeof value === "string")
+      : [],
+  );
+  const can = (permission: string) => isOwner || permissions.has(permission);
+
+  const requiredPermission = WRITE_PERMISSION_BY_ACTION[String(body.action ?? "")];
+  if (requiredPermission && !can(requiredPermission)) {
+    return json({ error: `FORBIDDEN_PERMISSION:${requiredPermission}` }, 403);
+  }
+
   try {
+    if (body.action === "my_access") {
+      return json({ data: access });
+    }
+
+    if (body.action === "account_audit") {
+      if (!can("audit_users")) return json({ error: "FORBIDDEN_PERMISSION:audit_users" }, 403);
+      const targetId = typeof body.targetId === "string" ? body.targetId : "";
+      const packOffset = Math.max(0, Number(body.packOffset ?? 0) || 0);
+      const packLimit = Math.max(10, Math.min(50, Number(body.packLimit ?? 25) || 25));
+      if (!targetId) return json({ error: "INVALID_TARGET" }, 400);
+      const { data, error } = await admin.rpc("server_admin_account_audit", {
+        p_actor_id: user.id,
+        p_target_id: targetId,
+        p_pack_offset: packOffset,
+        p_pack_limit: packLimit,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "admin_team") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const { data, error } = await admin.rpc("server_owner_admin_team", { p_actor_id: user.id });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "set_admin_access") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const targetId = typeof body.targetId === "string" ? body.targetId : "";
+      const enabled = body.enabled === true;
+      const requested = Array.isArray(body.permissions)
+        ? body.permissions.filter(
+            (value: unknown): value is string =>
+              typeof value === "string" && ALLOWED_DELEGATED_PERMISSIONS.has(value),
+          )
+        : [];
+      if (!targetId) return json({ error: "INVALID_TARGET" }, 400);
+      const { data, error } = await admin.rpc("server_owner_set_admin_access", {
+        p_actor_id: user.id,
+        p_target_id: targetId,
+        p_enabled: enabled,
+        p_permissions: requested,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "redeem_codes" && !can("codes_manage")) {
+      return json({ data: [] });
+    }
     if (body.action === "set_maintenance") {
       const enabled = body.enabled === true;
       const message = typeof body.message === "string" ? body.message.trim() : "";
