@@ -30,6 +30,8 @@ export type PlayerProfile = {
 
 export type OwnedCardEntry = {
   quantity: number;
+  inventory_quantity?: number;
+  marketplace_quantity?: number;
   favorite: boolean;
   first_obtained_at: string;
   cards: {
@@ -116,6 +118,64 @@ export async function getMyBag(search?: string) {
   const { data, error } = await query;
   if (error) throw error;
   return data as unknown as OwnedCardEntry[];
+}
+
+export async function getMyLegacyCardPool(): Promise<OwnedCardEntry[]> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const userId = userData.user?.id;
+  if (!userId) throw new Error('Usuário não autenticado.');
+
+  const [bag, listingResult] = await Promise.all([
+    getMyBag(),
+    supabase
+      .from('market_listings')
+      .select('quantity,created_at,cards(id,pokemon_name,pokedex_numbers,set_id,set_name,card_number,rarity,types,image_small,image_large,game_value,market_price_usd,market_price_low_usd,market_price_high_usd,market_price_variant,market_price_source,market_price_updated_at,tcg_data)')
+      .eq('seller_id', userId)
+      .eq('status', 'active'),
+  ]);
+
+  if (listingResult.error) throw listingResult.error;
+
+  const merged = new Map<string, OwnedCardEntry>();
+
+  for (const entry of bag) {
+    const cardId = entry.cards?.id;
+    if (!cardId) continue;
+    merged.set(cardId, {
+      ...entry,
+      quantity: Number(entry.quantity ?? 0),
+      inventory_quantity: Number(entry.quantity ?? 0),
+      marketplace_quantity: 0,
+    });
+  }
+
+  for (const row of (listingResult.data ?? []) as any[]) {
+    const card = Array.isArray(row.cards) ? row.cards[0] : row.cards;
+    const cardId = card?.id ? String(card.id) : '';
+    const listedQuantity = Math.max(0, Number(row.quantity ?? 0));
+    if (!cardId || !listedQuantity) continue;
+
+    const existing = merged.get(cardId);
+    if (existing) {
+      existing.quantity += listedQuantity;
+      existing.marketplace_quantity = Number(existing.marketplace_quantity ?? 0) + listedQuantity;
+      continue;
+    }
+
+    merged.set(cardId, {
+      quantity: listedQuantity,
+      inventory_quantity: 0,
+      marketplace_quantity: listedQuantity,
+      favorite: false,
+      first_obtained_at: String(row.created_at ?? new Date(0).toISOString()),
+      cards: card as OwnedCardEntry['cards'],
+    });
+  }
+
+  return [...merged.values()].sort(
+    (a, b) => new Date(b.first_obtained_at).getTime() - new Date(a.first_obtained_at).getTime(),
+  );
 }
 
 export async function getCardDetail(cardId: string): Promise<CardDetailEntry> {
