@@ -4,76 +4,37 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
 
-const PATTERN_POSITIONS = [
-  ['8%', '12%', -14], ['78%', '18%', 12], ['23%', '39%', 8],
-  ['88%', '48%', -10], ['10%', '69%', 15], ['62%', '76%', -8], ['35%', '91%', 10],
+const STAR_POSITIONS=[
+ ['8%','12%',8],['24%','22%',5],['72%','9%',7],['89%','31%',5],['61%','42%',6],['14%','63%',5],['80%','72%',7],['34%','86%',5],
 ] as const;
 
-const THEME_ICONS = {
-  trainer: 'paw', midnight: 'moon', poke_red: 'radio-button-on', electric: 'flash',
-  ghost: 'skull', fire: 'flame', water: 'water', grass: 'leaf', psychic: 'eye',
-  dragon: 'sparkles', fighting: 'barbell', steel: 'hardware-chip', fairy: 'heart', darkness: 'moon',
-  kanto: 'paw', johto: 'leaf', hoenn: 'water', sinnoh: 'sparkles',
-} as const;
-
-function CaptureOrb({ top, right, left, size, color, opacity }: {
-  top: string; right?: string; left?: string; size: number; color: string; opacity: number;
-}) {
-  return (
-    <View style={[styles.orb, { top: top as any, right: right as any, left: left as any, width: size, height: size, borderRadius: size / 2, borderColor: color, opacity }]}>
-      <View style={[styles.orbLine, { backgroundColor: color }]} />
-      <View style={[styles.orbCenter, { width: size * .25, height: size * .25, borderRadius: size, borderColor: color }]}>
-        <View style={[styles.orbDot, { width: size * .095, height: size * .095, borderRadius: size, backgroundColor: color }]} />
-      </View>
-    </View>
-  );
-}
-
-export const PremiumBackground = memo(function PremiumBackground() {
-  const { colors, isLight, themeName } = useAppTheme();
-  const patternIcon = THEME_ICONS[themeName as keyof typeof THEME_ICONS] ?? 'paw';
-  const visual = getThemeVisual(themeName);
-  const webTexture = Platform.OS === 'web' ? ({
-    backgroundImage:
-      `radial-gradient(circle at 88% 10%, ${colors.accent}20 0 54px, transparent 55px),` +
-      `radial-gradient(circle at 88% 10%, transparent 0 78px, ${colors.accent}18 79px 82px, transparent 83px),` +
-      `radial-gradient(circle at 9% 72%, transparent 0 92px, ${colors.yellow}12 93px 96px, transparent 97px),` +
-      `repeating-radial-gradient(circle at 20% 20%, ${isLight ? 'rgba(10,20,35,.035)' : 'rgba(255,255,255,.028)'} 0 1px, transparent 1px 15px)`,
-  } as any) : null;
-
-  return (
-    <View style={[styles.layer, { backgroundColor: colors.bg }, webTexture]}>
-      <Image source={{uri:visual.image}} resizeMode="contain" style={[styles.themePokemonRight,{opacity:isLight?.08:.13}]} />
-      <Image source={{uri:visual.image}} resizeMode="contain" style={[styles.themePokemonLeft,{opacity:isLight?.045:.07}]} />
-      <View style={[styles.landMass, { backgroundColor: colors.accent, opacity: isLight ? .045 : .08 }]} />
-      <View style={[styles.landMassTwo, { backgroundColor: colors.yellow, opacity: isLight ? .035 : .055 }]} />
-      {Platform.OS !== 'web' ? (
-        <>
-          <CaptureOrb top="4%" right="-42" size={178} color={colors.accent} opacity={isLight ? .10 : .15} />
-          <CaptureOrb top="61%" left="-62" size={205} color={colors.yellow} opacity={isLight ? .07 : .10} />
-          {PATTERN_POSITIONS.map(([left, top, rotation], index) => (
-            <View key={`type-${index}`} style={{ position:'absolute', left:left as any, top:top as any, transform:[{ rotate:`${rotation}deg` }], opacity:isLight ? .055 : .075 }}>
-              <Ionicons name={patternIcon} size={index % 2 ? 29 : 22} color={index % 3 ? colors.accent : colors.yellow} />
-            </View>
-          ))}
-        </>
-      ) : null}
-      <View style={[styles.routeLine, { borderColor: colors.accent, opacity: isLight ? .07 : .11 }]} />
-      <View style={[styles.routeLineTwo, { borderColor: colors.yellow, opacity: isLight ? .05 : .08 }]} />
-    </View>
-  );
+export const PremiumBackground=memo(function PremiumBackground(){
+ const {colors,isLight,themeName}=useAppTheme();
+ const visual=getThemeVisual(themeName);
+ const webTexture=Platform.OS==='web'?({
+   backgroundImage:
+    'linear-gradient(135deg, rgba(217,178,76,.06), transparent 32%),'+
+    'radial-gradient(circle at 82% 14%, rgba(217,178,76,.13) 0 90px, transparent 91px),'+
+    'radial-gradient(circle at 18% 78%, rgba(109,130,255,.08) 0 120px, transparent 121px),'+
+    'repeating-linear-gradient(118deg, rgba(255,255,255,.018) 0 1px, transparent 1px 22px)'
+ } as any):null;
+ return <View style={[styles.layer,{backgroundColor:colors.bg},webTexture]}>
+   <View style={styles.goldArc}/>
+   <View style={styles.blueArc}/>
+   <View style={styles.diagonalA}/>
+   <View style={styles.diagonalB}/>
+   <Image source={{uri:visual.image}} resizeMode='contain' style={[styles.heroPokemon,{opacity:isLight?.08:.20}]}/>
+   <Image source={{uri:visual.image}} resizeMode='contain' style={[styles.heroPokemonGhost,{opacity:isLight?.03:.055}]}/>
+   {STAR_POSITIONS.map(([left,top,size],index)=><View key={index} style={{position:'absolute',left:left as any,top:top as any,opacity:isLight?.08:.16}}><Ionicons name='sparkles' size={size} color={index%2?'#D9B24C':'#7388FF'}/></View>)}
+ </View>;
 });
 
-const styles = StyleSheet.create({
-  layer: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', pointerEvents: 'none' } as any,
-  themePokemonRight:{position:'absolute',right:-52,top:'8%',width:240,height:320,transform:[{rotate:'8deg'}]},
-  themePokemonLeft:{position:'absolute',left:-80,bottom:'3%',width:260,height:350,transform:[{rotate:'-10deg'}]},
-  orb: { position: 'absolute', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  orbLine: { position: 'absolute', left: 0, right: 0, height: 3 },
-  orbCenter: { borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  orbDot: {},
-  landMass: { position:'absolute', width:430, height:250, borderRadius:180, top:'25%', right:-300, transform:[{ rotate:'-22deg' }] },
-  landMassTwo: { position:'absolute', width:390, height:210, borderRadius:160, bottom:'5%', left:-270, transform:[{ rotate:'17deg' }] },
-  routeLine: { position:'absolute', width:'65%', height:190, borderWidth:2, borderRadius:150, top:'31%', left:'46%', transform:[{ rotate:'-17deg' }] },
-  routeLineTwo: { position:'absolute', width:'58%', height:170, borderWidth:2, borderRadius:150, top:'70%', left:'-24%', transform:[{ rotate:'11deg' }] },
+const styles=StyleSheet.create({
+ layer:{...StyleSheet.absoluteFillObject,overflow:'hidden',pointerEvents:'none'} as any,
+ heroPokemon:{position:'absolute',right:-45,top:'4%',width:360,height:430,transform:[{rotate:'7deg'}]},
+ heroPokemonGhost:{position:'absolute',left:-120,bottom:'-4%',width:420,height:480,transform:[{rotate:'-13deg'},{scaleX:-1}]},
+ goldArc:{position:'absolute',right:-95,top:-72,width:320,height:320,borderRadius:180,borderWidth:2,borderColor:'#D9B24C',opacity:.13},
+ blueArc:{position:'absolute',left:-120,bottom:-95,width:390,height:390,borderRadius:220,borderWidth:2,borderColor:'#6D82FF',opacity:.08},
+ diagonalA:{position:'absolute',width:'72%',height:2,right:'-18%',top:'37%',backgroundColor:'#D9B24C',opacity:.07,transform:[{rotate:'-17deg'}]},
+ diagonalB:{position:'absolute',width:'66%',height:2,left:'-22%',bottom:'28%',backgroundColor:'#6D82FF',opacity:.05,transform:[{rotate:'14deg'}]}
 });
