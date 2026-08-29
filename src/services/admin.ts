@@ -159,6 +159,23 @@ export type AdminReleaseResetPreview = {
   preflight: AdminReleasePreflight;
 };
 
+export type AdminReleaseReadiness = {
+  readyToReset: boolean;
+  phase: string;
+  targetVersion: string;
+  downloadUrlReady: boolean;
+  snapshotPrepared: boolean;
+  preparedSnapshotCount: number;
+  snapshotId: string | null;
+  maintenanceEnabled: boolean;
+  economyFrozen: boolean;
+  legacySelectionEnabled: boolean;
+  activeOperations: number;
+  preflightReady: boolean;
+  accountsAwaitingAutoFill: number;
+  preview: AdminReleaseResetPreview;
+};
+
 export type AdminPermission =
   | 'audit_users'
   | 'moderate_users'
@@ -305,6 +322,9 @@ export async function runAdminReleasePreflight() {
 }
 export async function getAdminReleaseResetPreview() {
   return invokeAdmin({ action: 'release_reset_preview' }) as Promise<AdminReleaseResetPreview>;
+}
+export async function getAdminReleaseReadiness() {
+  return invokeAdmin({ action: 'release_readiness' }) as Promise<AdminReleaseReadiness>;
 }
 export async function setLegacySelectionEnabled(enabled: boolean) {
   return invokeAdmin({ action: 'set_legacy_selection', enabled }) as Promise<AdminReleaseCampaignStatus>;
