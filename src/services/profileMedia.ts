@@ -65,13 +65,9 @@ export async function uploadMyProfilePhoto(input: {
     });
   if (uploadError) throw uploadError;
 
-  const { error: updateError } = await supabase
-    .from('players')
-    .update({
-      avatar_path: nextPath,
-      avatar_updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
+  const { error: updateError } = await supabase.rpc('set_my_profile_avatar', {
+    p_avatar_path: nextPath,
+  });
 
   if (updateError) {
     await supabase.storage.from(BUCKET).remove([nextPath]).catch(() => null);
@@ -103,13 +99,9 @@ export async function removeMyProfilePhoto() {
   if (currentError) throw currentError;
 
   const previousPath = typeof current?.avatar_path === 'string' ? current.avatar_path : null;
-  const { error: updateError } = await supabase
-    .from('players')
-    .update({
-      avatar_path: null,
-      avatar_updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
+  const { error: updateError } = await supabase.rpc('set_my_profile_avatar', {
+    p_avatar_path: null,
+  });
   if (updateError) throw updateError;
 
   if (previousPath) {
