@@ -53,6 +53,116 @@ export type TesterTitleHub = {
 };
 export type TesterTitleGrantResult = { targetId: string; username: string; achievementId: string; title: string; icon?: string };
 
+export type AdminPermission =
+  | 'audit_users'
+  | 'moderate_users'
+  | 'economy_grant'
+  | 'economy_remove'
+  | 'battlepass_grant'
+  | 'codes_manage'
+  | 'announcements_manage'
+  | 'events_manage'
+  | 'maintenance_manage'
+  | 'guilds_manage';
+
+export const ADMIN_PERMISSION_OPTIONS: Array<{
+  id: AdminPermission;
+  label: string;
+  description: string;
+}> = [
+  { id: 'audit_users', label: 'Auditar usuários', description: 'Ver dados da conta, economia, packs e sinais de abuso.' },
+  { id: 'moderate_users', label: 'Moderação', description: 'Avisar, suspender, banir e restaurar usuários.' },
+  { id: 'economy_grant', label: 'Dar saldo', description: 'Adicionar Coins e Diamantes.' },
+  { id: 'economy_remove', label: 'Corrigir saldo', description: 'Retirar Coins e Diamantes com registro.' },
+  { id: 'battlepass_grant', label: 'Passe VIP', description: 'Conceder o Passe VIP administrativo.' },
+  { id: 'codes_manage', label: 'Códigos', description: 'Criar, ativar e desativar códigos.' },
+  { id: 'announcements_manage', label: 'Anúncios', description: 'Publicar e encerrar anúncios globais.' },
+  { id: 'events_manage', label: 'Eventos', description: 'Gerenciar Admin Abuse e eventos ao vivo.' },
+  { id: 'maintenance_manage', label: 'Manutenção', description: 'Pausar e liberar o aplicativo.' },
+  { id: 'guilds_manage', label: 'Guildas', description: 'Alterar liderança administrativa das guildas.' },
+];
+
+export type AdminAccess = {
+  playerId: string;
+  role: 'owner' | 'admin';
+  isOwner: boolean;
+  permissions: AdminPermission[];
+};
+
+export type AdminTeamMember = {
+  playerId: string;
+  username: string;
+  role: 'owner' | 'admin';
+  createdAt: string;
+  permissions: AdminPermission[];
+  permissionsUpdatedAt: string | null;
+};
+
+export type AdminAuditFlag = {
+  severity: 'info' | 'medium' | 'high';
+  code: string;
+  title: string;
+  detail: string;
+};
+
+export type AdminAccountAudit = {
+  generatedAt: string;
+  account: Record<string, any>;
+  collection: Record<string, any>;
+  packs: {
+    total: number;
+    last24h: number;
+    maxPerMinute: number;
+    legacySpecialPricingOpenings: number;
+    adminAbuseEventOpenings: number;
+    offset: number;
+    limit: number;
+    hasMore: boolean;
+  };
+  packHistory: Array<Record<string, any>>;
+  economy: Record<string, any>;
+  activity: Record<string, any>;
+  moderation: Array<Record<string, any>>;
+  progression: Record<string, any>;
+  social: Record<string, any>;
+  flags: AdminAuditFlag[];
+};
+
+export async function getMyAdminAccess() {
+  return invokeAdmin({ action: 'my_access' }) as Promise<AdminAccess>;
+}
+
+export async function getAdminTeam() {
+  return invokeAdmin({ action: 'admin_team' }) as Promise<AdminTeamMember[]>;
+}
+
+export async function setAdminAccess(
+  targetId: string,
+  enabled: boolean,
+  permissions: AdminPermission[] = [],
+) {
+  return invokeAdmin({ action: 'set_admin_access', targetId, enabled, permissions }) as Promise<{
+    targetId: string;
+    username: string;
+    enabled: boolean;
+    permissions: AdminPermission[];
+    action: string;
+  }>;
+}
+
+export async function getAdminAccountAudit(
+  targetId: string,
+  packOffset = 0,
+  packLimit = 25,
+) {
+  return invokeAdmin({
+    action: 'account_audit',
+    targetId,
+    packOffset,
+    packLimit,
+  }) as Promise<AdminAccountAudit>;
+}
+
 export async function getAdminOverview() { return invokeAdmin({ action: 'overview' }) as Promise<AdminOverview>; }
 export async function getAdminPlayers() { return invokeAdmin({ action: 'players' }) as Promise<AdminPlayer[]>; }
 export async function moderatePlayer(targetId: string, moderationAction: AdminModerationAction, reason?: string, durationHours?: number | null) {
