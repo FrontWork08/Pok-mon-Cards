@@ -1,0 +1,41 @@
+name: Sync Native Dependency
+
+on:
+  push:
+    branches:
+      - native-dependency-sync
+
+permissions:
+  contents: write
+
+jobs:
+  sync-image-picker:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dependency branch
+        uses: actions/checkout@v4
+        with:
+          ref: native-dependency-sync
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Expo image picker
+        run: npx expo install expo-image-picker
+
+      - name: Commit dependency lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Dependency already synchronized."
+            exit 0
+          fi
+          git commit -m "chore: add Expo image picker"
+          git push origin HEAD:native-dependency-sync
