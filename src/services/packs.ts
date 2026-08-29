@@ -39,6 +39,37 @@ export type OpenedCard = {
   imageFallbackLarge?: string | null;
 };
 
+async function hydrateOpenedCardPrices(cards: OpenedCard[]) {
+  const missingIds = [...new Set(
+    cards
+      .filter((card) => card.marketPriceUsd == null || Number(card.marketPriceUsd) <= 0)
+      .map((card) => card.id)
+      .filter(Boolean),
+  )];
+  if (!missingIds.length) return cards;
+
+  const { data, error } = await supabase
+    .from('cards')
+    .select('id,market_price_usd')
+    .in('id', missingIds);
+
+  if (error) return cards;
+
+  const prices = new Map(
+    (data ?? []).map((row: any) => [
+      String(row.id),
+      row.market_price_usd == null ? null : Number(row.market_price_usd),
+    ]),
+  );
+
+  return cards.map((card) => {
+    const fallback = prices.get(card.id);
+    return fallback != null && fallback > 0
+      ? { ...card, marketPriceUsd: fallback }
+      : card;
+  });
+}
+
 const LEGENDARY_POKEDEX_NUMBERS = [
   144,145,146,150,151,243,244,245,249,250,251,
   377,378,379,380,381,382,383,384,385,386,
@@ -104,7 +135,11 @@ export async function openPack(packId: string) {
   const { data, error } = await supabase.functions.invoke('open-pack', { body: { packId } });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível abrir este booster.');
   if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível abrir este booster.');
-  return data as { openingId: string; cards: OpenedCard[] };
+  const result = data as { openingId: string; cards: OpenedCard[] };
+  return {
+    ...result,
+    cards: await hydrateOpenedCardPrices(Array.isArray(result.cards) ? result.cards : []),
+  };
 }
 
 export async function getLegendaryPackConfig() {
@@ -127,7 +162,11 @@ export async function openLegendaryDiamondPack() {
   });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível abrir o pacote lendário.');
   if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível abrir o pacote lendário.');
-  return data as { openingId: string; cards: OpenedCard[]; diamonds: number; pricePaid: number };
+  const result = data as { openingId: string; cards: OpenedCard[]; diamonds: number; pricePaid: number };
+  return {
+    ...result,
+    cards: await hydrateOpenedCardPrices(Array.isArray(result.cards) ? result.cards : []),
+  };
 }
 
 
