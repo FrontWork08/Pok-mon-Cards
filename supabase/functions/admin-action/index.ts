@@ -94,6 +94,15 @@ Deno.serve(async (req: Request) => {
       return json({ data });
     }
 
+    if (body.action === "begin_release_freeze") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const { data, error } = await admin.rpc("server_begin_release_freeze", {
+        p_actor_id: user.id,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
     if (body.action === "release_campaign_status") {
       const { data: campaign, error: campaignError } = await admin
         .from("release_campaigns")
