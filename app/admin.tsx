@@ -39,6 +39,8 @@ import {
   startGameEvent,
   stopGameEvent,
   setMaintenanceMode,
+  getAdminReleaseCampaignStatus,
+  setLegacySelectionEnabled,
   type AdminAccess,
   type AdminPermission,
   type AdminGameEvent,
@@ -49,6 +51,7 @@ import {
   type AdminRedeemCode,
   type GlobalAnnouncement,
   type TesterTitleHub,
+  type AdminReleaseCampaignStatus,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
@@ -100,6 +103,7 @@ export default function AdminScreen() {
   const [freeBoosterMinutes, setFreeBoosterMinutes] = useState('1');
   const [activeEvent, setActiveEvent] = useState<AdminGameEvent | null>(null);
   const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
+  const [releaseStatus, setReleaseStatus] = useState<AdminReleaseCampaignStatus | null>(null);
   const [maintenanceMessage, setMaintenanceMessage] = useState('Estamos aplicando uma atualização importante. O jogo voltará em breve.');
   const [gameEvents, setGameEvents] = useState<AdminGameEvent[]>([]);
   const [eventType, setEventType] = useState<'double_xp'|'rare_boost'|'featured_set'>('double_xp');
@@ -140,7 +144,7 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [accessState, status, grants, events, guildState, codes, runtime, announcements, testerState] = await Promise.all([
+      const [accessState, status, grants, events, guildState, codes, runtime, announcements, testerState, releaseState] = await Promise.all([
         getMyAdminAccess(),
         getAdminOverview(),
         getCurrencyAdjustmentHistory(),
@@ -150,6 +154,7 @@ export default function AdminScreen() {
         getMaintenanceStatus(),
         getActiveGlobalAnnouncementsAdmin(),
         getTesterTitleHub(),
+        getAdminReleaseCampaignStatus(),
         syncPlayers(),
       ]);
       setAdminAccessState(accessState);
@@ -163,6 +168,7 @@ export default function AdminScreen() {
       setMaintenanceMessage(runtime.maintenance_message);
       setActiveAnnouncement(announcements[0] ?? null);
       setTesterHub(testerState);
+      setReleaseStatus(releaseState);
       setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
@@ -740,6 +746,52 @@ export default function AdminScreen() {
   }
 
 
+  async function applyLegacySelection(enabled: boolean) {
+    if (working || !adminAccess?.isOwner) return;
+    try {
+      setWorking(true);
+      setError(null);
+      const result = await setLegacySelectionEnabled(enabled);
+      setReleaseStatus(result);
+      setNotice(
+        enabled
+          ? `Escolha de legado liberada: cada veterano pode salvar e confirmar até ${result.legacy_card_limit} cartas.`
+          : 'Escolha de legado pausada. Seleções confirmadas continuam protegidas e a economia NÃO foi congelada.',
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '';
+      setError(
+        message.includes('OWNER_ONLY')
+          ? 'Somente o dono do jogo pode alterar a fase de legado.'
+          : message.includes('RELEASE_PHASE_LOCKED')
+            ? 'A campanha já avançou para uma fase que não permite reabrir a seleção.'
+            : message || 'Não foi possível alterar a seleção de legado.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmLegacySelectionToggle() {
+    if (!releaseStatus || working || !adminAccess?.isOwner) return;
+    const enabled = !releaseStatus.legacy_selection_enabled;
+    Alert.alert(
+      enabled ? 'Liberar escolha das cartas?' : 'Pausar escolha das cartas?',
+      enabled
+        ? `Isso abrirá a tela de Legado Beta para os jogadores. Cada conta poderá escolher até ${releaseStatus.legacy_card_limit} cartas. O reset e o congelamento da economia NÃO serão executados.`
+        : 'Isso impedirá novas alterações enquanto estiver pausado. Cartas já confirmadas continuarão protegidas e o reset NÃO será executado.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: enabled ? 'LIBERAR ESCOLHA' : 'PAUSAR ESCOLHA',
+          style: enabled ? 'default' : 'destructive',
+          onPress: () => { void applyLegacySelection(enabled); },
+        },
+      ],
+    );
+  }
+
+
   return (
     <Screen title="Admin Command Center" subtitle="Controle privado de usuários, economia, eventos, segurança e saúde da Trainer Collection.">
       <View style={styles.topRow}>
@@ -798,6 +850,54 @@ export default function AdminScreen() {
               </View>
             </View>
           </View>
+
+          {adminAccess?.isOwner && releaseStatus ? (
+            <View style={[styles.legacyAdminPanel,{backgroundColor:colors.surface,borderColor:releaseStatus.legacy_selection_enabled ? '#65D894' : colors.border}]}>
+              <View style={styles.legacyAdminHeader}>
+                <View style={[styles.legacyAdminIcon,{backgroundColor:releaseStatus.legacy_selection_enabled ? '#153426' : colors.accentSoft}]}>
+                  <Ionicons name="albums" size={23} color={releaseStatus.legacy_selection_enabled ? '#65D894' : colors.yellow}/>
+                </View>
+                <View style={{flex:1,minWidth:190}}>
+                  <Text style={[styles.legacyAdminKicker,{color:colors.yellow}]}>TRANSIÇÃO BETA → 1.0</Text>
+                  <Text style={[styles.legacyAdminTitle,{color:colors.text}]}>Escolha das {releaseStatus.legacy_card_limit} cartas</Text>
+                  <Text style={[styles.legacyAdminText,{color:colors.muted}]}>
+                    {releaseStatus.legacy_selection_enabled
+                      ? 'A seleção está aberta. Jogadores podem salvar e confirmar o próprio legado.'
+                      : releaseStatus.phase === 'legacy_selection'
+                        ? 'A seleção está pausada. Confirmações existentes permanecem protegidas.'
+                        : 'A seleção ainda não foi liberada. A economia Beta continua normal.'}
+                  </Text>
+                </View>
+                <View style={[styles.legacyStateBadge,{backgroundColor:releaseStatus.legacy_selection_enabled ? '#173A2F' : colors.surfaceAlt,borderColor:releaseStatus.legacy_selection_enabled ? '#2F9E68' : colors.border}]}>
+                  <Text style={[styles.legacyStateText,{color:releaseStatus.legacy_selection_enabled ? '#9CEFC1' : colors.muted}]}>{releaseStatus.legacy_selection_enabled ? 'ABERTA' : 'FECHADA'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.legacyAdminStats}>
+                <View style={[styles.legacyAdminStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.legacyAdminValue,{color:colors.text}]}>{releaseStatus.selections.toLocaleString('pt-BR')}</Text><Text style={[styles.legacyAdminLabel,{color:colors.muted}]}>CARTAS SALVAS</Text></View>
+                <View style={[styles.legacyAdminStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.legacyAdminValue,{color:'#65D894'}]}>{releaseStatus.submissions.toLocaleString('pt-BR')}</Text><Text style={[styles.legacyAdminLabel,{color:colors.muted}]}>CONTAS CONFIRMADAS</Text></View>
+                <View style={[styles.legacyAdminStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.legacyAdminValue,{color:colors.yellow}]}>{releaseStatus.phase.toUpperCase()}</Text><Text style={[styles.legacyAdminLabel,{color:colors.muted}]}>FASE</Text></View>
+              </View>
+
+              <View style={styles.legacyAdminActions}>
+                <Pressable
+                  disabled={working}
+                  onPress={confirmLegacySelectionToggle}
+                  style={[styles.legacyToggleButton,{backgroundColor:releaseStatus.legacy_selection_enabled ? '#C74658' : colors.yellow,opacity:working?.55:1}]}
+                >
+                  <Ionicons name={releaseStatus.legacy_selection_enabled ? 'pause' : 'play'} size={18} color={releaseStatus.legacy_selection_enabled ? '#fff' : '#07111F'}/>
+                  <Text style={[styles.legacyToggleText,{color:releaseStatus.legacy_selection_enabled ? '#fff' : '#07111F'}]}>{releaseStatus.legacy_selection_enabled ? 'PAUSAR ESCOLHA' : 'LIBERAR ESCOLHA'}</Text>
+                </Pressable>
+                {releaseStatus.legacy_selection_enabled ? (
+                  <Pressable onPress={() => router.push('/legacy-selection')} style={[styles.legacyPreviewButton,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                    <Ionicons name="eye" size={17} color={colors.accent}/>
+                    <Text style={[styles.legacyPreviewText,{color:colors.text}]}>ABRIR MINHA TELA</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <Text style={[styles.legacySafety,{color:colors.muted}]}>Este controle não reseta contas, não distribui a recompensa e não congela a economia.</Text>
+            </View>
+          ) : null}
 
           {hasAdminPermission('audit_users') ? (
           <Pressable
@@ -1956,6 +2056,24 @@ const styles = StyleSheet.create({
   auditLaunchTitle: { fontSize: 14, fontWeight: '900' },
   auditLaunchText: { fontSize: 9, lineHeight: 14, marginTop: 3 },
   adminIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center', zIndex:2 },
+  legacyAdminPanel:{borderRadius:24,borderWidth:1,padding:15,gap:12},
+  legacyAdminHeader:{flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'},
+  legacyAdminIcon:{width:48,height:48,borderRadius:15,alignItems:'center',justifyContent:'center'},
+  legacyAdminKicker:{fontSize:8,fontWeight:'900',letterSpacing:1.1},
+  legacyAdminTitle:{fontSize:17,fontWeight:'900',marginTop:2},
+  legacyAdminText:{fontSize:9,lineHeight:14,marginTop:3},
+  legacyStateBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:10,paddingVertical:7},
+  legacyStateText:{fontSize:7,fontWeight:'900',letterSpacing:.55},
+  legacyAdminStats:{flexDirection:'row',flexWrap:'wrap',gap:7},
+  legacyAdminStat:{flexGrow:1,flexBasis:120,minWidth:105,borderRadius:13,borderWidth:1,paddingHorizontal:10,paddingVertical:9},
+  legacyAdminValue:{fontSize:15,fontWeight:'900'},
+  legacyAdminLabel:{fontSize:7,fontWeight:'900',letterSpacing:.55,marginTop:2},
+  legacyAdminActions:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  legacyToggleButton:{minHeight:45,borderRadius:13,paddingHorizontal:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
+  legacyToggleText:{fontSize:8,fontWeight:'900'},
+  legacyPreviewButton:{minHeight:45,borderRadius:13,borderWidth:1,paddingHorizontal:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
+  legacyPreviewText:{fontSize:8,fontWeight:'900'},
+  legacySafety:{fontSize:8,lineHeight:12},
   heroKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   heroTitle: { fontSize: 18, fontWeight: '900', marginTop: 2 },
   heroText: { fontSize: 10, lineHeight: 15, marginTop: 3 },
