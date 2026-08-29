@@ -776,6 +776,23 @@ export default function AdminScreen() {
             </View>
           </View>
 
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/admin-audit')}
+            style={[styles.auditLaunch, { backgroundColor: colors.surface, borderColor: colors.yellow }]}
+          >
+            <View style={[styles.auditLaunchIcon, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="analytics" size={23} color={colors.yellow} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.auditLaunchTitle, { color: colors.text }]}>Auditoria & Equipe Admin</Text>
+              <Text style={[styles.auditLaunchText, { color: colors.muted }]}>
+                Investigue contas, veja histórico de packs/economia e configure permissões dos admins de confiança.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.yellow} />
+          </Pressable>
+
           <CollapsibleSection title="Modo Manutenção">
           <View
             style={[
@@ -1879,6 +1896,10 @@ const styles = StyleSheet.create({
   error: { borderRadius: 15, borderWidth: 1, borderColor: '#683243', backgroundColor: '#351A24', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 9 },
   errorText: { flex: 1, color: '#FFD7DD', fontSize: 11, fontWeight: '700' },
   adminHero: { borderRadius: 22, borderWidth: 1, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  auditLaunch: { minHeight: 78, borderRadius: 19, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  auditLaunchIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  auditLaunchTitle: { fontSize: 14, fontWeight: '900' },
+  auditLaunchText: { fontSize: 9, lineHeight: 14, marginTop: 3 },
   adminIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   heroKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   heroTitle: { fontSize: 18, fontWeight: '900', marginTop: 2 },
