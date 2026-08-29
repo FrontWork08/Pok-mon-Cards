@@ -10,6 +10,8 @@ import { getUnreadConversationCount } from '@/services/notifications';
 import { getMyRankSnapshot, type RankSnapshot } from '@/services/rankStatus';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
+import { getMyProfile } from '@/services/player';
+import { getProfileMediaPublicUrl } from '@/services/profileMedia';
 
 type MenuItem = {
   label: string;
@@ -52,6 +54,7 @@ export function TrainerNavigation() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [unread, setUnread] = useState(0);
   const [rankSnapshot, setRankSnapshot] = useState<RankSnapshot | null>(null);
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -59,14 +62,18 @@ export function TrainerNavigation() {
       isCurrentUserAdmin().catch(() => false),
       getUnreadConversationCount().catch(() => 0),
       getMyRankSnapshot().catch(() => null),
-    ]).then(([admin, count, snapshot]) => {
+      getMyProfile().catch(() => null),
+    ]).then(([admin, count, snapshot, profile]) => {
       setIsAdmin(admin);
       setUnread(count);
       setRankSnapshot(snapshot);
+      setAvatarPath(profile?.avatar_path ?? null);
     });
   }, [userId, open]);
 
   if (!userId) return null;
+
+  const avatarUrl = getProfileMediaPublicUrl(avatarPath);
 
   function navigate(href: string) {
     setOpen(false);
@@ -86,7 +93,7 @@ export function TrainerNavigation() {
         </Pressable>
         <View style={styles.currency}><CurrencyBar compact /></View>
         <Pressable accessibilityLabel="Abrir perfil" onPress={() => router.replace('/(tabs)/profile')}>
-          <TrainerAvatar icon={profileIcon} color={colors.accent} backgroundColor={colors.surface} size={40} />
+          <TrainerAvatar icon={profileIcon} imageUrl={avatarUrl} color={colors.accent} backgroundColor={colors.surface} size={40} />
         </Pressable>
       </View>
       {rankSnapshot ? <View style={styles.rankStrip}>
@@ -99,7 +106,7 @@ export function TrainerNavigation() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={[styles.drawer, { backgroundColor: colors.bg, borderColor: colors.border }] }>
             <View style={[styles.drawerHeader, { borderBottomColor: colors.border, paddingTop: Math.max(insets.top, 16) }] }>
-              <TrainerAvatar icon={profileIcon} color={colors.accent} backgroundColor={colors.surface} size={48} />
+              <TrainerAvatar icon={profileIcon} imageUrl={avatarUrl} color={colors.accent} backgroundColor={colors.surface} size={48} />
               <View style={styles.headerText}>
                 <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER MENU</Text>
                 <Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{username ?? 'Treinador'}</Text>
