@@ -1,5 +1,6 @@
 -- Increase mission / battle-pass coin rewards and add secure duplicate-card sales.
--- Duplicate-sale rate: US$ 0.50 = 100 Coins; US$ 1.00 = 200 Coins.
+-- Duplicate-sale curve is intentionally non-linear: US$ 0.50 = 50 Coins, US$ 1 = 100, US$ 10 = 500.
+-- Above US$ 500, rewards keep growing slowly with no fixed 5,000-Coin cap.
 -- One copy of each card is always protected in the player's collection.
 
 create table if not exists private.card_duplicate_sales (
@@ -18,6 +19,31 @@ create index if not exists card_duplicate_sales_player_created_idx
 
 create index if not exists card_duplicate_sales_card_idx
   on private.card_duplicate_sales(card_id);
+
+create or replace function private.duplicate_sale_coin_value(p_price numeric)
+returns bigint
+language sql
+immutable
+set search_path=''
+as $
+  select case
+    when p_price is null or p_price <= 0 then 0
+    when p_price <= 0.50 then greatest(10, round(((p_price / 0.50) * 50) / 10.0) * 10)::bigint
+    when p_price <= 1.00 then (round((50 + ((p_price - 0.50) / 0.50) * 50) / 10.0) * 10)::bigint
+    when p_price <= 2.00 then (round((100 + ((p_price - 1.00) / 1.00) * 50) / 10.0) * 10)::bigint
+    when p_price <= 5.00 then (round((150 + ((p_price - 2.00) / 3.00) * 150) / 10.0) * 10)::bigint
+    when p_price <= 10.00 then (round((300 + ((p_price - 5.00) / 5.00) * 200) / 10.0) * 10)::bigint
+    when p_price <= 20.00 then (round((500 + ((p_price - 10.00) / 10.00) * 250) / 10.0) * 10)::bigint
+    when p_price <= 50.00 then (round((750 + ((p_price - 20.00) / 30.00) * 500) / 10.0) * 10)::bigint
+    when p_price <= 100.00 then (round((1250 + ((p_price - 50.00) / 50.00) * 750) / 10.0) * 10)::bigint
+    when p_price <= 200.00 then (round((2000 + ((p_price - 100.00) / 100.00) * 1000) / 10.0) * 10)::bigint
+    when p_price <= 500.00 then (round((3000 + ((p_price - 200.00) / 300.00) * 2000) / 10.0) * 10)::bigint
+    else (round((5000 + 1500 * (ln(p_price / 500.0) / ln(2.0))) / 50.0) * 50)::bigint
+  end
+$;
+
+revoke all on function private.duplicate_sale_coin_value(numeric)
+from public, anon, authenticated;
 
 create or replace function public.sell_duplicate_cards(
   p_card_id text,
@@ -62,7 +88,7 @@ begin
   if v_inventory <= 1 then raise exception 'NO_DUPLICATES'; end if;
   if p_quantity > (v_inventory - 1) then raise exception 'KEEP_ONE_COPY'; end if;
 
-  v_unit_coins := greatest(10, round((v_market_price * 200) / 10.0) * 10)::bigint;
+  v_unit_coins := private.duplicate_sale_coin_value(v_market_price);
   v_total_coins := v_unit_coins * p_quantity;
 
   update public.player_cards
