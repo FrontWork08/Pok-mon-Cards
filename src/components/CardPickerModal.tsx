@@ -202,6 +202,16 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
   const card = entry.cards;
   if (!card) return null;
   const combat = getBattleCardPreview(card);
+  const marketplaceQuantity = Math.max(0, Number(entry.marketplace_quantity ?? 0));
+  const inventoryQuantity = Math.max(
+    0,
+    Number(entry.inventory_quantity ?? Math.max(Number(entry.quantity ?? 0) - marketplaceQuantity, 0)),
+  );
+  const locationLabel = marketplaceQuantity > 0
+    ? inventoryQuantity > 0
+      ? `Bag ×${inventoryQuantity} • Loja ×${marketplaceQuantity}`
+      : `Loja ×${marketplaceQuantity}`
+    : `Bag ×${entry.quantity}`;
   return (
     <Pressable
       style={[styles.card, { backgroundColor: colors.surface, borderColor: selected ? colors.yellow : colors.border }]}
@@ -213,7 +223,7 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
         {selected && mode === 'single' ? <View style={[styles.checkBadge, { backgroundColor: colors.yellow }]}><Ionicons name="checkmark" size={17} color="#07111F" /></View> : null}
       </View>
       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.pokemon_name}</Text>
-      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `HP ${combat.hp} • ATQ ${combat.maxDamage} • ⚡ ${combat.bestEnergy}` : `${card.rarity ?? 'Sem raridade'} • Bag ×${entry.quantity}`}</Text>
+      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `HP ${combat.hp} • ATQ ${combat.maxDamage} • ⚡ ${combat.bestEnergy}` : `${card.rarity ?? 'Sem raridade'} • ${locationLabel}`}</Text>
       {displayMode === 'battle' ? <Text numberOfLines={1} style={[styles.battleMeta, { color: colors.muted }]}>EF {combat.efficiencyScore} • VEL {combat.speedScore} • TEC {combat.techniqueScore}</Text> : null}
       {mode === 'quantity' ? (
         <View style={styles.qtyRow}>
