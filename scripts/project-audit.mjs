@@ -31,7 +31,8 @@ assert(pkg.dependencies?.expo === baseline.expoSdk, 'Versão do Expo SDK mudou.'
 assert(pkg.dependencies?.['react-native'] === baseline.reactNative, 'Versão do React Native mudou.');
 
 assert(apkWorkflow.includes('workflow_dispatch:'), 'Workflow do APK perdeu o gatilho manual.');
-assert(!/^\s*push:\s*$/m.test(apkWorkflow), 'Workflow do APK voltou a ter gatilho push automático.');
+assert(apkWorkflow.includes('- apk-release'), 'Workflow do APK perdeu a branch dedicada apk-release.');
+assert(!/branches:\s*\n\s*-\s*main\b/m.test(apkWorkflow), 'Workflow do APK não pode gerar APK em pushes normais do main.');
 assert(otaWorkflow.includes('- app/**'), 'OTA não observa alterações em app/**.');
 assert(otaWorkflow.includes('- src/**'), 'OTA não observa alterações em src/**.');
 assert(otaWorkflow.includes('- assets/**'), 'OTA não observa alterações em assets/**.');
@@ -57,4 +58,4 @@ if (failures.length) {
 }
 
 console.log('✅ Auditoria OTA/native passou.');
-console.log('   APK permanece manual; app/src/assets continuam no canal Expo Updates.');
+console.log('   APK só é liberado por workflow_dispatch ou pela branch dedicada apk-release; app/src/assets continuam via Expo Updates.');
