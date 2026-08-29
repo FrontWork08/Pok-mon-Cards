@@ -66,4 +66,4 @@ jobs:
         run: npx expo export --platform web
 
       - name: Deploy stable 1.0 preview alias
-        run: eas deploy --alias trainer-collection-1-0 --environment preview --non-interactive
+        run: eas deploy --alias trainer-collection-v1-preview --environment preview --non-interactive
