@@ -6,6 +6,8 @@ export type PlayerProfile = {
   coins: number;
   diamonds: number;
   profile_icon: string;
+  avatar_path: string | null;
+  avatar_updated_at: string | null;
   level: number;
   xp: number;
   battle_rating: number;
@@ -88,7 +90,7 @@ export async function getMyProfile() {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id, username, coins, diamonds, profile_icon, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), equipped_frame_id, equipped_background_id, equipped_frame:cosmetic_definitions!players_equipped_frame_id_fkey(id,name,primary_color,secondary_color), equipped_background:cosmetic_definitions!players_equipped_background_id_fkey(id,name,primary_color,secondary_color), show_battle_rating, created_at, last_daily_claim_at, account_status, suspended_until, moderation_reason, warning_count')
+    .select('id, username, coins, diamonds, profile_icon, avatar_path, avatar_updated_at, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), equipped_frame_id, equipped_background_id, equipped_frame:cosmetic_definitions!players_equipped_frame_id_fkey(id,name,primary_color,secondary_color), equipped_background:cosmetic_definitions!players_equipped_background_id_fkey(id,name,primary_color,secondary_color), show_battle_rating, created_at, last_daily_claim_at, account_status, suspended_until, moderation_reason, warning_count')
     .eq('id', userData.user.id)
     .single();
 
@@ -100,6 +102,90 @@ export async function setMyProfileIcon(profileIcon: string) {
   const { data, error } = await supabase.rpc('set_profile_icon', { p_icon: profileIcon });
   if (error) throw error;
   return String(data);
+}
+
+const PROFILE_MEDIA_BUCKET = 'profile-media';
+const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
+
+export function getProfileAvatarUrl(avatarPath?: string | null, updatedAt?: string | null) {
+  if (!avatarPath) return null;
+  const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(avatarPath);
+  const publicUrl = data?.publicUrl ?? null;
+  if (!publicUrl) return null;
+  if (!updatedAt) return publicUrl;
+  const separator = publicUrl.includes('?') ? '&' : '?';
+  return `${publicUrl}${separator}v=${encodeURIComponent(updatedAt)}`;
+}
+
+function base64ToArrayBuffer(value: string) {
+  const clean = value.replace(/^data:[^;]+;base64,/, '');
+  const decoder = (globalThis as any).atob as ((input: string) => string) | undefined;
+  if (!decoder) throw new Error('Este dispositivo não conseguiu processar a imagem selecionada.');
+
+  const binary = decoder(clean);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer as ArrayBuffer;
+}
+
+export async function uploadMyProfileAvatar(input: {
+  base64: string;
+  previousPath?: string | null;
+}) {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  const playerId = auth.user?.id;
+  if (!playerId) throw new Error('Usuário não autenticado.');
+
+  const body = base64ToArrayBuffer(input.base64);
+  if (body.byteLength <= 0) throw new Error('A imagem selecionada está vazia.');
+  if (body.byteLength > MAX_PROFILE_PHOTO_BYTES) {
+    throw new Error('A foto precisa ter no máximo 5 MB.');
+  }
+
+  const path = `${playerId}/avatar-${Date.now()}.jpg`;
+  const storage = supabase.storage.from(PROFILE_MEDIA_BUCKET);
+  const { error: uploadError } = await storage.upload(path, body, {
+    contentType: 'image/jpeg',
+    cacheControl: '3600',
+    upsert: false,
+  });
+  if (uploadError) throw uploadError;
+
+  const { error: avatarError } = await supabase.rpc('set_my_profile_avatar', {
+    p_avatar_path: path,
+  });
+
+  if (avatarError) {
+    await storage.remove([path]).catch(() => null);
+    throw avatarError;
+  }
+
+  if (input.previousPath && input.previousPath !== path) {
+    await storage.remove([input.previousPath]).catch(() => null);
+  }
+
+  const updatedAt = new Date().toISOString();
+  return {
+    path,
+    updatedAt,
+    publicUrl: getProfileAvatarUrl(path, updatedAt),
+  };
+}
+
+export async function removeMyProfileAvatar(previousPath?: string | null) {
+  const { error } = await supabase.rpc('set_my_profile_avatar', {
+    p_avatar_path: null,
+  });
+  if (error) throw error;
+
+  if (previousPath) {
+    await supabase.storage.from(PROFILE_MEDIA_BUCKET).remove([previousPath]).catch(() => null);
+  }
+
+  return { path: null as string | null, updatedAt: new Date().toISOString() };
 }
 
 export async function getMyBag(search?: string) {
