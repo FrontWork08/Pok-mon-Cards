@@ -44,6 +44,7 @@ import {
   getAdminReleaseResetPreview,
   getAdminReleaseReadiness,
   setLegacySelectionEnabled,
+  setReleaseDownloadUrl,
   type AdminAccess,
   type AdminPermission,
   type AdminGameEvent,
@@ -113,6 +114,7 @@ export default function AdminScreen() {
   const [releasePreflight, setReleasePreflight] = useState<AdminReleasePreflight | null>(null);
   const [releaseResetPreview, setReleaseResetPreview] = useState<AdminReleaseResetPreview | null>(null);
   const [releaseReadiness, setReleaseReadiness] = useState<AdminReleaseReadiness | null>(null);
+  const [releaseDownloadUrl, setReleaseDownloadUrlInput] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('Estamos aplicando uma atualização importante. O jogo voltará em breve.');
   const [gameEvents, setGameEvents] = useState<AdminGameEvent[]>([]);
   const [eventType, setEventType] = useState<'double_xp'|'rare_boost'|'featured_set'>('double_xp');
@@ -178,6 +180,7 @@ export default function AdminScreen() {
       setActiveAnnouncement(announcements[0] ?? null);
       setTesterHub(testerState);
       setReleaseStatus(releaseState);
+      setReleaseDownloadUrlInput(releaseState?.download_url ?? '');
       setSelectedGuildId((current) => current ?? guildState.guilds[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Acesso administrativo indisponível.');
@@ -863,6 +866,34 @@ export default function AdminScreen() {
   }
 
 
+  async function saveReleaseDownloadUrl() {
+    if (working || !adminAccess?.isOwner) return;
+    const value = releaseDownloadUrl.trim();
+    if (!value) {
+      setError('Cole a URL HTTPS do APK 1.0 antes de salvar.');
+      return;
+    }
+    try {
+      setWorking(true);
+      setError(null);
+      const result = await setReleaseDownloadUrl(value);
+      setReleaseStatus(result);
+      setReleaseDownloadUrlInput(result.download_url ?? value);
+      setReleaseReadiness(null);
+      setNotice('Link do APK 1.0 salvo. Isso não inicia freeze nem reset.');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '';
+      setError(
+        message.includes('INVALID_RELEASE_DOWNLOAD_URL')
+          ? 'Use uma URL HTTPS oficial do Expo/GitHub que aponte para um arquivo .apk.'
+          : message || 'Não foi possível salvar o link do APK 1.0.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+
   return (
     <Screen title="Admin Command Center" subtitle="Controle privado de usuários, economia, eventos, segurança e saúde da Trainer Collection.">
       <View style={styles.topRow}>
@@ -998,6 +1029,31 @@ export default function AdminScreen() {
                     <Text style={[styles.preflightButtonText,{color:colors.accent}]}>ATUALIZAR</Text>
                   </Pressable>
                 </View>
+
+                <View style={[styles.releaseUrlBox,{borderColor:releaseStatus?.download_url ? '#2F9E68' : colors.border}]}>
+                  <View style={{flex:1,minWidth:210}}>
+                    <Text style={[styles.releaseUrlLabel,{color:colors.muted}]}>URL OFICIAL DO APK 1.0</Text>
+                    <TextInput
+                      value={releaseDownloadUrl}
+                      onChangeText={setReleaseDownloadUrlInput}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      placeholder="https://expo.dev/.../TrainerCollection-v1.0.0.apk"
+                      placeholderTextColor={colors.muted}
+                      style={[styles.releaseUrlInput,{color:colors.text,backgroundColor:colors.surface,borderColor:colors.border}]}
+                    />
+                    <Text style={[styles.releaseUrlHint,{color:colors.muted}]}>Aceita somente HTTPS oficial do Expo/GitHub terminando em .apk. Salvar o link não executa a migração.</Text>
+                  </View>
+                  <Pressable
+                    disabled={working}
+                    onPress={() => { void saveReleaseDownloadUrl(); }}
+                    style={[styles.releaseUrlButton,{backgroundColor:colors.yellow,opacity:working ? .55 : 1}]}
+                  >
+                    <Ionicons name="link" size={16} color="#07111F"/>
+                    <Text style={styles.releaseUrlButtonText}>SALVAR APK</Text>
+                  </Pressable>
+                </View>
+
                 {releaseReadiness ? (
                   <>
                     <View style={styles.checklistGrid}>
@@ -2290,6 +2346,12 @@ const styles = StyleSheet.create({
   checklistDot:{width:7,height:7,borderRadius:999},
   checklistLabel:{fontSize:8,fontWeight:'900',letterSpacing:.4},
   checklistHint:{fontSize:6.5,lineHeight:10,marginTop:1},
+  releaseUrlBox:{borderRadius:13,borderWidth:1,padding:10,flexDirection:'row',alignItems:'flex-end',gap:8,flexWrap:'wrap'},
+  releaseUrlLabel:{fontSize:7,fontWeight:'900',letterSpacing:.6},
+  releaseUrlInput:{minHeight:42,borderRadius:11,borderWidth:1,paddingHorizontal:10,fontSize:9,marginTop:5},
+  releaseUrlHint:{fontSize:6.5,lineHeight:10,marginTop:4},
+  releaseUrlButton:{minHeight:42,borderRadius:11,paddingHorizontal:11,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
+  releaseUrlButtonText:{fontSize:7,fontWeight:'900',color:'#07111F'},
   resetPreviewBox:{borderRadius:17,borderWidth:1,padding:11,gap:9},
   resetPreviewHead:{flexDirection:'row',alignItems:'center',gap:9,flexWrap:'wrap'},
   resetPreviewIcon:{width:40,height:40,borderRadius:13,alignItems:'center',justifyContent:'center'},
