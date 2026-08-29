@@ -11,11 +11,13 @@ import { runFriendAction } from '@/services/playerActions';
 import { getRelationshipWith, type PublicRelationshipState } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { getThemeVisual } from '@/theme/themeCatalog';
 
 export default function PlayerShowcaseScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors } = useAppTheme();
+  const { colors, themeName } = useAppTheme();
+  const themeVisual = getThemeVisual(themeName);
   const [profile, setProfile] = useState<PublicPlayerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export default function PlayerShowcaseScreen() {
   }
 
   return (
-    <Screen title="Perfil de Exibição" subtitle="Cartas mais raras, valor da conta, guilda e desempenho do treinador.">
+    <Screen title="Trainer Showcase" subtitle="Identidade pública, vitrine, valor da coleção, guilda e desempenho do treinador.">
       <Pressable style={styles.back} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted} /><Text style={[styles.backText, { color: colors.muted }]}>Voltar ao ranking</Text></Pressable>
       {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
       {error ? <Pressable style={styles.error} onPress={() => void load()}><Ionicons name="alert-circle" size={19} color="#FF9FAF" /><Text style={styles.errorText}>{error} Toque para tentar novamente.</Text></Pressable> : null}
@@ -85,9 +87,11 @@ export default function PlayerShowcaseScreen() {
 
       {player && collection ? <>
         <View style={[styles.hero, { backgroundColor, borderColor: frameColor, borderWidth: player.frame ? 2 : 1 }]}>
+          <View style={[styles.heroGlow,{backgroundColor:frameColor}]} />
+          <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/>
           <TrainerAvatar icon={player.profileIcon} color={frameColor} backgroundColor={player.background?.primaryColor ? player.background.primaryColor + '22' : colors.surfaceAlt} size={66} />
           <View style={styles.heroInfo}>
-            <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER SHOWCASE</Text>
+            <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER SHOWCASE • 1.0</Text>
             <Text style={[styles.username, { color: colors.text }]}>@{player.username}</Text>
             {player.equippedTitle ? <Text style={[styles.titleText, { color: colors.yellow }]}>{player.equippedTitle.icon} {player.equippedTitle.title}</Text> : null}
             <Text style={[styles.meta, { color: colors.muted }]}>Nível {player.level} • {rank ? `${rank.symbol} ${rank.displayName}` : 'ELO oculto'}</Text>
@@ -193,16 +197,18 @@ const styles = StyleSheet.create({
   pendingFriendText:{fontSize:7,fontWeight:'900'},
   friendConfirmedBadge:{borderRadius:999,borderWidth:1,borderColor:'#2F9E68',backgroundColor:'#153426',paddingHorizontal:10,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:5},
   friendConfirmedText:{color:'#9CEFC1',fontSize:7,fontWeight:'900'},
-  hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 13, padding: 17, borderRadius: 23, borderWidth: 1 },
+  hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 13, padding: 17, borderRadius: 28, borderWidth: 1, overflow:'hidden', position:'relative', minHeight:145 },
+  heroGlow:{position:'absolute',right:-70,top:-90,width:260,height:260,borderRadius:999,opacity:.13},
+  heroPokemon:{position:'absolute',right:-22,bottom:-45,width:190,height:205,opacity:.18,transform:[{rotate:'6deg'}]},
   avatar: { width: 66, height: 66, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 28, fontWeight: '900' },
-  heroInfo: { flex: 1, minWidth: 180 },
+  heroInfo: { flex: 1, minWidth: 180, zIndex:2 },
   kicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
   username: { fontSize: 24, fontWeight: '900', marginTop: 2 },
   titleText: { fontSize: 11, fontWeight: '900', marginTop: 2 },
   meta: { fontSize: 10, marginTop: 4 },
   cosmeticMeta: { fontSize: 8, fontWeight: '900', marginTop: 4, letterSpacing: .4 },
-  guildBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  guildBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, zIndex:2 },
   guildText: { fontSize: 9, fontWeight: '900' },
   valuePanel: { borderRadius: 21, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   valueKicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.3 },
