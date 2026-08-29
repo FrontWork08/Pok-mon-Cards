@@ -20,6 +20,11 @@
       "expo-secure-store",
       "expo-notifications"
     ],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#07111F"
+    },
     "android": {
       "package": "com.frontwork.pokemoncards",
       "googleServicesFile": "./google-services.json",
