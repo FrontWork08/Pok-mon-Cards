@@ -13,12 +13,28 @@
     },
     "updates": {
       "url": "https://u.expo.dev/e02b9525-0e99-4b45-a84f-1c44501633be",
-      "checkAutomatically": "ON_ERROR_RECOVERY"
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "A Trainer Collection usa suas fotos somente para você escolher uma imagem de perfil.",
+          "cameraPermission": "A Trainer Collection usa a câmera somente quando você escolher tirar uma foto de perfil.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#D9B45B",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "splash": {
       "image": "./assets/splash.png",
@@ -42,6 +58,14 @@
     "experiments": {
       "typedRoutes": true
     },
-    "backgroundColor": "#07111F"
+    "backgroundColor": "#07111F",
+    "androidStatusBar": {
+      "backgroundColor": "#07111F",
+      "barStyle": "light-content"
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#07111F",
+      "barStyle": "light-content"
+    }
   }
 }
