@@ -40,6 +40,15 @@ function AppStack() {
   const lastOpenedMatch = useRef<string | null>(null);
 
   useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setTimeout(() => router.replace('/reset-password'), 0);
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, [router]);
+
+  useEffect(() => {
     if (!userId) return;
     const publisher = publishMyOnlinePresence(userId, settings?.show_online_status ?? true);
     return () => publisher.stop();
@@ -404,7 +413,8 @@ function AppStack() {
   // Global auth boundary: once WalletProvider confirms there is no session,
   // private routes cannot stay mounted. This also covers logout from profile,
   // maintenance screens, deep links and any future sign-out entry point.
-  if (!walletLoading && !userId && pathname !== '/') {
+  const publicAuthRoute = pathname === '/' || pathname === '/reset-password';
+  if (!walletLoading && !userId && !publicAuthRoute) {
     return <Redirect href="/" />;
   }
 
