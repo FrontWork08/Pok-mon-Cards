@@ -77,7 +77,7 @@ function AppStack() {
         }
       } catch (error) {
         console.warn(passwordRecovery ? 'Password recovery callback failed:' : 'Google OAuth callback failed:', error);
-        if (!disposed) router.replace('/');
+        if (!disposed) router.replace('/login');
       }
     };
 
@@ -425,9 +425,9 @@ function AppStack() {
   // Global auth boundary: once WalletProvider confirms there is no session,
   // private routes cannot stay mounted. This also covers logout from profile,
   // maintenance screens, deep links and any future sign-out entry point.
-  const publicAuthRoute = pathname === '/' || pathname === '/reset-password';
+  const publicAuthRoute = pathname === '/login' || pathname === '/reset-password';
   if (!walletLoading && !userId && !publicAuthRoute) {
-    return <Redirect href="/" />;
+    return <Redirect href="/login" />;
   }
 
   const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/') && pathname !== '/reset-password';
