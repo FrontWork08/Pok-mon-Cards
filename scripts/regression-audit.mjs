@@ -114,7 +114,8 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   assert(read('app/_layout.tsx').includes("event === 'PASSWORD_RECOVERY'"), 'Regressão: layout global não trata PASSWORD_RECOVERY.');
   assert(read('app/_layout.tsx').includes('isPasswordRecoveryUrl(url)'), 'Regressão: deep link nativo não diferencia reset de senha de OAuth comum.');
   assert(read('app/_layout.tsx').includes('pendingRecoveryForUser'), 'Regressão: layout não trata callbacks de recovery que chegam apenas com code.');
-  assert(login.includes('isPendingPasswordRecoveryFor'), 'Regressão: login pode disputar a navegação com o reset de senha.');
+  assert(reset.includes('clearPendingPasswordRecovery'), 'Regressão: reset concluído precisa limpar o marcador nativo de recuperação.');
+  assert(login.includes('clearPendingPasswordRecovery'), 'Regressão: login normal precisa limpar marcador de recuperação obsoleto.');
   assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
