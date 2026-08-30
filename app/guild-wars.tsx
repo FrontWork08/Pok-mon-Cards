@@ -50,6 +50,8 @@ export default function GuildWarsScreen() {
   const [picker, setPicker] = useState<PickerState | null>(null);
   const [bagCards, setBagCards] = useState<OwnedCardEntry[]>([]);
   const [bagLoading, setBagLoading] = useState(false);
+  const [bagLoaded, setBagLoaded] = useState(false);
+  const [bagLoadError, setBagLoadError] = useState<string | null>(null);
   const [attackTeam, setAttackTeam] = useState<string[]>([]);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
 
@@ -121,9 +123,12 @@ export default function GuildWarsScreen() {
   }, [myActiveKey, refreshBoard]);
 
   useEffect(() => {
-    if (!picker || bagCards.length || bagLoading) return;
+    if (!picker || bagLoaded) return;
     let disposed = false;
+
     setBagLoading(true);
+    setBagLoadError(null);
+
     getMyBagPage(0, 100, {
       search: '',
       setQuery: '',
@@ -134,16 +139,27 @@ export default function GuildWarsScreen() {
       sortMode: 'damage',
     })
       .then((page) => {
-        if (!disposed) setBagCards(page.items.filter((item) => Boolean(item.cards)));
+        if (disposed) return;
+        setBagCards(page.items.filter((item) => Boolean(item.cards)));
+        setBagLoaded(true);
       })
       .catch((e) => {
-        if (!disposed) setError(e instanceof Error ? e.message : 'Não foi possível carregar sua Bag.');
+        if (disposed) return;
+        const message = e instanceof Error ? e.message : 'Não foi possível carregar sua Bag.';
+        setBagLoadError(message);
+        setError(message);
       })
       .finally(() => {
         if (!disposed) setBagLoading(false);
       });
+
     return () => { disposed = true; };
-  }, [picker, bagCards.length, bagLoading]);
+  }, [picker, bagLoaded]);
+
+  function retryBagLoad() {
+    setBagLoadError(null);
+    setBagLoaded(false);
+  }
 
   function openDefensePicker(warId: string, gym: GuildWarGym) {
     setAttackTeam([]);
@@ -334,6 +350,7 @@ export default function GuildWarsScreen() {
         state={picker}
         cards={bagCards}
         loading={bagLoading}
+        loadError={bagLoadError}
         busy={Boolean(actionBusy)}
         attackTeam={attackTeam}
         onClose={() => {
@@ -344,6 +361,7 @@ export default function GuildWarsScreen() {
         onChooseDefender={(cardId) => { void chooseDefender(cardId); }}
         onToggleAttack={toggleAttackCard}
         onAttack={() => { void confirmAttack(); }}
+        onRetry={retryBagLoad}
       />
     </Screen>
   );
@@ -541,22 +559,26 @@ function CardPickerModal({
   state,
   cards,
   loading,
+  loadError,
   busy,
   attackTeam,
   onClose,
   onChooseDefender,
   onToggleAttack,
   onAttack,
+  onRetry,
 }: {
   state: PickerState | null;
   cards: OwnedCardEntry[];
   loading: boolean;
+  loadError: string | null;
   busy: boolean;
   attackTeam: string[];
   onClose: () => void;
   onChooseDefender: (cardId: string) => void;
   onToggleAttack: (cardId: string) => void;
   onAttack: () => void;
+  onRetry: () => void;
 }) {
   const { colors } = useAppTheme();
   if (!state) return null;
@@ -583,7 +605,25 @@ function CardPickerModal({
             </Pressable>
           </View>
 
-          {loading ? <ActivityIndicator size="large" color={colors.yellow}/> : (
+          {loading ? (
+            <View style={styles.pickerState}>
+              <ActivityIndicator size="large" color={colors.yellow}/>
+              <Text style={[styles.pickerStateText,{color:colors.muted}]}>Carregando seus Pokémon...</Text>
+            </View>
+          ) : loadError ? (
+            <View style={[styles.pickerError,{borderColor:'#C96B7A'}]}>
+              <Ionicons name="alert-circle" size={22} color="#FF8290"/>
+              <Text style={[styles.pickerStateText,{color:colors.muted}]}>{loadError}</Text>
+              <Pressable onPress={onRetry} style={[styles.retryButton,{borderColor:colors.border,backgroundColor:colors.surfaceAlt}]}>
+                <Text style={[styles.retryText,{color:colors.text}]}>TENTAR NOVAMENTE</Text>
+              </Pressable>
+            </View>
+          ) : cards.length === 0 ? (
+            <View style={styles.pickerState}>
+              <Ionicons name="albums-outline" size={28} color={colors.muted}/>
+              <Text style={[styles.pickerStateText,{color:colors.muted}]}>Sua Bag não possui Pokémon disponíveis.</Text>
+            </View>
+          ) : (
             <ScrollView style={styles.cardScroll} contentContainerStyle={styles.cardGrid} showsVerticalScrollIndicator={false}>
               {cards.map((entry) => {
                 const card = entry.cards;
@@ -743,6 +783,11 @@ const styles = StyleSheet.create({
   pickerTitle:{fontSize:17,fontWeight:'900',marginTop:1},
   pickerHint:{fontSize:8,lineHeight:12,marginTop:2},
   modalClose:{width:38,height:38,alignItems:'center',justifyContent:'center'},
+  pickerState:{minHeight:180,alignItems:'center',justifyContent:'center',gap:10,padding:16},
+  pickerStateText:{fontSize:9,lineHeight:14,fontWeight:'800',textAlign:'center'},
+  pickerError:{minHeight:180,borderWidth:1,borderRadius:16,alignItems:'center',justifyContent:'center',gap:10,padding:16},
+  retryButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:13,alignItems:'center',justifyContent:'center'},
+  retryText:{fontSize:8,fontWeight:'900',letterSpacing:.4},
   cardScroll:{flexGrow:0},
   cardGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,paddingBottom:4},
   choiceCard:{width:'31.5%',minWidth:130,borderRadius:15,borderWidth:1,padding:7,gap:3,position:'relative'},
