@@ -50,6 +50,24 @@ if (existsSync('app/collection-ranking.tsx')) {
   assert(avatarCount === 1, 'Regressão: ranking semanal deve renderizar exatamente um avatar por jogador.');
 }
 
+if (existsSync('app/friends.tsx')) {
+  const friends = read('app/friends.tsx');
+  const actions = friends.split('function FriendActions')[1]?.split('return (')[0] ?? '';
+  assert(!actions.includes('>PERFIL<'), 'Regressão: botão Perfil voltou para a barra de ações dos amigos.');
+  assert(friends.includes('Abrir perfil de @'), 'Regressão: username dos amigos deixou de abrir o perfil.');
+  assert(friends.includes('playerInfo:{flex:1,minWidth:0}'), 'Regressão: layout social pode voltar a cortar as ações em telas estreitas.');
+}
+
+if (existsSync('supabase/migrations/20260830183500_unique_weekly_collection_scoring.sql')) {
+  const weeklyUnique = read('supabase/migrations/20260830183500_unique_weekly_collection_scoring.sql');
+  const ranking = read('app/collection-ranking.tsx');
+  assert(weeklyUnique.includes("elem->>'isNew'"), 'Regressão: ranking semanal voltou a contar duplicatas de packs normais.');
+  assert(weeklyUnique.includes('first_obtained_at'), 'Regressão: ranking semanal não valida primeira obtenção em packs de diamante.');
+  assert(weeklyUnique.includes('count(distinct'), 'Regressão: packs do semanal precisam contar apenas aberturas com novidade.');
+  assert(ranking.includes('GANHO SEMANAL ÚNICO'), 'Regressão: UI não explica o placar semanal único.');
+  assert(ranking.includes('cartas únicas'), 'Regressão: contagem semanal não está identificada como única na UI.');
+}
+
 if (existsSync('app/friend-qr-scan.tsx')) {
   const scanner = read('app/friend-qr-scan.tsx');
   assert(scanner.includes('CameraView'), 'Regressão: scanner de QR perdeu a câmera.');
