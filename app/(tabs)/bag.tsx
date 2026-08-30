@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
+import { TrainerPageHeader } from '@/components/TrainerPageHeader';
 import {
   getMyBagOverview,
   getMyBagPage,
@@ -165,17 +166,11 @@ export default function BagScreen() {
 
   const header = (
     <View style={styles.headerContent}>
-<View style={styles.pageHeaderRow}>
-        <View style={styles.pageHeader}>
-          <View style={styles.brandRow}>
-            <View style={[styles.brandDot,{backgroundColor:colors.yellow}]} />
-            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER COLLECTION</Text>
-            <View style={[styles.versionPill,{backgroundColor:colors.accentSoft,borderColor:colors.border}]}><Text style={[styles.versionText,{color:colors.accent}]}>1.0</Text></View>
-          </View>
-          <Text style={[styles.title, { color: colors.text }]}>Collection Vault</Text>
-          <Text style={[styles.subtitle, { color: colors.muted }]}>Sua Bag organizada como uma coleção de treinador: valor, combate, raridade e sets.</Text>
-        </View>
-      </View>
+<TrainerPageHeader
+        title="Collection Vault"
+        subtitle="Sua Bag organizada como uma coleção de treinador: valor, combate, raridade e sets."
+        icon="albums"
+      />
 
       <View style={[styles.summary, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
         <View style={[styles.summaryGlow,{backgroundColor:colors.accent}]} />
