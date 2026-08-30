@@ -116,20 +116,20 @@ export default function ChatScreen() {
 
   return (
     <View style={[styles.safe,{backgroundColor:colors.bg}]}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title,
-          headerStyle: { backgroundColor: colors.bg },
-          headerTintColor: colors.text,
-          headerShadowVisible: false,
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
 
       <View style={[styles.challengeBar,{backgroundColor:colors.surface,borderBottomColor:colors.border}]}>
         <View style={styles.friendMeta}>
-          <View style={[styles.onlineDot,{backgroundColor:'#65D894'}]}/>
-          <Text style={[styles.friendRating,{color:colors.muted}]}>ELO {friend?.battle_rating??1000}</Text>
+          <View style={[styles.chatAvatar,{backgroundColor:colors.accentSoft}]}>
+            <Ionicons name="person" size={18} color={colors.accent}/>
+          </View>
+          <View>
+            <Text style={[styles.friendName,{color:colors.text}]}>{title}</Text>
+            <View style={styles.friendPresence}>
+              <View style={[styles.onlineDot,{backgroundColor:'#65D894'}]}/>
+              <Text style={[styles.friendRating,{color:colors.muted}]}>ELO {friend?.battle_rating??1000}</Text>
+            </View>
+          </View>
         </View>
         <Pressable style={[styles.challengeMystery,{backgroundColor:colors.accent}]} onPress={openBattleSetup} disabled={sending}>
           <Ionicons name="game-controller" size={17} color="#fff" />
@@ -314,7 +314,10 @@ const styles = StyleSheet.create({
   safe:{flex:1},
   center:{flex:1,alignItems:'center',justifyContent:'center'},
   challengeBar:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:7,paddingHorizontal:12,paddingVertical:9,borderBottomWidth:1},
-  friendMeta:{flexDirection:'row',alignItems:'center',gap:6},
+  friendMeta:{flexDirection:'row',alignItems:'center',gap:9},
+  chatAvatar:{width:38,height:38,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  friendName:{fontSize:13,fontWeight:'900'},
+  friendPresence:{flexDirection:'row',alignItems:'center',gap:5,marginTop:2},
   onlineDot:{width:7,height:7,borderRadius:99},
   challengeMystery:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:14,paddingVertical:10,borderRadius:11},
   challengeMysteryText:{color:'#fff',fontSize:10,fontWeight:'900'},
