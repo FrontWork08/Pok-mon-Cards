@@ -501,9 +501,6 @@ export default function PacksScreen() {
         maxToRenderPerBatch={isMobile ? 6 : 10}
         updateCellsBatchingPeriod={40}
         windowSize={9}
-        // Android can repeatedly detach/reattach these tall, transformed pack
-        // cards right at the viewport edge. That changes measurements while the
-        // user is dragging and produces the rapid up/down "rubber-band" jump.
         removeClippedSubviews={false}
         overScrollMode="never"
         bounces={false}
