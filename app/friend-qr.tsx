@@ -92,11 +92,19 @@ export default function FriendQrScreen() {
 
           <View style={styles.actions}>
             <Pressable
-              onPress={shareProfile}
+              onPress={() => router.push('/friend-qr-scan')}
               style={[styles.primaryAction, { backgroundColor: colors.yellow }]}
             >
-              <Ionicons name="share-social" size={19} color="#07111F" />
-              <Text style={styles.primaryActionText}>COMPARTILHAR LINK</Text>
+              <Ionicons name="scan" size={19} color="#07111F" />
+              <Text style={styles.primaryActionText}>ESCANEAR QR DE AMIGO</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={shareProfile}
+              style={[styles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.accent }]}
+            >
+              <Ionicons name="share-social" size={19} color={colors.accent} />
+              <Text style={[styles.secondaryActionText, { color: colors.text }]}>COMPARTILHAR MEU LINK</Text>
             </Pressable>
 
             <Pressable
@@ -113,7 +121,7 @@ export default function FriendQrScreen() {
             <View style={styles.tipCopy}>
               <Text style={[styles.tipTitle, { color: colors.text }]}>Como usar</Text>
               <Text style={[styles.tipText, { color: colors.muted }]}>
-                Abra esta tela em um celular e aponte a câmera do outro aparelho para o QR. O link abre direto no Trainer Showcase, onde o pedido de amizade pode ser enviado.
+                Use o scanner dentro do app para ler o QR de outro treinador. O código abre o Trainer Showcase, onde o pedido de amizade pode ser enviado.
               </Text>
             </View>
           </View>
