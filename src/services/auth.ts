@@ -1,8 +1,58 @@
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
+import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../lib/supabase';
 
 export const GOOGLE_OAUTH_REDIRECT = 'pokemoncards://auth/callback';
+const PASSWORD_RECOVERY_PENDING_KEY = 'trainer_collection_password_recovery_pending_v1';
+const PASSWORD_RECOVERY_PENDING_TTL_MS = 2 * 60 * 60 * 1000;
+
+type PendingPasswordRecovery = {
+  email: string;
+  requestedAt: number;
+};
+
+async function writePendingPasswordRecovery(email: string) {
+  if (Platform.OS === 'web') return;
+  await SecureStore.setItemAsync(
+    PASSWORD_RECOVERY_PENDING_KEY,
+    JSON.stringify({ email: email.trim().toLowerCase(), requestedAt: Date.now() } satisfies PendingPasswordRecovery),
+  );
+}
+
+export async function getPendingPasswordRecovery() {
+  if (Platform.OS === 'web') return null;
+
+  const raw = await SecureStore.getItemAsync(PASSWORD_RECOVERY_PENDING_KEY).catch(() => null);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as PendingPasswordRecovery;
+    if (
+      !parsed?.email
+      || !Number.isFinite(parsed.requestedAt)
+      || Date.now() - parsed.requestedAt > PASSWORD_RECOVERY_PENDING_TTL_MS
+    ) {
+      await SecureStore.deleteItemAsync(PASSWORD_RECOVERY_PENDING_KEY).catch(() => null);
+      return null;
+    }
+    return parsed;
+  } catch {
+    await SecureStore.deleteItemAsync(PASSWORD_RECOVERY_PENDING_KEY).catch(() => null);
+    return null;
+  }
+}
+
+export async function clearPendingPasswordRecovery() {
+  if (Platform.OS === 'web') return;
+  await SecureStore.deleteItemAsync(PASSWORD_RECOVERY_PENDING_KEY).catch(() => null);
+}
+
+export async function isPendingPasswordRecoveryFor(email?: string | null) {
+  const pending = await getPendingPasswordRecovery();
+  if (!pending || !email) return false;
+  return pending.email === email.trim().toLowerCase();
+}
 
 function getAuthRedirectUrl() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -155,6 +205,7 @@ export async function requestPasswordReset(email: string) {
   });
 
   if (error) throw new Error(authErrorMessage(error.message));
+  await writePendingPasswordRecovery(normalizedEmail);
 }
 
 export async function updateRecoveredPassword(password: string) {
