@@ -7,7 +7,7 @@ import { formatUsd } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
-type SortMode = 'value' | 'battle' | 'name' | 'quantity' | 'recent';
+type SortMode = 'value' | 'battle' | 'atk_desc' | 'atk_asc' | 'def_desc' | 'def_asc' | 'name' | 'quantity' | 'recent';
 type QuantityMap = Record<string, number>;
 
 export { getBattleCardPreview } from '@/services/battleStats';
@@ -22,6 +22,7 @@ type Props = {
   maxPerCard?: number;
   maxTotal?: number;
   displayMode?: 'market' | 'battle';
+  enableCombatSort?: boolean;
   onSelectedIdChange?: (id: string | null) => void;
   onSelectedMapChange?: (value: QuantityMap) => void;
   onClose: () => void;
@@ -41,6 +42,7 @@ export function CardPickerModal({
   maxPerCard,
   maxTotal,
   displayMode = 'market',
+  enableCombatSort = false,
   onSelectedIdChange,
   onSelectedMapChange,
   onClose,
@@ -67,6 +69,10 @@ export function CardPickerModal({
     });
     return [...filtered].sort((a, b) => {
       if (sort === 'battle') return getBattleCardPreview(b.cards).score - getBattleCardPreview(a.cards).score;
+      if (sort === 'atk_desc') return getBattleCardPreview(b.cards).maxDamage - getBattleCardPreview(a.cards).maxDamage;
+      if (sort === 'atk_asc') return getBattleCardPreview(a.cards).maxDamage - getBattleCardPreview(b.cards).maxDamage;
+      if (sort === 'def_desc') return getBattleCardPreview(b.cards).hp - getBattleCardPreview(a.cards).hp;
+      if (sort === 'def_asc') return getBattleCardPreview(a.cards).hp - getBattleCardPreview(b.cards).hp;
       if (sort === 'value') return Number(b.cards?.market_price_usd ?? -1) - Number(a.cards?.market_price_usd ?? -1);
       if (sort === 'name') return String(a.cards?.pokemon_name ?? '').localeCompare(String(b.cards?.pokemon_name ?? ''));
       if (sort === 'quantity') return Number(b.quantity ?? 0) - Number(a.quantity ?? 0);
@@ -134,10 +140,19 @@ export function CardPickerModal({
             {displayMode === 'battle'
               ? <SortChip label="Atributos de combate" active={sort === 'battle'} onPress={() => setSort('battle')} />
               : <SortChip label="Mais caras" active={sort === 'value'} onPress={() => setSort('value')} />}
+            {enableCombatSort ? (
+              <>
+                <SortChip label="ATK MAIOR" active={sort === 'atk_desc'} onPress={() => setSort('atk_desc')} />
+                <SortChip label="ATK MENOR" active={sort === 'atk_asc'} onPress={() => setSort('atk_asc')} />
+                <SortChip label="DEF MAIOR" active={sort === 'def_desc'} onPress={() => setSort('def_desc')} />
+                <SortChip label="DEF MENOR" active={sort === 'def_asc'} onPress={() => setSort('def_asc')} />
+              </>
+            ) : null}
             <SortChip label="A–Z" active={sort === 'name'} onPress={() => setSort('name')} />
             <SortChip label="Quantidade" active={sort === 'quantity'} onPress={() => setSort('quantity')} />
             <SortChip label="Recentes" active={sort === 'recent'} onPress={() => setSort('recent')} />
           </View>
+          {enableCombatSort ? <Text style={[styles.combatSortHint,{color:colors.muted}]}>ATK = maior dano • DEF = HP da carta</Text> : null}
           <Text style={[styles.result, { color: colors.muted }]}>{visibleCards.length} cartas disponíveis</Text>
         </View>
 
@@ -161,6 +176,7 @@ export function CardPickerModal({
               selected={mode === 'single' ? selectedId === item.cards?.id : Number(selectedMap[item.cards?.id ?? ''] ?? 0) > 0}
               quantity={Number(selectedMap[item.cards?.id ?? ''] ?? 0)}
               displayMode={displayMode}
+              showCombatStats={enableCombatSort}
               onPress={() => selectSingle(item)}
               onMinus={() => changeQuantity(item, -1)}
               onPlus={() => changeQuantity(item, 1)}
@@ -188,12 +204,13 @@ export function CardPickerModal({
   );
 }
 
-const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, displayMode, onPress, onMinus, onPlus }: {
+const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, displayMode, showCombatStats, onPress, onMinus, onPlus }: {
   entry: OwnedCardEntry;
   mode: 'single' | 'quantity';
   selected: boolean;
   quantity: number;
   displayMode: 'market' | 'battle';
+  showCombatStats: boolean;
   onPress: () => void;
   onMinus: () => void;
   onPlus: () => void;
@@ -224,6 +241,7 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
       </View>
       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.pokemon_name}</Text>
       <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `HP ${combat.hp} • ATQ ${combat.maxDamage} • ⚡ ${combat.bestEnergy}` : `${card.rarity ?? 'Sem raridade'} • ${locationLabel}`}</Text>
+      {showCombatStats && displayMode !== 'battle' ? <Text numberOfLines={1} style={[styles.legacyCombatMeta,{color:colors.yellow}]}>ATK {combat.maxDamage} • DEF {combat.hp}</Text> : null}
       {displayMode === 'battle' ? <Text numberOfLines={1} style={[styles.battleMeta, { color: colors.muted }]}>EF {combat.efficiencyScore} • VEL {combat.speedScore} • TEC {combat.techniqueScore}</Text> : null}
       {mode === 'quantity' ? (
         <View style={styles.qtyRow}>
@@ -255,6 +273,7 @@ const styles = StyleSheet.create({
   chip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
   chipText: { fontSize: 9, fontWeight: '900' },
   result: { fontSize: 9, fontWeight: '800' },
+  combatSortHint:{fontSize:8,fontWeight:'800',marginTop:-2},
   list: { padding: 12, paddingBottom: 24 },
   row: { gap: 8 },
   card: { flex: 1, minWidth: 0, marginBottom: 8, borderRadius: 15, borderWidth: 1, padding: 7 },
@@ -266,6 +285,7 @@ const styles = StyleSheet.create({
   cardName: { fontSize: 11, fontWeight: '900', marginTop: 7 },
   cardMeta: { fontSize: 8, marginTop: 2 },
   battleMeta: { fontSize: 7, marginTop: 3, fontWeight: '800' },
+  legacyCombatMeta:{fontSize:8,marginTop:3,fontWeight:'900'},
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
   qtyButton: { width: 31, height: 31, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   qtySign: { fontSize: 18, fontWeight: '900' },
