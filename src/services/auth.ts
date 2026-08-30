@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 
 export const GOOGLE_OAUTH_REDIRECT = 'pokemoncards://auth/callback';
+export const PASSWORD_RECOVERY_WEB_REDIRECT = 'https://pokemon-cards-frontwork.expo.app/';
 
 function getAuthRedirectUrl() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -18,13 +19,15 @@ function authErrorMessage(message: string) {
     return 'O login com Google ainda não foi habilitado no Supabase.';
   }
   if (normalized.includes('email rate limit exceeded') || normalized.includes('over_email_send_rate_limit')) {
-    return 'O limite de confirmações por e-mail foi atingido. Use o Google ou tente novamente mais tarde.';
+    return 'O limite de e-mails foi atingido. Aguarde um pouco antes de tentar novamente.';
   }
   if (normalized.includes('email address not authorized')) {
-    return 'O envio de confirmação ainda não está liberado para este e-mail. Use o Google por enquanto.';
+    return 'O servidor de e-mail ainda não está liberado para enviar mensagens para este endereço.';
   }
   if (normalized.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
   if (normalized.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (normalized.includes('password should be at least')) return 'A nova senha precisa ter pelo menos 6 caracteres.';
+  if (normalized.includes('rate limit')) return 'Muitas tentativas em pouco tempo. Aguarde um pouco antes de tentar novamente.';
   if (normalized.includes('user already registered')) return 'Já existe uma conta com este e-mail.';
   return message;
 }
@@ -120,6 +123,47 @@ export async function signInWithGoogle() {
     await Linking.openURL(data.url);
   }
 
+  return data;
+}
+
+export function isPasswordRecoveryUrl(url?: string | null) {
+  if (!url) return false;
+  const queryIndex = url.indexOf('?');
+  const hashIndex = url.indexOf('#');
+  const query = queryIndex >= 0 ? url.slice(queryIndex + 1, hashIndex >= 0 ? hashIndex : undefined) : '';
+  const hash = hashIndex >= 0 ? url.slice(hashIndex + 1) : '';
+  const params = new URLSearchParams(hash || query);
+  return params.get('type') === 'recovery';
+}
+
+function getPasswordRecoveryRedirectUrl() {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return `${window.location.origin}/`;
+  }
+  // The recovery link intentionally opens the production web app. This uses
+  // the already-deployed HTTPS origin and therefore does not require a new
+  // Android intent filter or APK.
+  return PASSWORD_RECOVERY_WEB_REDIRECT;
+}
+
+export async function requestPasswordReset(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes('@')) {
+    throw new Error('Digite o e-mail usado na sua conta.');
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: getPasswordRecoveryRedirectUrl(),
+  });
+
+  if (error) throw new Error(authErrorMessage(error.message));
+}
+
+export async function updateRecoveredPassword(password: string) {
+  if (password.length < 6) throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');
+
+  const { data, error } = await supabase.auth.updateUser({ password });
+  if (error) throw new Error(authErrorMessage(error.message));
   return data;
 }
 

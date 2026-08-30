@@ -408,7 +408,7 @@ function AppStack() {
     return <Redirect href="/" />;
   }
 
-  const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/');
+  const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/') && pathname !== '/reset-password';
   return (
     <View style={[styles.appShell,{backgroundColor:colors.bg}]}>
       <StatusBar style={isLight ? 'dark' : 'light'} />
