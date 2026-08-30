@@ -68,7 +68,7 @@ if (existsSync('src/components/WebPwaBootstrap.tsx') && existsSync('app/_layout.
 if (existsSync('app/_layout.tsx') && existsSync('src/wallet/WalletProvider.tsx')) {
   const layout = read('app/_layout.tsx');
   const wallet = read('src/wallet/WalletProvider.tsx');
-  assert(layout.includes('Redirect') && layout.includes("pathname !== '/'"), 'Regressão: rotas privadas não estão protegidas após logout.');
+  assert(layout.includes('Redirect') && layout.includes('publicAuthRoute') && layout.includes('!publicAuthRoute'), 'Regressão: rotas privadas não estão protegidas após logout.');
   assert(layout.includes('walletLoading'), 'Regressão: auth guard precisa aguardar a restauração da sessão.');
   assert(wallet.includes('if (!nextUserId)'), 'Regressão: WalletProvider não limpa estado imediatamente no SIGNED_OUT.');
   assert(wallet.includes('setUserId(null)'), 'Regressão: logout não limpa o usuário global.');
@@ -82,6 +82,9 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   assert(auth.includes('updateUser({ password })'), 'Regressão: atualização segura da nova senha ausente.');
   assert(login.includes('ESQUECI MINHA SENHA'), 'Regressão: login perdeu o botão de recuperação de senha.');
   assert(login.includes("event === 'PASSWORD_RECOVERY'"), 'Regressão: callback PASSWORD_RECOVERY não é tratado.');
+  assert(read('src/lib/supabase.ts').includes('initialWebAuthUrl'), 'Regressão: URL inicial de recuperação não é preservada antes do Supabase processá-la.');
+  assert(read('app/_layout.tsx').includes("event === 'PASSWORD_RECOVERY'"), 'Regressão: layout global não trata PASSWORD_RECOVERY.');
+  assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
 }

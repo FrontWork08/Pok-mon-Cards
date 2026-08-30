@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentSession, isPasswordRecoveryUrl, requestPasswordReset, signIn, signInWithGoogle, signUp } from '../src/services/auth';
-import { supabase } from '../src/lib/supabase';
+import { initialWebAuthUrl, supabase } from '../src/lib/supabase';
 import { PremiumBackground } from '../src/components/PremiumBackground';
 import { useAppTheme } from '../src/theme/ThemeProvider';
 import { getThemeVisual } from '../src/theme/themeCatalog';
@@ -39,8 +39,7 @@ export default function AuthScreen() {
   useEffect(() => {
     let mounted = true;
     let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
-    const browserUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.href : null;
-    const openingRecovery = isPasswordRecoveryUrl(browserUrl);
+    const openingRecovery = isPasswordRecoveryUrl(initialWebAuthUrl);
 
     if (openingRecovery) {
       // Supabase parses the recovery token from the URL during client startup.
