@@ -3,7 +3,6 @@ import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 
 export const GOOGLE_OAUTH_REDIRECT = 'pokemoncards://auth/callback';
-export const PASSWORD_RECOVERY_WEB_REDIRECT = 'https://pokemon-cards-frontwork.expo.app/';
 
 function getAuthRedirectUrl() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -140,10 +139,9 @@ function getPasswordRecoveryRedirectUrl() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     return `${window.location.origin}/`;
   }
-  // The recovery link intentionally opens the production web app. This uses
-  // the already-deployed HTTPS origin and therefore does not require a new
-  // Android intent filter or APK.
-  return PASSWORD_RECOVERY_WEB_REDIRECT;
+  // Reuse the callback scheme already embedded in the installed APK and
+  // already used by Auth. No new Android intent filter or APK is required.
+  return GOOGLE_OAUTH_REDIRECT;
 }
 
 export async function requestPasswordReset(email: string) {
