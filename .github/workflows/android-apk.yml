@@ -89,3 +89,12 @@ jobs:
 
           git commit -m "release: update Android download metadata"
           git push origin HEAD:main
+
+      - name: Deploy updated download site
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas env:pull --environment preview --path .env.local --non-interactive
+          npx expo export --platform web
+          eas deploy --prod --environment preview --dev-domain pokemon-cards-frontwork --non-interactive
