@@ -5,7 +5,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { getMessages, getOrCreateConversation, markConversationRead, sendMessage, subscribeToMessages } from '@/services/chat';
 import { createBattle, type BattleMode, type BattleStakeType } from '@/services/battles';
-import { getMyBag } from '@/services/player';
+import { getMyBag, getProfileAvatarUrl } from '@/services/player';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const WAGERS=[100,250,500,1000,2500];
@@ -44,7 +45,7 @@ export default function ChatScreen() {
         setLoading(true);
         const [{ data: auth }, { data: player }, cid] = await Promise.all([
           supabase.auth.getUser(),
-          supabase.from('players').select('id,username,level,battle_rating').eq('id', friendId).single(),
+          supabase.from('players').select('id,username,level,battle_rating,profile_icon,avatar_path,avatar_updated_at').eq('id', friendId).single(),
           getOrCreateConversation(friendId),
         ]);
         setUserId(auth.user?.id ?? '');
@@ -120,9 +121,13 @@ export default function ChatScreen() {
 
       <View style={[styles.challengeBar,{backgroundColor:colors.surface,borderBottomColor:colors.border}]}>
         <View style={styles.friendMeta}>
-          <View style={[styles.chatAvatar,{backgroundColor:colors.accentSoft}]}>
-            <Ionicons name="person" size={18} color={colors.accent}/>
-          </View>
+          <TrainerAvatar
+            icon={friend?.profile_icon}
+            avatarUrl={getProfileAvatarUrl(friend?.avatar_path, friend?.avatar_updated_at)}
+            color={colors.accent}
+            backgroundColor={colors.accentSoft}
+            size={38}
+          />
           <View>
             <Text style={[styles.friendName,{color:colors.text}]}>{title}</Text>
             <View style={styles.friendPresence}>
