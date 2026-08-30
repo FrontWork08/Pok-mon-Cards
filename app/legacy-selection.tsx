@@ -358,6 +358,7 @@ export default function LegacySelectionScreen() {
         selectedMap={draft}
         maxPerCard={1}
         maxTotal={limit}
+        enableCombatSort
         onSelectedMapChange={setDraft}
         onClose={closePicker}
         onConfirm={saveDraft}
