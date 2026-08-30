@@ -134,7 +134,7 @@ export async function getMyBattleHistory(limit = 50) {
 export async function getBattleLeaderboard(limit = 50) {
   const { data, error } = await supabase
     .from('players')
-    .select('id,username,level,battle_rating,battle_wins,battle_losses,battle_streak,best_battle_streak,show_battle_rating,equipped_title_id')
+    .select('id,username,level,battle_rating,battle_wins,battle_losses,battle_streak,best_battle_streak,show_battle_rating,equipped_title_id,profile_icon,avatar_path,avatar_updated_at')
     .order('battle_rating', { ascending: false })
     .order('battle_wins', { ascending: false })
     .limit(limit);
