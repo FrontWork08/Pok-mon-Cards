@@ -15,11 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { PremiumBackground } from '@/components/PremiumBackground';
+import { TrainerPageHeader } from '@/components/TrainerPageHeader';
 import {
   getMyPackHistoryPage,
   type PackHistoryEntry,
 } from '@/services/collections';
-import { gameTheme } from '@/theme/gameTheme';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const PAGE_SIZE = 25;
@@ -41,16 +41,12 @@ function cardValue(card: any) {
 function openingBestCard(opening: PackHistoryEntry) {
   const cards = Array.isArray(opening.cards_received) ? opening.cards_received : [];
   if (!cards.length) return null;
-
   let best = cards[0];
   let bestValue = cardValue(best);
   for (let index = 1; index < cards.length; index += 1) {
     const card = cards[index];
     const value = cardValue(card);
-    if (
-      value > bestValue
-      || (value === bestValue && rarityScore(card?.rarity) > rarityScore(best?.rarity))
-    ) {
+    if (value > bestValue || (value === bestValue && rarityScore(card?.rarity) > rarityScore(best?.rarity))) {
       best = card;
       bestValue = value;
     }
@@ -59,13 +55,14 @@ function openingBestCard(opening: PackHistoryEntry) {
 }
 
 const HistoryRow = memo(function HistoryRow({ opening }: { opening: PackHistoryEntry }) {
+  const { colors, isLight } = useAppTheme();
   const pack = Array.isArray(opening.packs) ? opening.packs[0] : opening.packs;
   const cards = Array.isArray(opening.cards_received) ? opening.cards_received : [];
   const best = openingBestCard(opening);
 
   return (
-    <View style={styles.row}>
-      <View style={styles.packIcon}>
+    <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.packIcon, { backgroundColor: isLight ? '#EDF2F7' : colors.bg }]}>
         {pack?.image_url ? (
           <Image
             source={{ uri: pack.image_url }}
@@ -74,16 +71,16 @@ const HistoryRow = memo(function HistoryRow({ opening }: { opening: PackHistoryE
             fadeDuration={Platform.OS === 'android' ? 0 : undefined}
           />
         ) : (
-          <Ionicons name="cube" size={24} color="#7594BD" />
+          <Ionicons name="cube" size={24} color={colors.accent} />
         )}
       </View>
       <View style={styles.rowBody}>
-        <Text numberOfLines={1} style={styles.packName}>{pack?.name ?? 'Booster'}</Text>
-        <Text style={styles.meta}>
+        <Text numberOfLines={1} style={[styles.packName, { color: colors.text }]}>{pack?.name ?? 'Booster'}</Text>
+        <Text style={[styles.meta, { color: colors.muted }]}>
           {new Date(opening.opened_at).toLocaleString('pt-BR')} • {cards.length} cards
         </Text>
         {best ? (
-          <Text numberOfLines={1} style={styles.pull}>
+          <Text numberOfLines={1} style={[styles.pull, { color: colors.muted }]}>
             Melhor pull: {best.name ?? 'Carta'} • {best.rarity ?? 'Comum'}
           </Text>
         ) : null}
@@ -93,7 +90,7 @@ const HistoryRow = memo(function HistoryRow({ opening }: { opening: PackHistoryE
           <Image
             key={`${card.id ?? 'card'}-${index}`}
             source={{ uri: card.image }}
-            style={[styles.miniCard, { marginLeft: index ? -13 : 0 }]}
+            style={[styles.miniCard, { marginLeft: index ? -13 : 0, borderColor: colors.border }]}
             resizeMode="cover"
             fadeDuration={Platform.OS === 'android' ? 0 : undefined}
           />
@@ -105,7 +102,7 @@ const HistoryRow = memo(function HistoryRow({ opening }: { opening: PackHistoryE
 
 export default function HistoryScreen() {
   const router = useRouter();
-  const { colors } = useAppTheme();
+  const { colors, isLight } = useAppTheme();
   const [history, setHistory] = useState<PackHistoryEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -165,46 +162,44 @@ export default function HistoryScreen() {
 
   const header = useMemo(() => (
     <View style={styles.headerStack}>
-      <View style={styles.header}>
-        <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER HUB</Text>
-        <Text style={[styles.title, { color: colors.text }]}>Histórico de Packs</Text>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>
-          Reveja boosters abertos e seus melhores pulls.
-        </Text>
-      </View>
+      <TrainerPageHeader
+        title="Histórico de Packs"
+        subtitle="Reveja boosters abertos e seus melhores pulls."
+        icon="time"
+      />
 
       <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}>
-        <Ionicons name="arrow-back" size={18} color="#A9BDD7" />
-        <Text style={styles.backText}>Voltar</Text>
+        <Ionicons name="arrow-back" size={18} color={colors.muted} />
+        <Text style={[styles.backText, { color: colors.muted }]}>Voltar</Text>
       </Pressable>
 
-      <View style={styles.hero}>
+      <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
         <View>
-          <Text style={styles.heroKicker}>TOTAL ABERTO</Text>
-          <Text style={styles.heroValue}>{total.toLocaleString('pt-BR')}</Text>
-          <Text style={styles.heroText}>boosters registrados</Text>
+          <Text style={[styles.heroKicker, { color: colors.yellow }]}>TOTAL ABERTO</Text>
+          <Text style={[styles.heroValue, { color: colors.text }]}>{total.toLocaleString('pt-BR')}</Text>
+          <Text style={[styles.heroText, { color: colors.muted }]}>boosters registrados</Text>
         </View>
-        <View style={styles.heroIcon}>
-          <Ionicons name="time" size={28} color={gameTheme.colors.yellow} />
+        <View style={[styles.heroIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name="time" size={28} color={colors.yellow} />
         </View>
       </View>
 
       {bestPulls.length > 0 ? (
         <View style={styles.bestSection}>
-          <Text style={styles.sectionTitle}>Melhores pulls recentes</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Melhores pulls recentes</Text>
           <View style={styles.bestGrid}>
             {bestPulls.map((card: any, index) => (
-              <View key={`${card.id ?? 'card'}-${index}`} style={styles.bestCard}>
+              <View key={`${card.id ?? 'card'}-${index}`} style={[styles.bestCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {card.image ? (
                   <Image
                     source={{ uri: card.image }}
-                    style={styles.bestImage}
+                    style={[styles.bestImage, { backgroundColor: isLight ? '#EDF2F7' : colors.bg }]}
                     resizeMode="contain"
                     fadeDuration={Platform.OS === 'android' ? 0 : undefined}
                   />
-                ) : <View style={styles.bestImage} />}
-                <Text numberOfLines={1} style={styles.bestName}>{card.name ?? 'Carta'}</Text>
-                <Text numberOfLines={1} style={styles.bestRarity}>{card.rarity ?? 'Comum'}</Text>
+                ) : <View style={[styles.bestImage, { backgroundColor: colors.surfaceAlt }]} />}
+                <Text numberOfLines={1} style={[styles.bestName, { color: colors.text }]}>{card.name ?? 'Carta'}</Text>
+                <Text numberOfLines={1} style={[styles.bestRarity, { color: colors.yellow }]}>{card.rarity ?? 'Comum'}</Text>
               </View>
             ))}
           </View>
@@ -212,11 +207,13 @@ export default function HistoryScreen() {
       ) : null}
 
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Aberturas</Text>
-        <Text style={styles.count}>{history.length}/{total}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Aberturas</Text>
+        <View style={[styles.countBadge, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+          <Text style={[styles.count, { color: colors.muted }]}>{history.length}/{total}</Text>
+        </View>
       </View>
     </View>
-  ), [bestPulls, colors.muted, colors.text, colors.yellow, history.length, router, total]);
+  ), [bestPulls, colors.accent, colors.accentSoft, colors.bg, colors.border, colors.muted, colors.surface, colors.surfaceAlt, colors.text, colors.yellow, history.length, isLight, router, total]);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<PackHistoryEntry>) => <HistoryRow opening={item} />,
@@ -232,14 +229,14 @@ export default function HistoryScreen() {
         renderItem={renderItem}
         ListHeaderComponent={header}
         ListEmptyComponent={!loading ? (
-          <View style={styles.empty}>
-            <Ionicons name="cube-outline" size={34} color="#627C9D" />
-            <Text style={styles.emptyTitle}>Nenhum pack aberto</Text>
-            <Text style={styles.emptyText}>Suas próximas aberturas aparecerão aqui.</Text>
+          <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="cube-outline" size={34} color={colors.accent} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum pack aberto</Text>
+            <Text style={[styles.emptyText, { color: colors.muted }]}>Suas próximas aberturas aparecerão aqui.</Text>
           </View>
         ) : null}
         ListFooterComponent={loadingMore ? (
-          <ActivityIndicator style={styles.footerLoader} color={gameTheme.colors.yellow} />
+          <ActivityIndicator style={styles.footerLoader} color={colors.yellow} />
         ) : null}
         contentContainerStyle={styles.content}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -262,38 +259,35 @@ const styles = StyleSheet.create({
   safe: { flex: 1, overflow: 'hidden' },
   content: { width: '100%', maxWidth: 1280, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 36 },
   headerStack: { gap: 16, marginBottom: 8 },
-  header: { width: '100%', gap: 5, marginBottom: 4 },
-  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
-  title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
-  subtitle: { fontSize: 15, lineHeight: 21 },
   backRow: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7 },
-  backText: { color: '#A9BDD7', fontSize: 12, fontWeight: '800' },
-  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderRadius: 22, backgroundColor: '#10284B', borderWidth: 1, borderColor: '#285A9A' },
-  heroKicker: { color: gameTheme.colors.yellow, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
-  heroValue: { color: '#fff', fontSize: 32, fontWeight: '900', marginTop: 2 },
-  heroText: { color: '#9FB4CF', fontSize: 10 },
-  heroIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C291B' },
+  backText: { fontSize: 12, fontWeight: '800' },
+  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderRadius: 22, borderWidth: 1 },
+  heroKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  heroValue: { fontSize: 32, fontWeight: '900', marginTop: 2 },
+  heroText: { fontSize: 10 },
+  heroIcon: { width: 56, height: 56, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   bestSection: { gap: 9 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { color: '#fff', fontSize: 19, fontWeight: '900' },
-  count: { color: '#8195AF', fontSize: 10, fontWeight: '800' },
+  sectionTitle: { fontSize: 19, fontWeight: '900' },
+  countBadge: { minWidth: 48, height: 30, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  count: { fontSize: 9, fontWeight: '900' },
   bestGrid: { flexDirection: 'row', gap: 9 },
-  bestCard: { flex: 1, minWidth: 0, padding: 7, borderRadius: 15, backgroundColor: '#101D30', borderWidth: 1, borderColor: '#263E5C' },
-  bestImage: { width: '100%', aspectRatio: 0.72, borderRadius: 9, backgroundColor: '#091524' },
-  bestName: { color: '#fff', fontSize: 10, fontWeight: '900', marginTop: 5 },
-  bestRarity: { color: gameTheme.colors.yellow, fontSize: 8, marginTop: 2 },
-  empty: { alignItems: 'center', padding: 26, gap: 7, borderRadius: 18, backgroundColor: '#0E1A2B', borderWidth: 1, borderColor: '#203650', marginTop: 10 },
-  emptyTitle: { color: '#fff', fontSize: 15, fontWeight: '900' },
-  emptyText: { color: '#7E92AD', fontSize: 10 },
+  bestCard: { flex: 1, minWidth: 0, padding: 7, borderRadius: 15, borderWidth: 1 },
+  bestImage: { width: '100%', aspectRatio: .72, borderRadius: 9 },
+  bestName: { fontSize: 10, fontWeight: '900', marginTop: 5 },
+  bestRarity: { fontSize: 8, marginTop: 2 },
+  empty: { alignItems: 'center', padding: 26, gap: 7, borderRadius: 18, borderWidth: 1, marginTop: 10 },
+  emptyTitle: { fontSize: 15, fontWeight: '900' },
+  emptyText: { fontSize: 10 },
   separator: { height: 8 },
-  row: { minHeight: 90, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, backgroundColor: '#101D30', borderWidth: 1, borderColor: '#263E5C' },
-  packIcon: { width: 55, height: 68, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#091524', overflow: 'hidden' },
+  row: { minHeight: 90, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, borderWidth: 1 },
+  packIcon: { width: 55, height: 68, borderRadius: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   packImage: { width: '90%', height: '90%' },
   rowBody: { flex: 1, minWidth: 0 },
-  packName: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  meta: { color: '#778CA8', fontSize: 8, marginTop: 3 },
-  pull: { color: '#AFC2DA', fontSize: 9, marginTop: 5, fontWeight: '700' },
+  packName: { fontSize: 12, fontWeight: '900' },
+  meta: { fontSize: 8, marginTop: 3 },
+  pull: { fontSize: 9, marginTop: 5, fontWeight: '700' },
   cardsPreview: { flexDirection: 'row', alignItems: 'center', paddingLeft: 6 },
-  miniCard: { width: 34, height: 47, borderRadius: 4, borderWidth: 1, borderColor: '#263E5C' },
+  miniCard: { width: 34, height: 47, borderRadius: 4, borderWidth: 1 },
   footerLoader: { marginVertical: 18 },
 });
