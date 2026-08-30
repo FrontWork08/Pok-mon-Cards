@@ -22,6 +22,7 @@ import { useWallet } from '@/wallet/WalletProvider';
 import { isCurrentUserAdmin } from '@/services/market';
 import { getMaintenanceStatus, type AppRuntimeStatus } from '@/services/maintenance';
 import { publishMyOnlinePresence } from '@/services/presence';
+import { WebPwaBootstrap } from '@/components/WebPwaBootstrap';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
@@ -517,7 +518,7 @@ function AppStack() {
 }
 
 export default function RootLayout() {
-  return <SafeAreaProvider><ThemeProvider><WalletProvider><AppStack /></WalletProvider></ThemeProvider></SafeAreaProvider>;
+  return <SafeAreaProvider><ThemeProvider><WalletProvider><WebPwaBootstrap /><AppStack /></WalletProvider></ThemeProvider></SafeAreaProvider>;
 }
 
 

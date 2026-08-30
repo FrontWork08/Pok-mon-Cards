@@ -22,5 +22,51 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "shortcuts": [
+    {
+      "name": "Minha Bag",
+      "short_name": "Bag",
+      "description": "Abrir sua coleção de cartas.",
+      "url": "/bag",
+      "icons": [
+        {
+          "src": "/icon.png",
+          "sizes": "1024x1024",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Pack Lab",
+      "short_name": "Packs",
+      "description": "Abrir a loja de boosters.",
+      "url": "/packs",
+      "icons": [
+        {
+          "src": "/icon.png",
+          "sizes": "1024x1024",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Social Hub",
+      "short_name": "Amigos",
+      "description": "Abrir amigos, mensagens e QR.",
+      "url": "/friends",
+      "icons": [
+        {
+          "src": "/icon.png",
+          "sizes": "1024x1024",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }
