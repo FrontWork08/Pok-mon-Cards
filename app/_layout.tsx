@@ -9,7 +9,7 @@ import { ReleaseCampaignNotice } from '@/components/ReleaseCampaignNotice';
 import { ThemeProvider, useAppTheme } from '@/theme/ThemeProvider';
 import { registerPushNotifications, resolveNotificationRoute, subscribeToMyNotifications } from '@/services/notifications';
 import { playBattleSound } from '@/services/battleEffects';
-import { completeOAuthFromUrl, isOAuthCallbackUrl, isPasswordRecoveryUrl } from '@/services/auth';
+import { clearPendingPasswordRecovery, completeOAuthFromUrl, isOAuthCallbackUrl, isPasswordRecoveryUrl, isPendingPasswordRecoveryFor } from '@/services/auth';
 import { getMyProfile, type PlayerProfile } from '@/services/player';
 import { supabase } from '@/lib/supabase';
 import { WalletProvider } from '@/wallet/WalletProvider';
@@ -60,11 +60,17 @@ function AppStack() {
 
     const handleOAuthUrl = async (url?: string | null) => {
       if (disposed || !url || !isOAuthCallbackUrl(url)) return;
-      const passwordRecovery = isPasswordRecoveryUrl(url);
+      const recoveryMarkerInUrl = isPasswordRecoveryUrl(url);
+      let passwordRecovery = recoveryMarkerInUrl;
       try {
         const session = await completeOAuthFromUrl(url);
         if (disposed || !session?.user) return;
+
+        const pendingRecoveryForUser = await isPendingPasswordRecoveryFor(session.user.email);
+        passwordRecovery = recoveryMarkerInUrl || pendingRecoveryForUser;
+
         if (passwordRecovery) {
+          await clearPendingPasswordRecovery();
           router.replace('/reset-password');
         } else {
           router.replace('/(tabs)');
