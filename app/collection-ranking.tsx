@@ -90,7 +90,7 @@ export default function CollectionRankingScreen() {
   return (
     <Screen
       title="Ranking de Coleções"
-      subtitle="A página abre sempre no Semanal. O ranking Global continua permanente e nunca é resetado."
+      subtitle="O Semanal mede apenas cartas novas únicas. Duplicatas não pontuam; o Global continua permanente."
     >
       <View style={styles.topRow}>
         <Pressable
@@ -170,7 +170,7 @@ export default function CollectionRankingScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.infoTitle, { color: colors.text }]}>Valor conquistado na semana</Text>
               <Text style={[styles.infoText, { color: colors.muted }]}>
-                Conta o valor das cartas no momento em que são obtidas por aberturas oficiais. Mudança posterior de preço e transferências entre jogadores não dão pontos extras.
+                Conta somente a primeira obtenção de cada carta diferente por abertura oficial. Duplicatas valem 0 no semanal. O valor é congelado no momento em que a carta entra na coleção.
               </Text>
               {weeklyMeta ? (
                 <Text style={[styles.periodText, { color: colors.yellow }]}>
@@ -269,7 +269,7 @@ export default function CollectionRankingScreen() {
                     @{row.username}{mine ? ' • VOCÊ' : ''}
                   </Text>
                   <Text style={[styles.coverage, { color: colors.muted }]}>
-                    +{row.cards_gained.toLocaleString('pt-BR')} cartas • {row.packs_opened.toLocaleString('pt-BR')} packs
+                    +{row.cards_gained.toLocaleString('pt-BR')} cartas únicas • {row.packs_opened.toLocaleString('pt-BR')} packs c/ novidade
                   </Text>
                   {row.reward_coins > 0 || row.reward_diamonds > 0 ? (
                     <Text style={[styles.projectedReward, { color: colors.yellow }]}>
@@ -279,7 +279,7 @@ export default function CollectionRankingScreen() {
                 </View>
 
                 <View style={styles.valueWrap}>
-                  <Text style={[styles.valueLabel, { color: colors.muted }]}>GANHO SEMANAL</Text>
+                  <Text style={[styles.valueLabel, { color: colors.muted }]}>GANHO SEMANAL ÚNICO</Text>
                   <Text style={[styles.value, { color: colors.yellow }]}>{formatUsd(row.weekly_value_usd)}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={17} color={colors.muted} />
