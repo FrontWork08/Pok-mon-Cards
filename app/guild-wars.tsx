@@ -25,6 +25,11 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
 import { useWallet } from '@/wallet/WalletProvider';
 
+function formatGuildDominanceName(name:string){
+  const trimmed=name.trim();
+  return /^guilda\s/i.test(trimmed)?trimmed:`Guilda ${trimmed}`;
+}
+
 type PickerState = {
   mode: 'defense' | 'attack';
   warId: string;
@@ -451,7 +456,7 @@ function GymTerritoryCard({
       <View style={[styles.dominance,{backgroundColor:ownerColor+'18',borderColor:ownerColor}]}>
         <Ionicons name="flag" size={14} color={ownerColor}/>
         <Text style={[styles.dominanceText,{color:colors.text}]}>
-          {gym.ownerGuild ? `Guilda ${gym.ownerGuild.name} domina ${gym.name}` : `${gym.name} está sem domínio`}
+          {gym.ownerGuild ? `${formatGuildDominanceName(gym.ownerGuild.name)} domina ${gym.name}` : `${gym.name} está sem domínio`}
         </Text>
       </View>
 
