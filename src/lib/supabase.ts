@@ -6,6 +6,13 @@ import { createClient } from '@supabase/supabase-js';
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '';
 
+// Capture the very first browser URL before Supabase processes auth fragments.
+// Password-recovery links may have their hash/query consumed during client
+// initialization, so reading window.location later can miss type=recovery.
+export const initialWebAuthUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+  ? window.location.href
+  : null;
+
 if (!url || !publishableKey) {
   console.warn('Supabase environment variables are not configured.');
 }
