@@ -29,6 +29,7 @@ type Props = {
   onConfirm: () => void | Promise<void>;
   confirmLabel?: string;
   working?: boolean;
+  errorText?: string;
 };
 
 export function CardPickerModal({
@@ -49,6 +50,7 @@ export function CardPickerModal({
   onConfirm,
   confirmLabel = 'CONFIRMAR SELEÇÃO',
   working = false,
+  errorText = '',
 }: Props) {
   const { colors } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -185,6 +187,13 @@ export function CardPickerModal({
           ListEmptyComponent={<View style={styles.empty}><Ionicons name="search-outline" size={32} color={colors.muted} /><Text style={[styles.emptyText, { color: colors.muted }]}>Nenhuma carta encontrada.</Text></View>}
         />
 
+        {errorText ? (
+          <View style={styles.pickerError}>
+            <Ionicons name="alert-circle" size={17} color="#FF9FAF" />
+            <Text style={styles.pickerErrorText}>{errorText}</Text>
+          </View>
+        ) : null}
+
         <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <View style={styles.footerInfo}>
             <Text style={[styles.footerLabel, { color: colors.muted }]}>{mode === 'single' ? 'SELEÇÃO' : 'CARTAS SELECIONADAS'}</Text>
@@ -193,7 +202,7 @@ export function CardPickerModal({
           <Pressable
             style={[styles.confirm, { backgroundColor: colors.yellow }, selectedCount === 0 && styles.disabled]}
             disabled={working || selectedCount === 0}
-            onPress={onConfirm}
+            onPress={() => { void onConfirm(); }}
           >
             <Ionicons name={working ? 'hourglass' : 'checkmark-circle'} size={20} color="#07111F" />
             <Text style={styles.confirmText}>{working ? 'SALVANDO…' : confirmLabel}</Text>
@@ -292,6 +301,8 @@ const styles = StyleSheet.create({
   qty: { minWidth: 22, textAlign: 'center', fontSize: 13, fontWeight: '900' },
   empty: { padding: 50, alignItems: 'center', gap: 8 },
   emptyText: { fontSize: 12 },
+  pickerError:{marginHorizontal:14,marginBottom:8,borderRadius:12,borderWidth:1,borderColor:'#683243',backgroundColor:'#351A24',paddingHorizontal:10,paddingVertical:9,flexDirection:'row',alignItems:'center',gap:7},
+  pickerErrorText:{flex:1,color:'#FFD7DD',fontSize:9,fontWeight:'800',lineHeight:13},
   footer: { borderTopWidth: 1, paddingHorizontal: 14, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 12 },
   footerInfo: { flex: 1 },
   footerLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
