@@ -8,6 +8,7 @@ const assert = (condition, message) => {
 
 const requiredFiles = [
   'app/friend-qr-scan.tsx',
+  'app/reset-password.tsx',
   'src/components/FriendQrCard.tsx',
   'src/components/GuildChatPanel.tsx',
   'src/components/ReleaseCampaignNotice.tsx',
@@ -71,6 +72,18 @@ if (existsSync('app/_layout.tsx') && existsSync('src/wallet/WalletProvider.tsx')
   assert(layout.includes('walletLoading'), 'Regressão: auth guard precisa aguardar a restauração da sessão.');
   assert(wallet.includes('if (!nextUserId)'), 'Regressão: WalletProvider não limpa estado imediatamente no SIGNED_OUT.');
   assert(wallet.includes('setUserId(null)'), 'Regressão: logout não limpa o usuário global.');
+}
+
+if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsSync('app/reset-password.tsx')) {
+  const auth = read('src/services/auth.ts');
+  const login = read('app/index.tsx');
+  const reset = read('app/reset-password.tsx');
+  assert(auth.includes('resetPasswordForEmail'), 'Regressão: serviço de recuperação de senha ausente.');
+  assert(auth.includes('updateUser({ password })'), 'Regressão: atualização segura da nova senha ausente.');
+  assert(login.includes('ESQUECI MINHA SENHA'), 'Regressão: login perdeu o botão de recuperação de senha.');
+  assert(login.includes("event === 'PASSWORD_RECOVERY'"), 'Regressão: callback PASSWORD_RECOVERY não é tratado.');
+  assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
+  assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
 }
 
 if (failures.length) {
