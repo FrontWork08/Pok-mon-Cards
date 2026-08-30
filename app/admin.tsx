@@ -1093,7 +1093,7 @@ export default function AdminScreen() {
       setReleaseStatus(result);
       setReleaseDownloadUrlInput(result.download_url ?? value);
       setReleaseReadiness(null);
-      setNotice('Link do APK 1.0 salvo. Isso não inicia freeze nem reset.');
+      setNotice('Link do APK atual salvo. Isso não inicia freeze nem reset.');
     } catch (e) {
       const message = e instanceof Error ? e.message : '';
       setError(
@@ -1123,19 +1123,19 @@ export default function AdminScreen() {
       };
       if (
         release.status !== 'ready'
-        || release.version !== '1.0.0'
+        || release.version !== releaseStatus?.target_version
         || typeof release.downloadUrl !== 'string'
         || !release.downloadUrl.trim()
       ) {
         throw new Error('RELEASE_METADATA_NOT_READY');
       }
       setReleaseDownloadUrlInput(release.downloadUrl.trim());
-      setNotice('APK 1.0 encontrado no site oficial. Revise a URL e toque em SALVAR APK.');
+      setNotice(`APK ${release.version ?? releaseStatus?.target_version ?? 'atual'} encontrado no site oficial. Revise a URL e toque em SALVAR APK.`);
     } catch (e) {
       const message = e instanceof Error ? e.message : '';
       setError(
         message.includes('NOT_READY')
-          ? 'O site ainda não publicou um APK 1.0 válido. Gere o build Android primeiro.'
+          ? `O site ainda não publicou o APK ${releaseStatus?.target_version ?? 'atual'} esperado. Gere/valide o build Android primeiro.`
           : 'Não foi possível importar o metadata do APK agora.',
       );
     } finally {
@@ -1282,13 +1282,13 @@ export default function AdminScreen() {
 
                 <View style={[styles.releaseUrlBox,{borderColor:releaseStatus?.download_url ? '#2F9E68' : colors.border}]}>
                   <View style={{flex:1,minWidth:210}}>
-                    <Text style={[styles.releaseUrlLabel,{color:colors.muted}]}>URL OFICIAL DO APK 1.0</Text>
+                    <Text style={[styles.releaseUrlLabel,{color:colors.muted}]}>URL OFICIAL DO APK ATUAL</Text>
                     <TextInput
                       value={releaseDownloadUrl}
                       onChangeText={setReleaseDownloadUrlInput}
                       autoCapitalize="none"
                       autoCorrect={false}
-                      placeholder="https://expo.dev/.../TrainerCollection-v1.0.0.apk"
+                      placeholder="https://expo.dev/.../TrainerCollection.apk"
                       placeholderTextColor={colors.muted}
                       style={[styles.releaseUrlInput,{color:colors.text,backgroundColor:colors.surface,borderColor:colors.border}]}
                     />
