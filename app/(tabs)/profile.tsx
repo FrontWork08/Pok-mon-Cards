@@ -160,7 +160,7 @@ export default function ProfileScreen() {
       setProfile(null);
       setStats(null);
       setFriendCount(0);
-      router.replace('/');
+      router.replace('/login');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível sair.');
     }
