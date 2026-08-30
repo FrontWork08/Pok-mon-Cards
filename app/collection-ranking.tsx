@@ -264,13 +264,6 @@ export default function CollectionRankingScreen() {
                   backgroundColor={colors.accentSoft}
                   size={46}
                 />
-                <TrainerAvatar
-                  icon={avatars[row.player_id]?.profileIcon}
-                  avatarUrl={getProfileAvatarUrl(avatars[row.player_id]?.avatarPath, avatars[row.player_id]?.avatarUpdatedAt)}
-                  color={colors.accent}
-                  backgroundColor={colors.accentSoft}
-                  size={46}
-                />
                 <View style={styles.identity}>
                   <Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>
                     @{row.username}{mine ? ' • VOCÊ' : ''}
