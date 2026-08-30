@@ -43,6 +43,13 @@ if (existsSync('src/components/ReleaseCampaignNotice.tsx')) {
   assert(release.includes('compareVersions'), 'Regressão: comparação de versão mínima ausente.');
 }
 
+if (existsSync('app/collection-ranking.tsx')) {
+  const ranking = read('app/collection-ranking.tsx');
+  const weeklySection = ranking.split("!loading && mode === 'weekly'")[1]?.split("!loading && mode === 'global'")[0] ?? '';
+  const avatarCount = (weeklySection.match(/<TrainerAvatar/g) ?? []).length;
+  assert(avatarCount === 1, 'Regressão: ranking semanal deve renderizar exatamente um avatar por jogador.');
+}
+
 if (existsSync('app/friend-qr-scan.tsx')) {
   const scanner = read('app/friend-qr-scan.tsx');
   assert(scanner.includes('CameraView'), 'Regressão: scanner de QR perdeu a câmera.');
