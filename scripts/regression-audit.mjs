@@ -79,11 +79,13 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   const login = read('app/index.tsx');
   const reset = read('app/reset-password.tsx');
   assert(auth.includes('resetPasswordForEmail'), 'Regressão: serviço de recuperação de senha ausente.');
+  assert(auth.includes('return GOOGLE_OAUTH_REDIRECT'), 'Regressão: recuperação nativa deixou de abrir o callback do APK.');
   assert(auth.includes('updateUser({ password })'), 'Regressão: atualização segura da nova senha ausente.');
   assert(login.includes('ESQUECI MINHA SENHA'), 'Regressão: login perdeu o botão de recuperação de senha.');
   assert(login.includes("event === 'PASSWORD_RECOVERY'"), 'Regressão: callback PASSWORD_RECOVERY não é tratado.');
   assert(read('src/lib/supabase.ts').includes('initialWebAuthUrl'), 'Regressão: URL inicial de recuperação não é preservada antes do Supabase processá-la.');
   assert(read('app/_layout.tsx').includes("event === 'PASSWORD_RECOVERY'"), 'Regressão: layout global não trata PASSWORD_RECOVERY.');
+  assert(read('app/_layout.tsx').includes('isPasswordRecoveryUrl(url)'), 'Regressão: deep link nativo não diferencia reset de senha de OAuth comum.');
   assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
