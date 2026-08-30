@@ -61,12 +61,13 @@ function AppStack() {
     const handleOAuthUrl = async (url?: string | null) => {
       if (disposed || !url || !isOAuthCallbackUrl(url)) return;
       const recoveryMarkerInUrl = isPasswordRecoveryUrl(url);
+      let passwordRecovery = recoveryMarkerInUrl;
       try {
         const session = await completeOAuthFromUrl(url);
         if (disposed || !session?.user) return;
 
         const pendingRecoveryForUser = await isPendingPasswordRecoveryFor(session.user.email);
-        const passwordRecovery = recoveryMarkerInUrl || pendingRecoveryForUser;
+        passwordRecovery = recoveryMarkerInUrl || pendingRecoveryForUser;
 
         if (passwordRecovery) {
           await clearPendingPasswordRecovery();
