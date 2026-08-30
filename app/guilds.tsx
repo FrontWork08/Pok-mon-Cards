@@ -23,7 +23,8 @@ import {
   type GuildHub,
   type GuildWeeklyReward,
 } from '@/services/guilds';
-import { findPlayers } from '@/services/player';
+import { findPlayers, getPlayerAvatarMap, getProfileAvatarUrl, type PlayerAvatarMeta } from '@/services/player';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
@@ -42,6 +43,7 @@ export default function GuildsScreen() {
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [collectiveOpen, setCollectiveOpen] = useState(false);
+  const [avatars, setAvatars] = useState<Record<string, PlayerAvatarMeta>>({});
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -50,6 +52,8 @@ export default function GuildsScreen() {
       const next = await getGuildHub();
       setHub(next);
       setSelectedId((current) => current ?? next.myMembership?.guildId ?? next.guilds[0]?.id ?? null);
+      const memberIds = next.guilds.flatMap((guild) => guild.members.map((member) => member.id));
+      setAvatars(await getPlayerAvatarMap(memberIds).catch(() => ({})));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível carregar as guildas.');
     } finally {
@@ -212,6 +216,7 @@ export default function GuildsScreen() {
         onOpenPlayer={(id) => router.push(`/player/${id}`)}
         onKick={confirmKick}
         onSetRole={(member, role) => void run(`role:${member.id}`, () => setGuildMemberRole(selected.id, member.id, role), 'Cargo atualizado.')}
+        avatars={avatars}
       /> : null}
 
       {selected && myMembership?.guildId === selected.id ? (
@@ -275,7 +280,7 @@ export default function GuildsScreen() {
 }
 
 function GuildDetail({
-  guild, myGuildId, myRole, working, weeklyReward, onClaimWeeklyReward, onJoin, onLeave, onOpenPlayer, onKick, onSetRole,
+  guild, myGuildId, myRole, working, weeklyReward, onClaimWeeklyReward, onJoin, onLeave, onOpenPlayer, onKick, onSetRole, avatars,
 }: {
   guild: Guild;
   myGuildId: string | null;
@@ -288,6 +293,7 @@ function GuildDetail({
   onOpenPlayer: (id: string) => void;
   onKick: (member: GuildMember) => void;
   onSetRole: (member: GuildMember, role: 'officer' | 'member') => void;
+  avatars: Record<string, PlayerAvatarMeta>;
 }) {
   const { colors } = useAppTheme();
   const mine = myGuildId === guild.id;
@@ -328,7 +334,7 @@ function GuildDetail({
     </View> : null}
 
     <View style={styles.subHeader}><Text style={[styles.subTitle, { color: colors.text }]}>Membros</Text><Text style={[styles.subMeta, { color: colors.muted }]}>{guild.members.length}</Text></View>
-    <View style={styles.memberList}>{guild.members.length === 0 ? <Text style={[styles.noMembers, { color: colors.muted }]}>Nenhum membro ainda. Seja o primeiro a entrar.</Text> : guild.members.map((member) => <View key={member.id} style={[styles.memberRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Pressable style={styles.memberIdentity} onPress={() => onOpenPlayer(member.id)}><View style={[styles.memberAvatar, { backgroundColor: guild.color + '25' }]}><Text style={[styles.memberAvatarText, { color: guild.color }]}>{member.username.slice(0, 1).toUpperCase()}</Text></View><View style={{ flex: 1 }}><Text style={[styles.memberName, { color: colors.text }]}>@{member.username}</Text><Text style={[styles.memberMeta, { color: colors.muted }]}>Nível {member.level} • {member.role === 'leader' ? 'Chefe' : member.role === 'officer' ? 'Oficial' : 'Membro'}</Text></View></Pressable>{leader && member.role !== 'leader' ? <View style={styles.memberActions}><Pressable disabled={working === `role:${member.id}`} onPress={() => onSetRole(member, member.role === 'officer' ? 'member' : 'officer')} style={[styles.roleButton, { borderColor: guild.color }]}><Text style={[styles.roleText, { color: guild.color }]}>{member.role === 'officer' ? 'MEMBRO' : 'OFICIAL'}</Text></Pressable><Pressable disabled={working === `kick:${member.id}`} onPress={() => onKick(member)} style={styles.kick}><Ionicons name="person-remove" size={16} color="#FF9FAF" /></Pressable></View> : <Ionicons name="chevron-forward" size={17} color={colors.muted} />}</View>)}</View>
+    <View style={styles.memberList}>{guild.members.length === 0 ? <Text style={[styles.noMembers, { color: colors.muted }]}>Nenhum membro ainda. Seja o primeiro a entrar.</Text> : guild.members.map((member) => <View key={member.id} style={[styles.memberRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Pressable style={styles.memberIdentity} onPress={() => onOpenPlayer(member.id)}><TrainerAvatar icon={avatars[member.id]?.profileIcon} avatarUrl={getProfileAvatarUrl(avatars[member.id]?.avatarPath,avatars[member.id]?.avatarUpdatedAt)} color={guild.color} backgroundColor={guild.color + '25'} size={38}/><View style={{ flex: 1 }}><Text style={[styles.memberName, { color: colors.text }]}>@{member.username}</Text><Text style={[styles.memberMeta, { color: colors.muted }]}>Nível {member.level} • {member.role === 'leader' ? 'Chefe' : member.role === 'officer' ? 'Oficial' : 'Membro'}</Text></View></Pressable>{leader && member.role !== 'leader' ? <View style={styles.memberActions}><Pressable disabled={working === `role:${member.id}`} onPress={() => onSetRole(member, member.role === 'officer' ? 'member' : 'officer')} style={[styles.roleButton, { borderColor: guild.color }]}><Text style={[styles.roleText, { color: guild.color }]}>{member.role === 'officer' ? 'MEMBRO' : 'OFICIAL'}</Text></Pressable><Pressable disabled={working === `kick:${member.id}`} onPress={() => onKick(member)} style={styles.kick}><Ionicons name="person-remove" size={16} color="#FF9FAF" /></Pressable></View> : <Ionicons name="chevron-forward" size={17} color={colors.muted} />}</View>)}</View>
   </View>;
 }
 
