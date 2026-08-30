@@ -223,6 +223,16 @@ export type AdminReleaseReadiness = {
   preview: AdminReleaseResetPreview;
 };
 
+export type AdminReleaseSnapshotState = {
+  phase: string;
+  preparedSnapshotId: string | null;
+  preparedAt: string | null;
+  usedSnapshotId: string | null;
+  usedAt: string | null;
+  restoredSnapshotId: string | null;
+  restoredAt: string | null;
+};
+
 export type AdminPermission =
   | 'audit_users'
   | 'moderate_users'
@@ -375,6 +385,25 @@ export async function getAdminReleaseResetPreview() {
 }
 export async function getAdminReleaseReadiness() {
   return invokeAdmin({ action: 'release_readiness' }) as Promise<AdminReleaseReadiness>;
+}
+
+export async function beginAdminReleaseFreeze() {
+  return invokeAdmin({ action: 'begin_release_freeze' }) as Promise<Record<string, any>>;
+}
+export async function createAdminReleaseSnapshot() {
+  return invokeAdmin({ action: 'create_release_snapshot' }) as Promise<Record<string, any>>;
+}
+export async function executeAdminReleaseReset(snapshotId: string, confirmPhrase: string) {
+  return invokeAdmin({ action: 'execute_release_reset', snapshotId, confirmPhrase }) as Promise<Record<string, any>>;
+}
+export async function getAdminReleaseSnapshotState() {
+  return invokeAdmin({ action: 'release_snapshot_state' }) as Promise<AdminReleaseSnapshotState>;
+}
+export async function restoreAdminReleaseSnapshot(snapshotId: string, confirmPhrase: string) {
+  return invokeAdmin({ action: 'restore_release_snapshot', snapshotId, confirmPhrase }) as Promise<Record<string, any>>;
+}
+export async function completeAdminRelease(confirmPhrase: string) {
+  return invokeAdmin({ action: 'complete_release', confirmPhrase }) as Promise<Record<string, any>>;
 }
 export async function setLegacySelectionEnabled(enabled: boolean) {
   return invokeAdmin({ action: 'set_legacy_selection', enabled }) as Promise<AdminReleaseCampaignStatus>;

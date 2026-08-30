@@ -121,6 +121,66 @@ Deno.serve(async (req: Request) => {
       return json({ data });
     }
 
+    if (body.action === "create_release_snapshot") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const { data, error } = await admin.rpc("server_create_release_snapshot", {
+        p_actor_id: user.id,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "execute_release_reset") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      if (String(body.confirmPhrase ?? "").trim().toUpperCase() !== "RESETAR 1.0") {
+        return json({ error: "RESET_CONFIRMATION_REQUIRED" }, 400);
+      }
+      const snapshotId = String(body.snapshotId ?? "").trim();
+      if (!snapshotId) return json({ error: "RELEASE_SNAPSHOT_REQUIRED" }, 400);
+      const { data, error } = await admin.rpc("server_execute_release_reset", {
+        p_actor_id: user.id,
+        p_snapshot_id: snapshotId,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "release_snapshot_state") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const { data, error } = await admin.rpc("server_release_snapshot_state", {
+        p_actor_id: user.id,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "restore_release_snapshot") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      if (String(body.confirmPhrase ?? "").trim().toUpperCase() !== "RESTAURAR 1.0") {
+        return json({ error: "RESTORE_CONFIRMATION_REQUIRED" }, 400);
+      }
+      const snapshotId = String(body.snapshotId ?? "").trim();
+      if (!snapshotId) return json({ error: "RELEASE_USED_SNAPSHOT_REQUIRED" }, 400);
+      const { data, error } = await admin.rpc("server_restore_release_snapshot", {
+        p_actor_id: user.id,
+        p_snapshot_id: snapshotId,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "complete_release") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      if (String(body.confirmPhrase ?? "").trim().toUpperCase() !== "CONCLUIR 1.0") {
+        return json({ error: "COMPLETE_CONFIRMATION_REQUIRED" }, 400);
+      }
+      const { data, error } = await admin.rpc("server_complete_release", {
+        p_actor_id: user.id,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
     if (body.action === "release_campaign_status") {
       const { data: campaign, error: campaignError } = await admin
         .from("release_campaigns")

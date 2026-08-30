@@ -44,6 +44,12 @@ import {
   runAdminReleasePreflight,
   getAdminReleaseResetPreview,
   getAdminReleaseReadiness,
+  beginAdminReleaseFreeze,
+  createAdminReleaseSnapshot,
+  executeAdminReleaseReset,
+  getAdminReleaseSnapshotState,
+  restoreAdminReleaseSnapshot,
+  completeAdminRelease,
   setLegacySelectionEnabled,
   setReleaseDownloadUrl,
   type AdminAccess,
@@ -61,6 +67,7 @@ import {
   type AdminReleasePreflight,
   type AdminReleaseResetPreview,
   type AdminReleaseReadiness,
+  type AdminReleaseSnapshotState,
 } from '@/services/admin';
 import { formatUsd } from '@/services/market';
 import { getMyProfile } from '@/services/player';
@@ -120,6 +127,8 @@ export default function AdminScreen() {
   const [releasePreflight, setReleasePreflight] = useState<AdminReleasePreflight | null>(null);
   const [releaseResetPreview, setReleaseResetPreview] = useState<AdminReleaseResetPreview | null>(null);
   const [releaseReadiness, setReleaseReadiness] = useState<AdminReleaseReadiness | null>(null);
+  const [releaseSnapshotState, setReleaseSnapshotState] = useState<AdminReleaseSnapshotState | null>(null);
+  const [releaseDangerPhrase, setReleaseDangerPhrase] = useState('');
   const [releaseDownloadUrl, setReleaseDownloadUrlInput] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('Estamos aplicando uma atualização importante. O jogo voltará em breve.');
   const [gameEvents, setGameEvents] = useState<AdminGameEvent[]>([]);
@@ -916,6 +925,160 @@ export default function AdminScreen() {
   }
 
 
+  async function refreshReleaseSafetyState() {
+    const [status, readiness, snapshot, runtime] = await Promise.all([
+      getAdminReleaseCampaignStatus(),
+      getAdminReleaseReadiness(),
+      getAdminReleaseSnapshotState(),
+      getMaintenanceStatus(),
+    ]);
+    setReleaseStatus(status);
+    setReleaseReadiness(readiness);
+    setReleaseResetPreview(readiness.preview);
+    setReleasePreflight(readiness.preview.preflight);
+    setReleaseSnapshotState(snapshot);
+    setMaintenanceStatus(runtime);
+    return { status, readiness, snapshot, runtime };
+  }
+
+  function confirmBeginReleaseFreeze() {
+    if (working || !adminAccess?.isOwner) return;
+    Alert.alert(
+      'Iniciar freeze da migração?',
+      'Isso ativa manutenção, encerra operações pendentes, devolve cartas do marketplace e completa automaticamente as vagas de Legado com as cartas de maior valor. Ainda NÃO executa o reset.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'INICIAR FREEZE', style: 'destructive', onPress: () => { void beginReleaseFreeze(); } },
+      ],
+    );
+  }
+
+  async function beginReleaseFreeze() {
+    try {
+      setWorking(true);
+      setError(null);
+      await beginAdminReleaseFreeze();
+      await refreshReleaseSafetyState();
+      setNotice('Freeze concluído. Operações foram encerradas e o Legado automático foi finalizado. O reset ainda NÃO foi executado.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível iniciar o freeze.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function prepareReleaseSnapshot() {
+    if (working || !adminAccess?.isOwner) return;
+    try {
+      setWorking(true);
+      setError(null);
+      await createAdminReleaseSnapshot();
+      await refreshReleaseSafetyState();
+      setNotice('Snapshot privado preparado. Agora o reset só poderá rodar se todas as travas continuarem verdes.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível criar o snapshot de segurança.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmExecuteReleaseReset() {
+    if (working || !releaseReadiness?.readyToReset || !releaseReadiness.snapshotId) return;
+    if (releaseDangerPhrase.trim().toUpperCase() !== 'RESETAR 1.0') {
+      setError('Digite RESETAR 1.0 exatamente para liberar o reset.');
+      return;
+    }
+    Alert.alert(
+      'Executar reset 1.0 agora?',
+      'Esta ação reinicia economia, progressão, decks e coleção não preservada. Contas, Admin/Tester, guildas e cartas de Legado permanecem. Um snapshot privado já precisa estar preparado.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'EXECUTAR RESET', style: 'destructive', onPress: () => { void executeReleaseResetNow(); } },
+      ],
+    );
+  }
+
+  async function executeReleaseResetNow() {
+    const snapshotId = releaseReadiness?.snapshotId;
+    if (!snapshotId) return;
+    try {
+      setWorking(true);
+      setError(null);
+      await executeAdminReleaseReset(snapshotId, 'RESETAR 1.0');
+      setReleaseDangerPhrase('');
+      await refreshReleaseSafetyState();
+      setNotice('Reset 1.0 executado com snapshot preservado. A manutenção continua ativa para você conferir o resultado antes de liberar os jogadores.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'O reset foi bloqueado por uma trava de segurança.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmRestoreRelease() {
+    const snapshotId = releaseSnapshotState?.usedSnapshotId;
+    if (working || !snapshotId) return;
+    if (releaseDangerPhrase.trim().toUpperCase() !== 'RESTAURAR 1.0') {
+      setError('Digite RESTAURAR 1.0 exatamente para liberar a restauração.');
+      return;
+    }
+    Alert.alert(
+      'Restaurar snapshot anterior?',
+      'Isso desfaz o reset usando o backup privado e mantém o jogo em manutenção/freeze para uma nova tentativa.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'RESTAURAR', style: 'destructive', onPress: () => { void restoreReleaseNow(snapshotId); } },
+      ],
+    );
+  }
+
+  async function restoreReleaseNow(snapshotId: string) {
+    try {
+      setWorking(true);
+      setError(null);
+      await restoreAdminReleaseSnapshot(snapshotId, 'RESTAURAR 1.0');
+      setReleaseDangerPhrase('');
+      await refreshReleaseSafetyState();
+      setNotice('Snapshot restaurado. O ambiente voltou ao freeze e continua em manutenção.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível restaurar o snapshot.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirmCompleteRelease() {
+    if (working || releaseStatus?.phase !== 'update_required') return;
+    if (releaseDangerPhrase.trim().toUpperCase() !== 'CONCLUIR 1.0') {
+      setError('Digite CONCLUIR 1.0 exatamente para liberar os jogadores.');
+      return;
+    }
+    Alert.alert(
+      'Concluir lançamento 1.0?',
+      'Use somente depois de conferir contas, Legado e saldos. O servidor valida novamente os invariantes, tira a manutenção e reabre a economia.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'CONCLUIR E LIBERAR', onPress: () => { void completeReleaseNow(); } },
+      ],
+    );
+  }
+
+  async function completeReleaseNow() {
+    try {
+      setWorking(true);
+      setError(null);
+      await completeAdminRelease('CONCLUIR 1.0');
+      setReleaseDangerPhrase('');
+      await refreshReleaseSafetyState();
+      setNotice('Trainer Collection 1.0 concluída: manutenção encerrada e economia liberada. A atualização 1.0.1 continua obrigatória para clientes antigos.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'A conclusão foi bloqueada porque uma validação final falhou.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+
   async function saveReleaseDownloadUrl() {
     if (working || !adminAccess?.isOwner) return;
     const value = releaseDownloadUrl.trim();
@@ -1178,6 +1341,88 @@ export default function AdminScreen() {
                       <Text style={[styles.resetReadyText,{color:releaseReadiness.readyToReset ? '#9CEFC1' : colors.muted}]}>{releaseReadiness.readyToReset ? 'TODAS AS TRAVAS PRONTAS — RESET CONTINUA MANUAL E NÃO EXECUTADO' : `FASE ATUAL: ${releaseReadiness.phase.toUpperCase()} • RESET BLOQUEADO`}</Text>
                     </View>
                   </>
+                ) : null}
+              </View>
+
+              <View style={[styles.releaseOpsPanel,{backgroundColor:colors.surfaceAlt,borderColor:releaseStatus.phase === 'completed' ? '#2F9E68' : '#8A6A2D'}]}>
+                <View style={styles.releaseOpsHeader}>
+                  <View style={[styles.resetPreviewIcon,{backgroundColor:releaseStatus.phase === 'completed' ? '#153426' : '#352B16'}]}>
+                    <Ionicons name="shield-checkmark" size={20} color={releaseStatus.phase === 'completed' ? '#65D894' : colors.yellow}/>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={[styles.resetPreviewTitle,{color:colors.text}]}>OPERAÇÃO FINAL DO RESET</Text>
+                    <Text style={[styles.resetPreviewText,{color:colors.muted}]}>Sequência protegida: freeze → snapshot → reset → conferência → conclusão. Nenhuma etapa destrutiva roda sem confirmação.</Text>
+                  </View>
+                </View>
+
+                <View style={styles.releaseOpsSteps}>
+                  <Pressable
+                    disabled={working || !['notice','legacy_selection','freeze'].includes(releaseStatus.phase)}
+                    onPress={confirmBeginReleaseFreeze}
+                    style={[styles.releaseOpsButton,{borderColor:colors.yellow,backgroundColor:'#352B16',opacity:working || releaseStatus.phase === 'completed' || releaseStatus.phase === 'update_required' ? .45 : 1}]}
+                  >
+                    <Ionicons name="snow" size={17} color={colors.yellow}/>
+                    <Text style={[styles.releaseOpsButtonText,{color:colors.yellow}]}>1. INICIAR FREEZE + AUTO LEGADO</Text>
+                  </Pressable>
+
+                  <Pressable
+                    disabled={working || !releaseReadiness?.economyFrozen || !releaseReadiness?.maintenanceEnabled || releaseReadiness?.snapshotPrepared}
+                    onPress={() => { void prepareReleaseSnapshot(); }}
+                    style={[styles.releaseOpsButton,{borderColor:colors.accent,backgroundColor:colors.accentSoft,opacity:working || !releaseReadiness?.economyFrozen || releaseReadiness?.snapshotPrepared ? .45 : 1}]}
+                  >
+                    <Ionicons name="archive" size={17} color={colors.accent}/>
+                    <Text style={[styles.releaseOpsButtonText,{color:colors.accent}]}>2. CRIAR SNAPSHOT PRIVADO</Text>
+                  </Pressable>
+                </View>
+
+                <Text style={[styles.releaseConfirmHint,{color:colors.muted}]}>
+                  Para resetar: RESETAR 1.0 • para desfazer: RESTAURAR 1.0 • para liberar após conferir: CONCLUIR 1.0
+                </Text>
+                <TextInput
+                  value={releaseDangerPhrase}
+                  onChangeText={setReleaseDangerPhrase}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  placeholder="Digite a frase de confirmação"
+                  placeholderTextColor={colors.muted}
+                  style={[styles.releaseConfirmInput,{color:colors.text,backgroundColor:colors.surface,borderColor:colors.border}]}
+                />
+
+                <Pressable
+                  disabled={working || !releaseReadiness?.readyToReset}
+                  onPress={confirmExecuteReleaseReset}
+                  style={[styles.releaseResetButton,{opacity:working || !releaseReadiness?.readyToReset ? .42 : 1}]}
+                >
+                  <Ionicons name="warning" size={18} color="#fff"/>
+                  <Text style={styles.releaseResetButtonText}>3. EXECUTAR RESET 1.0</Text>
+                </Pressable>
+
+                {releaseStatus.phase === 'update_required' ? (
+                  <View style={styles.releaseAfterResetRow}>
+                    <Pressable
+                      disabled={working || !releaseSnapshotState?.usedSnapshotId}
+                      onPress={confirmRestoreRelease}
+                      style={[styles.releaseRestoreButton,{opacity:working || !releaseSnapshotState?.usedSnapshotId ? .42 : 1}]}
+                    >
+                      <Ionicons name="arrow-undo" size={17} color="#FFD7DD"/>
+                      <Text style={styles.releaseRestoreText}>RESTAURAR SNAPSHOT</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={working}
+                      onPress={confirmCompleteRelease}
+                      style={[styles.releaseCompleteButton,{opacity:working ? .45 : 1}]}
+                    >
+                      <Ionicons name="rocket" size={17} color="#07111F"/>
+                      <Text style={styles.releaseCompleteText}>4. CONCLUIR E LIBERAR</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                {releaseStatus.phase === 'completed' ? (
+                  <View style={styles.releaseCompletedBadge}>
+                    <Ionicons name="checkmark-circle" size={18} color="#65D894"/>
+                    <Text style={styles.releaseCompletedText}>LANÇAMENTO CONCLUÍDO • ECONOMIA E SERVIDOR LIBERADOS</Text>
+                  </View>
                 ) : null}
               </View>
 
@@ -2722,4 +2967,20 @@ const styles = StyleSheet.create({
   historyBalance: { fontSize: 8, marginTop: 2 },
   emptyHistory: { borderRadius: 16, borderWidth: 1, padding: 18, alignItems: 'center' },
   emptyText: { fontSize: 10, lineHeight: 15 },
+  releaseOpsPanel:{borderRadius:19,borderWidth:1,padding:13,gap:10},
+  releaseOpsHeader:{flexDirection:'row',alignItems:'flex-start',gap:10},
+  releaseOpsSteps:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  releaseOpsButton:{flexGrow:1,flexBasis:210,minHeight:46,borderRadius:13,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
+  releaseOpsButtonText:{fontSize:8,fontWeight:'900',letterSpacing:.25,textAlign:'center'},
+  releaseConfirmHint:{fontSize:8,lineHeight:13,fontWeight:'700'},
+  releaseConfirmInput:{minHeight:46,borderRadius:13,borderWidth:1,paddingHorizontal:12,fontSize:12,fontWeight:'900',letterSpacing:.4},
+  releaseResetButton:{minHeight:50,borderRadius:14,backgroundColor:'#8B2F3F',borderWidth:1,borderColor:'#C74B5D',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},
+  releaseResetButtonText:{color:'#fff',fontSize:9,fontWeight:'900',letterSpacing:.4},
+  releaseAfterResetRow:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  releaseRestoreButton:{flexGrow:1,flexBasis:180,minHeight:48,borderRadius:13,backgroundColor:'#4A2029',borderWidth:1,borderColor:'#8D4050',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
+  releaseRestoreText:{color:'#FFD7DD',fontSize:8,fontWeight:'900'},
+  releaseCompleteButton:{flexGrow:1,flexBasis:180,minHeight:48,borderRadius:13,backgroundColor:'#65D894',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
+  releaseCompleteText:{color:'#07111F',fontSize:8,fontWeight:'900'},
+  releaseCompletedBadge:{minHeight:45,borderRadius:13,backgroundColor:'#153426',borderWidth:1,borderColor:'#2F9E68',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingHorizontal:10},
+  releaseCompletedText:{color:'#9CEFC1',fontSize:8,fontWeight:'900',textAlign:'center'},
 });
