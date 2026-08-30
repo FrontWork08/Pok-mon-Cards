@@ -160,35 +160,18 @@ export async function saveLegacySelection(
   cardIds: string[],
 ): Promise<LegacySelectionState> {
   const desired = [...new Set(cardIds.filter(Boolean))];
-  const current = await getLegacySelection(campaignId, playerId);
-  if (current.submission) throw new Error('Seu legado já foi confirmado e não pode mais ser alterado.');
-
-  const currentSet = new Set(current.cardIds);
-  const desiredSet = new Set(desired);
-  const removeIds = current.cardIds.filter((id) => !desiredSet.has(id));
-  const addIds = desired.filter((id) => !currentSet.has(id));
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!auth.user?.id || auth.user.id !== playerId) {
+    throw new Error('Sua sessão mudou. Entre novamente antes de salvar o Legado.');
+  }
 
   try {
-    if (removeIds.length) {
-      const { error } = await supabase
-        .from('release_campaign_legacy_selections')
-        .delete()
-        .eq('campaign_id', campaignId)
-        .eq('player_id', playerId)
-        .in('card_id', removeIds);
-      if (error) throw error;
-    }
-
-    if (addIds.length) {
-      const { error } = await supabase
-        .from('release_campaign_legacy_selections')
-        .insert(addIds.map((cardId) => ({
-          campaign_id: campaignId,
-          player_id: playerId,
-          card_id: cardId,
-        })));
-      if (error) throw error;
-    }
+    const { error } = await supabase.rpc('save_my_legacy_selection', {
+      p_campaign_id: campaignId,
+      p_card_ids: desired,
+    });
+    if (error) throw error;
   } catch (error) {
     throw legacySelectionError(error);
   }
