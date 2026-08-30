@@ -2,18 +2,6 @@ name: Deploy Web App
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - app/**
-      - src/**
-      - assets/**
-      - public/**
-      - app.json
-      - package.json
-      - package-lock.json
-      - scripts/generate-trainer-assets.py
-      - .github/workflows/web-deploy.yml
 
 permissions:
   contents: read
