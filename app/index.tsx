@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCurrentSession, signIn, signInWithGoogle, signUp } from '../src/services/auth';
+import { getCurrentSession, isPasswordRecoveryUrl, requestPasswordReset, signIn, signInWithGoogle, signUp } from '../src/services/auth';
 import { supabase } from '../src/lib/supabase';
 import { PremiumBackground } from '../src/components/PremiumBackground';
 import { useAppTheme } from '../src/theme/ThemeProvider';
@@ -34,24 +34,51 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(true);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [recoverySending, setRecoverySending] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    getCurrentSession()
-      .then((session) => {
-        if (mounted && session) router.replace('/(tabs)');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+    let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+    const browserUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.href : null;
+    const openingRecovery = isPasswordRecoveryUrl(browserUrl);
 
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (openingRecovery) {
+      // Supabase parses the recovery token from the URL during client startup.
+      // Give it a brief moment, then fall back to the recovered session if the
+      // PASSWORD_RECOVERY event was emitted before this screen subscribed.
+      recoveryTimer = setTimeout(() => {
+        getCurrentSession()
+          .then((session) => {
+            if (!mounted) return;
+            if (session?.user) router.replace('/reset-password');
+            else setLoading(false);
+          })
+          .catch(() => {
+            if (mounted) setLoading(false);
+          });
+      }, 350);
+    } else {
+      getCurrentSession()
+        .then((session) => {
+          if (mounted && session) router.replace('/(tabs)');
+        })
+        .finally(() => {
+          if (mounted) setLoading(false);
+        });
+    }
+
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setTimeout(() => router.replace('/reset-password'), 0);
+        return;
+      }
       if (!session?.user) return;
       setTimeout(() => router.replace('/(tabs)'), 0);
     });
 
     return () => {
       mounted = false;
+      if (recoveryTimer) clearTimeout(recoveryTimer);
       data.subscription.unsubscribe();
     };
   }, []);
@@ -85,6 +112,27 @@ export default function AuthScreen() {
       Alert.alert(mode === 'signup' ? 'Erro ao criar conta' : 'Erro ao entrar', message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    const address = email.trim();
+    if (!address || !address.includes('@')) {
+      Alert.alert('Recuperar senha', 'Digite primeiro o e-mail usado na sua conta.');
+      return;
+    }
+
+    try {
+      setRecoverySending(true);
+      await requestPasswordReset(address);
+      Alert.alert(
+        'Confira seu e-mail',
+        'Se existir uma conta com esse e-mail, você receberá um link para criar uma nova senha. Verifique também a caixa de spam.',
+      );
+    } catch (error) {
+      Alert.alert('Recuperar senha', error instanceof Error ? error.message : 'Não foi possível enviar o e-mail de recuperação.');
+    } finally {
+      setRecoverySending(false);
     }
   }
 
@@ -246,6 +294,19 @@ export default function AuthScreen() {
                 secureTextEntry
               />
 
+              {mode === 'login' ? (
+                <Pressable
+                  disabled={recoverySending}
+                  onPress={() => { void handleForgotPassword(); }}
+                  style={styles.forgotButton}
+                >
+                  {recoverySending ? <ActivityIndicator size="small" color={colors.accent} /> : <Ionicons name="key-outline" size={15} color={colors.accent} />}
+                  <Text style={[styles.forgotText, { color: colors.accent }]}>
+                    {recoverySending ? 'ENVIANDO RECUPERAÇÃO...' : 'ESQUECI MINHA SENHA'}
+                  </Text>
+                </Pressable>
+              ) : null}
+
               <Pressable style={[styles.primaryButton, { backgroundColor: colors.yellow }]} onPress={submit}>
                 <Ionicons name={mode === 'login' ? 'log-in-outline' : 'person-add-outline'} size={19} color="#07111F" />
                 <Text style={styles.primaryText}>{mode === 'login' ? 'ENTRAR NA TRAINER COLLECTION' : 'CRIAR TREINADOR'}</Text>
@@ -354,6 +415,8 @@ const styles = StyleSheet.create({
   dividerText: { fontSize: 7, fontWeight: '900', letterSpacing: 1 },
   inputWrap: { minHeight: 52, borderRadius: 15, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 9 },
   input: { flex: 1, minHeight: 50, fontSize: 13, paddingVertical: 0 },
+  forgotButton: { alignSelf: 'flex-end', minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 4 },
+  forgotText: { fontSize: 8, fontWeight: '900', letterSpacing: .55 },
   primaryButton: { minHeight: 53, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 2 },
   primaryText: { color: '#07111F', fontWeight: '900', fontSize: 10, letterSpacing: .45 },
   accountNote: { borderRadius: 14, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
