@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
-import { getMyProfile } from '@/services/player';
+import { getMyProfile, getPlayerAvatarMap, getProfileAvatarUrl, type PlayerAvatarMeta } from '@/services/player';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
 import {
   formatUsd,
   getCollectionValueLeaderboard,
@@ -36,6 +37,7 @@ export default function CollectionRankingScreen() {
   const [weeklyRows, setWeeklyRows] = useState<WeeklyCollectionRankEntry[]>([]);
   const [globalRows, setGlobalRows] = useState<CollectionRankEntry[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
+  const [avatars, setAvatars] = useState<Record<string, PlayerAvatarMeta>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +57,8 @@ export default function CollectionRankingScreen() {
       setMyId(profile.id);
       setWeeklyRows(weekly);
       setGlobalRows(global);
+      const ids = [...weekly.map((row) => row.player_id), ...global.map((row) => row.player_id)];
+      setAvatars(await getPlayerAvatarMap(ids));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível carregar o ranking.');
     } finally {
@@ -253,6 +257,20 @@ export default function CollectionRankingScreen() {
                   <Text style={[styles.rank, { color: colors.text }]}>{medal ?? '#' + row.weekly_rank}</Text>
                 </View>
 
+                <TrainerAvatar
+                  icon={avatars[row.player_id]?.profileIcon}
+                  avatarUrl={getProfileAvatarUrl(avatars[row.player_id]?.avatarPath, avatars[row.player_id]?.avatarUpdatedAt)}
+                  color={colors.accent}
+                  backgroundColor={colors.accentSoft}
+                  size={46}
+                />
+                <TrainerAvatar
+                  icon={avatars[row.player_id]?.profileIcon}
+                  avatarUrl={getProfileAvatarUrl(avatars[row.player_id]?.avatarPath, avatars[row.player_id]?.avatarUpdatedAt)}
+                  color={colors.accent}
+                  backgroundColor={colors.accentSoft}
+                  size={46}
+                />
                 <View style={styles.identity}>
                   <Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>
                     @{row.username}{mine ? ' • VOCÊ' : ''}
