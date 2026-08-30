@@ -91,20 +91,32 @@ export function GlobalBottomNavigation() {
                 pressed && styles.pressed,
               ]}
             >
-              <Ionicons
-                name={active ? item.activeIcon : item.icon}
-                size={21}
-                color={active ? colors.yellow : colors.muted}
-              />
+              <View
+                style={[
+                  styles.iconShell,
+                  active && {
+                    backgroundColor: colors.accentSoft,
+                    borderColor: colors.yellow,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={active ? item.activeIcon : item.icon}
+                  size={active ? 22 : 20}
+                  color={active ? colors.yellow : colors.muted}
+                />
+              </View>
               <Text
                 numberOfLines={1}
                 style={[
                   styles.label,
-                  { color: active ? colors.yellow : colors.muted },
+                  { color: active ? colors.text : colors.muted },
+                  active && styles.activeLabel,
                 ]}
               >
                 {item.label}
               </Text>
+              {active ? <View style={[styles.activeDot, { backgroundColor: colors.yellow }]} /> : null}
             </Pressable>
           );
         })}
@@ -116,37 +128,60 @@ export function GlobalBottomNavigation() {
 const styles = StyleSheet.create({
   host: {
     width: '100%',
-    paddingHorizontal: 10,
-    paddingTop: 6,
+    paddingHorizontal: 12,
+    paddingTop: 7,
   },
   bar: {
     width: '100%',
-    minHeight: 64,
-    borderRadius: 22,
+    minHeight: 72,
+    borderRadius: 28,
     borderWidth: 1,
     paddingHorizontal: 5,
-    paddingVertical: 6,
+    paddingTop: 7,
+    paddingBottom: 6,
     flexDirection: 'row',
     alignItems: 'stretch',
     shadowColor: '#000',
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 14,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 9 },
+    elevation: 16,
   },
   item: {
     flex: 1,
     minWidth: 0,
-    minHeight: 50,
-    borderRadius: 16,
+    minHeight: 58,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 2,
+    position: 'relative',
+  },
+  iconShell: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
-    fontSize: 9,
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  activeLabel: {
     fontWeight: '900',
   },
+  activeDot: {
+    position: 'absolute',
+    bottom: 0,
+    width: 16,
+    height: 3,
+    borderRadius: 999,
+  },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.68,
+    transform: [{ scale: 0.97 }],
   },
 });
