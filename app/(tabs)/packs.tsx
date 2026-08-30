@@ -478,7 +478,10 @@ export default function PacksScreen() {
         data={filtered}
         keyExtractor={(pack) => pack.id}
         numColumns={columns}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: isMobile ? 118 : 72 },
+        ]}
         columnWrapperStyle={columns > 1 ? styles.columnWrap : undefined}
         ListHeaderComponent={header}
         ListEmptyComponent={
@@ -494,11 +497,17 @@ export default function PacksScreen() {
           )
         }
         ListFooterComponent={<View style={styles.listFooter} />}
-        initialNumToRender={isMobile ? 3 : 6}
-        maxToRenderPerBatch={isMobile ? 3 : 6}
-        updateCellsBatchingPeriod={70}
-        windowSize={5}
-        removeClippedSubviews={Platform.OS === 'android'}
+        initialNumToRender={isMobile ? 5 : 8}
+        maxToRenderPerBatch={isMobile ? 6 : 10}
+        updateCellsBatchingPeriod={40}
+        windowSize={9}
+        // Android can repeatedly detach/reattach these tall, transformed pack
+        // cards right at the viewport edge. That changes measurements while the
+        // user is dragging and produces the rapid up/down "rubber-band" jump.
+        removeClippedSubviews={false}
+        overScrollMode="never"
+        bounces={false}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         renderItem={({ item: pack }) => {
           const affordable = (pack.currency === 'diamonds' ? diamonds : coins) >= pack.price;
@@ -615,7 +624,7 @@ export default function PacksScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, overflow: 'hidden' },
-  listContent: { paddingHorizontal: 10, paddingTop: 10, paddingBottom: 34 },
+  listContent: { paddingHorizontal: 10, paddingTop: 10 },
   columnWrap: { alignItems: 'stretch' },
   headerStack: { gap: 14, paddingHorizontal: 6, paddingBottom: 14 },
   headerTop: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
@@ -706,5 +715,5 @@ const styles = StyleSheet.create({
   empty: { marginHorizontal: 6, borderRadius: 20, padding: 24, alignItems: 'center', gap: 8, borderWidth: 1 },
   emptyTitle: { fontSize: 17, fontWeight: '900' },
   loader: { marginVertical: 30 },
-  listFooter: { height: 24 },
+  listFooter: { height: 36 },
 });
