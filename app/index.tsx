@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCurrentSession, isPasswordRecoveryUrl, requestPasswordReset, signIn, signInWithGoogle, signUp } from '../src/services/auth';
+import { getCurrentSession, isPasswordRecoveryUrl, isPendingPasswordRecoveryFor, requestPasswordReset, signIn, signInWithGoogle, signUp } from '../src/services/auth';
 import { initialWebAuthUrl, supabase } from '../src/lib/supabase';
 import { PremiumBackground } from '../src/components/PremiumBackground';
 import { useAppTheme } from '../src/theme/ThemeProvider';
@@ -72,7 +72,15 @@ export default function AuthScreen() {
         return;
       }
       if (!session?.user) return;
-      setTimeout(() => router.replace('/(tabs)'), 0);
+
+      setTimeout(() => {
+        void isPendingPasswordRecoveryFor(session.user.email)
+          .then((pendingRecovery) => {
+            if (pendingRecovery) router.replace('/reset-password');
+            else router.replace('/(tabs)');
+          })
+          .catch(() => router.replace('/(tabs)'));
+      }, 0);
     });
 
     return () => {
