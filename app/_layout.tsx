@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
-import { Stack, usePathname, useRouter } from 'expo-router';
+import { Redirect, Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { GlobalAnnouncementOverlay } from '@/components/GlobalAnnouncement';
@@ -29,7 +29,7 @@ function AppStack() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { userId } = useWallet();
+  const { userId, loading: walletLoading } = useWallet();
   const [liveNotification, setLiveNotification] = useState<any>(null);
   const [accountRestriction, setAccountRestriction] = useState<PlayerProfile | null>(null);
   const [matchmaking, setMatchmaking] = useState<MatchmakingState | null>(null);
@@ -400,6 +400,14 @@ function AppStack() {
   const maintenanceBlocked = Boolean(
     userId && maintenanceStatus?.maintenance_enabled && !maintenanceAdmin,
   );
+
+  // Global auth boundary: once WalletProvider confirms there is no session,
+  // private routes cannot stay mounted. This also covers logout from profile,
+  // maintenance screens, deep links and any future sign-out entry point.
+  if (!walletLoading && !userId && pathname !== '/') {
+    return <Redirect href="/" />;
+  }
+
   const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/');
   return (
     <View style={[styles.appShell,{backgroundColor:colors.bg}]}>

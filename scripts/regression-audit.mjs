@@ -64,6 +64,15 @@ if (existsSync('src/components/WebPwaBootstrap.tsx') && existsSync('app/_layout.
   assert(read('public/sw.js').includes("url.origin !== self.location.origin"), 'Regressão: service worker deve limitar cache à mesma origem.');
 }
 
+if (existsSync('app/_layout.tsx') && existsSync('src/wallet/WalletProvider.tsx')) {
+  const layout = read('app/_layout.tsx');
+  const wallet = read('src/wallet/WalletProvider.tsx');
+  assert(layout.includes('Redirect') && layout.includes("pathname !== '/'"), 'Regressão: rotas privadas não estão protegidas após logout.');
+  assert(layout.includes('walletLoading'), 'Regressão: auth guard precisa aguardar a restauração da sessão.');
+  assert(wallet.includes('if (!nextUserId)'), 'Regressão: WalletProvider não limpa estado imediatamente no SIGNED_OUT.');
+  assert(wallet.includes('setUserId(null)'), 'Regressão: logout não limpa o usuário global.');
+}
+
 if (failures.length) {
   console.error('\n❌ Auditoria de regressão falhou:');
   failures.forEach((failure) => console.error(' - ' + failure));
