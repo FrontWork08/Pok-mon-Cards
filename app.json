@@ -3,7 +3,7 @@
     "name": "Trainer Collection",
     "slug": "pokemon-cards",
     "owner": "frontwork",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "pokemoncards",
@@ -33,6 +33,13 @@
           "icon": "./assets/notification-icon.png",
           "color": "#D9B45B",
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "A Trainer Collection usa a câmera para escanear QR Codes de amizade.",
+          "recordAudioAndroid": false
         }
       ]
     ],

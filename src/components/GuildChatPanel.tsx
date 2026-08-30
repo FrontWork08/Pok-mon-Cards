@@ -8,6 +8,8 @@ import {
   type GuildChatMessage,
 } from '@/services/guilds';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { getPlayerAvatarMap, getProfileAvatarUrl, type PlayerAvatarMeta } from '@/services/player';
 
 export function GuildChatPanel({
   guildId,
@@ -24,6 +26,7 @@ export function GuildChatPanel({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatars, setAvatars] = useState<Record<string, PlayerAvatarMeta>>({});
   const scrollRef = useRef<ScrollView | null>(null);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -32,6 +35,8 @@ export function GuildChatPanel({
       if (!silent) setLoading(true);
       const rows = await getGuildChatMessages(guildId, 60);
       setMessages(rows);
+      const playerIds = rows.map((message) => message.playerId);
+      setAvatars(await getPlayerAvatarMap(playerIds).catch(() => ({})));
       setError(null);
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: false }));
     } catch (e) {
@@ -116,11 +121,14 @@ export function GuildChatPanel({
           >
             {messages.map((message) => (
               <View key={message.id} style={[styles.message, { borderBottomColor: colors.border }]}>
-                <Pressable
-                  onPress={() => onOpenPlayer(message.playerId)}
-                  style={[styles.avatar, { backgroundColor: guildColor + '24', borderColor: guildColor }]}
-                >
-                  <Text style={[styles.avatarText, { color: guildColor }]}>{message.username.slice(0, 1).toUpperCase()}</Text>
+                <Pressable onPress={() => onOpenPlayer(message.playerId)}>
+                  <TrainerAvatar
+                    icon={avatars[message.playerId]?.profileIcon}
+                    avatarUrl={getProfileAvatarUrl(avatars[message.playerId]?.avatarPath, avatars[message.playerId]?.avatarUpdatedAt)}
+                    color={guildColor}
+                    backgroundColor={guildColor + '24'}
+                    size={31}
+                  />
                 </Pressable>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={styles.identityRow}>

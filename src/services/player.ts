@@ -344,11 +344,38 @@ export async function findPlayers(username: string) {
   if (term.length < 2) return [];
   const { data: userData } = await supabase.auth.getUser();
   const myId = userData.user?.id;
-  let query = supabase.from('players').select('id, username, level, battle_rating, show_battle_rating, equipped_title_id').ilike('username', `%${term}%`).limit(20);
+  let query = supabase.from('players').select('id, username, level, battle_rating, show_battle_rating, equipped_title_id, profile_icon, avatar_path, avatar_updated_at').ilike('username', `%${term}%`).limit(20);
   if (myId) query = query.neq('id', myId);
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
+}
+
+export type PlayerAvatarMeta = {
+  avatarPath: string | null;
+  avatarUpdatedAt: string | null;
+  profileIcon: string | null;
+};
+
+export async function getPlayerAvatarMap(playerIds: string[]) {
+  const ids = [...new Set(playerIds.filter(Boolean))].slice(0, 250);
+  if (!ids.length) return {} as Record<string, PlayerAvatarMeta>;
+
+  const { data, error } = await supabase
+    .from('players')
+    .select('id,profile_icon,avatar_path,avatar_updated_at')
+    .in('id', ids);
+
+  if (error) throw error;
+
+  return Object.fromEntries((data ?? []).map((row: any) => [
+    String(row.id),
+    {
+      avatarPath: row.avatar_path ? String(row.avatar_path) : null,
+      avatarUpdatedAt: row.avatar_updated_at ? String(row.avatar_updated_at) : null,
+      profileIcon: row.profile_icon ? String(row.profile_icon) : null,
+    },
+  ])) as Record<string, PlayerAvatarMeta>;
 }
 
 export async function getMyProfileStats() {
