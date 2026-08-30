@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type ComponentProps, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -280,7 +280,7 @@ function AuthFeature({ icon, title, text }: { icon: keyof typeof Ionicons.glyphM
   );
 }
 
-function AuthInput(props: React.ComponentProps<typeof TextInput> & { icon: keyof typeof Ionicons.glyphMap }) {
+function AuthInput(props: ComponentProps<typeof TextInput> & { icon: keyof typeof Ionicons.glyphMap }) {
   const { colors } = useAppTheme();
   const { icon, ...inputProps } = props;
   return (
