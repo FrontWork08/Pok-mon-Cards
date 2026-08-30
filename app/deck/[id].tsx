@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { PremiumBackground } from '@/components/PremiumBackground';
+import { TrainerPageHeader } from '@/components/TrainerPageHeader';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import {
   getDeckBuilderPage,
@@ -222,6 +224,12 @@ export default function DeckEditorScreen() {
 
   const header = (
     <View style={styles.headerContent}>
+      <TrainerPageHeader
+        title={deck?.name ?? 'Deck Builder'}
+        subtitle="Monte sua equipe, filtre por tipo/raridade e compare estatísticas antes de salvar."
+        icon="albums"
+        compact
+      />
       {notice ? (
         <Pressable
           style={[styles.notice, { backgroundColor: colors.surface, borderColor: colors.yellow }]}
@@ -376,14 +384,8 @@ export default function DeckEditorScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: colors.bg }]}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: deck?.name ?? 'Editar Deck',
-          headerStyle: { backgroundColor: colors.bg },
-          headerTintColor: colors.text,
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
+      <PremiumBackground />
       <FlatList
         key={`deck-builder-${columns}`}
         data={loadingCards ? [] : cards}
