@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PremiumBackground } from '@/components/PremiumBackground';
-import { getCurrentSession, signOut, updateRecoveredPassword } from '@/services/auth';
+import { clearPendingPasswordRecovery, getCurrentSession, signOut, updateRecoveredPassword } from '@/services/auth';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function ResetPasswordScreen() {
@@ -56,9 +56,13 @@ export default function ResetPasswordScreen() {
     try {
       setSaving(true);
       await updateRecoveredPassword(password);
+      // The native recovery marker is only a routing fallback. Once the new
+      // password is committed, it must be removed before the next normal login
+      // or the account can be mistaken for a recovery session again.
+      await clearPendingPasswordRecovery();
       await signOut();
       Alert.alert('Senha alterada', 'Sua senha foi atualizada. Entre novamente com a nova senha.');
-      router.replace('/');
+      router.replace('/login');
     } catch (error) {
       Alert.alert('Nova senha', error instanceof Error ? error.message : 'Não foi possível atualizar sua senha.');
     } finally {
@@ -105,7 +109,7 @@ export default function ResetPasswordScreen() {
                     Solicite um novo e-mail de recuperação na tela de login.
                   </Text>
                 </View>
-                <Pressable onPress={() => router.replace('/')} style={[styles.backButton, { borderColor: colors.border }]}>
+                <Pressable onPress={() => router.replace('/login')} style={[styles.backButton, { borderColor: colors.border }]}>
                   <Text style={[styles.backText, { color: colors.accent }]}>VOLTAR</Text>
                 </Pressable>
               </View>
