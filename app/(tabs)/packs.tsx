@@ -19,6 +19,7 @@ import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PackContentsModal } from '@/components/PackContentsModal';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
 import { PremiumBackground } from '@/components/PremiumBackground';
+import { TrainerPageHeader } from '@/components/TrainerPageHeader';
 import {
   exchangeCoinsForDiamonds,
   getFavoritePackIds,
@@ -273,19 +274,11 @@ export default function PacksScreen() {
 
   const header = (
     <View style={styles.headerStack}>
-      <View style={styles.headerTop}>
-        <View style={styles.header}>
-          <View style={styles.brandRow}>
-            <View style={[styles.brandDot,{backgroundColor:colors.yellow}]} />
-            <Text style={[styles.eyebrow, { color: colors.yellow }]}>TRAINER COLLECTION</Text>
-            <View style={[styles.versionPill,{backgroundColor:colors.accentSoft,borderColor:colors.border}]}><Text style={[styles.versionText,{color:colors.accent}]}>1.0</Text></View>
-          </View>
-          <Text style={[styles.title, { color: colors.text }]}>Pack Lab</Text>
-          <Text style={[styles.subtitle, { color: colors.muted }]}>
-            Explore eras, compare raridade e abra boosters com economia registrada pelo servidor.
-          </Text>
-        </View>
-      </View>
+      <TrainerPageHeader
+        title="Pack Lab"
+        subtitle="Explore eras, compare raridade e abra boosters com economia registrada pelo servidor."
+        icon="cube"
+      />
 
       <View style={[styles.balanceRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View>

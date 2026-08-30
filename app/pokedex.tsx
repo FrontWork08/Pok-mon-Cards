@@ -16,18 +16,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { PremiumBackground } from '@/components/PremiumBackground';
+import { TrainerPageHeader } from '@/components/TrainerPageHeader';
 import {
   generationForNumber,
   getMyOwnedPokedexNumbers,
   getPokedexCatalog,
   type PokedexEntry,
 } from '@/services/pokedex';
-import { gameTheme } from '@/theme/gameTheme';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function PokedexScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const { colors, isLight } = useAppTheme();
   const [catalog, setCatalog] = useState<PokedexEntry[]>([]);
   const [discovered, setDiscovered] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
@@ -81,17 +83,26 @@ export default function PokedexScreen() {
       <Pressable
         disabled={!owned}
         onPress={() => router.push(`/pokemon/${entry.pokedex_number}`)}
-        style={[styles.tile, { width: tileWidth }, !owned && styles.lockedTile]}
+        style={[
+          styles.tile,
+          {
+            width: tileWidth,
+            backgroundColor: owned ? colors.surface : colors.surfaceAlt,
+            borderColor: owned ? colors.border : colors.border,
+            opacity: owned ? 1 : .68,
+          },
+        ]}
       >
         <View style={styles.numberRow}>
-          <Text style={styles.number}>#{String(entry.pokedex_number).padStart(4, '0')}</Text>
+          <Text style={[styles.number, { color: colors.muted }]}>#{String(entry.pokedex_number).padStart(4, '0')}</Text>
           {owned ? (
-            <Ionicons name="chevron-forward-circle" size={17} color="#65D894" />
+            <Ionicons name="chevron-forward-circle" size={17} color={colors.green} />
           ) : (
-            <Ionicons name="lock-closed" size={14} color="#5D6E83" />
+            <Ionicons name="lock-closed" size={14} color={colors.muted} />
           )}
         </View>
-        <View style={styles.imageWrap}>
+
+        <View style={[styles.imageWrap, { backgroundColor: isLight ? '#E8EEF5' : colors.bg }]}>
           {owned && entry.image_small ? (
             <Image
               source={{ uri: entry.image_small }}
@@ -101,54 +112,60 @@ export default function PokedexScreen() {
               style={styles.image}
             />
           ) : (
-            <View style={styles.unknown}><Text style={styles.question}>?</Text></View>
+            <View style={[styles.unknown, { backgroundColor: colors.surfaceAlt }]}>
+              <Text style={[styles.question, { color: colors.border }]}>?</Text>
+            </View>
           )}
         </View>
-        <Text numberOfLines={1} style={[styles.name, !owned && styles.hiddenName]}>
+
+        <Text
+          numberOfLines={1}
+          style={[styles.name, { color: owned ? colors.text : colors.muted }]}
+        >
           {owned ? entry.pokemon_name : 'Não descoberto'}
         </Text>
-        <Text numberOfLines={1} style={styles.meta}>
+        <Text numberOfLines={1} style={[styles.meta, { color: colors.muted }]}>
           {owned
             ? `Toque para ver os cards • Gen ${generationForNumber(entry.pokedex_number)}`
             : `Gen ${generationForNumber(entry.pokedex_number)}`}
         </Text>
       </Pressable>
     );
-  }, [discovered, router, tileWidth]);
+  }, [colors.bg, colors.border, colors.green, colors.muted, colors.surface, colors.surfaceAlt, colors.text, discovered, isLight, router, tileWidth]);
 
   const header = (
     <View style={styles.headerContent}>
-      <View style={styles.pageHeader}>
-        <Text style={styles.eyebrow}>TRAINER HUB</Text>
-        <Text style={styles.pageTitle}>Pokédex</Text>
-        <Text style={styles.pageSubtitle}>
-          Descubra espécies abrindo boosters e acompanhe tudo o que ainda falta.
-        </Text>
-      </View>
+      <TrainerPageHeader
+        title="Pokédex"
+        subtitle="Descubra espécies abrindo boosters e acompanhe tudo o que ainda falta."
+        icon="book"
+      />
 
       <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}>
-        <Ionicons name="arrow-back" size={18} color="#A9BDD7" />
-        <Text style={styles.backText}>Voltar</Text>
+        <Ionicons name="arrow-back" size={18} color={colors.muted} />
+        <Text style={[styles.backText, { color: colors.muted }]}>Voltar</Text>
       </Pressable>
 
-      <View style={styles.hero}>
+      <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
         <View>
-          <Text style={styles.heroKicker}>PROGRESSO GLOBAL</Text>
-          <Text style={styles.heroValue}>{discovered.size} / {catalog.length || '—'}</Text>
-          <Text style={styles.heroText}>espécies descobertas</Text>
+          <Text style={[styles.heroKicker, { color: colors.yellow }]}>PROGRESSO GLOBAL</Text>
+          <Text style={[styles.heroValue, { color: colors.text }]}>{discovered.size} / {catalog.length || '—'}</Text>
+          <Text style={[styles.heroText, { color: colors.muted }]}>espécies descobertas</Text>
         </View>
-        <View style={styles.percentCircle}><Text style={styles.percentText}>{completion}%</Text></View>
+        <View style={[styles.percentCircle, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
+          <Text style={[styles.percentText, { color: colors.text }]}>{completion}%</Text>
+        </View>
       </View>
 
-      <View style={styles.searchBox}>
-        <Ionicons name="search" size={20} color={gameTheme.colors.muted} />
+      <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Ionicons name="search" size={20} color={colors.muted} />
         <TextInput
           value={search}
           onChangeText={setSearch}
           placeholder="Buscar Pokémon ou número..."
-          placeholderTextColor="#70839F"
+          placeholderTextColor={colors.muted}
           autoCapitalize="none"
-          style={styles.search}
+          style={[styles.search, { color: colors.text }]}
         />
       </View>
 
@@ -165,8 +182,8 @@ export default function PokedexScreen() {
       </View>
 
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Espécies</Text>
-        <Text style={styles.count}>{filtered.length} exibidas</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Espécies</Text>
+        <Text style={[styles.count, { color: colors.muted }]}>{filtered.length} exibidas</Text>
       </View>
 
       {error ? (
@@ -179,7 +196,7 @@ export default function PokedexScreen() {
   );
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
         key={`pokedex-grid-${columns}`}
@@ -191,9 +208,12 @@ export default function PokedexScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.loader} size="large" color={gameTheme.colors.yellow} />
+            <ActivityIndicator style={styles.loader} size="large" color={colors.yellow} />
           ) : !error ? (
-            <View style={styles.empty}><Text style={styles.emptyText}>Nenhuma espécie encontrada.</Text></View>
+            <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="search-outline" size={28} color={colors.muted} />
+              <Text style={[styles.emptyText, { color: colors.muted }]}>Nenhuma espécie encontrada.</Text>
+            </View>
           ) : null
         }
         contentContainerStyle={[
@@ -212,54 +232,56 @@ export default function PokedexScreen() {
 }
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const { colors } = useAppTheme();
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.chip,
+        {
+          backgroundColor: active ? colors.yellow : colors.surface,
+          borderColor: active ? colors.yellow : colors.border,
+        },
+      ]}
+    >
+      <Text style={[styles.chipText, { color: active ? '#07111F' : colors.muted }]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, overflow: 'hidden', backgroundColor: gameTheme.colors.bg },
+  safe: { flex: 1, overflow: 'hidden' },
   content: { width: '100%', maxWidth: 1280, alignSelf: 'center', paddingHorizontal: 16, paddingBottom: 40 },
   headerContent: { gap: 16, marginBottom: 10 },
-  pageHeader: { gap: 5, marginBottom: 4 },
-  eyebrow: { color: gameTheme.colors.yellow, fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
-  pageTitle: { color: '#fff', fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
-  pageSubtitle: { color: '#9DB0C9', fontSize: 15, lineHeight: 21 },
   backRow: { alignSelf: 'flex-start', flexDirection: 'row', gap: 7, alignItems: 'center' },
-  backText: { color: '#A9BDD7', fontWeight: '800', fontSize: 12 },
-  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#10284B', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#285A9A' },
-  heroKicker: { color: gameTheme.colors.yellow, fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
-  heroValue: { color: '#fff', fontSize: 32, fontWeight: '900', marginTop: 3 },
-  heroText: { color: '#AFC1DB', fontSize: 12 },
-  percentCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A1930', borderWidth: 5, borderColor: gameTheme.colors.yellow },
-  percentText: { color: '#fff', fontWeight: '900', fontSize: 18 },
-  searchBox: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 17, backgroundColor: gameTheme.colors.surface, borderWidth: 1, borderColor: gameTheme.colors.border },
-  search: { flex: 1, height: '100%', color: '#fff', fontSize: 14 },
+  backText: { fontWeight: '800', fontSize: 12 },
+  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 24, padding: 18, borderWidth: 1, overflow: 'hidden' },
+  heroKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
+  heroValue: { fontSize: 32, fontWeight: '900', marginTop: 3 },
+  heroText: { fontSize: 12 },
+  percentCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 5 },
+  percentText: { fontWeight: '900', fontSize: 18 },
+  searchBox: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 17, borderWidth: 1 },
+  search: { flex: 1, height: '100%', fontSize: 14 },
   gens: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  chip: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 999, backgroundColor: '#101D30', borderWidth: 1, borderColor: '#263E5C' },
-  chipActive: { backgroundColor: gameTheme.colors.yellow, borderColor: gameTheme.colors.yellow },
-  chipText: { color: '#9EB0C8', fontSize: 10, fontWeight: '900' },
-  chipTextActive: { color: '#07111F' },
+  chip: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
+  chipText: { fontSize: 10, fontWeight: '900' },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { color: '#fff', fontSize: 21, fontWeight: '900' },
-  count: { color: gameTheme.colors.muted, fontSize: 12, fontWeight: '700' },
+  sectionTitle: { fontSize: 21, fontWeight: '900' },
+  count: { fontSize: 12, fontWeight: '700' },
   row: { gap: 10 },
-  tile: { marginBottom: 10, backgroundColor: '#101D30', borderRadius: 18, padding: 9, borderWidth: 1, borderColor: '#263E5C' },
-  lockedTile: { opacity: 0.72, backgroundColor: '#0C1625' },
+  tile: { marginBottom: 10, borderRadius: 18, padding: 9, borderWidth: 1 },
   numberRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 2, marginBottom: 7 },
-  number: { color: '#7489A7', fontSize: 10, fontWeight: '900' },
-  imageWrap: { width: '100%', aspectRatio: 0.72, borderRadius: 12, overflow: 'hidden', backgroundColor: '#091524' },
+  number: { fontSize: 10, fontWeight: '900' },
+  imageWrap: { width: '100%', aspectRatio: .72, borderRadius: 12, overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
-  unknown: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111C2A' },
-  question: { color: '#354A65', fontSize: 54, fontWeight: '900' },
-  name: { color: '#fff', fontSize: 13, fontWeight: '900', marginTop: 8 },
-  hiddenName: { color: '#6A7C94' },
-  meta: { color: '#71849E', fontSize: 8, fontWeight: '700', marginTop: 3 },
+  unknown: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  question: { fontSize: 54, fontWeight: '900' },
+  name: { fontSize: 13, fontWeight: '900', marginTop: 8 },
+  meta: { fontSize: 8, fontWeight: '700', marginTop: 3 },
   loader: { marginVertical: 38 },
-  empty: { padding: 32, alignItems: 'center' },
-  emptyText: { color: '#71849E', fontSize: 12, fontWeight: '700' },
+  empty: { padding: 28, alignItems: 'center', gap: 7, borderWidth: 1, borderRadius: 18 },
+  emptyText: { fontSize: 12, fontWeight: '700' },
   error: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, borderColor: '#683243', backgroundColor: '#351A24', padding: 12 },
   errorText: { flex: 1, color: '#FFD7DD', fontSize: 11, fontWeight: '700' },
 });

@@ -16,16 +16,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { PremiumBackground } from '@/components/PremiumBackground';
+import { TrainerPageHeader } from '@/components/TrainerPageHeader';
 import {
   getMyOwnedSetCounts,
   getSetCatalog,
   type SetCatalogEntry,
 } from '@/services/collections';
-import { gameTheme } from '@/theme/gameTheme';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 function SetThumb({ uri }: { uri: string | null }) {
   const [failed, setFailed] = useState(false);
-  if (!uri || failed) return <Ionicons name="albums-outline" size={38} color="#707070" />;
+  const { colors } = useAppTheme();
+  if (!uri || failed) return <Ionicons name="albums-outline" size={38} color={colors.muted} />;
   return (
     <Image
       source={{ uri }}
@@ -41,6 +43,7 @@ function SetThumb({ uri }: { uri: string | null }) {
 export default function SetsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const { colors, isLight } = useAppTheme();
   const [sets, setSets] = useState<SetCatalogEntry[]>([]);
   const [ownedBySet, setOwnedBySet] = useState<Map<string, number>>(new Map());
   const [search, setSearch] = useState('');
@@ -94,68 +97,72 @@ export default function SetsScreen() {
 
     return (
       <Pressable
-        style={[styles.setCard, { width: cardWidth }]}
+        style={[styles.setCard, { width: cardWidth, backgroundColor: colors.surface, borderColor: colors.border }]}
         onPress={() => router.push(`/set/${set.set_id}`)}
       >
-        <View style={styles.setImageWrap}><SetThumb uri={set.representative_image} /></View>
+        <View style={[styles.setImageWrap, { backgroundColor: isLight ? '#EDF2F7' : colors.bg }]}>
+          <SetThumb uri={set.representative_image} />
+        </View>
         <View style={styles.setBody}>
           <View style={styles.setTitleRow}>
             <View style={{ flex: 1 }}>
-              <Text numberOfLines={1} style={styles.setName}>{set.set_name}</Text>
-              <Text style={styles.setId}>{set.set_id.toUpperCase()}</Text>
+              <Text numberOfLines={1} style={[styles.setName, { color: colors.text }]}>{set.set_name}</Text>
+              <Text style={[styles.setId, { color: colors.muted }]}>{set.set_id.toUpperCase()}</Text>
             </View>
-            <Text style={styles.percent}>{percent}%</Text>
+            <Text style={[styles.percent, { color: colors.yellow }]}>{percent}%</Text>
           </View>
-          <Text style={styles.progressText}>{owned} / {set.total_cards} cards</Text>
-          <View style={styles.track}><View style={[styles.fill, { width: `${percent}%` }]} /></View>
+          <Text style={[styles.progressText, { color: colors.muted }]}>{owned} / {set.total_cards} cards</Text>
+          <View style={[styles.track, { backgroundColor: colors.surfaceAlt }]}>
+            <View style={[styles.fill, { width: `${percent}%`, backgroundColor: percent === 100 ? colors.green : colors.yellow }]} />
+          </View>
         </View>
-        <Ionicons name="chevron-forward" size={18} color="#777" />
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </Pressable>
     );
-  }, [cardWidth, ownedBySet, router]);
+  }, [cardWidth, colors.bg, colors.border, colors.green, colors.muted, colors.surface, colors.surfaceAlt, colors.text, colors.yellow, isLight, ownedBySet, router]);
 
   const header = (
     <View style={styles.headerContent}>
-<View style={styles.pageHeader}>
-        <Text style={styles.eyebrow}>TRAINER HUB</Text>
-        <Text style={styles.pageTitle}>Coleções por Set</Text>
-        <Text style={styles.pageSubtitle}>
-          Acompanhe quantos cards você já conseguiu em cada coleção.
-        </Text>
-      </View>
+      <TrainerPageHeader
+        title="Coleções por Set"
+        subtitle="Acompanhe quantos cards você já conseguiu em cada coleção."
+        icon="layers"
+      />
 
       <Pressable style={styles.backRow} onPress={() => goBackOrHome(router)}>
-        <Ionicons name="arrow-back" size={18} color="#B8B8B8" />
-        <Text style={styles.backText}>Voltar</Text>
+        <Ionicons name="arrow-back" size={18} color={colors.muted} />
+        <Text style={[styles.backText, { color: colors.muted }]}>Voltar</Text>
       </Pressable>
 
-      <View style={styles.hero}>
+      <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
         <View>
-          <Text style={styles.heroKicker}>COLEÇÕES</Text>
-          <Text style={styles.heroValue}>{sets.length}</Text>
-          <Text style={styles.heroText}>sets no catálogo</Text>
+          <Text style={[styles.heroKicker, { color: colors.yellow }]}>COLEÇÕES</Text>
+          <Text style={[styles.heroValue, { color: colors.text }]}>{sets.length}</Text>
+          <Text style={[styles.heroText, { color: colors.muted }]}>sets no catálogo</Text>
         </View>
         <View style={styles.heroRight}>
-          <Text style={styles.completeValue}>{completed}</Text>
-          <Text style={styles.completeLabel}>100% completos</Text>
+          <Text style={[styles.completeValue, { color: colors.green }]}>{completed}</Text>
+          <Text style={[styles.completeLabel, { color: colors.muted }]}>100% completos</Text>
         </View>
       </View>
 
-      <View style={styles.searchBox}>
-        <Ionicons name="search" size={19} color="#8B8B8B" />
+      <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Ionicons name="search" size={19} color={colors.muted} />
         <TextInput
           value={search}
           onChangeText={setSearch}
           placeholder="Buscar set..."
-          placeholderTextColor="#777"
+          placeholderTextColor={colors.muted}
           autoCapitalize="none"
-          style={styles.search}
+          style={[styles.search, { color: colors.text }]}
         />
       </View>
 
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Todos os sets</Text>
-        <Text style={styles.count}>{filtered.length}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Todos os sets</Text>
+        <View style={[styles.countBadge, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+          <Text style={[styles.count, { color: colors.muted }]}>{filtered.length}</Text>
+        </View>
       </View>
 
       {error ? (
@@ -168,7 +175,7 @@ export default function SetsScreen() {
   );
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
         key={`set-grid-${columns}`}
@@ -180,15 +187,15 @@ export default function SetsScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.loader} size="large" color={gameTheme.colors.yellow} />
+            <ActivityIndicator style={styles.loader} size="large" color={colors.yellow} />
           ) : !error ? (
-            <View style={styles.empty}><Text style={styles.emptyText}>Nenhum set encontrado.</Text></View>
+            <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="layers-outline" size={28} color={colors.muted} />
+              <Text style={[styles.emptyText, { color: colors.muted }]}>Nenhum set encontrado.</Text>
+            </View>
           ) : null
         }
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: 12 },
-        ]}
+        contentContainerStyle={[styles.content, { paddingTop: 12 }]}
         initialNumToRender={6}
         maxToRenderPerBatch={6}
         updateCellsBatchingPeriod={70}
@@ -201,42 +208,39 @@ export default function SetsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, overflow: 'hidden', backgroundColor: gameTheme.colors.bg },
+  safe: { flex: 1, overflow: 'hidden' },
   content: { width: '100%', maxWidth: 1280, alignSelf: 'center', paddingHorizontal: 16, paddingBottom: 40 },
   headerContent: { gap: 16, marginBottom: 10 },
-  pageHeader: { gap: 5, marginBottom: 4 },
-  eyebrow: { color: gameTheme.colors.yellow, fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
-  pageTitle: { color: '#fff', fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
-  pageSubtitle: { color: '#A5A5A5', fontSize: 15, lineHeight: 21 },
   backRow: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7 },
-  backText: { color: '#B8B8B8', fontSize: 12, fontWeight: '800' },
-  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderRadius: 23, backgroundColor: '#101010', borderWidth: 1, borderColor: '#343434' },
-  heroKicker: { color: gameTheme.colors.yellow, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
-  heroValue: { color: '#fff', fontSize: 32, fontWeight: '900', marginTop: 2 },
-  heroText: { color: '#A5A5A5', fontSize: 10 },
+  backText: { fontSize: 12, fontWeight: '800' },
+  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderRadius: 23, borderWidth: 1 },
+  heroKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  heroValue: { fontSize: 32, fontWeight: '900', marginTop: 2 },
+  heroText: { fontSize: 10 },
   heroRight: { alignItems: 'flex-end' },
-  completeValue: { color: '#65D894', fontSize: 27, fontWeight: '900' },
-  completeLabel: { color: '#9B9B9B', fontSize: 9 },
-  searchBox: { height: 50, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderRadius: 15, backgroundColor: '#141414', borderWidth: 1, borderColor: '#2D2D2D' },
-  search: { flex: 1, height: '100%', color: '#fff', fontSize: 13 },
+  completeValue: { fontSize: 27, fontWeight: '900' },
+  completeLabel: { fontSize: 9 },
+  searchBox: { height: 50, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderRadius: 15, borderWidth: 1 },
+  search: { flex: 1, height: '100%', fontSize: 13 },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },
-  count: { color: '#8D8D8D', fontSize: 11, fontWeight: '800' },
+  sectionTitle: { fontSize: 20, fontWeight: '900' },
+  countBadge: { minWidth: 34, height: 30, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  count: { fontSize: 10, fontWeight: '900' },
   row: { gap: 10 },
-  setCard: { minHeight: 120, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 11, padding: 10, borderRadius: 18, backgroundColor: '#121212', borderWidth: 1, borderColor: '#2D2D2D' },
-  setImageWrap: { width: 86, height: 82, borderRadius: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#090909', padding: 8 },
+  setCard: { minHeight: 120, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 11, padding: 10, borderRadius: 18, borderWidth: 1 },
+  setImageWrap: { width: 86, height: 82, borderRadius: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8 },
   setImage: { width: '100%', height: '100%' },
   setBody: { flex: 1 },
   setTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  setName: { color: '#fff', fontSize: 13, fontWeight: '900' },
-  setId: { color: '#7E7E7E', fontSize: 8, fontWeight: '800', marginTop: 2 },
-  percent: { color: gameTheme.colors.yellow, fontSize: 13, fontWeight: '900' },
-  progressText: { color: '#9B9B9B', fontSize: 9, marginTop: 9 },
-  track: { height: 6, borderRadius: 999, overflow: 'hidden', backgroundColor: '#242424', marginTop: 5 },
-  fill: { height: '100%', borderRadius: 999, backgroundColor: gameTheme.colors.yellow },
+  setName: { fontSize: 13, fontWeight: '900' },
+  setId: { fontSize: 8, fontWeight: '800', marginTop: 2 },
+  percent: { fontSize: 13, fontWeight: '900' },
+  progressText: { fontSize: 9, marginTop: 9 },
+  track: { height: 6, borderRadius: 999, overflow: 'hidden', marginTop: 5 },
+  fill: { height: '100%', borderRadius: 999 },
   loader: { marginVertical: 38 },
-  empty: { padding: 32, alignItems: 'center' },
-  emptyText: { color: '#8D8D8D', fontSize: 12, fontWeight: '700' },
+  empty: { padding: 28, alignItems: 'center', gap: 7, borderRadius: 18, borderWidth: 1 },
+  emptyText: { fontSize: 12, fontWeight: '700' },
   error: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, borderColor: '#683243', backgroundColor: '#351A24', padding: 12 },
   errorText: { flex: 1, color: '#FFD7DD', fontSize: 11, fontWeight: '700' },
 });

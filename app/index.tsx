@@ -1,11 +1,33 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { type ComponentProps, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentSession, signIn, signInWithGoogle, signUp } from '../src/services/auth';
 import { supabase } from '../src/lib/supabase';
+import { PremiumBackground } from '../src/components/PremiumBackground';
+import { useAppTheme } from '../src/theme/ThemeProvider';
+import { getThemeVisual } from '../src/theme/themeCatalog';
 
 export default function AuthScreen() {
+  const { colors, isLight, themeName } = useAppTheme();
+  const visual = getThemeVisual(themeName);
+  const { width } = useWindowDimensions();
+  const wide = width >= 860;
+
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -25,8 +47,6 @@ export default function AuthScreen() {
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) return;
-      // Defer navigation too: mounting authenticated screens can start
-      // Supabase queries, which must not happen inside the auth callback.
       setTimeout(() => router.replace('/(tabs)'), 0);
     });
 
@@ -82,96 +102,260 @@ export default function AuthScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#FFD447" />
-        <Text style={styles.loadingText}>Preparando sua conta...</Text>
-      </View>
+      <SafeAreaView style={[styles.loading, { backgroundColor: colors.bg }]}>
+        <PremiumBackground />
+        <View style={[styles.loadingMark, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Image source={require('../assets/icon.png')} resizeMode="cover" style={styles.loadingLogo} />
+        </View>
+        <ActivityIndicator size="large" color={colors.yellow} />
+        <Text style={[styles.loadingTitle, { color: colors.text }]}>Trainer Collection</Text>
+        <Text style={[styles.loadingText, { color: colors.muted }]}>Preparando sua coleção...</Text>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.brandMark}><Ionicons name="flash" size={24} color="#050505" /></View>
-      <Text style={styles.logo}>Pokémon Cards</Text>
-      <Text style={styles.subtitle}>Abra boosters, complete sua Bag e jogue com seus amigos.</Text>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
+      <PremiumBackground />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+        >
+          <View style={[styles.shell, wide && styles.shellWide]}>
+            <View
+              style={[
+                styles.hero,
+                wide && styles.heroWide,
+                { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+              ]}
+            >
+              <View style={[styles.heroGlow, { backgroundColor: colors.accent }]} />
+              <Image source={{ uri: visual.image }} resizeMode="contain" style={styles.heroPokemon} />
 
-      <Pressable style={[styles.googleButton, googleLoading && styles.disabled]} onPress={handleGoogle} disabled={googleLoading}>
-        <View style={styles.googleMark}><Text style={styles.googleLetter}>G</Text></View>
-        <Text style={styles.googleText}>{googleLoading ? 'ABRINDO GOOGLE...' : 'CONTINUAR COM GOOGLE'}</Text>
-      </Pressable>
+              <View style={[styles.logoFrame, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Image source={require('../assets/icon.png')} resizeMode="cover" style={styles.logoImage} />
+              </View>
 
-      <View style={styles.divider}><View style={styles.dividerLine} /><Text style={styles.dividerText}>OU</Text><View style={styles.dividerLine} /></View>
+              <View style={styles.versionRow}>
+                <View style={[styles.versionBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={[styles.versionDot, { backgroundColor: '#65D894' }]} />
+                  <Text style={[styles.versionText, { color: colors.text }]}>VERSÃO 1.0</Text>
+                </View>
+                <Text style={[styles.mascotText, { color: colors.yellow }]}>{visual.mascot.toUpperCase()} THEME</Text>
+              </View>
 
-      <View style={styles.switcher}>
-        <Pressable style={[styles.switchButton, mode === 'login' && styles.switchActive]} onPress={() => setMode('login')}>
-          <Text style={[styles.switchText, mode === 'login' && styles.switchTextActive]}>Entrar</Text>
-        </Pressable>
-        <Pressable style={[styles.switchButton, mode === 'signup' && styles.switchActive]} onPress={() => setMode('signup')}>
-          <Text style={[styles.switchText, mode === 'signup' && styles.switchTextActive]}>Criar conta</Text>
-        </Pressable>
+              <Text style={[styles.brand, { color: colors.text }]}>Trainer Collection</Text>
+              <Text style={[styles.heroTitle, { color: colors.text }]}>Sua coleção. Seu treinador. Seu legado.</Text>
+              <Text style={[styles.heroText, { color: colors.muted }]}>
+                Abra boosters, monte sua Bag, acompanhe preços, batalhe e construa sua rede de treinadores em uma experiência única.
+              </Text>
+
+              <View style={styles.featureList}>
+                <AuthFeature icon="albums" title="Collection Vault" text="Bag, preços, raridades e estatísticas de batalha." />
+                <AuthFeature icon="cube" title="Pack Lab" text="Boosters de várias eras e aberturas registradas." />
+                <AuthFeature icon="people" title="Trainer Network" text="Perfis, QR de amizade, guildas, chat e trocas." />
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.authCard,
+                wide && styles.authCardWide,
+                {
+                  backgroundColor: isLight ? 'rgba(255,255,255,.94)' : colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View style={styles.authHead}>
+                <View style={[styles.authIcon, { backgroundColor: colors.accentSoft }]}>
+                  <Ionicons name={mode === 'login' ? 'log-in' : 'person-add'} size={22} color={colors.yellow} />
+                </View>
+                <View style={styles.authHeadCopy}>
+                  <Text style={[styles.authKicker, { color: colors.yellow }]}>TRAINER ACCESS</Text>
+                  <Text style={[styles.authTitle, { color: colors.text }]}>
+                    {mode === 'login' ? 'Bem-vindo de volta' : 'Crie seu treinador'}
+                  </Text>
+                  <Text style={[styles.authSubtitle, { color: colors.muted }]}>
+                    {mode === 'login' ? 'Entre para continuar sua coleção.' : 'Comece sua jornada na Trainer Collection.'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.switcher, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                <Pressable
+                  style={[styles.switchButton, mode === 'login' && { backgroundColor: colors.surface, borderColor: colors.accent }]}
+                  onPress={() => setMode('login')}
+                >
+                  <Text style={[styles.switchText, { color: mode === 'login' ? colors.text : colors.muted }]}>Entrar</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.switchButton, mode === 'signup' && { backgroundColor: colors.surface, borderColor: colors.accent }]}
+                  onPress={() => setMode('signup')}
+                >
+                  <Text style={[styles.switchText, { color: mode === 'signup' ? colors.text : colors.muted }]}>Criar conta</Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={[styles.googleButton, { backgroundColor: isLight ? '#FFFFFF' : colors.surfaceAlt, borderColor: colors.border }, googleLoading && styles.disabled]}
+                onPress={handleGoogle}
+                disabled={googleLoading}
+              >
+                <View style={styles.googleMark}><Text style={styles.googleLetter}>G</Text></View>
+                <Text style={[styles.googleText, { color: colors.text }]}>
+                  {googleLoading ? 'ABRINDO GOOGLE...' : 'CONTINUAR COM GOOGLE'}
+                </Text>
+              </Pressable>
+
+              <View style={styles.divider}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                <Text style={[styles.dividerText, { color: colors.muted }]}>OU USE E-MAIL</Text>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              </View>
+
+              {mode === 'signup' ? (
+                <AuthInput
+                  icon="person-outline"
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="Username de treinador"
+                  autoCapitalize="none"
+                />
+              ) : null}
+
+              <AuthInput
+                icon="mail-outline"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="E-mail"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <AuthInput
+                icon="lock-closed-outline"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Senha"
+                secureTextEntry
+              />
+
+              <Pressable style={[styles.primaryButton, { backgroundColor: colors.yellow }]} onPress={submit}>
+                <Ionicons name={mode === 'login' ? 'log-in-outline' : 'person-add-outline'} size={19} color="#07111F" />
+                <Text style={styles.primaryText}>{mode === 'login' ? 'ENTRAR NA TRAINER COLLECTION' : 'CRIAR TREINADOR'}</Text>
+              </Pressable>
+
+              <View style={[styles.accountNote, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+                <Ionicons name="shield-checkmark" size={17} color={colors.green} />
+                <Text style={[styles.accountHint, { color: colors.muted }]}>
+                  Ao usar Google com o mesmo e-mail de uma conta existente, seu progresso continua na mesma conta.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+function AuthFeature({ icon, title, text }: { icon: keyof typeof Ionicons.glyphMap; title: string; text: string }) {
+  const { colors } = useAppTheme();
+  return (
+    <View style={[styles.feature, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.featureIcon, { backgroundColor: colors.accentSoft }]}>
+        <Ionicons name={icon} size={18} color={colors.accent} />
       </View>
+      <View style={styles.featureCopy}>
+        <Text style={[styles.featureTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.featureText, { color: colors.muted }]}>{text}</Text>
+      </View>
+    </View>
+  );
+}
 
-      {mode === 'signup' && (
-        <TextInput
-          value={username}
-          onChangeText={setUsername}
-          placeholder="Username de treinador"
-          placeholderTextColor="#747474"
-          autoCapitalize="none"
-          style={styles.input}
-        />
-      )}
-
+function AuthInput(props: ComponentProps<typeof TextInput> & { icon: keyof typeof Ionicons.glyphMap }) {
+  const { colors } = useAppTheme();
+  const { icon, ...inputProps } = props;
+  return (
+    <View style={[styles.inputWrap, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+      <Ionicons name={icon} size={18} color={colors.muted} />
       <TextInput
-        value={email}
-        onChangeText={setEmail}
-        placeholder="E-mail"
-        placeholderTextColor="#747474"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        style={styles.input}
+        {...inputProps}
+        placeholderTextColor={colors.muted}
+        style={[styles.input, { color: colors.text }]}
       />
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Senha"
-        placeholderTextColor="#747474"
-        secureTextEntry
-        style={styles.input}
-      />
-
-      <Pressable style={styles.primaryButton} onPress={submit}>
-        <Ionicons name={mode === 'login' ? 'log-in-outline' : 'person-add-outline'} size={18} color="#050505" />
-        <Text style={styles.primaryText}>{mode === 'login' ? 'ENTRAR NO JOGO' : 'CRIAR TREINADOR'}</Text>
-      </Pressable>
-
-      <Text style={styles.accountHint}>Ao usar Google com o mesmo e-mail de uma conta existente, seu progresso continua na mesma conta.</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#050505', paddingHorizontal: 24, justifyContent: 'center', alignItems: 'stretch' },
-  loading: { flex: 1, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: '#9A9A9A', fontSize: 12, fontWeight: '700' },
-  brandMark: { width: 52, height: 52, borderRadius: 17, backgroundColor: '#FFD447', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 14 },
-  logo: { color: '#F7F7F7', fontSize: 34, fontWeight: '900', textAlign: 'center' },
-  subtitle: { color: '#9A9A9A', fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 8, marginBottom: 26 },
-  googleButton: { minHeight: 54, borderRadius: 15, backgroundColor: '#F7F7F7', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11, borderWidth: 1, borderColor: '#DADADA' },
+  flex: { flex: 1 },
+  safe: { flex: 1, overflow: 'hidden' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 9, overflow: 'hidden' },
+  loadingMark: { width: 84, height: 84, borderRadius: 27, borderWidth: 1, padding: 5, marginBottom: 7 },
+  loadingLogo: { width: '100%', height: '100%', borderRadius: 22 },
+  loadingTitle: { fontSize: 21, fontWeight: '900' },
+  loadingText: { fontSize: 11, fontWeight: '700' },
+  scroll: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: 20, justifyContent: 'center' },
+  shell: { width: '100%', maxWidth: 1120, alignSelf: 'center', gap: 14 },
+  shellWide: { flexDirection: 'row', alignItems: 'stretch', gap: 16 },
+  hero: {
+    minHeight: 350,
+    borderRadius: 30,
+    borderWidth: 1,
+    padding: 20,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  heroWide: { flex: 1.15, minHeight: 630, justifyContent: 'center', padding: 28 },
+  heroGlow: { position: 'absolute', right: -100, top: -110, width: 360, height: 360, borderRadius: 999, opacity: .14 },
+  heroPokemon: { position: 'absolute', right: -35, bottom: -45, width: 300, height: 355, opacity: .23, transform: [{ rotate: '7deg' }] },
+  logoFrame: { width: 72, height: 72, borderRadius: 23, borderWidth: 1, padding: 4, zIndex: 2 },
+  logoImage: { width: '100%', height: '100%', borderRadius: 19 },
+  versionRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 15, zIndex: 2 },
+  versionBadge: { minHeight: 29, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  versionDot: { width: 7, height: 7, borderRadius: 999 },
+  versionText: { fontSize: 8, fontWeight: '900', letterSpacing: .8 },
+  mascotText: { fontSize: 8, fontWeight: '900', letterSpacing: .9 },
+  brand: { fontSize: 13, fontWeight: '900', letterSpacing: 1.1, marginTop: 18, zIndex: 2 },
+  heroTitle: { fontSize: 34, lineHeight: 38, fontWeight: '900', letterSpacing: -.8, marginTop: 4, maxWidth: 510, zIndex: 2 },
+  heroText: { fontSize: 12, lineHeight: 18, maxWidth: 500, marginTop: 8, zIndex: 2 },
+  featureList: { gap: 8, marginTop: 22, maxWidth: 510, zIndex: 2 },
+  feature: { minHeight: 62, borderRadius: 17, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  featureIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  featureCopy: { flex: 1, minWidth: 0 },
+  featureTitle: { fontSize: 10, fontWeight: '900' },
+  featureText: { fontSize: 8, lineHeight: 12, marginTop: 2 },
+  authCard: { width: '100%', borderRadius: 30, borderWidth: 1, padding: 18, gap: 12 },
+  authCardWide: { flex: .85, maxWidth: 470, justifyContent: 'center', padding: 24 },
+  authHead: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 2 },
+  authIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  authHeadCopy: { flex: 1, minWidth: 0 },
+  authKicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
+  authTitle: { fontSize: 21, fontWeight: '900', marginTop: 2 },
+  authSubtitle: { fontSize: 9, marginTop: 2 },
+  switcher: { flexDirection: 'row', gap: 5, padding: 4, borderRadius: 15, borderWidth: 1 },
+  switchButton: { flex: 1, minHeight: 39, borderRadius: 11, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  switchText: { fontSize: 10, fontWeight: '900' },
+  googleButton: { minHeight: 52, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1 },
   googleMark: { width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E0E0E0' },
   googleLetter: { color: '#4285F4', fontSize: 16, fontWeight: '900' },
-  googleText: { color: '#242424', fontSize: 11, fontWeight: '900', letterSpacing: .45 },
-  disabled: { opacity: .6 },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 19 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#252525' },
-  dividerText: { color: '#666', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
-  switcher: { flexDirection: 'row', gap: 7, marginBottom: 15, backgroundColor: '#0D0D0D', padding: 4, borderRadius: 14, borderWidth: 1, borderColor: '#242424' },
-  switchButton: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  switchActive: { backgroundColor: '#1A1A1A' },
-  switchText: { color: '#777', fontWeight: '800' },
-  switchTextActive: { color: '#F7F7F7' },
-  input: { backgroundColor: '#0D0D0D', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: '#F7F7F7', marginBottom: 10, borderWidth: 1, borderColor: '#282828' },
-  primaryButton: { backgroundColor: '#FFD447', minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 5 },
-  primaryText: { color: '#050505', fontWeight: '900', fontSize: 12, letterSpacing: .55 },
-  accountHint: { color: '#6F6F6F', fontSize: 9, lineHeight: 14, textAlign: 'center', marginTop: 15, paddingHorizontal: 12 },
+  googleText: { fontSize: 10, fontWeight: '900', letterSpacing: .35 },
+  disabled: { opacity: .55 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 9, marginVertical: 2 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 7, fontWeight: '900', letterSpacing: 1 },
+  inputWrap: { minHeight: 52, borderRadius: 15, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  input: { flex: 1, minHeight: 50, fontSize: 13, paddingVertical: 0 },
+  primaryButton: { minHeight: 53, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 2 },
+  primaryText: { color: '#07111F', fontWeight: '900', fontSize: 10, letterSpacing: .45 },
+  accountNote: { borderRadius: 14, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  accountHint: { flex: 1, fontSize: 8, lineHeight: 13 },
 });

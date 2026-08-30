@@ -21,15 +21,22 @@ export function CurrencyBar({ compact = false }: { compact?: boolean }) {
     await Share.share({
       message:
         `Olá! Quero adicionar 🪙 ${item.coins.toLocaleString('pt-BR')} Coins ` +
-        `(${item.price}) na minha conta do Pokémon Cards. Vou enviar o Pix e o comprovante.`,
+        `(${item.price}) na minha conta do Trainer Collection. Vou enviar o Pix e o comprovante.`,
     }).catch(() => null);
   }
 
   return (
     <>
       <View style={[styles.bar, compact && styles.barCompact]}>
-        <View style={[styles.currency, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.value, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text>
+        <View style={[styles.currency, styles.coinCurrency, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.currencyGlow, { backgroundColor: colors.yellow }]} />
+          <View style={[styles.currencyIcon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+            <Ionicons name="disc" size={14} color={colors.yellow} />
+          </View>
+          <View style={styles.currencyCopy}>
+            <Text style={[styles.currencyLabel, { color: colors.muted }]}>COINS</Text>
+            <Text style={[styles.value, { color: colors.yellow }]}>{coins.toLocaleString('pt-BR')}</Text>
+          </View>
           <Pressable
             accessibilityLabel="Adicionar Coins"
             hitSlop={7}
@@ -39,9 +46,15 @@ export function CurrencyBar({ compact = false }: { compact?: boolean }) {
             <Ionicons name="add" size={14} color="#07111F" />
           </Pressable>
         </View>
-        <View style={[styles.currency, { backgroundColor: colors.surface, borderColor: '#68D9FF' }]}>
-          <Ionicons name="diamond" size={14} color="#68D9FF" />
-          <Text style={[styles.value, { color: '#68D9FF' }]}>{diamonds.toLocaleString('pt-BR')}</Text>
+        <View style={[styles.currency, styles.diamondCurrency, { backgroundColor: colors.surface, borderColor: '#68D9FF' }]}>
+          <View style={[styles.currencyGlow, { backgroundColor: '#68D9FF' }]} />
+          <View style={[styles.currencyIcon, { backgroundColor: '#68D9FF' + '18', borderColor: '#68D9FF' + '55' }]}>
+            <Ionicons name="diamond" size={14} color="#68D9FF" />
+          </View>
+          <View style={styles.currencyCopy}>
+            <Text style={[styles.currencyLabel, { color: colors.muted }]}>DIAMANTES</Text>
+            <Text style={[styles.value, { color: '#68D9FF' }]}>{diamonds.toLocaleString('pt-BR')}</Text>
+          </View>
         </View>
       </View>
 
@@ -86,10 +99,27 @@ export function CurrencyBar({ compact = false }: { compact?: boolean }) {
 
 const styles = StyleSheet.create({
   bar: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6 },
-  barCompact: { maxWidth: 260 },
-  currency: { minHeight: 34, borderRadius: 12, borderWidth: 1, paddingLeft: 10, paddingRight: 7, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  value: { fontSize: 11, fontWeight: '900' },
-  plus: { width: 22, height: 22, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  barCompact: { maxWidth: 290 },
+  currency: {
+    minHeight: 42,
+    borderRadius: 15,
+    borderWidth: 1,
+    paddingLeft: 6,
+    paddingRight: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  coinCurrency: { minWidth: 112 },
+  diamondCurrency: { minWidth: 92 },
+  currencyGlow: { position: 'absolute', width: 46, height: 46, borderRadius: 999, left: -18, top: -16, opacity: .10 },
+  currencyIcon: { width: 29, height: 29, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  currencyCopy: { minWidth: 0 },
+  currencyLabel: { fontSize: 6, fontWeight: '900', letterSpacing: .75 },
+  value: { fontSize: 11, fontWeight: '900', marginTop: -1 },
+  plus: { width: 24, height: 24, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginLeft: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,.72)', justifyContent: 'flex-end', padding: 12 },
   sheet: { width: '100%', maxWidth: 620, alignSelf: 'center', borderRadius: 25, borderWidth: 1, padding: 16, gap: 14, marginBottom: 8 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 11 },
