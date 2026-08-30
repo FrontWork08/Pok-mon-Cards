@@ -91,6 +91,68 @@ export type GuildWar = {
   winnerGuildId:string|null;
   contributors:GuildWarContributor[];
 };
+export type GuildWarGymDefender = {
+  id:string;
+  playerId:string;
+  username:string;
+  guildId:string;
+  cardId:string;
+  pokemonName:string;
+  imageSmall:string|null;
+  rarity:string|null;
+  types:string[];
+  maxHp:number;
+  currentHp:number;
+  maxDamage:number;
+  wins:number;
+  placedAt:string;
+  updatedAt:string;
+};
+
+export type GuildWarGymEvent = {
+  id:number;
+  gymId:string;
+  eventType:'defender_set'|'heal'|'attack'|'capture';
+  actorId:string|null;
+  guildId:string|null;
+  message:string;
+  metadata:Record<string,unknown>;
+  createdAt:string;
+};
+
+export type GuildWarGym = {
+  id:string;
+  slot:number;
+  key:string;
+  name:string;
+  ownerGuild:{id:string;name:string;color:string}|null;
+  controlledSince:string;
+  captureCount:number;
+  lastAttackedAt:string|null;
+  defenders:GuildWarGymDefender[];
+};
+
+export type GuildWarGymBoard = {
+  warId:string;
+  status:'active'|'completed';
+  startsAt:string;
+  endsAt:string;
+  guildA:{id:string;name:string;color:string};
+  guildB:{id:string;name:string;color:string};
+  gyms:GuildWarGym[];
+  events:GuildWarGymEvent[];
+};
+
+export type GuildGymAttackResult = {
+  gymId:string;
+  conquered:boolean;
+  ownerGuildId:string;
+  defendersDefeated:number;
+  defendersRemaining:number;
+  attackersFainted:number;
+  teamSize:number;
+};
+
 export type GuildCollectiveBooster = {
   id?:string;
   guildId:string|null;
@@ -188,6 +250,165 @@ export async function getGuildHub(): Promise<GuildHub> {
   if (warsResult.error) throw warsResult.error;
   if (collectiveResult.error) throw collectiveResult.error;
   return normalizeHub(hubResult.data, rewardResult.data, warsResult.data, collectiveResult.data);
+}
+
+function guildGymError(error:any){
+  const raw=String(error?.message??error??'Não foi possível concluir a ação no ginásio.');
+  const messages:Record<string,string>={
+    WAR_NOT_FOUND:'A Guerra de Guildas não foi encontrada.',
+    WAR_NOT_ACTIVE:'Esta Guerra de Guildas não está ativa.',
+    GYM_NOT_FOUND:'O ginásio não foi encontrado.',
+    NOT_IN_THIS_GUILD_WAR:'Sua guilda não participa deste confronto.',
+    GYM_NOT_OWNED_BY_YOUR_GUILD:'Sua guilda não domina este ginásio.',
+    CARD_NOT_OWNED_OR_NOT_POKEMON:'Escolha um Pokémon que esteja disponível na sua Bag.',
+    DEFENDER_DAMAGED_CANNOT_REPLACE:'Esse defensor já tomou dano. Cure-o antes de trocar a defesa.',
+    DEFENDER_NOT_FOUND:'O defensor não foi encontrado.',
+    CANNOT_HEAL_ENEMY_DEFENDER:'Você só pode restaurar HP de defensores da sua própria guilda.',
+    DEFENDER_ALREADY_DEFEATED:'Esse Pokémon já foi derrotado e não pode ser restaurado.',
+    DEFENDER_ALREADY_FULL_HP:'Esse Pokémon já está com o HP máximo.',
+    INSUFFICIENT_COINS:'Você precisa de 🪙 25.000 para restaurar 50 HP.',
+    ATTACK_TEAM_MUST_HAVE_1_TO_6_POKEMON:'Monte um time de ataque com até 6 Pokémon.',
+    ATTACK_TEAM_HAS_DUPLICATES:'Não repita a mesma carta no time de ataque.',
+    ATTACK_CARD_NOT_OWNED_OR_NOT_POKEMON:'Seu time contém uma carta indisponível na Bag.',
+    CANNOT_ATTACK_YOUR_OWN_GYM:'Você não pode atacar um ginásio dominado pela sua guilda.',
+    GYM_HAS_NO_OWNER:'Esse ginásio ainda não possui uma guilda dominante.',
+    INVALID_GYM_OWNER:'O domínio desse ginásio está inconsistente. Atualize a tela e tente novamente.',
+  };
+  const key=Object.keys(messages).find((candidate)=>raw.includes(candidate));
+  return new Error(key?messages[key]:raw);
+}
+
+function normalizeGuildWarGymBoard(data:any):GuildWarGymBoard{
+  return {
+    warId:String(data?.warId??''),
+    status:data?.status==='completed'?'completed':'active',
+    startsAt:String(data?.startsAt??''),
+    endsAt:String(data?.endsAt??''),
+    guildA:{
+      id:String(data?.guildA?.id??''),
+      name:String(data?.guildA?.name??'Guilda A'),
+      color:String(data?.guildA?.color??'#FFD447'),
+    },
+    guildB:{
+      id:String(data?.guildB?.id??''),
+      name:String(data?.guildB?.name??'Guilda B'),
+      color:String(data?.guildB?.color??'#68D9FF'),
+    },
+    gyms:Array.isArray(data?.gyms)?data.gyms.map((gym:any)=>({
+      id:String(gym?.id??''),
+      slot:Number(gym?.slot??0),
+      key:String(gym?.key??''),
+      name:String(gym?.name??'Ginásio'),
+      ownerGuild:gym?.ownerGuild?{
+        id:String(gym.ownerGuild.id??''),
+        name:String(gym.ownerGuild.name??'Guilda'),
+        color:String(gym.ownerGuild.color??'#FFD447'),
+      }:null,
+      controlledSince:String(gym?.controlledSince??''),
+      captureCount:Number(gym?.captureCount??0),
+      lastAttackedAt:gym?.lastAttackedAt?String(gym.lastAttackedAt):null,
+      defenders:Array.isArray(gym?.defenders)?gym.defenders.map((d:any)=>({
+        id:String(d?.id??''),
+        playerId:String(d?.playerId??''),
+        username:String(d?.username??'Treinador'),
+        guildId:String(d?.guildId??''),
+        cardId:String(d?.cardId??''),
+        pokemonName:String(d?.pokemonName??'Pokémon'),
+        imageSmall:d?.imageSmall?String(d.imageSmall):null,
+        rarity:d?.rarity?String(d.rarity):null,
+        types:Array.isArray(d?.types)?d.types.map(String):[],
+        maxHp:Number(d?.maxHp??1),
+        currentHp:Number(d?.currentHp??0),
+        maxDamage:Number(d?.maxDamage??10),
+        wins:Number(d?.wins??0),
+        placedAt:String(d?.placedAt??''),
+        updatedAt:String(d?.updatedAt??''),
+      })):[],
+    })):[],
+    events:Array.isArray(data?.events)?data.events.map((event:any)=>({
+      id:Number(event?.id??0),
+      gymId:String(event?.gymId??''),
+      eventType:event?.eventType??'attack',
+      actorId:event?.actorId?String(event.actorId):null,
+      guildId:event?.guildId?String(event.guildId):null,
+      message:String(event?.message??''),
+      metadata:event?.metadata&&typeof event.metadata==='object'?event.metadata:{},
+      createdAt:String(event?.createdAt??''),
+    })):[],
+  };
+}
+
+export async function getGuildWarGyms(warId:string):Promise<GuildWarGymBoard>{
+  const {data,error}=await supabase.rpc('get_guild_war_gyms',{p_war_id:warId});
+  if(error)throw guildGymError(error);
+  return normalizeGuildWarGymBoard(data);
+}
+
+export async function setGuildWarGymDefender(warId:string,gymId:string,cardId:string){
+  const {data,error}=await supabase.rpc('set_guild_war_gym_defender',{
+    p_war_id:warId,
+    p_gym_id:gymId,
+    p_card_id:cardId,
+  });
+  if(error)throw guildGymError(error);
+  return data;
+}
+
+export async function healGuildWarGymDefender(defenderId:string){
+  const {data,error}=await supabase.rpc('heal_guild_war_gym_defender',{p_defender_id:defenderId});
+  if(error)throw guildGymError(error);
+  return {
+    defenderId:String(data?.defenderId??defenderId),
+    healedHp:Number(data?.healedHp??0),
+    costCoins:Number(data?.costCoins??25000),
+    currentHp:Number(data?.currentHp??0),
+    maxHp:Number(data?.maxHp??0),
+  };
+}
+
+export async function attackGuildWarGym(warId:string,gymId:string,cardIds:string[]):Promise<GuildGymAttackResult>{
+  const {data,error}=await supabase.rpc('attack_guild_war_gym',{
+    p_war_id:warId,
+    p_gym_id:gymId,
+    p_card_ids:cardIds,
+  });
+  if(error)throw guildGymError(error);
+  return {
+    gymId:String(data?.gymId??gymId),
+    conquered:Boolean(data?.conquered),
+    ownerGuildId:String(data?.ownerGuildId??''),
+    defendersDefeated:Number(data?.defendersDefeated??0),
+    defendersRemaining:Number(data?.defendersRemaining??0),
+    attackersFainted:Number(data?.attackersFainted??0),
+    teamSize:Number(data?.teamSize??cardIds.length),
+  };
+}
+
+let guildGymChannelSequence=0;
+export function subscribeToGuildWarGyms(warId:string,onChange:()=>void){
+  guildGymChannelSequence+=1;
+  let disposed=false;
+  let timer:ReturnType<typeof setTimeout>|null=null;
+  const refresh=()=>{
+    if(disposed)return;
+    if(timer)clearTimeout(timer);
+    timer=setTimeout(()=>{
+      timer=null;
+      if(!disposed)onChange();
+    },120);
+  };
+  const channel=supabase
+    .channel(`guild-war-gyms:${warId}:${guildGymChannelSequence}:${Date.now()}`)
+    .on('postgres_changes',{event:'*',schema:'public',table:'guild_war_gyms',filter:`war_id=eq.${warId}`},refresh)
+    .on('postgres_changes',{event:'*',schema:'public',table:'guild_war_gym_defenders',filter:`war_id=eq.${warId}`},refresh)
+    .on('postgres_changes',{event:'*',schema:'public',table:'guild_war_gym_events',filter:`war_id=eq.${warId}`},refresh)
+    .subscribe();
+
+  return ()=>{
+    disposed=true;
+    if(timer)clearTimeout(timer);
+    void supabase.removeChannel(channel);
+  };
 }
 
 export async function claimGuildWeeklyReward() {
