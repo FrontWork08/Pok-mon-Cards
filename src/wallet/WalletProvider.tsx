@@ -57,9 +57,29 @@ export function WalletProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     void refresh();
-    const { data } = supabase.auth.onAuthStateChange(() => {
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextUserId = session?.user?.id ?? null;
+
+      if (!nextUserId) {
+        // Clear authenticated UI state immediately on logout instead of waiting
+        // for a follow-up getUser() round trip. This prevents stale private
+        // screens (for example the profile) from remaining visible.
+        setUserId(null);
+        setUsername(null);
+        setProfileIcon(null);
+        setAvatarPath(null);
+        setAvatarUpdatedAt(null);
+        setCoins(0);
+        setDiamonds(0);
+        setLoading(false);
+        return;
+      }
+
+      setUserId(nextUserId);
       setTimeout(() => { void refresh(); }, 0);
     });
+
     return () => data.subscription.unsubscribe();
   }, [refresh]);
 
