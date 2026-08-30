@@ -153,7 +153,18 @@ export default function ProfileScreen() {
     }
   }
 
-  async function handleSignOut() { try { await signOut(); router.replace('/'); } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível sair.'); } }
+  async function handleSignOut() {
+    try {
+      setError(null);
+      await signOut();
+      setProfile(null);
+      setStats(null);
+      setFriendCount(0);
+      router.replace('/');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível sair.');
+    }
+  }
   const xp = Number(profile?.xp ?? 0);
   const levelXp = xp % 250;
   const collectionMarketValueUsd = Number(stats?.collectionMarketValueUsd ?? 0);
