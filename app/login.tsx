@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCurrentSession, isPasswordRecoveryUrl, isPendingPasswordRecoveryFor, requestPasswordReset, signIn, signInWithGoogle, signUp } from '../src/services/auth';
+import { clearPendingPasswordRecovery, getCurrentSession, isPasswordRecoveryUrl, requestPasswordReset, signIn, signInWithGoogle, signUp } from '../src/services/auth';
 import { initialWebAuthUrl, supabase } from '../src/lib/supabase';
 import { PremiumBackground } from '../src/components/PremiumBackground';
 import { useAppTheme } from '../src/theme/ThemeProvider';
@@ -73,14 +73,9 @@ export default function AuthScreen() {
       }
       if (!session?.user) return;
 
-      setTimeout(() => {
-        void isPendingPasswordRecoveryFor(session.user.email)
-          .then((pendingRecovery) => {
-            if (pendingRecovery) router.replace('/reset-password');
-            else router.replace('/(tabs)');
-          })
-          .catch(() => router.replace('/(tabs)'));
-      }, 0);
+      // A normal SIGNED_IN event must never reuse the old native recovery
+      // marker. Recovery routing is decided by the recovery callback itself.
+      setTimeout(() => router.replace('/(tabs)'), 0);
     });
 
     return () => {
@@ -113,6 +108,7 @@ export default function AuthScreen() {
       } else {
         await signIn(email, password);
       }
+      await clearPendingPasswordRecovery();
       router.replace('/(tabs)');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Não foi possível autenticar.';
