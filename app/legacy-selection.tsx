@@ -359,11 +359,15 @@ export default function LegacySelectionScreen() {
         maxPerCard={1}
         maxTotal={limit}
         enableCombatSort
-        onSelectedMapChange={setDraft}
+        onSelectedMapChange={(next) => {
+          setDraft(next);
+          if (error) setError('');
+        }}
         onClose={closePicker}
         onConfirm={saveDraft}
         confirmLabel={`SALVAR ${draftCount}/${limit}`}
         working={working}
+        errorText={error}
       />
     </Screen>
   );
