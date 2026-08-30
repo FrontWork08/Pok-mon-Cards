@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CurrencyBar } from '@/components/CurrencyBar';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { getProfileAvatarUrl } from '@/services/player';
 import { isCurrentUserAdmin } from '@/services/market';
 import { getUnreadConversationCount } from '@/services/notifications';
 import { getMyRankSnapshot, type RankSnapshot } from '@/services/rankStatus';
@@ -35,6 +36,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label: 'Mercado de Treinadores', description: 'Lojas e ofertas em tempo real', href: '/marketplace', icon: 'storefront' },
   { label: 'Resgatar Código', description: 'Recompensas únicas por conta', href: '/codes', icon: 'ticket' },
   { label: 'Amigos e Chat', description: 'Amizades e conversas', href: '/friends', icon: 'people' },
+  { label: 'QR de amizade', description: 'Mostre seu Trainer Link para adicionar amigos', href: '/friend-qr', icon: 'qr-code' },
   { label: 'Meus Decks', description: 'Monte suas equipes de batalha', href: '/decks', icon: 'albums' },
   { label: 'Missões', description: 'Objetivos diários e semanais', href: '/missions', icon: 'checkbox' },
   { label: 'Pokédex', description: 'Espécies e cartas descobertas', href: '/pokedex', icon: 'book' },
@@ -46,7 +48,8 @@ const MENU_ITEMS: MenuItem[] = [
 export function TrainerNavigation() {
   const router = useRouter();
   const { colors } = useAppTheme();
-  const { userId, username, profileIcon } = useWallet();
+  const { userId, username, profileIcon, avatarPath, avatarUpdatedAt } = useWallet();
+  const avatarUrl = getProfileAvatarUrl(avatarPath, avatarUpdatedAt);
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -86,7 +89,7 @@ export function TrainerNavigation() {
         </Pressable>
         <View style={styles.currency}><CurrencyBar compact /></View>
         <Pressable accessibilityLabel="Abrir perfil" onPress={() => router.replace('/(tabs)/profile')}>
-          <TrainerAvatar icon={profileIcon} color={colors.accent} backgroundColor={colors.surface} size={40} />
+          <TrainerAvatar icon={profileIcon} avatarUrl={avatarUrl} color={colors.accent} backgroundColor={colors.surface} size={40} />
         </Pressable>
       </View>
       {rankSnapshot ? <View style={styles.rankStrip}>
@@ -99,7 +102,7 @@ export function TrainerNavigation() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={[styles.drawer, { backgroundColor: colors.bg, borderColor: colors.border }] }>
             <View style={[styles.drawerHeader, { borderBottomColor: colors.border, paddingTop: Math.max(insets.top, 16) }] }>
-              <TrainerAvatar icon={profileIcon} color={colors.accent} backgroundColor={colors.surface} size={48} />
+              <TrainerAvatar icon={profileIcon} avatarUrl={avatarUrl} color={colors.accent} backgroundColor={colors.surface} size={48} />
               <View style={styles.headerText}>
                 <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER MENU</Text>
                 <Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{username ?? 'Treinador'}</Text>
