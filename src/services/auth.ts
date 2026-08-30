@@ -19,15 +19,15 @@ function authErrorMessage(message: string) {
     return 'O login com Google ainda não foi habilitado no Supabase.';
   }
   if (normalized.includes('email rate limit exceeded') || normalized.includes('over_email_send_rate_limit')) {
-    return 'O limite de confirmações por e-mail foi atingido. Use o Google ou tente novamente mais tarde.';
+    return 'O limite de e-mails foi atingido. Aguarde um pouco antes de tentar novamente.';
   }
   if (normalized.includes('email address not authorized')) {
-    return 'O envio de confirmação ainda não está liberado para este e-mail. Use o Google por enquanto.';
+    return 'O servidor de e-mail ainda não está liberado para enviar mensagens para este endereço.';
   }
   if (normalized.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
   if (normalized.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
   if (normalized.includes('password should be at least')) return 'A nova senha precisa ter pelo menos 6 caracteres.';
-  if (normalized.includes('rate limit') || normalized.includes('over_email_send_rate_limit')) return 'Muitas tentativas em pouco tempo. Aguarde um pouco antes de pedir outro e-mail.';
+  if (normalized.includes('rate limit')) return 'Muitas tentativas em pouco tempo. Aguarde um pouco antes de tentar novamente.';
   if (normalized.includes('user already registered')) return 'Já existe uma conta com este e-mail.';
   return message;
 }
