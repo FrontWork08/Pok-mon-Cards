@@ -13,6 +13,8 @@ on:
       - package.json
       - package-lock.json
       - scripts/generate-trainer-assets.py
+      - scripts/project-audit.mjs
+      - scripts/regression-audit.mjs
       - .github/workflows/eas-update.yml
 
 permissions:
