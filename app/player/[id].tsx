@@ -95,8 +95,9 @@ export default function PlayerShowcaseScreen() {
           <View style={styles.heroInfo}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER SHOWCASE • 1.0</Text>
             <Text style={[styles.username, { color: colors.text }]}>@{player.username}</Text>
-            {player.equippedTitle ? <Text style={[styles.titleText, { color: colors.yellow }]}>{player.equippedTitle.icon} {player.equippedTitle.title}</Text> : null}
+            {player.economyTitle ? <Text style={[styles.economyTitle,{color:colors.yellow}]}>{player.economyTitle.icon} {player.economyTitle.title}</Text> : player.equippedTitle ? <Text style={[styles.titleText, { color: colors.yellow }]}>{player.equippedTitle.icon} {player.equippedTitle.title}</Text> : null}
             <Text style={[styles.meta, { color: colors.muted }]}>Nível {player.level} • {rank ? `${rank.symbol} ${rank.displayName}` : 'ELO oculto'}</Text>
+            {player.prestige.level>0?<View style={[styles.prestigeBadge,{backgroundColor:colors.surface,borderColor:colors.yellow}]}><Ionicons name="ribbon" size={13} color={colors.yellow}/><Text style={[styles.prestigeText,{color:colors.yellow}]}>PRESTÍGIO {player.prestige.level}{player.prestige.stars>0?` • ★${player.prestige.stars}`:''}</Text></View>:null}
             {player.frame || player.background ? <Text style={[styles.cosmeticMeta, { color: frameColor }]}>{player.frame?.name ?? 'Sem moldura'} • {player.background?.name ?? 'Sem background'}</Text> : null}
           </View>
           {player.guild ? <Pressable onPress={() => router.push('/guilds')} style={[styles.guildBadge, { backgroundColor: player.guild.color + '25', borderColor: player.guild.color }]}><Ionicons name="shield" size={16} color={player.guild.color} /><Text style={[styles.guildText, { color: player.guild.color }]}>{player.guild.name} • Nv. {player.guild.level}</Text></Pressable> : null}
@@ -144,6 +145,19 @@ export default function PlayerShowcaseScreen() {
           <Metric icon="trophy" label="VITÓRIAS" value={player.battleWins.toLocaleString('pt-BR')} />
           <Metric icon="analytics" label="WIN RATE" value={`${winRate}%`} />
         </View>
+
+        {collection.museum.cards.length ? <>
+          <View style={styles.sectionHead}><View><Text style={[styles.sectionTitle,{color:colors.text}]}>Museu da Coleção</Text><Text style={[styles.sectionHint,{color:colors.muted}]}>Galeria permanente • nível {collection.museum.level} • {collection.museum.cards.length}/{collection.museum.slots} espaços usados.</Text></View><View style={[styles.museumLevelBadge,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name="library" size={14} color={colors.accent}/><Text style={[styles.museumLevelText,{color:colors.accent}]}>NV. {collection.museum.level}</Text></View></View>
+          <View style={styles.showcaseGrid}>
+            {collection.museum.cards.map((card)=><Pressable key={`museum-${card.slot}`} onPress={()=>router.push(`/card/${card.id}`)} style={[styles.showcaseCard,{backgroundColor:colors.surface,borderColor:card.style?colors.accent:colors.border}]}>
+              <View style={styles.museumSlotTop}><Text style={[styles.showcaseSlot,{color:colors.yellow}]}>MUSEU {card.slot}</Text>{card.style?<View style={[styles.cardStyleBadge,{backgroundColor:colors.accentSoft}]}><Ionicons name={(card.style.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={11} color={colors.accent}/><Text style={[styles.cardStyleText,{color:colors.accent}]}>{card.style.name}</Text></View>:null}</View>
+              {card.imageSmall?<Image source={{uri:card.imageSmall}} resizeMode="contain" resizeMethod="resize" fadeDuration={0} style={styles.showcaseImage}/>:<View style={[styles.showcaseImage,{backgroundColor:colors.surfaceAlt}]}/>}
+              <Text numberOfLines={1} style={[styles.showcaseName,{color:colors.text}]}>{card.name}</Text>
+              <Text numberOfLines={1} style={[styles.cardMeta,{color:colors.muted}]}>{card.rarity??'Sem raridade'}</Text>
+              <Text style={[styles.cardValue,{color:colors.yellow}]}>{card.marketPriceUsd==null?'US$ —':formatUsd(card.marketPriceUsd)}</Text>
+            </Pressable>)}
+          </View>
+        </>:null}
 
         {collection.showcase.length ? <>
           <View style={styles.sectionHead}><View><Text style={[styles.sectionTitle, { color: colors.text }]}>Vitrine do treinador</Text><Text style={[styles.sectionHint, { color: colors.muted }]}>As cartas escolhidas para representar esta coleção.</Text></View><Text style={[styles.count, { color: colors.yellow }]}>{collection.showcase.length}/6</Text></View>
@@ -208,6 +222,9 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
   username: { fontSize: 24, fontWeight: '900', marginTop: 2 },
   titleText: { fontSize: 11, fontWeight: '900', marginTop: 2 },
+  economyTitle:{fontSize:11,fontWeight:'900',marginTop:2,letterSpacing:.25},
+  prestigeBadge:{alignSelf:'flex-start',marginTop:6,borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:4},
+  prestigeText:{fontSize:7,fontWeight:'900',letterSpacing:.55},
   meta: { fontSize: 10, marginTop: 4 },
   cosmeticMeta: { fontSize: 8, fontWeight: '900', marginTop: 4, letterSpacing: .4 },
   guildBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, zIndex:2 },
@@ -226,6 +243,11 @@ const styles = StyleSheet.create({
   sectionHint: { fontSize: 10, marginTop: 2 },
   count: { fontSize: 15, fontWeight: '900' },
   showcaseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  museumLevelBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:9,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:4},
+  museumLevelText:{fontSize:7,fontWeight:'900'},
+  museumSlotTop:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:5},
+  cardStyleBadge:{maxWidth:100,borderRadius:999,paddingHorizontal:5,paddingVertical:3,flexDirection:'row',alignItems:'center',gap:3},
+  cardStyleText:{fontSize:5.5,fontWeight:'900',maxWidth:75},
   showcaseCard: { flexGrow: 1, flexBasis: 140, maxWidth: 190, minWidth: 128, borderRadius: 17, borderWidth: 1, padding: 8 },
   showcaseSlot: { fontSize: 7, fontWeight: '900', letterSpacing: .8 },
   showcaseImage: { width: '100%', height: 175, marginTop: 5 },
