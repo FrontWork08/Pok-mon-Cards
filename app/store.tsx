@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
@@ -8,6 +8,7 @@ import { AuraFrame } from '@/components/AuraFrame';
 import {
   buyTrainerStoreItem,
   equipTrainerStoreItem,
+  giftTrainerStoreItem,
   getTrainerShopCatalog,
   type TrainerShopCatalog,
   type TrainerStoreCategory,
@@ -15,6 +16,9 @@ import {
 } from '@/services/store';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
+import { getMySocial, type SocialPlayer } from '@/services/social';
+import { getProfileAvatarUrl } from '@/services/player';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
 
 type FilterKey = 'all'|'profile'|'card'|'deck'|'market'|'booster'|'identity'|'owned';
 
@@ -74,6 +78,13 @@ export default function TrainerStoreScreen(){
   const [notice,setNotice]=useState<string|null>(null);
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState<FilterKey>('all');
+  const [giftItem,setGiftItem]=useState<TrainerStoreItem|null>(null);
+  const [giftFriends,setGiftFriends]=useState<SocialPlayer[]|null>(null);
+  const [giftFriendsLoading,setGiftFriendsLoading]=useState(false);
+  const [giftFriendId,setGiftFriendId]=useState<string|null>(null);
+  const [giftSearch,setGiftSearch]=useState('');
+  const [giftMessage,setGiftMessage]=useState('');
+  const [giftSending,setGiftSending]=useState(false);
   const loadedOnce=useRef(false);
 
   const load=useCallback(async()=>{
@@ -183,6 +194,66 @@ export default function TrainerStoreScreen(){
     return {label:'COMPRADO',icon:'checkmark' as const,disabled:true,onPress:()=>{}};
   }
 
+  const filteredGiftFriends=useMemo(()=>{
+    const term=giftSearch.trim().toLowerCase();
+    return (giftFriends??[]).filter((friend)=>!term||friend.username.toLowerCase().includes(term));
+  },[giftFriends,giftSearch]);
+
+  async function openGift(item:TrainerStoreItem){
+    if(working||giftSending)return;
+    if(!catalog?.live&&!catalog?.adminPreview){
+      setError('Os presentes da Trainer Shop serão liberados junto com a Economy 2.1 após a migração 1.0.');
+      return;
+    }
+    setGiftItem(item);
+    setGiftFriendId(null);
+    setGiftSearch('');
+    setGiftMessage('');
+    if(giftFriends!==null)return;
+    try{
+      setGiftFriendsLoading(true);
+      const social=await getMySocial();
+      setGiftFriends(social.friends);
+    }catch(e){
+      setGiftFriends([]);
+      setError(e instanceof Error?e.message:'Não foi possível carregar seus amigos.');
+    }finally{
+      setGiftFriendsLoading(false);
+    }
+  }
+
+  function closeGift(){
+    if(giftSending)return;
+    setGiftItem(null);
+    setGiftFriendId(null);
+    setGiftSearch('');
+    setGiftMessage('');
+  }
+
+  async function sendGift(){
+    if(!giftItem||!giftFriendId||giftSending)return;
+    const friend=giftFriends?.find((entry)=>entry.id===giftFriendId);
+    if(!friend)return;
+    if(wallet.coins<giftItem.priceCoins){
+      setError(`Faltam 🪙 ${Math.max(0,giftItem.priceCoins-wallet.coins).toLocaleString('pt-BR')} para enviar este presente.`);
+      return;
+    }
+    try{
+      setGiftSending(true);
+      setError(null);
+      const result=await giftTrainerStoreItem(giftItem.id,friend.id,giftMessage);
+      await Promise.all([wallet.refresh(),load()]);
+      setGiftItem(null);
+      setGiftFriendId(null);
+      setGiftMessage('');
+      setNotice(`🎁 ${result.itemName} foi enviado para @${result.recipientName}.`);
+    }catch(e){
+      setError(e instanceof Error?e.message:'Não foi possível enviar o presente.');
+    }finally{
+      setGiftSending(false);
+    }
+  }
+
   return (
     <Screen title="Trainer Shop" subtitle="Uma loja única para molduras, backgrounds, estilos de carta e deck, temas de mercado, efeitos de booster, títulos e troféus.">
       <AuraBanner
@@ -227,7 +298,7 @@ export default function TrainerStoreScreen(){
           </View>
           <View style={styles.luxuryGrid}>
             {(catalog?.luxury.items??[]).map((item)=>(
-              <StoreCard key={item.id} item={{...item,luxury:true}} working={working===item.id} colors={colors} onBuy={confirmBuy} onOwned={ownedAction} equipped={equipped(item)} />
+              <StoreCard key={item.id} item={{...item,luxury:true}} working={working===item.id} colors={colors} onBuy={confirmBuy} onGift={openGift} onOwned={ownedAction} equipped={equipped(item)} />
             ))}
           </View>
         </View>
@@ -266,7 +337,7 @@ export default function TrainerStoreScreen(){
       {loading&&!catalog ? <ActivityIndicator size="large" color={colors.yellow}/> : null}
 
       <View style={styles.grid}>
-        {visible.map((item)=><StoreCard key={(item.luxury?'lux-':'')+item.id} item={item} working={working===item.id} colors={colors} onBuy={confirmBuy} onOwned={ownedAction} equipped={equipped(item)} />)}
+        {visible.map((item)=><StoreCard key={(item.luxury?'lux-':'')+item.id} item={item} working={working===item.id} colors={colors} onBuy={confirmBuy} onGift={openGift} onOwned={ownedAction} equipped={equipped(item)} />)}
       </View>
 
       {!loading&&visible.length===0 ? (
@@ -276,6 +347,99 @@ export default function TrainerStoreScreen(){
           <Text style={[styles.emptyText,{color:colors.muted}]}>Troque a categoria ou limpe a busca para ver o catálogo completo.</Text>
         </View>
       ):null}
+
+      <Modal visible={Boolean(giftItem)} transparent animationType="fade" onRequestClose={closeGift}>
+        <View style={styles.giftOverlay}>
+          <View style={[styles.giftModal,{backgroundColor:colors.surface,borderColor:giftItem?rarityAccent(giftItem.rarity,colors):colors.border}]}>
+            <View style={styles.giftHeader}>
+              <View style={[styles.giftIcon,{backgroundColor:colors.accentSoft}]}>
+                <Ionicons name="gift" size={24} color={colors.yellow}/>
+              </View>
+              <View style={{flex:1}}>
+                <Text style={[styles.giftKicker,{color:colors.yellow}]}>PRESENTEAR UM AMIGO</Text>
+                <Text style={[styles.giftTitle,{color:colors.text}]}>{giftItem?.name??'Presente'}</Text>
+                <Text style={[styles.giftPrice,{color:colors.muted}]}>🪙 {Number(giftItem?.priceCoins??0).toLocaleString('pt-BR')}</Text>
+              </View>
+              <Pressable disabled={giftSending} onPress={closeGift} style={[styles.giftClose,{borderColor:colors.border}]}>
+                <Ionicons name="close" size={18} color={colors.muted}/>
+              </Pressable>
+            </View>
+
+            <Text style={[styles.giftStep,{color:colors.muted}]}>1. Escolha quem vai receber</Text>
+            <View style={[styles.giftSearchBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+              <Ionicons name="search" size={17} color={colors.muted}/>
+              <TextInput
+                value={giftSearch}
+                onChangeText={setGiftSearch}
+                placeholder="Buscar nos seus amigos..."
+                placeholderTextColor={colors.muted}
+                style={[styles.giftSearchInput,{color:colors.text}]}
+              />
+            </View>
+
+            <ScrollView style={styles.friendList} contentContainerStyle={styles.friendListContent} keyboardShouldPersistTaps="handled">
+              {giftFriendsLoading?<ActivityIndicator color={colors.yellow}/>:null}
+              {!giftFriendsLoading&&filteredGiftFriends.map((friend)=>{
+                const selected=giftFriendId===friend.id;
+                return <Pressable
+                  key={friend.id}
+                  onPress={()=>setGiftFriendId(friend.id)}
+                  style={[styles.friendRow,{backgroundColor:selected?colors.accentSoft:colors.surfaceAlt,borderColor:selected?colors.accent:colors.border}]}
+                >
+                  <TrainerAvatar
+                    icon={friend.profile_icon}
+                    avatarUrl={getProfileAvatarUrl(friend.avatar_path??null,friend.avatar_updated_at??null)}
+                    color={selected?colors.yellow:colors.accent}
+                    backgroundColor={colors.surface}
+                    size={42}
+                  />
+                  <View style={{flex:1,minWidth:0}}>
+                    <Text numberOfLines={1} style={[styles.friendName,{color:colors.text}]}>@{friend.username}</Text>
+                    <Text style={[styles.friendMeta,{color:colors.muted}]}>Nível {friend.level}</Text>
+                  </View>
+                  <Ionicons name={selected?'checkmark-circle':'ellipse-outline'} size={21} color={selected?colors.yellow:colors.muted}/>
+                </Pressable>;
+              })}
+              {!giftFriendsLoading&&giftFriends!==null&&filteredGiftFriends.length===0?(
+                <View style={styles.noFriends}>
+                  <Ionicons name="people-outline" size={25} color={colors.muted}/>
+                  <Text style={[styles.noFriendsText,{color:colors.muted}]}>Nenhum amigo encontrado. Adicione um amigo antes de enviar presentes.</Text>
+                </View>
+              ):null}
+            </ScrollView>
+
+            <Text style={[styles.giftStep,{color:colors.muted}]}>2. Escreva um recado</Text>
+            <View style={[styles.messageBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+              <TextInput
+                value={giftMessage}
+                onChangeText={setGiftMessage}
+                placeholder="Ex.: Vi esse cosmético e lembrei de você!"
+                placeholderTextColor={colors.muted}
+                multiline
+                maxLength={180}
+                style={[styles.messageInput,{color:colors.text}]}
+              />
+              <Text style={[styles.messageCount,{color:colors.muted}]}>{giftMessage.length}/180</Text>
+            </View>
+
+            <View style={[styles.giftPreview,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
+              <Ionicons name="notifications" size={17} color={colors.yellow}/>
+              <Text style={[styles.giftPreviewText,{color:colors.text}]}>
+                Seu amigo verá na tela: “🎁 Você recebeu um presente!” e o seu recado.
+              </Text>
+            </View>
+
+            <Pressable
+              disabled={!giftFriendId||giftSending}
+              onPress={()=>{void sendGift();}}
+              style={[styles.sendGiftButton,{backgroundColor:colors.yellow},(!giftFriendId||giftSending)&&styles.disabled]}
+            >
+              {giftSending?<ActivityIndicator color="#07111F"/>:<Ionicons name="gift" size={18} color="#07111F"/>}
+              <Text style={styles.sendGiftText}>{giftSending?'ENVIANDO…':`ENVIAR PRESENTE • 🪙 ${Number(giftItem?.priceCoins??0).toLocaleString('pt-BR')}`}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -285,12 +449,13 @@ function Metric({label,value}:{label:string;value:string}){
 }
 
 function StoreCard({
-  item,working,colors,onBuy,onOwned,equipped,
+  item,working,colors,onBuy,onGift,onOwned,equipped,
 }:{
   item:TrainerStoreItem;
   working:boolean;
   colors:any;
   onBuy:(item:TrainerStoreItem)=>void;
+  onGift:(item:TrainerStoreItem)=>void;
   onOwned:(item:TrainerStoreItem)=>{label:string;icon:keyof typeof Ionicons.glyphMap;disabled:boolean;onPress:()=>void};
   equipped:boolean;
 }){
@@ -344,6 +509,10 @@ function StoreCard({
           </Pressable>
         )}
       </View>
+      <Pressable disabled={working} onPress={()=>onGift(item)} style={[styles.giftButton,{borderColor:accent,backgroundColor:colors.surfaceAlt},working&&styles.disabled]}>
+        <Ionicons name="gift-outline" size={15} color={accent}/>
+        <Text style={[styles.giftButtonText,{color:accent}]}>PRESENTEAR UM AMIGO</Text>
+      </Pressable>
     </View>
   );
 
@@ -397,6 +566,33 @@ const styles=StyleSheet.create({
   buyText:{color:'#07111F',fontSize:8,fontWeight:'900'},
   ownedButton:{minHeight:39,borderRadius:11,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},
   ownedButtonText:{fontSize:8,fontWeight:'900'},
+  giftButton:{minHeight:36,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},
+  giftButtonText:{fontSize:7.5,fontWeight:'900',letterSpacing:.35},
+  giftOverlay:{flex:1,backgroundColor:'rgba(2,5,12,.86)',alignItems:'center',justifyContent:'center',padding:16},
+  giftModal:{width:'100%',maxWidth:520,maxHeight:'92%',borderRadius:24,borderWidth:1,padding:15,gap:10},
+  giftHeader:{flexDirection:'row',alignItems:'center',gap:10},
+  giftIcon:{width:48,height:48,borderRadius:15,alignItems:'center',justifyContent:'center'},
+  giftKicker:{fontSize:7,fontWeight:'900',letterSpacing:1},
+  giftTitle:{fontSize:17,fontWeight:'900',marginTop:2},
+  giftPrice:{fontSize:9,fontWeight:'800',marginTop:2},
+  giftClose:{width:36,height:36,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  giftStep:{fontSize:8,fontWeight:'900',letterSpacing:.6,marginTop:2},
+  giftSearchBox:{height:42,borderRadius:13,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},
+  giftSearchInput:{flex:1,height:'100%',fontSize:10},
+  friendList:{maxHeight:220},
+  friendListContent:{gap:6,paddingVertical:2},
+  friendRow:{minHeight:57,borderRadius:14,borderWidth:1,padding:7,flexDirection:'row',alignItems:'center',gap:9},
+  friendName:{fontSize:11,fontWeight:'900'},
+  friendMeta:{fontSize:7.5,fontWeight:'700',marginTop:2},
+  noFriends:{padding:18,alignItems:'center',gap:7},
+  noFriendsText:{fontSize:9,lineHeight:14,textAlign:'center'},
+  messageBox:{minHeight:92,borderRadius:14,borderWidth:1,padding:10},
+  messageInput:{minHeight:58,fontSize:10,lineHeight:15,textAlignVertical:'top'},
+  messageCount:{alignSelf:'flex-end',fontSize:7,fontWeight:'800'},
+  giftPreview:{borderRadius:13,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:7},
+  giftPreviewText:{flex:1,fontSize:8,lineHeight:12,fontWeight:'700'},
+  sendGiftButton:{minHeight:48,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
+  sendGiftText:{color:'#07111F',fontSize:9,fontWeight:'900'},
   disabled:{opacity:.48},
   empty:{borderRadius:18,borderWidth:1,padding:24,alignItems:'center',gap:7},
   emptyTitle:{fontSize:16,fontWeight:'900'},
