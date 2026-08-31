@@ -444,10 +444,10 @@ if (existsSync('app/marketplace.tsx')) {
   assert(marketUi.includes('shopPreview'), 'Regressão visual: Marketplace perdeu a prévia do tema da loja.');
   assert(marketUi.includes('AuraBanner'), 'Regressão visual: Marketplace perdeu o banner premium.');
   assert(marketUi.includes('AuraFrame'), 'Regressão visual: anúncios deixaram de usar aura dinâmica.');
-  assert(marketplace.includes('MarketplaceListingSurface'), 'Regressão visual: cards do Marketplace não usam mais a superfície premium interna.');
-  assert(marketplace.includes('premiumInnerPanel'), 'Regressão visual: cabeçalho premium do anúncio voltou a ser chapado.');
-  assert(marketplace.includes('premiumCardPanel'), 'Regressão visual: área da carta no anúncio voltou a esconder os efeitos.');
-  assert(marketplace.includes('ownOfferButton'), 'Regressão visual: bloco SUA OFERTA perdeu o acabamento premium.');
+  assert(marketUi.includes('MarketplaceListingSurface'), 'Regressão visual: cards do Marketplace não usam mais a superfície premium interna.');
+  assert(marketUi.includes('premiumInnerPanel'), 'Regressão visual: cabeçalho premium do anúncio voltou a ser chapado.');
+  assert(marketUi.includes('premiumCardPanel'), 'Regressão visual: área da carta no anúncio voltou a esconder os efeitos.');
+  assert(marketUi.includes('ownOfferButton'), 'Regressão visual: bloco SUA OFERTA perdeu o acabamento premium.');
 }
 
 if (existsSync('app/card/[id].tsx')) {
