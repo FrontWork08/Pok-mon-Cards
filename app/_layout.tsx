@@ -137,14 +137,12 @@ function AppStack() {
   }, [router]);
 
   useEffect(() => {
+    if (!userId) {
+      setLiveNotification(null);
+      return;
+    }
+
     let disposed = false;
-    let unsubscribeRealtime: (() => void) | null = null;
-
-    const clearRealtime = () => {
-      unsubscribeRealtime?.();
-      unsubscribeRealtime = null;
-    };
-
     const showNotification = (notification: any) => {
       if (disposed) return;
       setLiveNotification(notification);
@@ -154,35 +152,13 @@ function AppStack() {
       }, 6000);
     };
 
-    const attachRealtime = async (userId?: string | null) => {
-      clearRealtime();
-      let id = userId ?? null;
-      if (!id) {
-        const { data } = await supabase.auth.getUser();
-        id = data.user?.id ?? null;
-      }
-      if (!id || disposed) return;
-      unsubscribeRealtime = subscribeToMyNotifications(id, showNotification);
-    };
-
-    void attachRealtime();
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user?.id) {
-        const nextUserId = session.user.id;
-        setTimeout(() => { void attachRealtime(nextUserId); }, 0);
-      } else {
-        clearRealtime();
-        setLiveNotification(null);
-      }
-    });
-
+    const unsubscribeRealtime = subscribeToMyNotifications(userId, showNotification);
     return () => {
       disposed = true;
-      clearRealtime();
-      authListener.subscription.unsubscribe();
+      unsubscribeRealtime();
       if (liveNotificationTimer.current) clearTimeout(liveNotificationTimer.current);
     };
-  }, []);
+  }, [userId]);
 
   function openLiveNotification() {
     if (!liveNotification) return;
@@ -195,12 +171,10 @@ function AppStack() {
   }
 
   useEffect(() => {
+    if (!userId) return;
     let disposed = false;
-    let lastUserId: string | null = null;
 
-    const claimFor = async (userId?: string | null) => {
-      if (!userId || disposed || lastUserId === userId) return;
-      lastUserId = userId;
+    void (async () => {
       try {
         const result = await claimDailyLogin();
         if (disposed || !result.claimed) return;
@@ -216,36 +190,19 @@ function AppStack() {
       } catch {
         // Daily login is a bonus; it must never block app startup.
       }
-    };
+    })();
 
-    supabase.auth.getUser().then(({ data }) => {
-      void claimFor(data.user?.id ?? null);
-    }).catch(() => null);
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user?.id) {
-        lastUserId = null;
-      } else {
-        const nextUserId = session.user.id;
-        setTimeout(() => { void claimFor(nextUserId); }, 0);
-      }
-    });
-
-    return () => {
-      disposed = true;
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
+    return () => { disposed = true; };
+  }, [userId]);
 
   useEffect(() => {
+    if (!userId) {
+      setMatchmaking(null);
+      lastOpenedMatch.current = null;
+      return;
+    }
+
     let disposed = false;
-    let unsubscribe: (() => void) | null = null;
-
-    const clear = () => {
-      unsubscribe?.();
-      unsubscribe = null;
-    };
-
     const handleState = (state: MatchmakingState | null) => {
       if (disposed) return;
       setMatchmaking(state);
@@ -259,34 +216,13 @@ function AppStack() {
       }
     };
 
-    const attach = async (userId?: string | null) => {
-      clear();
-      if (!userId || disposed) {
-        setMatchmaking(null);
-        lastOpenedMatch.current = null;
-        return;
-      }
-      const initial = await getMyMatchmakingState().catch(() => null);
-      if (disposed) return;
-      handleState(initial);
-      unsubscribe = subscribeMyMatchmaking(userId, (next) => handleState(next));
-    };
-
-    supabase.auth.getUser().then(({ data }) => {
-      void attach(data.user?.id ?? null);
-    }).catch(() => null);
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const nextUserId = session?.user?.id ?? null;
-      setTimeout(() => { void attach(nextUserId); }, 0);
-    });
-
+    void getMyMatchmakingState().then(handleState).catch(() => null);
+    const unsubscribe = subscribeMyMatchmaking(userId, handleState);
     return () => {
       disposed = true;
-      clear();
-      authListener.subscription.unsubscribe();
+      unsubscribe();
     };
-  }, [router]);
+  }, [router, userId]);
 
   async function cancelGlobalMatchmaking() {
     try {
@@ -298,86 +234,51 @@ function AppStack() {
   }
 
   useEffect(() => {
+    if (!userId) {
+      setAccountRestriction(null);
+      return;
+    }
+
     let disposed = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let sequence = 0;
-
-    const clearChannel = () => {
-      if (!channel) return;
-      void supabase.removeChannel(channel);
-      channel = null;
-    };
-
     const refreshAccount = async () => {
       try {
         const profile = await getMyProfile();
-        if (disposed) return;
-        setAccountRestriction(profile.account_status === 'active' ? null : profile);
+        if (!disposed) setAccountRestriction(profile.account_status === 'active' ? null : profile);
       } catch {
         if (!disposed) setAccountRestriction(null);
       }
     };
 
-    const attach = async (userId?: string | null) => {
-      clearChannel();
-      if (!userId || disposed) {
-        setAccountRestriction(null);
-        return;
-      }
-
-      await refreshAccount();
-      if (disposed) return;
-
-      sequence += 1;
-      channel = supabase
-        .channel(`account-status-${userId}-${sequence}-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${userId}` },
-          () => { void refreshAccount(); },
-        );
-      channel.subscribe();
-    };
-
-    supabase.auth.getUser().then(({ data }) => {
-      void attach(data.user?.id ?? null);
-    }).catch(() => null);
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const nextUserId = session?.user?.id ?? null;
-      setTimeout(() => { void attach(nextUserId); }, 0);
-    });
+    void refreshAccount();
+    const channel = supabase
+      .channel(`account-status-${userId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${userId}` },
+        () => { void refreshAccount(); },
+      )
+      .subscribe();
 
     return () => {
       disposed = true;
-      clearChannel();
-      authListener.subscription.unsubscribe();
+      void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    if (!(settings?.battle_sounds ?? true)) return;
-    let disposed = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    supabase.auth.getUser().then(({ data }) => {
-      const userId = data.user?.id;
-      if (!userId || disposed) return;
-      channel = supabase
-        .channel(`battle-sounds:${userId}:${Date.now()}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'battle_events' }, (change) => {
-          const event = change.new as any;
-          const payload = event?.payload ?? {};
-          if (event?.event_type === 'card_locked' && payload.playerId === userId) playBattleSound('lock');
-          else if (event?.event_type === 'round_resolved') playBattleSound('reveal');
-          else if (event?.event_type === 'completed') playBattleSound(payload.winnerId === userId ? 'win' : 'loss');
-        })
-        .subscribe();
-    }).catch(() => null);
-    return () => {
-      disposed = true;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [settings?.battle_sounds]);
+    if (!userId || !(settings?.battle_sounds ?? true)) return;
+    const channel = supabase
+      .channel(`battle-sounds:${userId}:${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'battle_events' }, (change) => {
+        const event = change.new as any;
+        const payload = event?.payload ?? {};
+        if (event?.event_type === 'card_locked' && payload.playerId === userId) playBattleSound('lock');
+        else if (event?.event_type === 'round_resolved') playBattleSound('reveal');
+        else if (event?.event_type === 'completed') playBattleSound(payload.winnerId === userId ? 'win' : 'loss');
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [settings?.battle_sounds, userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -387,7 +288,11 @@ function AppStack() {
     }
 
     let disposed = false;
-    const refresh = async () => {
+    const refreshRuntime = async () => {
+      const runtime = await getMaintenanceStatus();
+      if (!disposed) setMaintenanceStatus(runtime);
+    };
+    const refreshAll = async () => {
       const [runtime, admin] = await Promise.all([
         getMaintenanceStatus(),
         isCurrentUserAdmin().catch(() => false),
@@ -398,18 +303,20 @@ function AppStack() {
       }
     };
 
-    void refresh().catch(() => null);
+    void refreshAll().catch(() => null);
     const channel = supabase
       .channel('maintenance-runtime-' + userId + '-' + Date.now())
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'app_runtime_status', filter: 'id=eq.1' },
-        () => { void refresh().catch(() => null); },
+        () => { void refreshRuntime().catch(() => null); },
       )
       .subscribe();
+
+    // Realtime is the primary path. The fallback only guards a dropped channel.
     const fallbackTimer = setInterval(() => {
-      void refresh().catch(() => null);
-    }, 15000);
+      void refreshRuntime().catch(() => null);
+    }, 60000);
 
     return () => {
       disposed = true;
