@@ -80,12 +80,14 @@ export default function CardDetailScreen() {
   const historyMax = priceHistory.length ? Math.max(...priceHistory.map((point) => point.priceUsd)) : 0;
   const historyRange = Math.max(.01, historyMax - historyMin);
   const historyDelta = priceHistory.length > 1 ? priceHistory[priceHistory.length - 1].priceUsd - priceHistory[0].priceUsd : 0;
+  const galaxyStyle = Boolean(economyStyle?.id.includes('galaxy'));
   const stylePrimary = economyStyle
-    ? economyStyle.id.includes('master') ? '#C493FF'
+    ? galaxyStyle ? '#8B5CFF'
+      : economyStyle.id.includes('master') ? '#C493FF'
       : economyStyle.id.includes('champion') ? '#FFD447'
       : colors.accent
     : colors.border;
-  const styleSecondary = economyStyle?.id.includes('master') ? '#8EE7FF' : economyStyle?.id.includes('champion') ? colors.accent : colors.yellow;
+  const styleSecondary = galaxyStyle ? '#55E6FF' : economyStyle?.id.includes('master') ? '#8EE7FF' : economyStyle?.id.includes('champion') ? colors.accent : colors.yellow;
   const cardArt = card ? (
     <View style={[
       styles.imagePanel,
@@ -117,7 +119,8 @@ export default function CardDetailScreen() {
             <AuraFrame
               primaryColor={stylePrimary}
               secondaryColor={styleSecondary}
-              intensity={economyStyle.id.includes('master')?'master':'premium'}
+              intensity={economyStyle.id.includes('master')||galaxyStyle?'master':'premium'}
+              variant={galaxyStyle?'galaxy':'energy'}
               radius={26}
             >
               {cardArt}
@@ -127,7 +130,7 @@ export default function CardDetailScreen() {
             <Text style={[styles.kicker, { color: colors.yellow }]}>#{card.pokedex_numbers?.[0] ?? '---'} • {card.set_id.toUpperCase()}</Text>
             <Text style={[styles.name, { color: colors.text }]}>{card.pokemon_name}</Text>
             <Text style={[styles.rarity, { color: colors.muted }]}>{card.rarity ?? 'Sem raridade informada'}</Text>
-            {economyStyle ? <View style={[styles.styleInfo,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name={(economyStyle.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={16} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.styleInfoTitle,{color:colors.text}]}>PERSONALIZAÇÃO ECONOMY 2.1</Text><Text style={[styles.styleInfoText,{color:colors.muted}]}>{economyStyle.name} • puramente visual, sem alterar estatísticas ou valor de mercado.</Text></View></View> : null}
+            {economyStyle ? <View style={[styles.styleInfo,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name={(economyStyle.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={16} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.styleInfoTitle,{color:colors.text}]}>PERSONALIZAÇÃO ECONOMY 2.1</Text><Text style={[styles.styleInfoText,{color:colors.muted}]}>{economyStyle.name}{galaxyStyle?' • Galaxy Flow com nebulosa e partículas estelares':''} • puramente visual, sem alterar estatísticas ou valor de mercado.</Text></View></View> : null}
             {!entry.owned ? <View style={[styles.previewBadge,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name="eye" size={15} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.previewBadgeTitle,{color:colors.text}]}>PRÉVIA DA CARTA</Text><Text style={[styles.previewBadgeText,{color:colors.muted}]}>Você ainda não possui esta carta. Veja as estatísticas antes de tentar obtê-la em um booster.</Text></View></View> : null}
 
             <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR DE MERCADO EM USD</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? (isUnreleasedWithoutMarket ? 'Sem cotação — esta versão inglesa nunca foi lançada fisicamente.' : 'Preço TCGplayer indisponível para esta carta.') : 'Snapshot de mercado TCGplayer'}</Text></View></View>
