@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,13 +11,33 @@ import { getBattleCardPreview } from '@/services/battleStats';
 import { getCardPriceHistory, type CardPricePoint } from '@/services/marketplace';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { isCardWishlisted, setCardWishlist } from '@/services/retention';
-import { getMyCardEconomyStyle } from '@/services/economy';
+import {
+  applyCardEconomyStyle,
+  clearCardEconomyStyle,
+  getMyCardEconomyStyle,
+  getMyVisualStyleOptions,
+  type VisualStyleOption,
+} from '@/services/economy';
 import { AuraFrame } from '@/components/AuraFrame';
+import { useWallet } from '@/wallet/WalletProvider';
+
+function economyStylePalette(id:string,accent:string,yellow:string){
+  const key=id.toLowerCase();
+  if(key.includes('galaxy')) return {primary:'#8B5CFF',secondary:'#55E6FF'};
+  if(key.includes('master')) return {primary:'#C493FF',secondary:'#8EE7FF'};
+  if(key.includes('celestial')) return {primary:'#55E6FF',secondary:'#D8B8FF'};
+  if(key.includes('crimson')||key.includes('crown')) return {primary:'#FF667A',secondary:'#FFB36B'};
+  if(key.includes('champion')||key.includes('gold')) return {primary:'#FFD447',secondary:'#FFF0A8'};
+  if(key.includes('indigo')) return {primary:'#6A7CFF',secondary:'#55D9FF'};
+  if(key.includes('kanto')||key.includes('night')) return {primary:'#8B72FF',secondary:'#6EC8FF'};
+  return {primary:accent,secondary:yellow};
+}
 
 export default function CardDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useAppTheme();
+  const wallet = useWallet();
   const [entry, setEntry] = useState<CardDetailEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,6 +45,10 @@ export default function CardDetailScreen() {
   const [wishlisted, setWishlisted] = useState(false);
   const [priceHistory, setPriceHistory] = useState<CardPricePoint[]>([]);
   const [economyStyle, setEconomyStyle] = useState<{id:string;name:string;icon:string;rarity:string}|null>(null);
+  const [stylePickerOpen,setStylePickerOpen]=useState(false);
+  const [styleOptions,setStyleOptions]=useState<VisualStyleOption[]>([]);
+  const [styleOptionsLoading,setStyleOptionsLoading]=useState(false);
+  const [styleApplying,setStyleApplying]=useState<string|null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -70,6 +94,51 @@ export default function CardDetailScreen() {
     }
   }
 
+  async function openStylePicker(){
+    if(!entry?.owned||!entry.cards)return;
+    setStylePickerOpen(true);
+    try{
+      setStyleOptionsLoading(true);
+      setError(null);
+      setStyleOptions(await getMyVisualStyleOptions('card'));
+    }catch(err){
+      setError(err instanceof Error?err.message:'Não foi possível carregar seus temas.');
+    }finally{
+      setStyleOptionsLoading(false);
+    }
+  }
+
+  async function applyVisualStyle(option:VisualStyleOption){
+    if(!entry?.cards||styleApplying)return;
+    try{
+      setStyleApplying(option.id);
+      setError(null);
+      await applyCardEconomyStyle(entry.cards.id,option.id);
+      setEconomyStyle({id:option.id,name:option.name,icon:option.icon,rarity:option.rarity});
+      await wallet.refresh();
+      setStylePickerOpen(false);
+    }catch(err){
+      setError(err instanceof Error?err.message:'Não foi possível aplicar este tema.');
+    }finally{
+      setStyleApplying(null);
+    }
+  }
+
+  async function removeVisualStyle(){
+    if(!entry?.cards||styleApplying)return;
+    try{
+      setStyleApplying('clear');
+      setError(null);
+      await clearCardEconomyStyle(entry.cards.id);
+      setEconomyStyle(null);
+      setStylePickerOpen(false);
+    }catch(err){
+      setError(err instanceof Error?err.message:'Não foi possível remover o tema.');
+    }finally{
+      setStyleApplying(null);
+    }
+  }
+
   const card = entry?.cards;
   const combat = getBattleCardPreview(card ?? null);
   const unitValue = Number(card?.game_value ?? 0);
@@ -81,13 +150,9 @@ export default function CardDetailScreen() {
   const historyRange = Math.max(.01, historyMax - historyMin);
   const historyDelta = priceHistory.length > 1 ? priceHistory[priceHistory.length - 1].priceUsd - priceHistory[0].priceUsd : 0;
   const galaxyStyle = Boolean(economyStyle?.id.includes('galaxy'));
-  const stylePrimary = economyStyle
-    ? galaxyStyle ? '#8B5CFF'
-      : economyStyle.id.includes('master') ? '#C493FF'
-      : economyStyle.id.includes('champion') ? '#FFD447'
-      : colors.accent
-    : colors.border;
-  const styleSecondary = galaxyStyle ? '#55E6FF' : economyStyle?.id.includes('master') ? '#8EE7FF' : economyStyle?.id.includes('champion') ? colors.accent : colors.yellow;
+  const stylePalette=economyStyle?economyStylePalette(economyStyle.id,colors.accent,colors.yellow):null;
+  const stylePrimary = stylePalette?.primary??colors.border;
+  const styleSecondary = stylePalette?.secondary??colors.yellow;
   const cardArt = card ? (
     <View style={[
       styles.imagePanel,
@@ -175,10 +240,45 @@ export default function CardDetailScreen() {
             <View style={styles.cardActions}>
               {entry.owned ? <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: entry.favorite ? '#B73C59' : colors.yellow }]} onPress={toggleFavorite} disabled={saving}><Ionicons name={entry.favorite ? 'heart' : 'heart-outline'} size={19} color={entry.favorite ? '#fff' : '#07111F'} /><Text style={[styles.favoriteButtonText, entry.favorite && { color: '#fff' }]}>{saving ? 'SALVANDO...' : entry.favorite ? 'REMOVER FAVORITO' : 'FAVORITAR'}</Text></Pressable> : null}
               <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: wishlisted ? '#FFD447' : colors.accentSoft, borderWidth: 1, borderColor: wishlisted ? '#FFD447' : colors.accent }]} onPress={toggleWishlist} disabled={wishlistSaving}><Ionicons name={wishlisted ? 'star' : 'star-outline'} size={19} color={wishlisted ? '#07111F' : colors.accent} /><Text style={[styles.favoriteButtonText, { color: wishlisted ? '#07111F' : colors.text }]}>{wishlistSaving ? 'SALVANDO...' : wishlisted ? 'NO CARD CHASE' : 'QUERO ESTA CARTA'}</Text></Pressable>
+              {entry.owned ? <Pressable style={[styles.favoriteButton,styles.flexAction,{backgroundColor:colors.surfaceAlt,borderWidth:1,borderColor:stylePrimary}]} onPress={()=>{void openStylePicker();}}><Ionicons name="color-wand" size={19} color={stylePrimary===colors.border?colors.accent:stylePrimary}/><Text style={[styles.favoriteButtonText,{color:colors.text}]}>{economyStyle?'TROCAR TEMA':'PERSONALIZAR CARTA'}</Text></Pressable>:null}
             </View>
           </View>
         </View> : null}
       </ScrollView>
+
+      <Modal visible={stylePickerOpen} transparent animationType="fade" onRequestClose={()=>setStylePickerOpen(false)}>
+        <View style={styles.styleBackdrop}>
+          <View style={[styles.styleModal,{backgroundColor:colors.surface,borderColor:economyStyle?stylePrimary:colors.accent}]}>
+            <View style={styles.styleHeader}>
+              <View style={{flex:1}}>
+                <Text style={[styles.styleKicker,{color:colors.yellow}]}>TEMAS DA SUA COLEÇÃO</Text>
+                <Text style={[styles.styleTitle,{color:colors.text}]}>Personalizar carta</Text>
+                <Text style={[styles.styleSubtitle,{color:colors.muted}]}>Molduras e backgrounds premium também aparecem aqui como temas universais.</Text>
+              </View>
+              <Pressable onPress={()=>setStylePickerOpen(false)} style={[styles.styleClose,{backgroundColor:colors.surfaceAlt}]}><Ionicons name="close" size={19} color={colors.text}/></Pressable>
+            </View>
+
+            {styleOptionsLoading?<ActivityIndicator size="large" color={colors.yellow}/>:(
+              <ScrollView style={styles.styleList} contentContainerStyle={styles.styleListContent}>
+                {economyStyle?<Pressable disabled={Boolean(styleApplying)} onPress={()=>{void removeVisualStyle();}} style={[styles.styleOption,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><View style={[styles.styleOptionIcon,{backgroundColor:colors.surface}]}><Ionicons name="ban-outline" size={20} color={colors.muted}/></View><View style={{flex:1}}><Text style={[styles.styleOptionName,{color:colors.text}]}>Sem tema</Text><Text style={[styles.styleOptionMeta,{color:colors.muted}]}>Remover personalização atual • grátis</Text></View>{styleApplying==='clear'?<ActivityIndicator color={colors.yellow}/>:null}</Pressable>:null}
+                {styleOptions.map((option)=>{
+                  const palette=economyStylePalette(option.id,colors.accent,colors.yellow);
+                  const active=economyStyle?.id===option.id;
+                  return <Pressable key={option.id} disabled={Boolean(styleApplying)} onPress={()=>{void applyVisualStyle(option);}} style={[styles.styleOption,{backgroundColor:active?colors.accentSoft:colors.surfaceAlt,borderColor:active?palette.primary:colors.border}]}>
+                    <View style={[styles.styleOptionIcon,{backgroundColor:`${palette.primary}18`,borderColor:palette.primary}]}><Ionicons name={(option.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={20} color={palette.primary}/></View>
+                    <View style={{flex:1,minWidth:0}}>
+                      <View style={styles.styleNameRow}><Text numberOfLines={1} style={[styles.styleOptionName,{color:colors.text}]}>{option.name}</Text>{option.universalTheme?<View style={[styles.universalBadge,{borderColor:palette.secondary}]}><Text style={[styles.universalBadgeText,{color:palette.secondary}]}>UNIVERSAL</Text></View>:null}</View>
+                      <Text style={[styles.styleOptionMeta,{color:colors.muted}]}>{option.effect==='galaxy'?'GALAXY FLOW • ':''}Aplicação 🪙 {option.applyCost.toLocaleString('pt-BR')}</Text>
+                    </View>
+                    {styleApplying===option.id?<ActivityIndicator color={palette.primary}/>:<Ionicons name={active?'checkmark-circle':'chevron-forward'} size={19} color={active?palette.primary:colors.muted}/>}
+                  </Pressable>;
+                })}
+                {!styleOptions.length?<View style={styles.noStyleOptions}><Ionicons name="color-wand-outline" size={28} color={colors.muted}/><Text style={[styles.styleSubtitle,{color:colors.muted,textAlign:'center'}]}>Você ainda não possui temas compatíveis. Compre molduras, backgrounds ou estilos de carta na Trainer Shop.</Text><Pressable onPress={()=>{setStylePickerOpen(false);router.push('/store');}} style={[styles.goStore,{backgroundColor:colors.yellow}]}><Text style={styles.goStoreText}>ABRIR TRAINER SHOP</Text></Pressable></View>:null}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -211,5 +311,24 @@ const styles = StyleSheet.create({
   bar: { width: '100%', minWidth: 2, borderRadius: 3 },
   historyDates: { marginTop: 7, flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
   historyDate: { fontSize: 7, fontWeight: '700' },
+  styleBackdrop:{flex:1,backgroundColor:'#05030ADC',alignItems:'center',justifyContent:'center',padding:16},
+  styleModal:{width:'100%',maxWidth:560,maxHeight:'86%',borderRadius:22,borderWidth:1,padding:14,gap:12},
+  styleHeader:{flexDirection:'row',alignItems:'flex-start',gap:10},
+  styleKicker:{fontSize:7,fontWeight:'900',letterSpacing:.9},
+  styleTitle:{fontSize:21,fontWeight:'900',marginTop:2},
+  styleSubtitle:{fontSize:8.5,lineHeight:13,marginTop:3},
+  styleClose:{width:38,height:38,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  styleList:{maxHeight:540},
+  styleListContent:{gap:7,paddingBottom:2},
+  styleOption:{minHeight:67,borderRadius:15,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:9},
+  styleOptionIcon:{width:44,height:44,borderRadius:13,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  styleOptionName:{fontSize:11,fontWeight:'900'},
+  styleOptionMeta:{fontSize:7.5,fontWeight:'700',marginTop:3},
+  styleNameRow:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},
+  universalBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:2},
+  universalBadgeText:{fontSize:5.5,fontWeight:'900',letterSpacing:.5},
+  noStyleOptions:{padding:24,alignItems:'center',gap:8},
+  goStore:{minHeight:40,borderRadius:11,paddingHorizontal:14,alignItems:'center',justifyContent:'center',marginTop:3},
+  goStoreText:{color:'#07111F',fontSize:8,fontWeight:'900'},
   valueHero: { marginTop: 16, borderRadius: 18, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11 }, valueIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, valueLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 }, valueNumber: { fontSize: 24, fontWeight: '900', marginTop: 2 }, valueHint: { fontSize: 8, lineHeight: 12, marginTop: 2 }, badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }, badge: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999, borderWidth: 1 }, badgeText: { fontSize: 11, fontWeight: '900' }, statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }, infoCard: { width: '48%', minHeight: 82, borderRadius: 16, padding: 13, borderWidth: 1 }, infoLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, infoValue: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 5 }, favoriteButton: { marginTop: 20, minHeight: 52, borderRadius: 16, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 }, favoriteButtonText: { color: '#07111F', fontSize: 11, fontWeight: '900', letterSpacing: .4 },
 });
