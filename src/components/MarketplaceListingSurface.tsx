@@ -8,6 +8,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 
 type MarketVisual = {
   primary:string;
@@ -39,13 +40,10 @@ function startMarketFlow(){
 
     marketFlow.setValue(0);
     const native=Platform.OS!=='web';
-    marketLoop=Animated.loop(
-      Animated.timing(marketFlow,{
-        toValue:1,
-        duration:5600,
-        useNativeDriver:native,
-      }),
-    );
+    marketLoop=Animated.loop(Animated.sequence([
+      Animated.timing(marketFlow,{toValue:1,duration:7600,useNativeDriver:native}),
+      Animated.timing(marketFlow,{toValue:0,duration:8200,useNativeDriver:native}),
+    ]));
     marketLoop.start();
   };
 
@@ -162,6 +160,7 @@ export function MarketplaceListingSurface({
   return (
     <View style={[styles.shell,style]}>
       <View style={styles.content}>{children}</View>
+      {visual.galaxy?<GalaxyFlowOverlay intensity="premium" opacity={0.50}/>:null}
 
       <Animated.View
         pointerEvents="none"
@@ -195,7 +194,7 @@ export function MarketplaceListingSurface({
           styles.topRail,
           {
             backgroundColor:boosted?'#FFD447':visual.secondary,
-            opacity:visual.premium?.98:.82,
+            opacity:visual.galaxy?0:visual.premium?.72:.58,
             transform:[{translateX:topRail}],
           },
         ]}
@@ -207,7 +206,7 @@ export function MarketplaceListingSurface({
           styles.bottomRail,
           {
             backgroundColor:visual.tertiary,
-            opacity:visual.premium?.86:.68,
+            opacity:visual.galaxy?0:visual.premium?.64:.50,
             transform:[{translateX:bottomRail}],
           },
         ]}
@@ -219,7 +218,7 @@ export function MarketplaceListingSurface({
           styles.shine,
           {
             backgroundColor:'#FFFFFF',
-            opacity:visual.premium?.16:.10,
+            opacity:visual.galaxy?0:visual.premium?.12:.08,
             transform:[{translateX:shineX},{rotate:'15deg'}],
           },
         ]}
@@ -233,59 +232,31 @@ export function MarketplaceListingSurface({
         ]}
       />
 
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.cornerGem,
-          styles.cornerTL,
-          {backgroundColor:visual.secondary,opacity:starPulse},
-        ]}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.cornerGem,
-          styles.cornerBR,
-          {backgroundColor:visual.tertiary,opacity:pulse},
-        ]}
-      />
-
-      {visual.premium?(
-        <>
-          <Animated.View pointerEvents="none" style={[styles.spark,{left:'18%',top:'18%',backgroundColor:visual.secondary,opacity:starPulse}]}/>
-          <Animated.View pointerEvents="none" style={[styles.sparkSmall,{left:'58%',top:'28%',backgroundColor:visual.tertiary,opacity:pulse}]}/>
-          <Animated.View pointerEvents="none" style={[styles.sparkSmall,{right:'12%',bottom:'24%',backgroundColor:'#FFFFFF',opacity:starPulse}]}/>
-        </>
-      ):null}
-
-      {visual.galaxy?(
+      {!visual.galaxy?(
         <>
           <Animated.View
             pointerEvents="none"
             style={[
-              styles.nebula,
-              {
-                top:'20%',
-                left:-220,
-                backgroundColor:'#8B5CFF',
-                opacity:Animated.multiply(pulse,.11),
-                transform:[{translateX:bottomRail},{rotate:'-8deg'}],
-              },
+              styles.cornerGem,
+              styles.cornerTL,
+              {backgroundColor:visual.secondary,opacity:starPulse},
             ]}
           />
           <Animated.View
             pointerEvents="none"
             style={[
-              styles.nebulaSmall,
-              {
-                bottom:'18%',
-                left:-180,
-                backgroundColor:'#55E6FF',
-                opacity:Animated.multiply(starPulse,.08),
-                transform:[{translateX:topRail},{rotate:'9deg'}],
-              },
+              styles.cornerGem,
+              styles.cornerBR,
+              {backgroundColor:visual.tertiary,opacity:pulse},
             ]}
           />
+          {visual.premium?(
+            <>
+              <Animated.View pointerEvents="none" style={[styles.spark,{left:'18%',top:'18%',backgroundColor:visual.secondary,opacity:Animated.multiply(starPulse,.72)}]}/>
+              <Animated.View pointerEvents="none" style={[styles.sparkSmall,{left:'58%',top:'28%',backgroundColor:visual.tertiary,opacity:Animated.multiply(pulse,.60)}]}/>
+              <Animated.View pointerEvents="none" style={[styles.sparkSmall,{right:'12%',bottom:'24%',backgroundColor:'#FFFFFF',opacity:Animated.multiply(starPulse,.58)}]}/>
+            </>
+          ):null}
         </>
       ):null}
     </View>
@@ -366,19 +337,5 @@ const styles=StyleSheet.create({
     height:3,
     borderRadius:999,
     zIndex:10,
-  },
-  nebula:{
-    position:'absolute',
-    width:280,
-    height:34,
-    borderRadius:999,
-    zIndex:6,
-  },
-  nebulaSmall:{
-    position:'absolute',
-    width:220,
-    height:22,
-    borderRadius:999,
-    zIndex:6,
   },
 });
