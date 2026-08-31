@@ -112,7 +112,7 @@ export type GuildWarGymDefender = {
 export type GuildWarGymEvent = {
   id:number;
   gymId:string;
-  eventType:'defender_set'|'heal'|'attack'|'capture';
+  eventType:'defender_set'|'heal'|'attack'|'capture'|'cosmetic';
   actorId:string|null;
   guildId:string|null;
   message:string;
@@ -129,6 +129,8 @@ export type GuildWarGym = {
   controlledSince:string;
   captureCount:number;
   lastAttackedAt:string|null;
+  flareKey:'banner'|'champion'|'legendary'|null;
+  flareUntil:string|null;
   defenders:GuildWarGymDefender[];
 };
 
@@ -307,6 +309,8 @@ function normalizeGuildWarGymBoard(data:any):GuildWarGymBoard{
       controlledSince:String(gym?.controlledSince??''),
       captureCount:Number(gym?.captureCount??0),
       lastAttackedAt:gym?.lastAttackedAt?String(gym.lastAttackedAt):null,
+      flareKey:gym?.flareKey==='banner'||gym?.flareKey==='champion'||gym?.flareKey==='legendary'?gym.flareKey:null,
+      flareUntil:gym?.flareUntil?String(gym.flareUntil):null,
       defenders:Array.isArray(gym?.defenders)?gym.defenders.map((d:any)=>({
         id:String(d?.id??''),
         playerId:String(d?.playerId??''),
