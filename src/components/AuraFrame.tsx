@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Platform, StyleSheet, type StyleProp, View, type ViewStyle } from 'react-native';
 import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 
@@ -22,16 +22,16 @@ export function AuraFrame({
   const pulse=useRef(new Animated.Value(0)).current;
   const flow=useRef(new Animated.Value(0)).current;
   const second=secondaryColor??'#FFD447';
-  const reduceMotion=useRef(false);
+  const [reduceMotion,setReduceMotion]=useState(false);
 
   useEffect(()=>{
     let mounted=true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((value)=>{ if(mounted) reduceMotion.current=Boolean(value); }).catch(()=>undefined);
+    void AccessibilityInfo.isReduceMotionEnabled().then((value)=>{ if(mounted) setReduceMotion(Boolean(value)); }).catch(()=>undefined);
     return()=>{mounted=false;};
   },[]);
 
   useEffect(()=>{
-    if(reduceMotion.current){
+    if(reduceMotion){
       pulse.setValue(.45);
       flow.setValue(.35);
       return;
@@ -49,7 +49,7 @@ export function AuraFrame({
     pulseLoop.start();
     flowLoop.start();
     return()=>{pulseLoop.stop();flowLoop.stop();};
-  },[flow,intensity,pulse]);
+  },[flow,intensity,pulse,reduceMotion]);
 
   const opacity=pulse.interpolate({
     inputRange:[0,1],
