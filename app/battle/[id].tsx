@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { CardPickerModal, getBattleCardPreview } from '@/components/CardPickerModal';
+import { CompactTrainerBanner } from '@/components/CompactTrainerBanner';
 import { supabase } from '@/lib/supabase';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
 import { getMyDecks } from '@/services/decks';
@@ -73,7 +74,7 @@ export default function BattleScreen() {
           playerPairKey.current = pairKey;
           const { data: playerRows } = await supabase
             .from('players')
-            .select('id,username,level,battle_rating')
+            .select('id,username,level,battle_rating,equipped_frame_id,equipped_background_id')
             .in('id', ids);
           setPlayers(Object.fromEntries((playerRows ?? []).map((player) => [player.id, player])));
         }
@@ -315,9 +316,9 @@ export default function BattleScreen() {
         {notice ? <Pressable style={[styles.notice, { backgroundColor: colors.surface, borderColor: colors.yellow }]} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={19} color={colors.yellow} /><Text style={[styles.noticeText, { color: colors.text }]}>{notice}</Text><Ionicons name="close" size={18} color={colors.muted} /></Pressable> : null}
 
         <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.accent }]}>
-          <PlayerSide label="DESAFIANTE" name={challenger?.username} rating={challenger?.battle_rating} score={battle.challenger_score} />
+          <PlayerSide label="DESAFIANTE" player={challenger} score={battle.challenger_score} />
           <View style={styles.vs}><Text style={[styles.vsText, { color: colors.text }]}>VS</Text><Text style={[styles.mode, { color: colors.accent }]}>{battle.mode === 'draft3' ? 'DRAFT • 3 RODADAS' : battle.mode === 'mystery' ? 'MELHOR DE 3' : '1 CARTA'}</Text>{battle.stake_type === 'coins' ? <Text style={[styles.wager, { color: colors.yellow }]}>🪙 {Number(battle.wager_coins).toLocaleString('pt-BR')} CADA</Text> : battle.stake_type === 'card' ? <Text style={[styles.wager, { color: '#C7A8FF' }]}>🎴 1 CARTA CADA</Text> : <Text style={[styles.casual, { color: colors.muted }]}>CASUAL</Text>}</View>
-          <PlayerSide label="OPONENTE" name={opponent?.username} rating={opponent?.battle_rating} score={battle.opponent_score} right />
+          <PlayerSide label="OPONENTE" player={opponent} score={battle.opponent_score} right />
         </View>
 
         {(drafting || selecting) ? (
@@ -476,9 +477,23 @@ export default function BattleScreen() {
   );
 }
 
-function PlayerSide({ label, name, rating, score, right }: { label: string; name?: string; rating?: number; score?: number; right?: boolean }) {
+function PlayerSide({ label, player, score, right }: { label: string; player?: any; score?: number; right?: boolean }) {
   const { colors } = useAppTheme();
-  return <View style={[styles.playerSide, right && styles.right]}><Text style={[styles.sideLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.playerName, { color: colors.text }]}>@{name ?? 'Treinador'}</Text><Text style={[styles.ratingText, { color: colors.muted }]}>ELO {rating ?? 1000}</Text><Text style={[styles.score, { color: colors.yellow }]}>{score ?? 0}</Text></View>;
+  return (
+    <CompactTrainerBanner
+      frameId={player?.equipped_frame_id}
+      backgroundId={player?.equipped_background_id}
+      fallbackColor={right?colors.yellow:colors.accent}
+      style={[styles.playerSide,right&&styles.right]}
+    >
+      <View style={[styles.playerSideInner,right&&styles.right]}>
+        <Text style={[styles.sideLabel, { color: colors.muted }]}>{label}</Text>
+        <Text style={[styles.playerName, { color: colors.text }]}>@{player?.username ?? 'Treinador'}</Text>
+        <Text style={[styles.ratingText, { color: colors.muted }]}>ELO {player?.battle_rating ?? 1000}</Text>
+        <Text style={[styles.score, { color: colors.yellow }]}>{score ?? 0}</Text>
+      </View>
+    </CompactTrainerBanner>
+  );
 }
 
 function DeckChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
@@ -527,7 +542,7 @@ function MiniRoundCard({ label, card, duel }: { label: string; card: any; duel?:
 const styles = StyleSheet.create({
   safe: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, content: { width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 15, paddingBottom: 48, gap: 13 }, contentWithDock: { paddingBottom: 112 },
   notice: { flexDirection: 'row', gap: 9, alignItems: 'center', padding: 12, borderRadius: 15, borderWidth: 1 }, noticeText: { flex: 1, fontSize: 11, fontWeight: '700' },
-  hero: { flexDirection: 'row', alignItems: 'stretch', borderRadius: 22, borderWidth: 1, padding: 15 }, playerSide: { flex: 1, justifyContent: 'center' }, right: { alignItems: 'flex-end' }, sideLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 }, playerName: { fontSize: 17, fontWeight: '900', marginTop: 3 }, ratingText: { fontSize: 9, marginTop: 2 }, score: { fontSize: 32, fontWeight: '900', marginTop: 5 }, vs: { width: 120, alignItems: 'center', justifyContent: 'center' }, vsText: { fontSize: 27, fontWeight: '900' }, mode: { fontSize: 9, fontWeight: '900', marginTop: 3 }, wager: { fontSize: 8, fontWeight: '900', marginTop: 4 }, casual: { fontSize: 8, fontWeight: '900', marginTop: 4 },
+  hero: { flexDirection: 'row', alignItems: 'stretch', borderRadius: 22, borderWidth: 1, padding: 15 }, playerSide: { flex: 1, justifyContent: 'center' }, playerSideInner:{padding:10,justifyContent:'center',minHeight:118}, right: { alignItems: 'flex-end' }, sideLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 }, playerName: { fontSize: 17, fontWeight: '900', marginTop: 3 }, ratingText: { fontSize: 9, marginTop: 2 }, score: { fontSize: 32, fontWeight: '900', marginTop: 5 }, vs: { width: 120, alignItems: 'center', justifyContent: 'center' }, vsText: { fontSize: 27, fontWeight: '900' }, mode: { fontSize: 9, fontWeight: '900', marginTop: 3 }, wager: { fontSize: 8, fontWeight: '900', marginTop: 4 }, casual: { fontSize: 8, fontWeight: '900', marginTop: 4 },
   panel: { alignItems: 'center', gap: 10, padding: 18, borderRadius: 22, borderWidth: 1 },
   forfeitPanel:{borderRadius:16,borderWidth:1,padding:10,flexDirection:'row',alignItems:'center',gap:10},
   forfeitCopy:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:8},
