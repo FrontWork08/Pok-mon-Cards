@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export type ShopTheme = 'guild' | 'classic' | 'night';
+export type ShopTheme = 'guild' | 'classic' | 'night' | 'royal' | 'neon' | 'master' | 'celestial';
 
 export type MarketplaceCard = {
   id: string;
@@ -23,12 +23,16 @@ export type MarketplaceListing = {
   quantity: number;
   price: number;
   status: 'active' | 'sold' | 'cancelled';
+  boostedUntil: string | null;
+  boostTier: string | null;
+  shopHighlightUntil: string | null;
   createdAt: string;
 };
 
 export type MarketplaceHub = {
   myId: string;
-  myShop: { name: string; themeStyle: ShopTheme } | null;
+  myShop: { name: string; themeStyle: ShopTheme; highlightUntil: string | null } | null;
+  ownedShopThemes: ShopTheme[];
   listings: MarketplaceListing[];
   myListings: MarketplaceListing[];
 };
@@ -77,6 +81,9 @@ function normalizeListing(row: any, shops: Map<string, any>, guilds: Map<string,
     quantity: Number(row.quantity ?? 1),
     price: Number(row.unit_price_coins ?? 0),
     status: row.status,
+    boostedUntil: row.boosted_until ? String(row.boosted_until) : null,
+    boostTier: row.boost_tier ? String(row.boost_tier) : null,
+    shopHighlightUntil: shop?.highlight_until ? String(shop.highlight_until) : null,
     createdAt: String(row.created_at),
   };
 }
@@ -87,11 +94,11 @@ export async function getMarketplaceHub(): Promise<MarketplaceHub> {
   const myId = auth.user?.id;
   if (!myId) throw new Error('Usuário não autenticado.');
   const fields =
-    'id,seller_id,buyer_id,card_id,quantity,unit_price_coins,status,created_at,' +
+    'id,seller_id,buyer_id,card_id,quantity,unit_price_coins,status,created_at,boosted_until,boost_tier,' +
     'cards(id,pokemon_name,rarity,image_small,image_large,market_price_usd),' +
     'seller:players!market_listings_seller_id_fkey(id,username,profile_icon)';
   const [activeResult, mineResult] = await Promise.all([
-    supabase.from('market_listings').select(fields).eq('status','active').order('created_at',{ascending:false}).limit(100),
+    supabase.from('market_listings').select(fields).eq('status','active').order('boosted_until',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).limit(100),
     supabase.from('market_listings').select(fields).eq('seller_id',myId).order('created_at',{ascending:false}).limit(100),
   ]);
   if (activeResult.error) throw activeResult.error;
@@ -100,7 +107,7 @@ export async function getMarketplaceHub(): Promise<MarketplaceHub> {
   const sellerIds = [...new Set(allRows.map((row) => String(row.seller_id)))];
   if (!sellerIds.includes(myId)) sellerIds.push(myId);
   const [shopResult, guildResult] = await Promise.all([
-    supabase.from('player_shops').select('player_id,name,theme_style').in('player_id',sellerIds),
+    supabase.from('player_shops').select('player_id,name,theme_style,highlight_until').in('player_id',sellerIds),
     supabase.from('guild_members').select('player_id,guilds(id,name,color)').in('player_id',sellerIds),
   ]);
   if (shopResult.error) throw shopResult.error;
@@ -108,9 +115,21 @@ export async function getMarketplaceHub(): Promise<MarketplaceHub> {
   const shops = new Map((shopResult.data ?? []).map((row:any) => [String(row.player_id), row]));
   const guilds = new Map((guildResult.data ?? []).map((row:any) => [String(row.player_id), row]));
   const myShop = shops.get(myId);
+  const ownedIdsResult = await supabase.from('player_economy_items').select('item_id').eq('player_id',myId);
+  if (ownedIdsResult.error) throw ownedIdsResult.error;
+  const ownedIds = (ownedIdsResult.data ?? []).map((row:any)=>String(row.item_id));
+  let ownedShopThemes:ShopTheme[]=[];
+  if (ownedIds.length) {
+    const ownedThemeResult = await supabase.from('economy_store_items').select('id,category,metadata').in('id',ownedIds).eq('category','shop_theme');
+    if (ownedThemeResult.error) throw ownedThemeResult.error;
+    ownedShopThemes=(ownedThemeResult.data ?? [])
+      .map((row:any)=>String(row.metadata?.themeStyle??''))
+      .filter((value:string):value is ShopTheme=>Boolean(value)) as ShopTheme[];
+  }
   return {
     myId,
-    myShop: myShop ? { name:String(myShop.name), themeStyle:myShop.theme_style as ShopTheme } : null,
+    myShop: myShop ? { name:String(myShop.name), themeStyle:myShop.theme_style as ShopTheme, highlightUntil:myShop.highlight_until ? String(myShop.highlight_until) : null } : null,
+    ownedShopThemes,
     listings: (activeResult.data ?? []).map((row:any) => normalizeListing(row,shops,guilds)),
     myListings: (mineResult.data ?? []).map((row:any) => normalizeListing(row,shops,guilds)),
   };
