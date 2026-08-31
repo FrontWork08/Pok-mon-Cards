@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
+import { AuraFrame } from '@/components/AuraFrame';
 import {
   attackGuildWarGym,
   getGuildHub,
