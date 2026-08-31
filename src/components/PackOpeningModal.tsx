@@ -7,6 +7,7 @@ import type { OpenedCard, Pack } from '@/services/packs';
 import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { formatUsd } from '@/services/market';
+import { getMyEquippedBoosterFx } from '@/services/economy';
 
 type Props = { visible: boolean; pack: Pack | null; onClose: () => void; onPurchase: () => Promise<OpenedCard[]>; onFinished?: () => void };
 type Stage = 'sealed' | 'opening' | 'cards' | 'summary';
@@ -50,6 +51,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const [faceUp, setFaceUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageFailureLevel, setImageFailureLevel] = useState<Record<string, number>>({});
+  const [boosterFx, setBoosterFx] = useState<{id:string;name:string;icon:string;rarity:string}|null>(null);
 
   const packY = useRef(new Animated.Value(0)).current;
   const packRotate = useRef(new Animated.Value(0)).current;
@@ -79,6 +81,8 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
   useEffect(() => {
     if (!visible) return;
+    setBoosterFx(null);
+    void getMyEquippedBoosterFx().then(setBoosterFx).catch(() => setBoosterFx(null));
     setStage('sealed'); setCards([]); setCardIndex(0); setFaceUp(false); setError(null); setImageFailureLevel({}); resetOpening(); resetReveal(); cardEnter.setValue(0); rarityPulse.setValue(0);
     const floating = Animated.loop(Animated.sequence([
       Animated.timing(packY, { toValue: -9, duration: 1350, useNativeDriver: USE_NATIVE_DRIVER }),
@@ -281,14 +285,26 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const sparkTravel = shockwave.interpolate({ inputRange: [0, 1], outputRange: [0, highTier ? -265 : -210] });
   const sparkOpacity = shockwave.interpolate({ inputRange: [0, .12, .62, 1], outputRange: [0, 1, .55, 0] });
   const rayScale = revealBurst.interpolate({ inputRange: [0, 1], outputRange: [.2, highTier ? 2.45 : 1.8] });
+  const boosterFxColor = boosterFx?.id.includes('master') || boosterFx?.id.includes('legend')
+    ? '#C493FF'
+    : boosterFx?.id.includes('champion')
+      ? '#FFD447'
+      : '#55D9FF';
+  const boosterFxIcon = (boosterFx?.icon || 'sparkles') as keyof typeof Ionicons.glyphMap;
+  const boosterFxScale = openingCore.interpolate({ inputRange: [0, 1], outputRange: [.6, 2.5] });
+  const boosterFxOpacity = openingFlash.interpolate({ inputRange: [0, .25, 1], outputRange: [.12, .52, .9] });
 
   return <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={() => { if (stage !== 'opening') onClose(); }}>
     <View style={styles.container}>
       <PremiumBackground />
       <View style={styles.shadeTop} /><View style={styles.shadeBottom} />
+      {boosterFx ? <View pointerEvents="none" style={[styles.boosterFxFrame,{borderColor:boosterFxColor}]} /> : null}
+      {boosterFx ? <View pointerEvents="none" style={[styles.boosterFxBadge,{borderColor:boosterFxColor,backgroundColor:'#0A0F18E8'}]}><Ionicons name={boosterFxIcon} size={14} color={boosterFxColor}/><Text style={[styles.boosterFxBadgeText,{color:boosterFxColor}]}>{boosterFx.name.toUpperCase()}</Text></View> : null}
       <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 17), minHeight: 66 + insets.top }]}><View style={{ flex: 1 }}><Text style={styles.kicker}>PACK OPENING</Text><Text numberOfLines={1} style={styles.title}>{pack.name}</Text></View>{stage !== 'opening' ? <Pressable style={styles.closeButton} onPress={onClose}><Ionicons name="close" size={21} color="#F4F4F4" /></Pressable> : null}</View>
 
       {(stage === 'sealed' || stage === 'opening') ? <View style={styles.openingStage}>
+        {boosterFx ? <Animated.View pointerEvents="none" style={[styles.boosterFxBurst,{borderColor:boosterFxColor,opacity:boosterFxOpacity,transform:[{scale:boosterFxScale}]}]} /> : null}
+        {boosterFx && stage==='opening' ? <Animated.View pointerEvents="none" style={[styles.boosterFxCore,{backgroundColor:boosterFxColor,opacity:boosterFxOpacity,transform:[{scale:boosterFxScale}]}]} /> : null}
         <Animated.View pointerEvents="none" style={[styles.floorHalo, { opacity: floorPulse, transform: [{ scaleX: floorScale }] }]} />
         <Animated.View pointerEvents="none" style={[styles.openingCore, { opacity: openingCoreOpacity, transform: [{ scale: openingCoreScale }] }]} />
         <Animated.View pointerEvents="none" style={[styles.openingShock, { opacity: openingShockOpacity, transform: [{ scale: openingShockScale }] }]} />
@@ -372,6 +388,11 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 }
 
 const styles = StyleSheet.create({
+  boosterFxFrame:{position:'absolute',left:7,right:7,top:7,bottom:7,borderWidth:2,borderRadius:24,opacity:.32,zIndex:8},
+  boosterFxBadge:{position:'absolute',right:14,top:14,zIndex:20,borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:5},
+  boosterFxBadgeText:{fontSize:7,fontWeight:'900',letterSpacing:.6},
+  boosterFxBurst:{position:'absolute',width:250,height:250,borderRadius:999,borderWidth:3,zIndex:1},
+  boosterFxCore:{position:'absolute',width:95,height:95,borderRadius:999,zIndex:1},
   rewardPriceRow:{marginTop:7,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
   rewardPrice:{color:'#65D894',fontSize:13,fontWeight:'900'},
   summaryPrice:{color:'#65D894',fontSize:10,fontWeight:'900',marginTop:4},
