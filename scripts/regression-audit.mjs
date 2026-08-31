@@ -23,6 +23,9 @@ const requiredFiles = [
   'supabase/migrations/20260831025059_economy_v2_release_guard.sql',
   'app/economy.tsx',
   'src/services/economy.ts',
+  'src/components/AuraBanner.tsx',
+  'src/components/AuraFrame.tsx',
+  'src/components/GuildHeadquartersShowcase.tsx',
   'supabase/migrations/20260831030951_economy_v21_permanent_sinks_schema.sql',
   'supabase/migrations/20260831031041_economy_v21_luxury_and_museum_schema.sql',
   'supabase/migrations/20260831031133_economy_v21_core_sink_actions.sql',
@@ -37,6 +40,7 @@ const requiredFiles = [
   'supabase/migrations/20260831032715_economy_v21_allow_gym_cosmetic_events.sql',
   'supabase/migrations/20260831035207_economy_v21_revoke_anon_rpc_execute.sql',
   'supabase/migrations/20260831035416_economy_v21_performance_hardening.sql',
+  'supabase/migrations/20260831104956_economy_v21_public_trophy_room.sql',
 ];
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
@@ -160,6 +164,11 @@ if (existsSync('supabase/migrations/20260831025059_economy_v2_release_guard.sql'
 if (existsSync('app/economy.tsx') && existsSync('src/services/economy.ts')) {
   const economyScreen = read('app/economy.tsx');
   const economyService = read('src/services/economy.ts');
+  assert(economyScreen.includes('AuraBanner'), 'Regressão visual: Economy 2.1 perdeu banners de aura animada.');
+  assert(economyScreen.includes('GuildHeadquartersShowcase'), 'Regressão visual: evolução da sede da guilda deixou de aparecer na Economy 2.1.');
+  assert(economyScreen.includes('GlobalProjectVisual'), 'Regressão visual: construção global deixou de evoluir visualmente.');
+  assert(economyScreen.includes('StorePreview'), 'Regressão visual: Loja premium perdeu a prévia dos cosméticos.');
+  assert(economyScreen.includes('auctionPedestal'), 'Regressão visual: leilão oficial perdeu o pedestal premium.');
   assert(economyScreen.includes('Prestígio de Trainer'), 'Regressão: hub da Economy 2.1 perdeu o Prestígio de Trainer.');
   assert(economyScreen.includes('Loja semanal de luxo'), 'Regressão: hub da Economy 2.1 perdeu a Loja semanal de luxo.');
   assert(economyScreen.includes('Museu da Coleção'), 'Regressão: hub da Economy 2.1 perdeu o Museu da Coleção.');
@@ -235,8 +244,46 @@ if (existsSync('supabase/migrations/20260831035416_economy_v21_performance_harde
 if (existsSync('app/guild-wars.tsx')) {
   const wars = read('app/guild-wars.tsx');
   assert(wars.includes('onFlare={(flare) => onFlare(gym, flare)}'), 'Regressão: cards de ginásio perderam o handler de cosmético.');
+  assert(wars.includes('AuraFrame'), 'Regressão visual: flare de ginásio perdeu a aura animada.');
   assert(wars.includes('if (!picker || bagLoaded) return;'), 'Regressão: picker de Pokémon pode voltar ao loop infinito de loading.');
   assert(!wars.includes('[picker, bagCards.length, bagLoading]'), 'Regressão: bagLoading não pode voltar a cancelar a própria requisição do picker.');
+}
+
+if (existsSync('src/components/AuraBanner.tsx')) {
+  const aura = read('src/components/AuraBanner.tsx');
+  assert(aura.includes('Animated.loop'), 'Regressão visual: aura de banner deixou de ter fluxo contínuo.');
+  assert(aura.includes('AccessibilityInfo.isReduceMotionEnabled'), 'Regressão de acessibilidade: aura não respeita redução de movimento.');
+  assert(aura.includes('flowTop') && aura.includes('flowBottom'), 'Regressão visual: fluxos de energia das bordas do banner desapareceram.');
+}
+
+if (existsSync('src/components/GuildHeadquartersShowcase.tsx')) {
+  const hq = read('src/components/GuildHeadquartersShowcase.tsx');
+  for (const landmark of ['Centro Pokémon','Hall da Fama','Estátua Lendária','Liga da Guilda','Sede Master']) {
+    assert(hq.includes(landmark), `Regressão visual: sede perdeu a etapa ${landmark}.`);
+  }
+}
+
+if (existsSync('app/player/[id].tsx')) {
+  const profile = read('app/player/[id].tsx');
+  assert(profile.includes('Sala de Troféus'), 'Regressão visual: perfil público perdeu a Sala de Troféus.');
+  assert(profile.includes('AuraBanner'), 'Regressão visual: Prestígio público perdeu a aura.');
+}
+
+if (existsSync('app/marketplace.tsx')) {
+  const marketUi = read('app/marketplace.tsx');
+  assert(marketUi.includes('shopPreview'), 'Regressão visual: Marketplace perdeu a prévia do tema da loja.');
+  assert(marketUi.includes('AuraBanner'), 'Regressão visual: Marketplace perdeu o banner premium.');
+  assert(marketUi.includes('AuraFrame'), 'Regressão visual: anúncios deixaram de usar aura dinâmica.');
+}
+
+if (existsSync('app/card/[id].tsx')) {
+  const cardDetail = read('app/card/[id].tsx');
+  assert(cardDetail.includes('AuraFrame'), 'Regressão visual: personalização premium de carta perdeu a aura.');
+}
+
+if (existsSync('app/decks.tsx')) {
+  const decks = read('app/decks.tsx');
+  assert(decks.includes('AuraFrame'), 'Regressão visual: estilos premium de deck perderam a aura.');
 }
 
 if (existsSync('app/(tabs)/packs.tsx')) {
