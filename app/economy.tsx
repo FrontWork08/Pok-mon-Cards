@@ -16,6 +16,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Screen } from '@/components/Screen';
 import { PremiumBackground } from '@/components/PremiumBackground';
+import { AuraBanner } from '@/components/AuraBanner';
+import { GuildHeadquartersShowcase } from '@/components/GuildHeadquartersShowcase';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { getMyBagPage } from '@/services/bag';
 import type { OwnedCardEntry } from '@/services/player';
@@ -194,11 +196,11 @@ export default function EconomyScreen(){
   },[hub]);
 
   if(loading&&!hub){
-    return <Screen title="Economy 2.0" subtitle="Sinks permanentes e progressão de longo prazo."><ActivityIndicator size="large" color={colors.yellow}/></Screen>;
+    return <Screen title="Economy 2.1" subtitle="Sinks permanentes e progressão visual de longo prazo."><ActivityIndicator size="large" color={colors.yellow}/></Screen>;
   }
 
   return (
-    <Screen title="Economy 2.0" subtitle="Prestígio, luxo, projetos coletivos e personalização sem vantagem competitiva.">
+    <Screen title="Economy 2.1" subtitle="Prestígio, luxo, projetos coletivos e personalização visual sem vantagem competitiva.">
       <View style={styles.topRow}>
         <Pressable onPress={()=>goBackOrHome(router)} style={[styles.back,{backgroundColor:colors.surface,borderColor:colors.border}]}>
           <Ionicons name="arrow-back" size={18} color={colors.text}/><Text style={[styles.backText,{color:colors.text}]}>Voltar</Text>
@@ -207,6 +209,33 @@ export default function EconomyScreen(){
           <Ionicons name="refresh" size={17} color={colors.accent}/><Text style={[styles.refreshText,{color:colors.accent}]}>ATUALIZAR</Text>
         </Pressable>
       </View>
+
+      <AuraBanner
+        eyebrow="TRAINER ECONOMY • PREMIUM HUB"
+        title="Sua coleção também constrói legado."
+        subtitle="Coins viram prestígio visual, museu, sede de guilda, efeitos, leilões e identidade — nunca poder escondido."
+        icon="sparkles"
+        primaryColor={colors.accent}
+        secondaryColor={colors.yellow}
+        intensity={(hub?.prestige.level??0)>=5?'master':'premium'}
+        badge={(hub?.prestige.level??0)>=5?'MASTER ECONOMY':'ECONOMY 2.1'}
+        minHeight={190}
+      >
+        <View style={styles.bannerStats}>
+          <View style={[styles.bannerStat,{borderColor:colors.border,backgroundColor:colors.surface+'D8'}]}>
+            <Text style={[styles.bannerStatLabel,{color:colors.muted}]}>SALDO DISPONÍVEL</Text>
+            <Text style={[styles.bannerStatValue,{color:colors.yellow}]}>{coins(hub?.wallet.coins)}</Text>
+          </View>
+          <View style={[styles.bannerStat,{borderColor:colors.border,backgroundColor:colors.surface+'D8'}]}>
+            <Text style={[styles.bannerStatLabel,{color:colors.muted}]}>SINKS • 30 DIAS</Text>
+            <Text style={[styles.bannerStatValue,{color:'#65D894'}]}>{coins(hub?.mySinks.last30Days)}</Text>
+          </View>
+          <View style={[styles.bannerStat,{borderColor:colors.border,backgroundColor:colors.surface+'D8'}]}>
+            <Text style={[styles.bannerStatLabel,{color:colors.muted}]}>PRESTÍGIO</Text>
+            <Text style={[styles.bannerStatValue,{color:colors.text}]}>NV. {hub?.prestige.level??0}{(hub?.prestige.stars??0)>0?` • ★${hub?.prestige.stars}`:''}</Text>
+          </View>
+        </View>
+      </AuraBanner>
 
       {!hub?.live ? (
         <View style={[styles.launchGate,{backgroundColor:hub?.adminPreview?'#2D2612':colors.surface,borderColor:hub?.adminPreview?'#D9A441':colors.border}]}>
@@ -232,22 +261,32 @@ export default function EconomyScreen(){
         <Metric label="PRESTÍGIO" value={`NÍVEL ${hub?.prestige.level??0} ${(hub?.prestige.stars??0)>0?`★${hub?.prestige.stars}`:''}`} icon="ribbon" />
       </View>
 
-      <Section title="Prestígio de Trainer" icon="ribbon" subtitle="Sink endgame infinito: títulos e troféus sem bônus de batalha.">
-        <View style={[styles.heroCard,{backgroundColor:colors.surface,borderColor:colors.yellow}]}>
-          <View style={{flex:1,minWidth:190}}>
-            <Text style={[styles.heroKicker,{color:colors.yellow}]}>PRESTÍGIO {hub?.prestige.level??0}</Text>
-            <Text style={[styles.heroTitle,{color:colors.text}]}>{(hub?.prestige.stars??0)>0?`${hub?.prestige.stars} estrela(s) Master`:'Construa seu legado econômico'}</Text>
-            <Text style={[styles.body,{color:colors.muted}]}>Total investido: {coins(hub?.prestige.totalSpentCoins)}. Depois do nível 5, o sistema continua infinitamente com estrelas de prestígio.</Text>
+      <Section title="Prestígio de Trainer" icon="ribbon" subtitle="Sink endgame infinito: títulos, troféus e aura de conta sem bônus de batalha.">
+        <AuraBanner
+          eyebrow={`PRESTÍGIO ${hub?.prestige.level??0}`}
+          title={(hub?.prestige.stars??0)>0?`${hub?.prestige.stars} estrela(s) Master`:'Construa seu legado econômico'}
+          subtitle={`Total investido: ${coins(hub?.prestige.totalSpentCoins)}. Depois do nível 5, a progressão continua infinitamente com estrelas.`}
+          icon={(hub?.prestige.stars??0)>0?'diamond':'ribbon'}
+          primaryColor={(hub?.prestige.level??0)>=5?'#C493FF':colors.yellow}
+          secondaryColor={(hub?.prestige.level??0)>=5?'#8EE7FF':colors.accent}
+          intensity={(hub?.prestige.level??0)>=5?'master':'premium'}
+          badge={(hub?.prestige.level??0)>=5?`★ ${hub?.prestige.stars??0} MASTER`:'ENDGAME'}
+          minHeight={205}
+        >
+          <View style={styles.prestigeVisualRow}>
+            <View style={styles.prestigeStars}>
+              {Array.from({length:5},(_,i)=><View key={i} style={[styles.prestigeStar,{backgroundColor:i<(hub?.prestige.level??0)?((hub?.prestige.level??0)>=5?'#C493FF':colors.yellow):colors.surfaceAlt,borderColor:i<(hub?.prestige.level??0)?((hub?.prestige.level??0)>=5?'#D8B8FF':colors.yellow):colors.border}]}><Ionicons name={i<(hub?.prestige.level??0)?'star':'star-outline'} size={15} color={i<(hub?.prestige.level??0)?'#07111F':colors.muted}/></View>)}
+            </View>
+            <Pressable
+              disabled={Boolean(busy)}
+              onPress={()=>confirmSpend('Subir Prestígio?',`Custo do próximo nível: ${coins(hub?.prestige.nextCost)}.`,'prestige',purchaseTrainerPrestige,'Prestígio aumentado.')}
+              style={[styles.primary,{backgroundColor:colors.yellow},busy&&styles.disabled]}
+            >
+              {busy==='prestige'?<ActivityIndicator color="#07111F"/>:<Ionicons name="arrow-up-circle" size={18} color="#07111F"/>}
+              <Text style={styles.primaryText}>SUBIR • {coins(hub?.prestige.nextCost)}</Text>
+            </Pressable>
           </View>
-          <Pressable
-            disabled={Boolean(busy)}
-            onPress={()=>confirmSpend('Subir Prestígio?',`Custo do próximo nível: ${coins(hub?.prestige.nextCost)}.`,'prestige',purchaseTrainerPrestige,'Prestígio aumentado.')}
-            style={[styles.primary,{backgroundColor:colors.yellow},busy&&styles.disabled]}
-          >
-            {busy==='prestige'?<ActivityIndicator color="#07111F"/>:<Ionicons name="arrow-up-circle" size={18} color="#07111F"/>}
-            <Text style={styles.primaryText}>{coins(hub?.prestige.nextCost)}</Text>
-          </Pressable>
-        </View>
+        </AuraBanner>
       </Section>
 
       <Section title="Loja permanente" icon="bag-handle" subtitle="Cosméticos, temas, efeitos, títulos e estilos. Tudo puramente visual.">
@@ -333,7 +372,13 @@ export default function EconomyScreen(){
         )}
       </Section>
 
-      <Section title="Tesouro e Projetos da Guilda" icon="shield" subtitle="Contribuições são destruídas da circulação e evoluem a sede coletivamente.">
+      <Section title="Tesouro e Projetos da Guilda" icon="shield" subtitle="Contribuições são destruídas da circulação e evoluem a sede visualmente.">
+        {hub?.guild ? <GuildHeadquartersShowcase
+          guildName={hub.guild.guildId.toUpperCase()}
+          guildColor={colors.accent}
+          upgrades={hub.guild.upgrades}
+          guildLevel={1+Object.values(hub.guild.upgrades??{}).reduce((sum,value)=>sum+Number(value??0),0)}
+        /> : null}
         {hub?.guild?.project?<ProgressSink
           title={hub.guild.project.name}
           subtitle={hub.guild.project.description}
@@ -350,17 +395,29 @@ export default function EconomyScreen(){
         </View>:null}
       </Section>
 
-      <Section title="Construção Global" icon="construct" subtitle="Projeto de servidor inteiro para absorver Coins sem dar poder competitivo.">
-        {hub?.globalProject?<ProgressSink
+      <Section title="Construção Global" icon="construct" subtitle="Projeto de servidor inteiro que transforma Coins em um marco visual da comunidade.">
+        {hub?.globalProject?<AuraBanner
+          eyebrow="PROJETO GLOBAL"
           title={hub.globalProject.name}
           subtitle={hub.globalProject.description}
-          current={hub.globalProject.contributedCoins}
-          target={hub.globalProject.targetCoins}
-          my={hub.globalProject.myContribution}
-          colors={colors}
-          onSpend={(amount)=>confirmSpend('Contribuir com a comunidade?',`${coins(amount)} serão removidas da economia global.`,`global:${amount}`,()=>contributeGlobalProject(hub.globalProject!.id,amount),'Contribuição global registrada.')}
-          busy={Boolean(busy)}
-        />:<Text style={[styles.empty,{color:colors.muted}]}>Nenhum projeto global ativo.</Text>}
+          icon={hub.globalProject.completedAt?'checkmark-circle':'construct'}
+          primaryColor={hub.globalProject.completedAt?'#65D894':colors.accent}
+          secondaryColor={colors.yellow}
+          intensity={hub.globalProject.completedAt?'master':'premium'}
+          badge={hub.globalProject.completedAt?'CONCLUÍDO':`${pct(hub.globalProject.contributedCoins,hub.globalProject.targetCoins).toFixed(1)}%`}
+          minHeight={245}
+        >
+          <ProgressSink
+            title="Construção comunitária"
+            subtitle={hub.globalProject.completedAt?'A obra foi concluída e ficará registrada como marco da comunidade.':'Cada contribuição alimenta visualmente a construção até a conclusão.'}
+            current={hub.globalProject.contributedCoins}
+            target={hub.globalProject.targetCoins}
+            my={hub.globalProject.myContribution}
+            colors={colors}
+            onSpend={(amount)=>confirmSpend('Contribuir com a comunidade?',`${coins(amount)} serão removidas da economia global.`,`global:${amount}`,()=>contributeGlobalProject(hub.globalProject!.id,amount),'Contribuição global registrada.')}
+            busy={Boolean(busy)}
+          />
+        </AuraBanner>:<Text style={[styles.empty,{color:colors.muted}]}>Nenhum projeto global ativo.</Text>}
       </Section>
 
       <Section title="Trainer Market Premium" icon="storefront" subtitle="Destaques pagos melhoram visibilidade, nunca as estatísticas da carta.">
@@ -379,8 +436,19 @@ export default function EconomyScreen(){
         </View>)}</View>
       </Section>
 
-      <Section title="Leilão oficial" icon="hammer" subtitle="Maior lance vence. Lances superados são devolvidos; só o lance vencedor é destruído.">
-        {hub?.auction?<View style={[styles.auction,{backgroundColor:colors.surface,borderColor:hub.auction.amIHighest?'#65D894':colors.yellow}]}>
+      <Section title="Leilão oficial" icon="hammer" subtitle="Evento premium: lances superados são devolvidos e só o lance vencedor é destruído.">
+        {hub?.auction?<AuraBanner
+          eyebrow="MASTER AUCTION"
+          title={hub.auction.itemName}
+          subtitle={`Maior lance: ${hub.auction.highestBidCoins?coins(hub.auction.highestBidCoins):'nenhum'} ${hub.auction.highestBidderName?`• @${hub.auction.highestBidderName}`:''}`}
+          icon={(hub.auction.itemIcon||'trophy') as keyof typeof Ionicons.glyphMap}
+          primaryColor={hub.auction.amIHighest?'#65D894':'#C493FF'}
+          secondaryColor={colors.yellow}
+          intensity="master"
+          badge={hub.auction.amIHighest?'VOCÊ ESTÁ NA FRENTE':'LEILÃO OFICIAL'}
+          minHeight={255}
+        >
+          <View style={[styles.auction,{backgroundColor:colors.surface+'D9',borderColor:hub.auction.amIHighest?'#65D894':colors.yellow}]}>
           <View style={[styles.auctionIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name={(hub.auction.itemIcon||'trophy') as keyof typeof Ionicons.glyphMap} size={28} color={colors.yellow}/></View>
           <View style={{flex:1,minWidth:200}}>
             <Text style={[styles.heroKicker,{color:colors.yellow}]}>MASTER AUCTION</Text>
@@ -392,7 +460,8 @@ export default function EconomyScreen(){
             <TextInput value={auctionBid} onChangeText={(v)=>setAuctionBid(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder={String(hub.auction.minimumNextBid)} placeholderTextColor={colors.muted} style={[styles.bidInput,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
             <Pressable disabled={Boolean(busy)||Number(auctionBid)<hub.auction.minimumNextBid} onPress={()=>confirmSpend('Confirmar lance?',`Lance: ${coins(Number(auctionBid))}. Se alguém superar, seu valor é devolvido integralmente.`,'auction',()=>placeEconomyAuctionBid(hub.auction!.id,Number(auctionBid)),'Lance registrado.')} style={[styles.primary,{backgroundColor:colors.yellow},(Number(auctionBid)<hub.auction.minimumNextBid)&&styles.disabled]}><Ionicons name="hammer" size={17} color="#07111F"/><Text style={styles.primaryText}>DAR LANCE</Text></Pressable>
           </View>
-        </View>:<Text style={[styles.empty,{color:colors.muted}]}>Nenhum leilão oficial ativo.</Text>}
+          </View>
+        </AuraBanner>:<Text style={[styles.empty,{color:colors.muted}]}>Nenhum leilão oficial ativo.</Text>}
       </Section>
 
       <Section title="Seu impacto econômico" icon="analytics" subtitle="Quanto você já removeu de Coins por categoria de sink.">
@@ -463,6 +532,13 @@ function ProgressSink({title,subtitle,current,target,my,colors,onSpend,busy}:{ti
 
 const styles=StyleSheet.create({
   topRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'},
+  bannerStats:{flexDirection:'row',flexWrap:'wrap',gap:7},
+  bannerStat:{flexGrow:1,minWidth:135,borderRadius:13,borderWidth:1,padding:10},
+  bannerStatLabel:{fontSize:6.5,fontWeight:'900',letterSpacing:.65},
+  bannerStatValue:{fontSize:13,fontWeight:'900',marginTop:3},
+  prestigeVisualRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'},
+  prestigeStars:{flexDirection:'row',gap:6,flexWrap:'wrap'},
+  prestigeStar:{width:34,height:34,borderRadius:11,borderWidth:1,alignItems:'center',justifyContent:'center'},
   back:{minHeight:42,borderRadius:13,borderWidth:1,paddingHorizontal:12,flexDirection:'row',alignItems:'center',gap:7},backText:{fontSize:10,fontWeight:'900'},
   refresh:{minHeight:42,borderRadius:13,borderWidth:1,paddingHorizontal:12,flexDirection:'row',alignItems:'center',gap:7},refreshText:{fontSize:8,fontWeight:'900'},
   launchGate:{borderRadius:18,borderWidth:1,padding:13,flexDirection:'row',gap:10,alignItems:'center'},launchTitle:{fontSize:10,fontWeight:'900',letterSpacing:.5},launchText:{fontSize:8,lineHeight:13,marginTop:3},
