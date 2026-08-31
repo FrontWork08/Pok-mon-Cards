@@ -374,10 +374,10 @@ export default function EconomyScreen(){
 
       <Section title="Tesouro e Projetos da Guilda" icon="shield" subtitle="Contribuições são destruídas da circulação e evoluem a sede visualmente.">
         {hub?.guild ? <GuildHeadquartersShowcase
-          guildName={hub.guild.guildId.toUpperCase()}
-          guildColor={colors.accent}
+          guildName={hub.guild.guildName}
+          guildColor={hub.guild.guildColor}
           upgrades={hub.guild.upgrades}
-          guildLevel={1+Object.values(hub.guild.upgrades??{}).reduce((sum,value)=>sum+Number(value??0),0)}
+          guildLevel={hub.guild.guildLevel}
         /> : null}
         {hub?.guild?.project?<ProgressSink
           title={hub.guild.project.name}
