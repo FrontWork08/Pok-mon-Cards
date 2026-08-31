@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerPageHeader } from '@/components/TrainerPageHeader';
+import { AuraFrame } from '@/components/AuraFrame';
 import {
   getMyBagOverview,
   getMyBagPage,
@@ -30,6 +31,18 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
 
 const PAGE_SIZE = 48;
+
+function bagThemePalette(id:string,accent:string,yellow:string){
+  const key=id.toLowerCase();
+  if(key.includes('galaxy')) return {primary:'#8B5CFF',secondary:'#55E6FF'};
+  if(key.includes('master')) return {primary:'#C493FF',secondary:'#8EE7FF'};
+  if(key.includes('celestial')) return {primary:'#55E6FF',secondary:'#D8B8FF'};
+  if(key.includes('crimson')||key.includes('crown')) return {primary:'#FF667A',secondary:'#FFB36B'};
+  if(key.includes('champion')||key.includes('gold')) return {primary:'#FFD447',secondary:'#FFF0A8'};
+  if(key.includes('indigo')) return {primary:'#6A7CFF',secondary:'#55D9FF'};
+  if(key.includes('kanto')||key.includes('night')) return {primary:'#8B72FF',secondary:'#6EC8FF'};
+  return {primary:accent,secondary:yellow};
+}
 
 export default function BagScreen() {
   const router = useRouter();
@@ -285,26 +298,74 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
   const card = entry.cards;
   if (!card) return null;
   const combat = getBattleCardPreview(card);
-  return (
-    <Pressable onPress={() => onOpen(card.id)} style={[styles.card, { width, backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.imageWrap, { backgroundColor: isLight ? '#E6EDF6' : colors.surfaceAlt }]}>
+  const theme=entry.economyStyle??null;
+  const palette=theme?bagThemePalette(theme.id,colors.accent,colors.yellow):null;
+  const galaxy=Boolean(theme?.id.includes('galaxy')||theme?.effect==='galaxy');
+
+  const content=(
+    <Pressable
+      onPress={() => onOpen(card.id)}
+      style={[
+        styles.card,
+        styles.cardInner,
+        {
+          backgroundColor:theme?(galaxy?'rgba(20,11,34,.96)':'rgba(18,20,30,.97)'):colors.surface,
+          borderColor:theme?palette!.primary:colors.border,
+        },
+      ]}
+    >
+      {theme ? <View pointerEvents="none" style={[styles.tileThemeWash,{backgroundColor:palette!.primary}]} /> : null}
+      <View
+        style={[
+          styles.imageWrap,
+          {
+            backgroundColor: theme ? '#09070D' : isLight ? '#E6EDF6' : colors.surfaceAlt,
+            borderColor: theme ? palette!.secondary : 'rgba(255,255,255,.06)',
+          },
+        ]}
+      >
         {card.image_small ? <Image source={{ uri: card.image_small }} style={styles.cardImage} resizeMode="contain" resizeMethod="resize" fadeDuration={0} /> : <View style={styles.cardPlaceholder}><Ionicons name="image-outline" size={28} color={colors.muted} /></View>}
-        <View style={styles.valueBadge}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
+        {theme ? <View pointerEvents="none" style={[styles.imageThemeTint,{backgroundColor:palette!.primary}]} /> : null}
+        {theme ? <View pointerEvents="none" style={[styles.imageThemeStroke,{borderColor:palette!.secondary}]} /> : null}
+        <View style={styles.valueBadge}><Text style={[styles.valueBadgeText, { color: theme?palette!.secondary:colors.yellow }]}>{card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
         <View style={styles.damageBadge}>
           <Ionicons name="flash" size={11} color="#FFB06A" />
           <Text style={styles.damageBadgeText}>{combat.maxDamage.toLocaleString('pt-BR')} DANO</Text>
         </View>
         {entry.favorite ? <View style={styles.favoriteBadge}><Ionicons name="heart" size={13} color="#fff" /></View> : null}
-        {Number(entry.quantity ?? 0) > 1 ? <View style={[styles.quantityBadge, { backgroundColor: colors.yellow }]}><Text style={styles.quantityText}>×{entry.quantity}</Text></View> : null}
+        {Number(entry.quantity ?? 0) > 1 ? <View style={[styles.quantityBadge, { backgroundColor: theme?palette!.secondary:colors.yellow }]}><Text style={styles.quantityText}>×{entry.quantity}</Text></View> : null}
       </View>
+
+      {theme ? (
+        <View style={[styles.themeTag,{borderColor:palette!.primary,backgroundColor:`${palette!.primary}18`}]}>
+          <Ionicons name={(theme.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={11} color={palette!.primary}/>
+          <Text numberOfLines={1} style={[styles.themeTagText,{color:palette!.primary}]}>{theme.name.toUpperCase()}</Text>
+        </View>
+      ) : null}
+
       <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>{card.pokemon_name}</Text>
       <Text style={[styles.setName, { color: colors.muted }]} numberOfLines={1}>{card.set_name}</Text>
       <View style={styles.combatLine}>
-        <Text style={[styles.combatPwr,{color:colors.yellow}]}>⚔ PWR {combat.battleRating}</Text>
+        <Text style={[styles.combatPwr,{color:theme?palette!.secondary:colors.yellow}]}>⚔ PWR {combat.battleRating}</Text>
         <Text style={[styles.combatMeta,{color:colors.muted}]}>HP {combat.hp} • ⚡ {combat.bestEnergy} • VEL {combat.speedScore}</Text>
       </View>
-      <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={[styles.totalValue, { color: colors.yellow }]}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : card.market_price_source === 'unreleased:no_english_market' ? 'Não lançada' : 'Sem preço'}</Text></View>
+      <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={[styles.totalValue, { color: theme?palette!.secondary:colors.yellow }]}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : card.market_price_source === 'unreleased:no_english_market' ? 'Não lançada' : 'Sem preço'}</Text></View>
     </Pressable>
+  );
+
+  if(!theme)return <View style={{width}}>{content}</View>;
+
+  return (
+    <AuraFrame
+      primaryColor={palette!.primary}
+      secondaryColor={palette!.secondary}
+      intensity={galaxy||theme.id.includes('master')||theme.id.includes('celestial')?'master':'premium'}
+      variant={galaxy?'galaxy':'energy'}
+      radius={20}
+      style={{width,marginBottom:10}}
+    >
+      {content}
+    </AuraFrame>
   );
 });
 
@@ -367,6 +428,12 @@ const styles = StyleSheet.create({
   errorText: { flex: 1, color: '#FFD7DD', fontSize: 10, fontWeight: '700' },
   column: { gap: 10 },
   card: { borderRadius: 20, padding: 8, borderWidth: 1, marginBottom: 10, overflow:'hidden' },
+  cardInner:{width:'100%',position:'relative'},
+  tileThemeWash:{...StyleSheet.absoluteFillObject,opacity:.045},
+  imageThemeTint:{...StyleSheet.absoluteFillObject,opacity:.055},
+  imageThemeStroke:{...StyleSheet.absoluteFillObject,borderWidth:2,borderRadius:13,opacity:.78},
+  themeTag:{alignSelf:'flex-start',maxWidth:'100%',marginTop:7,borderRadius:999,borderWidth:1,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},
+  themeTagText:{fontSize:6.5,fontWeight:'900',letterSpacing:.35,flexShrink:1},
   imageWrap: { width: '100%', aspectRatio: .72, borderRadius: 14, overflow: 'hidden', position: 'relative', borderWidth:1, borderColor:'rgba(255,255,255,.06)' },
   cardImage: { width: '100%', height: '100%' },
   cardPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
