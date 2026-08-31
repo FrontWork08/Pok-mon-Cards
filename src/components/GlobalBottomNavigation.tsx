@@ -62,7 +62,7 @@ export function GlobalBottomNavigation() {
         styles.host,
         {
           backgroundColor: colors.bg,
-          paddingBottom: Math.max(insets.bottom, 7),
+          paddingBottom: Math.max(insets.bottom, 5),
         },
       ]}
     >
@@ -102,7 +102,7 @@ export function GlobalBottomNavigation() {
               >
                 <Ionicons
                   name={active ? item.activeIcon : item.icon}
-                  size={active ? 22 : 20}
+                  size={active ? 20 : 19}
                   color={active ? colors.yellow : colors.muted}
                 />
               </View>
@@ -128,17 +128,17 @@ export function GlobalBottomNavigation() {
 const styles = StyleSheet.create({
   host: {
     width: '100%',
-    paddingHorizontal: 12,
-    paddingTop: 7,
+    paddingHorizontal: 10,
+    paddingTop: 5,
   },
   bar: {
     width: '100%',
-    minHeight: 72,
-    borderRadius: 28,
+    minHeight: 62,
+    borderRadius: 22,
     borderWidth: 1,
     paddingHorizontal: 5,
-    paddingTop: 7,
-    paddingBottom: 6,
+    paddingTop: 5,
+    paddingBottom: 4,
     flexDirection: 'row',
     alignItems: 'stretch',
     shadowColor: '#000',
@@ -149,17 +149,17 @@ const styles = StyleSheet.create({
   item: {
     flex: 1,
     minWidth: 0,
-    minHeight: 58,
-    borderRadius: 20,
+    minHeight: 50,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
     position: 'relative',
   },
   iconShell: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 31,
+    height: 31,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: 'transparent',
     alignItems: 'center',
