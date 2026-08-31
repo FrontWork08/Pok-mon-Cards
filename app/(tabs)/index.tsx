@@ -3,9 +3,9 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
-import { getMyBag, getMyProfile, getProfileAvatarUrl } from '@/services/player';
+import { getProfileAvatarUrl } from '@/services/player';
+import { getHomeDashboard } from '@/services/home';
 import { claimDailyReward } from '@/services/playerActions';
-import { getMyTrades } from '@/services/trades';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getBattlePass, type BattlePassReward, type BattlePassState } from '@/services/battlePass';
 import { GlobalChatHomeCard } from '@/components/GlobalChatHomeCard';
@@ -17,10 +17,9 @@ export default function HomeScreen() {
   const router = useRouter();
   const { colors, isLight, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
-  const [profile,setProfile]=useState<any>(null);const[bag,setBag]=useState<any[]>([]);const[trades,setTrades]=useState<any[]>([]);const[battlePass,setBattlePass]=useState<BattlePassState|null>(null);const[loading,setLoading]=useState(true);const[claiming,setClaiming]=useState(false);const[notice,setNotice]=useState<string|null>(null);
-  const load=useCallback(async()=>{try{setLoading(true);const[p,b,t,pass]=await Promise.all([getMyProfile(),getMyBag(),getMyTrades(),getBattlePass().catch(()=>null)]);setProfile(p);setBag(b??[]);setTrades(t??[]);setBattlePass(pass);}finally{setLoading(false);}},[]);
-  useFocusEffect(useCallback(()=>{load();},[load]));
-  const stats=useMemo(()=>{const totalCards=bag.reduce((sum,item)=>sum+Number(item.quantity??0),0);const species=new Set(bag.map((item)=>item.cards?.pokedex_numbers?.[0]).filter((v)=>typeof v==='number')).size;const completedTrades=trades.filter((trade)=>trade.status==='completed').length;return{totalCards,species,completedTrades};},[bag,trades]);
+  const [profile,setProfile]=useState<any>(null);const[stats,setStats]=useState({totalCards:0,species:0,completedTrades:0});const[battlePass,setBattlePass]=useState<BattlePassState|null>(null);const[loading,setLoading]=useState(true);const[claiming,setClaiming]=useState(false);const[notice,setNotice]=useState<string|null>(null);
+  const load=useCallback(async()=>{try{setLoading(true);const[dashboard,pass]=await Promise.all([getHomeDashboard(),getBattlePass().catch(()=>null)]);setProfile(dashboard.profile);setStats(dashboard.stats);setBattlePass(pass);}finally{setLoading(false);}},[]);
+  useFocusEffect(useCallback(()=>{void load();},[load]));
   const avatarUrl=getProfileAvatarUrl(profile?.avatar_path,profile?.avatar_updated_at);
   const canClaimDaily=useMemo(()=>!profile?.last_daily_claim_at||Date.now()-new Date(profile.last_daily_claim_at).getTime()>=24*60*60*1000,[profile?.last_daily_claim_at]);
   const battlePassPreview=useMemo(()=>{
