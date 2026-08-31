@@ -190,7 +190,7 @@ export default function CardDetailScreen() {
           <>
             <View pointerEvents="none" style={[styles.cardThemeWash,{backgroundColor:stylePrimary}]} />
             <View pointerEvents="none" style={[styles.cardThemeEdge,{borderColor:styleSecondary}]} />
-            {galaxyStyle ? <GalaxyFlowOverlay intensity="master" opacity={0.44} /> : null}
+            {galaxyStyle ? <GalaxyFlowOverlay intensity="master" opacity={0.70} /> : null}
           </>
         ) : null}
       </View>
