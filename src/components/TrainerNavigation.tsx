@@ -32,6 +32,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label: 'Guildas Pokémon', description: 'Equipe, missões e ranking coletivo', href: '/guilds', icon: 'shield' },
   { label: 'Guild Wars', description: 'Confrontos semanais entre guildas', href: '/guild-wars', icon: 'flash' },
   { label: 'Copa Trainer', description: 'Torneio de 8 jogadores com bracket', href: '/tournaments', icon: 'trophy' },
+  { label: 'Trainer Shop', description: 'Todos os cosméticos e itens compráveis', href: '/store', icon: 'bag-handle' },
   { label: 'Cosméticos', description: 'Molduras e backgrounds desbloqueáveis', href: '/cosmetics', icon: 'color-wand' },
   { label: 'Mercado de Treinadores', description: 'Lojas e ofertas em tempo real', href: '/marketplace', icon: 'storefront' },
   { label: 'Resgatar Código', description: 'Recompensas únicas por conta', href: '/codes', icon: 'ticket' },
