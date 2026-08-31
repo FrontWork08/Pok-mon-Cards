@@ -26,6 +26,7 @@ const requiredFiles = [
   'src/components/AuraBanner.tsx',
   'src/components/AuraFrame.tsx',
   'src/components/GuildHeadquartersShowcase.tsx',
+  'src/components/GalaxyFlowOverlay.tsx',
   'supabase/migrations/20260831030951_economy_v21_permanent_sinks_schema.sql',
   'supabase/migrations/20260831031041_economy_v21_luxury_and_museum_schema.sql',
   'supabase/migrations/20260831031133_economy_v21_core_sink_actions.sql',
@@ -41,6 +42,7 @@ const requiredFiles = [
   'supabase/migrations/20260831035207_economy_v21_revoke_anon_rpc_execute.sql',
   'supabase/migrations/20260831035416_economy_v21_performance_hardening.sql',
   'supabase/migrations/20260831104956_economy_v21_public_trophy_room.sql',
+  'supabase/migrations/20260831121232_economy_v21_galaxy_flow_collection.sql',
 ];
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
@@ -284,6 +286,75 @@ if (existsSync('app/card/[id].tsx')) {
 if (existsSync('app/decks.tsx')) {
   const decks = read('app/decks.tsx');
   assert(decks.includes('AuraFrame'), 'Regressão visual: estilos premium de deck perderam a aura.');
+}
+
+if (existsSync('src/components/GalaxyFlowOverlay.tsx')) {
+  const galaxy = read('src/components/GalaxyFlowOverlay.tsx');
+  assert(galaxy.includes('GalaxyFlowOverlay'), 'Regressão visual: overlay Galaxy Flow foi removido.');
+  assert(galaxy.includes('#8B5CFF') && galaxy.includes('#55E6FF'), 'Regressão visual: paleta cósmica Galaxy Flow foi alterada.');
+  assert(galaxy.includes('AccessibilityInfo.isReduceMotionEnabled'), 'Regressão de acessibilidade: Galaxy Flow não respeita redução de movimento.');
+  assert(galaxy.includes('flowRibbon') && galaxy.includes('orbit'), 'Regressão visual: Galaxy Flow perdeu órbitas ou correntes cósmicas.');
+}
+
+if (existsSync('supabase/migrations/20260831121232_economy_v21_galaxy_flow_collection.sql')) {
+  const galaxyDb = read('supabase/migrations/20260831121232_economy_v21_galaxy_flow_collection.sql');
+  for (const item of [
+    'galaxy_frame_flow',
+    'galaxy_bg_nebula',
+    'galaxy_card_flow',
+    'galaxy_deck_flow',
+    'galaxy_shop_flow',
+    'galaxy_fx_supernova',
+    'galaxy_title_cosmic',
+  ]) {
+    assert(galaxyDb.includes(item), `Regressão Galaxy Flow: item ausente ${item}.`);
+  }
+  assert(galaxyDb.includes("'galaxy'::text"), 'Regressão Galaxy Flow: Marketplace perdeu o tema galaxy na constraint.');
+  assert(galaxyDb.includes("when 'galaxy' then"), 'Regressão Galaxy Flow: ginásio perdeu o flare galáctico.');
+  assert(galaxyDb.includes('750000'), 'Regressão Galaxy Flow: custo do flare de ginásio foi removido.');
+}
+
+if (existsSync('src/components/PackOpeningModal.tsx')) {
+  const opening = read('src/components/PackOpeningModal.tsx');
+  assert(opening.includes('isGalaxyBoosterFx'), 'Regressão Galaxy Flow: abertura de booster não detecta efeito galáctico.');
+  assert(opening.includes('GalaxyFlowOverlay'), 'Regressão Galaxy Flow: booster perdeu nebulosa animada.');
+  assert(opening.includes('galaxyPortalOuter'), 'Regressão Galaxy Flow: booster perdeu portal cósmico.');
+}
+
+if (existsSync('app/cosmetics.tsx')) {
+  const cosmetics = read('app/cosmetics.tsx');
+  assert(cosmetics.includes('GALAXY FLOW'), 'Regressão Galaxy Flow: tela de cosméticos não identifica a linha galáctica.');
+  assert(cosmetics.includes("variant={galaxy?'galaxy':'energy'}"), 'Regressão Galaxy Flow: cosméticos galácticos perderam aura cósmica.');
+}
+
+if (existsSync('app/economy.tsx')) {
+  const economyGalaxy = read('app/economy.tsx');
+  assert(economyGalaxy.includes('Coleção Galaxy Flow'), 'Regressão Galaxy Flow: coleção dedicada sumiu da Economy 2.1.');
+  assert(economyGalaxy.includes('GALAXY FLOW COLLECTION'), 'Regressão Galaxy Flow: banner da coleção sumiu.');
+}
+
+if (existsSync('app/marketplace.tsx')) {
+  const marketGalaxy = read('app/marketplace.tsx');
+  assert(marketGalaxy.includes("id:'galaxy'"), 'Regressão Galaxy Flow: tema Galaxy Market sumiu da UI.');
+  assert(marketGalaxy.includes("shopTheme==='galaxy'"), 'Regressão Galaxy Flow: loja não ativa o fluxo de galáxia.');
+}
+
+if (existsSync('app/guild-wars.tsx')) {
+  const gymGalaxy = read('app/guild-wars.tsx');
+  assert(gymGalaxy.includes("'galaxy','GALAXY','750K'"), 'Regressão Galaxy Flow: botão do flare galáctico sumiu.');
+  assert(gymGalaxy.includes("variant={gym.flareKey==='galaxy'?'galaxy':'energy'}"), 'Regressão Galaxy Flow: ginásio não usa aura galáctica.');
+}
+
+if (existsSync('app/card/[id].tsx')) {
+  const cardGalaxy = read('app/card/[id].tsx');
+  assert(cardGalaxy.includes('galaxyStyle'), 'Regressão Galaxy Flow: carta personalizada não detecta estilo galáctico.');
+  assert(cardGalaxy.includes("variant={galaxyStyle?'galaxy':'energy'}"), 'Regressão Galaxy Flow: carta perdeu fluxo de galáxia.');
+}
+
+if (existsSync('app/decks.tsx')) {
+  const deckGalaxy = read('app/decks.tsx');
+  assert(deckGalaxy.includes('galaxyDeck'), 'Regressão Galaxy Flow: deck não detecta estilo galáctico.');
+  assert(deckGalaxy.includes("variant={galaxyDeck?'galaxy':'energy'}"), 'Regressão Galaxy Flow: deck perdeu fluxo de galáxia.');
 }
 
 if (existsSync('app/(tabs)/packs.tsx')) {
