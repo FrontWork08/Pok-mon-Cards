@@ -35,6 +35,8 @@ const requiredFiles = [
   'supabase/migrations/20260831031837_economy_v21_gym_flare_payload.sql',
   'supabase/migrations/20260831032310_economy_v21_public_prestige_and_museum.sql',
   'supabase/migrations/20260831032715_economy_v21_allow_gym_cosmetic_events.sql',
+  'supabase/migrations/20260831035207_economy_v21_revoke_anon_rpc_execute.sql',
+  'supabase/migrations/20260831035416_economy_v21_performance_hardening.sql',
 ];
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
@@ -215,6 +217,19 @@ if (existsSync('supabase/migrations/20260831031803_economy_v21_premium_market_th
 if (existsSync('supabase/migrations/20260831032715_economy_v21_allow_gym_cosmetic_events.sql')) {
   const gymEvents = read('supabase/migrations/20260831032715_economy_v21_allow_gym_cosmetic_events.sql');
   assert(gymEvents.includes("'cosmetic'"), 'Regressão: evento visual do ginásio não está permitido pela constraint.');
+}
+
+if (existsSync('supabase/migrations/20260831035207_economy_v21_revoke_anon_rpc_execute.sql')) {
+  const security = read('supabase/migrations/20260831035207_economy_v21_revoke_anon_rpc_execute.sql');
+  assert(security.includes('from public, anon'), 'Regressão: RPCs SECURITY DEFINER da Economy 2.1 podem voltar a ficar acessíveis para anônimos.');
+  assert(security.includes('grant execute on function public.purchase_economy_item(text) to authenticated'), 'Regressão: compra Economy 2.1 precisa continuar disponível somente após autenticação.');
+}
+
+if (existsSync('supabase/migrations/20260831035416_economy_v21_performance_hardening.sql')) {
+  const perf = read('supabase/migrations/20260831035416_economy_v21_performance_hardening.sql');
+  assert(perf.includes('(select auth.uid())'), 'Regressão: policies da Economy 2.1 voltaram a reavaliar auth.uid() linha por linha.');
+  assert(perf.includes('economy_auctions_highest_bidder_idx'), 'Regressão: leilões perderam índice de highest bidder.');
+  assert(perf.includes('player_economy_items_item_idx'), 'Regressão: inventário econômico perdeu índice por item.');
 }
 
 if (existsSync('app/guild-wars.tsx')) {
