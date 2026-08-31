@@ -16,6 +16,7 @@ import { Screen } from '@/components/Screen';
 import {
   getMyAdminAccess,
   getAdminOverview,
+  getAdminEconomyHealth,
   getAdminPlayers,
   getCurrencyAdjustmentHistory,
   getAdminEvents,
@@ -57,6 +58,7 @@ import {
   type AdminGameEvent,
   type AdminModerationAction,
   type AdminOverview,
+  type AdminEconomyHealth,
   type AdminPlayer,
   type AdminCurrencyAdjustmentHistory,
   type AdminRedeemCode,
@@ -84,6 +86,7 @@ export default function AdminScreen() {
   const { colors, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [economyHealth, setEconomyHealth] = useState<AdminEconomyHealth | null>(null);
   const [adminAccess, setAdminAccessState] = useState<AdminAccess | null>(null);
   const [players, setPlayers] = useState<AdminPlayer[]>([]);
   const [selfId, setSelfId] = useState('');
@@ -170,9 +173,10 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [accessState, status, grants, events, guildState, codes, runtime, announcements, testerState, releaseState] = await Promise.all([
+      const [accessState, status, economyState, grants, events, guildState, codes, runtime, announcements, testerState, releaseState] = await Promise.all([
         getMyAdminAccess(),
         getAdminOverview(),
+        getAdminEconomyHealth(),
         getCurrencyAdjustmentHistory(),
         getAdminEvents(),
         getGuildHub(),
@@ -185,6 +189,7 @@ export default function AdminScreen() {
       ]);
       setAdminAccessState(accessState);
       setOverview(status);
+      setEconomyHealth(economyState);
       setHistory(grants);
       setActiveEvent(events.find((event) => event.event_type === 'free_boosters') ?? null);
       setGameEvents(events.filter((event) => event.event_type !== 'free_boosters'));
@@ -1854,6 +1859,36 @@ export default function AdminScreen() {
           </View>
 
                     </CollapsibleSection>
+          <CollapsibleSection title="Saúde da Economia 2.0">
+            {economyHealth ? (
+              <View style={[styles.economyHealthPanel,{backgroundColor:colors.surface,borderColor:economyHealth.status==='healthy'?'#2F9E68':economyHealth.status==='watch'?'#D9A441':'#A84250'}]}>
+                <View style={styles.economyHealthHeader}>
+                  <View style={[styles.economyHealthIcon,{backgroundColor:economyHealth.status==='healthy'?'#153426':economyHealth.status==='watch'?'#362B13':'#351A24'}]}>
+                    <Ionicons name={economyHealth.status==='healthy'?'shield-checkmark':economyHealth.status==='watch'?'warning':'alert-circle'} size={22} color={economyHealth.status==='healthy'?'#65D894':economyHealth.status==='watch'?'#FFD447':'#FF8290'}/>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={[styles.economyHealthTitle,{color:colors.text}]}>Economy 2.0 • {economyHealth.status==='healthy'?'SAUDÁVEL':economyHealth.status==='watch'?'ATENÇÃO':'CRÍTICA'}</Text>
+                    <Text style={[styles.economyHealthText,{color:colors.muted}]}>Janela móvel de {economyHealth.windowDays} dias • burn/mint conhecido {economyHealth.burnToMintRatio==null?'—':(economyHealth.burnToMintRatio*100).toFixed(1)+'%'}</Text>
+                  </View>
+                </View>
+                <View style={styles.metricGrid}>
+                  <Metric icon="wallet" label="COINS EM CIRCULAÇÃO" value={economyHealth.balances.coins} coin />
+                  <Metric icon="arrow-up-circle" label="COINS CRIADAS" value={economyHealth.knownMint.total} hint="fontes conhecidas na janela" />
+                  <Metric icon="flame" label="COINS REMOVIDAS" value={economyHealth.knownBurn.total} hint="packs + taxas + sinks" />
+                  <Metric icon="cube" label="PACK MEDIANO" value={Number(economyHealth.packPrices.coinMedian??0)} coin />
+                </View>
+                <View style={[styles.economyFlowBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                  <Text style={[styles.economyFlowTitle,{color:colors.text}]}>FONTES • 7 DIAS</Text>
+                  <Text style={[styles.economyFlowText,{color:colors.muted}]}>Missões 🪙 {economyHealth.knownMint.missions.toLocaleString('pt-BR')} • Passe 🪙 {economyHealth.knownMint.battlePass.toLocaleString('pt-BR')} • Guilda 🪙 {economyHealth.knownMint.guild.toLocaleString('pt-BR')} • Repetidas 🪙 {economyHealth.knownMint.duplicates.toLocaleString('pt-BR')} • Códigos 🪙 {economyHealth.knownMint.codes.toLocaleString('pt-BR')}</Text>
+                  <Text style={[styles.economyFlowTitle,{color:colors.text,marginTop:7}]}>SUMIDOUROS • 7 DIAS</Text>
+                  <Text style={[styles.economyFlowText,{color:colors.muted}]}>Packs 🪙 {economyHealth.knownBurn.packs.toLocaleString('pt-BR')} • Mercado 🪙 {economyHealth.knownBurn.marketFees.toLocaleString('pt-BR')} • Diamantes 🪙 {economyHealth.knownBurn.diamondExchange.toLocaleString('pt-BR')} • Ginásios 🪙 {economyHealth.knownBurn.gymHealing.toLocaleString('pt-BR')}</Text>
+                </View>
+                {releaseStatus?.phase!=='completed'?<Text style={[styles.economyHealthText,{color:colors.muted}]}>O indicador ainda inclui atividade do Beta. Depois do reset, a janela passa a respeitar o novo marco da economia 1.0.</Text>:null}
+              </View>
+            ) : (
+              <Text style={[styles.emptyText,{color:colors.muted}]}>Monitor econômico indisponível.</Text>
+            )}
+          </CollapsibleSection>
           <CollapsibleSection title="Packs e atividade">
           <View style={styles.metricGrid}>
             <Metric icon="cube" label="PACKS ATIVOS" value={overview.packs.active} hint={`${overview.packs.withPhysicalArt} com packshot`} />
@@ -2910,6 +2945,14 @@ const styles = StyleSheet.create({
   correctionCard: { flexGrow: 1, flexBasis: 250, minWidth: 220, borderRadius: 16, borderWidth: 1, padding: 11, gap: 9 },
   destructiveGrantButton: { minHeight: 48, borderRadius: 13, backgroundColor: '#6B2634', borderWidth: 1, borderColor: '#A84250', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   destructiveGrantText: { color: '#FFD7DD', fontSize: 9, fontWeight: '900', letterSpacing: .3 },
+  economyHealthPanel:{borderRadius:20,borderWidth:1,padding:13,gap:10},
+  economyHealthHeader:{flexDirection:'row',alignItems:'center',gap:9},
+  economyHealthIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},
+  economyHealthTitle:{fontSize:13,fontWeight:'900'},
+  economyHealthText:{fontSize:8,lineHeight:13,marginTop:2},
+  economyFlowBox:{borderRadius:14,borderWidth:1,padding:10},
+  economyFlowTitle:{fontSize:7,fontWeight:'900',letterSpacing:.6},
+  economyFlowText:{fontSize:8,lineHeight:13,marginTop:3},
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   metric: { flexGrow: 1, flexBasis: 155, minWidth: 145, borderRadius: 17, borderWidth: 1, padding: 12 },
   metricIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
