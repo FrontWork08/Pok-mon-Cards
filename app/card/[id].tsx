@@ -12,6 +12,7 @@ import { getCardPriceHistory, type CardPricePoint } from '@/services/marketplace
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { isCardWishlisted, setCardWishlist } from '@/services/retention';
 import { getMyCardEconomyStyle } from '@/services/economy';
+import { AuraFrame } from '@/components/AuraFrame';
 
 export default function CardDetailScreen() {
   const router = useRouter();
@@ -79,6 +80,26 @@ export default function CardDetailScreen() {
   const historyMax = priceHistory.length ? Math.max(...priceHistory.map((point) => point.priceUsd)) : 0;
   const historyRange = Math.max(.01, historyMax - historyMin);
   const historyDelta = priceHistory.length > 1 ? priceHistory[priceHistory.length - 1].priceUsd - priceHistory[0].priceUsd : 0;
+  const stylePrimary = economyStyle
+    ? economyStyle.id.includes('master') ? '#C493FF'
+      : economyStyle.id.includes('champion') ? '#FFD447'
+      : colors.accent
+    : colors.border;
+  const styleSecondary = economyStyle?.id.includes('master') ? '#8EE7FF' : economyStyle?.id.includes('champion') ? colors.accent : colors.yellow;
+  const cardArt = card ? (
+    <View style={[
+      styles.imagePanel,
+      {
+        backgroundColor: colors.surface,
+        borderColor: stylePrimary,
+        borderWidth: economyStyle ? 2 : 1,
+      },
+    ]}>
+      {economyStyle ? <View style={[styles.economyStyleBadge,{backgroundColor:colors.surfaceAlt,borderColor:stylePrimary}]}><Ionicons name={(economyStyle.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={14} color={stylePrimary}/><Text style={[styles.economyStyleBadgeText,{color:colors.text}]}>{economyStyle.name.toUpperCase()}</Text></View> : null}
+      {card.image_large || card.image_small ? <Image source={{ uri: card.image_large ?? card.image_small ?? '' }} resizeMode="contain" style={[styles.image,economyStyle&&styles.styledCardImage]} /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.surfaceAlt }]}><Ionicons name="image-outline" size={56} color={colors.muted} /></View>}
+      {economyStyle ? <View pointerEvents="none" style={[styles.economyStyleGlow,{borderColor:stylePrimary}]} /> : null}
+    </View>
+  ) : null;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
@@ -92,22 +113,16 @@ export default function CardDetailScreen() {
         {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={20} color="#FF9C9C" /><Text style={styles.errorText}>{error}</Text></View> : null}
 
         {!loading && card ? <View style={styles.layout}>
-          <View style={[
-            styles.imagePanel,
-            {
-              backgroundColor: colors.surface,
-              borderColor: economyStyle
-                ? economyStyle.id.includes('master') ? '#C493FF'
-                  : economyStyle.id.includes('champion') ? '#FFD447'
-                  : colors.accent
-                : colors.border,
-              borderWidth: economyStyle ? 2 : 1,
-            },
-          ]}>
-            {economyStyle ? <View style={[styles.economyStyleBadge,{backgroundColor:colors.surfaceAlt,borderColor:economyStyle.id.includes('master')?'#C493FF':economyStyle.id.includes('champion')?'#FFD447':colors.accent}]}><Ionicons name={(economyStyle.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={14} color={economyStyle.id.includes('master')?'#C493FF':economyStyle.id.includes('champion')?'#FFD447':colors.accent}/><Text style={[styles.economyStyleBadgeText,{color:colors.text}]}>{economyStyle.name.toUpperCase()}</Text></View> : null}
-            {card.image_large || card.image_small ? <Image source={{ uri: card.image_large ?? card.image_small ?? '' }} resizeMode="contain" style={[styles.image,economyStyle&&styles.styledCardImage]} /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.surfaceAlt }]}><Ionicons name="image-outline" size={56} color={colors.muted} /></View>}
-            {economyStyle ? <View pointerEvents="none" style={[styles.economyStyleGlow,{borderColor:economyStyle.id.includes('master')?'#C493FF':economyStyle.id.includes('champion')?'#FFD447':colors.accent}]} /> : null}
-          </View>
+          {economyStyle ? (
+            <AuraFrame
+              primaryColor={stylePrimary}
+              secondaryColor={styleSecondary}
+              intensity={economyStyle.id.includes('master')?'master':'premium'}
+              radius={26}
+            >
+              {cardArt}
+            </AuraFrame>
+          ) : cardArt}
           <View style={[styles.infoPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>#{card.pokedex_numbers?.[0] ?? '---'} • {card.set_id.toUpperCase()}</Text>
             <Text style={[styles.name, { color: colors.text }]}>{card.pokemon_name}</Text>
