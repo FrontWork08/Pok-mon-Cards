@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260831201910_booster_luck_small_raise.sql',
   'supabase/migrations/20260831183747_bag_card_theme_preview.sql',
   'supabase/migrations/20260831171936_universal_visual_themes.sql',
   'src/components/MarketplaceListingSurface.tsx',
@@ -320,6 +321,17 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
+}
+
+if (existsSync('supabase/migrations/20260831201910_booster_luck_small_raise.sql')) {
+  const boosterLuck = read('supabase/migrations/20260831201910_booster_luck_small_raise.sql');
+  assert(boosterLuck.includes('when 7 then 0.40'), 'Regressão de balanceamento: Tier 7 perdeu o pequeno boost de chance.');
+  assert(boosterLuck.includes('when 6 then 1.12'), 'Regressão de balanceamento: Tier 6 perdeu o pequeno boost de chance.');
+  assert(boosterLuck.includes('when 5 then 3.30'), 'Regressão de balanceamento: Tier 5 perdeu o pequeno boost de chance.');
+  assert(boosterLuck.includes('when 4 then 10.80'), 'Regressão de balanceamento: Tier 4 perdeu o pequeno boost de chance.');
+  assert(boosterLuck.includes('when p_price<=100 then 0.39'), 'Regressão de balanceamento: cartas valiosas voltaram a ser penalizadas demais.');
+  assert(boosterLuck.includes('when p_price<=400 then 0.12'), 'Regressão de balanceamento: chase cards voltaram a ser penalizadas demais.');
+  assert(boosterLuck.includes('about 14.0% -> 15.0%'), 'Regressão de documentação: ajuste de sorte perdeu a meta de impacto moderado.');
 }
 
 if (existsSync('supabase/migrations/20260831024112_economy_v2_core_balance.sql')) {
