@@ -47,6 +47,8 @@ const requiredFiles = [
   'supabase/migrations/20260831121232_economy_v21_galaxy_flow_collection.sql',
   'supabase/migrations/20260831130337_economy_v21_booster_price_relief.sql',
   'supabase/migrations/20260831132415_home_dashboard_fast_path.sql',
+  'supabase/migrations/20260831133220_profile_stats_fast_path.sql',
+  'supabase/migrations/20260831133329_profile_stats_fast_path_v2.sql',
 ];
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
@@ -92,6 +94,25 @@ if (existsSync('supabase/migrations/20260831132415_home_dashboard_fast_path.sql'
   const homeDb = read('supabase/migrations/20260831132415_home_dashboard_fast_path.sql');
   assert(homeDb.includes('get_home_dashboard'), 'Regressão de performance: RPC compacta da Home ausente.');
   assert(homeDb.includes('grant execute on function public.get_home_dashboard() to authenticated'), 'Regressão de segurança: dashboard deve continuar restrito a autenticados.');
+}
+
+if (existsSync('supabase/migrations/20260831133329_profile_stats_fast_path_v2.sql')) {
+  const profileDb = read('supabase/migrations/20260831133329_profile_stats_fast_path_v2.sql');
+  assert(profileDb.includes('get_my_profile_stats_fast'), 'Regressão de performance: perfil perdeu a RPC compacta de estatísticas.');
+  assert(profileDb.includes('mostValuableMarketCard'), 'Regressão: perfil compacto perdeu a carta mais valiosa de mercado.');
+  assert(profileDb.includes('grant execute on function public.get_my_profile_stats_fast() to authenticated'), 'Regressão de segurança: stats de perfil devem continuar restritas a autenticados.');
+}
+
+if (existsSync('src/services/player.ts')) {
+  const playerService = read('src/services/player.ts');
+  const profileStats = playerService.split('export async function getMyProfileStats')[1]?.split('\n}')[0] ?? '';
+  assert(profileStats.includes("rpc('get_my_profile_stats_fast')"), 'Regressão de performance: perfil voltou a baixar a Bag inteira para calcular estatísticas.');
+  assert(!profileStats.includes('getMyBag()'), 'Regressão de performance: getMyProfileStats voltou ao scan completo da Bag no cliente.');
+}
+
+if (existsSync('app/(tabs)/profile.tsx')) {
+  const profileUi = read('app/(tabs)/profile.tsx');
+  assert(profileUi.includes('getMyFriendCount'), 'Regressão de performance: perfil voltou a baixar o grafo social completo só para contar amigos.');
 }
 
 if (existsSync('src/services/ranks.ts')) {
