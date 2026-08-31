@@ -559,9 +559,7 @@ if (existsSync('src/components/CompactTrainerBanner.tsx')) {
   assert(compactIdentity.includes('let sharedLoop:Animated.CompositeAnimation|null=null'), 'Regressão de performance: animação compacta perdeu o loop compartilhado.');
   assert(compactIdentity.includes('sharedUsers'), 'Regressão de performance: animação compacta perdeu o controle global de assinantes.');
   assert(compactIdentity.includes('GalaxyFlowOverlay') && compactIdentity.includes('visual.galaxy'), 'Regressão visual: banner compacto Galaxy perdeu a atmosfera naturalista.');
-  assert(compactIdentity.includes('galaxyTopEdge') && compactIdentity.includes('galaxyBottomEdge'), 'Regressão visual: Galaxy Flow compacto precisa ficar restrito às bordas para não apagar nomes.');
-  assert(compactIdentity.includes('visual.galaxy&&styles.galaxyContent'), 'Regressão de legibilidade: conteúdo Galaxy precisa ficar acima da nebulosa.');
-  assert(compactIdentity.includes('galaxyContent:{zIndex:30}'), 'Regressão de legibilidade: nomes em banners Galaxy podem voltar a ser apagados.');
+  assert(compactIdentity.includes('GalaxyFlowOverlay') && compactIdentity.includes('opacity={0.72}'), 'Regressão visual: Galaxy Flow deve continuar cobrindo o banner compacto inteiro.');
   assert(compactIdentity.includes('!visual.galaxy'), 'Regressão visual: banner Galaxy compacto voltou a misturar efeitos neon genéricos.');
   assert(compactIdentity.includes('styles.railTop') && compactIdentity.includes('translateX:railForward'), 'Regressão visual: fluxo animado superior do banner compacto foi removido.');
   assert(compactIdentity.includes('styles.railBottom') && compactIdentity.includes('translateX:railBackward'), 'Regressão visual: fluxo animado inferior do banner compacto foi removido.');
@@ -579,6 +577,7 @@ if (existsSync('app/collection-ranking.tsx')) {
   const collectionIdentity = read('app/collection-ranking.tsx');
   assert(collectionIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: ranking de coleções perdeu banners dos jogadores.');
   assert(collectionIdentity.includes('identityMeta?.frameId'), 'Regressão de identidade: ranking de coleções não usa a moldura equipada.');
+  assert(collectionIdentity.includes("textShadowColor:'#000000FF'") && collectionIdentity.includes('textShadowRadius:5'), 'Regressão de legibilidade: ranking de coleção perdeu sombra de legibilidade nos nomes.');
 }
 
 if (existsSync('app/(tabs)/battles.tsx')) {
@@ -587,24 +586,28 @@ if (existsSync('app/(tabs)/battles.tsx')) {
   assert(battleIdentity.includes('frameId={player.equipped_frame_id}'), 'Regressão de identidade: ranking ranqueado não usa moldura equipada.');
   assert(battleIdentity.includes('frameId={friend.equipped_frame_id}'), 'Regressão de identidade: cards de amigos na Battle Arena perderam a moldura.');
   assert(battleIdentity.includes('frameId={challenger?.equipped_frame_id}'), 'Regressão de identidade: convites de batalha perderam o banner do desafiante.');
+  assert(battleIdentity.includes("textShadowColor:'#000000FF'"), 'Regressão de legibilidade: Battle Arena perdeu contraste forte nos nomes.');
 }
 
 if (existsSync('app/friends.tsx')) {
   const friendsIdentity = read('app/friends.tsx');
   assert(friendsIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: lista de amigos perdeu banners premium.');
   assert(friendsIdentity.includes('player.equipped_frame_id'), 'Regressão de identidade: lista de amigos não usa moldura equipada.');
+  assert(friendsIdentity.includes("textShadowColor:'#000000FF'"), 'Regressão de legibilidade: lista de amigos perdeu contraste forte nos nomes.');
 }
 
 if (existsSync('app/guilds.tsx')) {
   const guildIdentity = read('app/guilds.tsx');
   assert(guildIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: membros de guilda perderam banners premium.');
   assert(guildIdentity.includes('frameId={identity?.frameId}'), 'Regressão de identidade: membro da guilda não usa moldura equipada.');
+  assert(guildIdentity.includes("textShadowColor:'#000000FF'"), 'Regressão de legibilidade: membros da guilda perderam contraste forte nos nomes.');
 }
 
 if (existsSync('app/battle/[id].tsx')) {
   const activeBattleIdentity = read('app/battle/[id].tsx');
   assert(activeBattleIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: batalha ativa perdeu banners dos jogadores.');
   assert(activeBattleIdentity.includes('equipped_frame_id,equipped_background_id'), 'Regressão de identidade: batalha ativa não carrega os cosméticos dos jogadores.');
+  assert(activeBattleIdentity.includes("textShadowColor:'#000000FF'"), 'Regressão de legibilidade: batalha ativa perdeu contraste forte nos nomes.');
 }
 
 if (existsSync('src/components/PremiumProfileFrame.tsx')) {
