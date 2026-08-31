@@ -308,6 +308,7 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
       style={[
         styles.card,
         styles.cardInner,
+        theme&&styles.cardThemed,
         {
           backgroundColor:theme?(galaxy?'rgba(20,11,34,.96)':'rgba(18,20,30,.97)'):colors.surface,
           borderColor:theme?palette!.primary:colors.border,
@@ -429,6 +430,7 @@ const styles = StyleSheet.create({
   column: { gap: 10 },
   card: { borderRadius: 20, padding: 8, borderWidth: 1, marginBottom: 10, overflow:'hidden' },
   cardInner:{width:'100%',position:'relative'},
+  cardThemed:{marginBottom:0},
   tileThemeWash:{...StyleSheet.absoluteFillObject,opacity:.045},
   imageThemeTint:{...StyleSheet.absoluteFillObject,opacity:.055},
   imageThemeStroke:{...StyleSheet.absoluteFillObject,borderWidth:2,borderRadius:13,opacity:.78},
