@@ -113,7 +113,7 @@ export function GalaxyFlowOverlay({
     return stopSharedGalaxy;
   },[]);
 
-  const strength=intensity==='master'?1:intensity==='premium'?.70:.42;
+  const strength=intensity==='master'?1:intensity==='premium'?.84:.62;
 
   const driftX=sharedDrift.interpolate({
     inputRange:[0,.5,1],
@@ -145,33 +145,42 @@ export function GalaxyFlowOverlay({
       <View style={styles.deepSpace}/>
 
       <Animated.View style={[styles.cloud,styles.cloudViolet,{
-        opacity:.075*strength,
+        opacity:.20*strength,
         transform:[{translateX:driftX},{translateY:driftY},{scale:cloudScale},{rotate:'-11deg'}],
       }]}/>
       <Animated.View style={[styles.cloud,styles.cloudBlue,{
-        opacity:.060*strength,
+        opacity:.13*strength,
         transform:[{translateX:driftXBack},{translateY:driftY},{scale:cloudScale},{rotate:'14deg'}],
       }]}/>
       <Animated.View style={[styles.cloud,styles.cloudMagenta,{
-        opacity:.040*strength,
+        opacity:.11*strength,
         transform:[{translateX:driftX},{scale:cloudScale},{rotate:'7deg'}],
       }]}/>
       <Animated.View style={[styles.cloud,styles.cloudIndigo,{
-        opacity:.055*strength,
+        opacity:.14*strength,
         transform:[{translateX:driftXBack},{translateY:driftY},{scale:cloudScale},{rotate:'-18deg'}],
       }]}/>
 
+      <Animated.View style={[styles.milkyCore,{
+        opacity:.15*strength,
+        transform:[{translateX:driftX},{translateY:driftY},{scaleX:cloudScale},{rotate:'-17deg'}],
+      }]}/>
+      <Animated.View style={[styles.milkyCore,styles.milkyCoreBack,{
+        opacity:.10*strength,
+        transform:[{translateX:driftXBack},{scaleX:cloudScale},{rotate:'11deg'}],
+      }]}/>
+
       <Animated.View style={[styles.filament,styles.filamentA,{
-        opacity:.065*strength,
+        opacity:.12*strength,
         transform:[{translateX:driftX},{scaleX:cloudScale},{rotate:'-8deg'}],
       }]}/>
       <Animated.View style={[styles.filament,styles.filamentB,{
-        opacity:.050*strength,
+        opacity:.095*strength,
         transform:[{translateX:driftXBack},{scaleX:cloudScale},{rotate:'12deg'}],
       }]}/>
 
       <Animated.View style={[styles.dust,styles.dustA,{
-        opacity:.22*strength,
+        opacity:.18*strength,
         transform:[{translateX:driftXBack},{scale:dustScale},{rotate:'9deg'}],
       }]}/>
       <Animated.View style={[styles.dust,styles.dustB,{
@@ -182,7 +191,7 @@ export function GalaxyFlowOverlay({
       {STARS.map(([left,top,size,phase],index)=>{
         const starOpacity=sharedTwinkle.interpolate({
           inputRange:[0,Math.max(.08,phase),1],
-          outputRange:[.18,index%5===0?.88:.62,.22],
+          outputRange:[.34,index%5===0?1:.82,.38],
         });
         const tinyDrift=sharedDrift.interpolate({
           inputRange:[0,1],
@@ -211,7 +220,7 @@ export function GalaxyFlowOverlay({
       {BRIGHT_STARS.map(([left,top,phase],index)=>{
         const bloom=sharedTwinkle.interpolate({
           inputRange:[0,Math.max(.10,phase),1],
-          outputRange:[.12,.72,.18],
+          outputRange:[.28,.96,.34],
         });
         return (
           <View key={`b-${index}`} style={[styles.brightStar,{left:left as any,top:top as any}]}>
@@ -223,7 +232,7 @@ export function GalaxyFlowOverlay({
       })}
 
       <Animated.View style={[styles.haze,{
-        opacity:Animated.multiply(shimmer,.035*strength),
+        opacity:Animated.multiply(shimmer,.085*strength),
         transform:[{translateX:driftXBack},{scale:cloudScale}],
       }]}/>
     </View>
@@ -231,14 +240,16 @@ export function GalaxyFlowOverlay({
 }
 
 const styles=StyleSheet.create({
-  root:{overflow:'hidden'},
-  deepSpace:{...StyleSheet.absoluteFillObject,backgroundColor:'#070812',opacity:.10},
+  root:{overflow:'hidden',zIndex:18},
+  deepSpace:{...StyleSheet.absoluteFillObject,backgroundColor:'#070812',opacity:.16},
 
   cloud:{position:'absolute',borderRadius:999},
   cloudViolet:{width:360,height:185,right:-128,top:-62,backgroundColor:'#7350A8'},
   cloudBlue:{width:330,height:170,left:-126,bottom:-58,backgroundColor:'#3678A8'},
   cloudMagenta:{width:240,height:118,left:'28%',top:'31%',backgroundColor:'#9A4F87'},
   cloudIndigo:{width:285,height:130,right:'9%',bottom:'12%',backgroundColor:'#3A3F86'},
+  milkyCore:{position:'absolute',width:430,height:52,left:-95,top:'39%',borderRadius:999,backgroundColor:'#D7C8FF'},
+  milkyCoreBack:{width:360,height:34,left:'12%',top:'18%',backgroundColor:'#B9F0FF'},
 
   filament:{position:'absolute',borderRadius:999},
   filamentA:{width:390,height:36,left:-105,top:'24%',backgroundColor:GALAXY_ACCENT_VIOLET},
