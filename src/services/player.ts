@@ -329,7 +329,7 @@ export async function findPlayers(username: string) {
   const term = username.trim();
   if (term.length < 2) return [];
   const myId = await getSessionUserId(false);
-  let query = supabase.from('players').select('id, username, level, battle_rating, show_battle_rating, equipped_title_id, profile_icon, avatar_path, avatar_updated_at').ilike('username', `%${term}%`).limit(20);
+  let query = supabase.from('players').select('id, username, level, battle_rating, show_battle_rating, equipped_title_id, equipped_economy_title_id, equipped_frame_id, equipped_background_id, profile_icon, avatar_path, avatar_updated_at').ilike('username', `%${term}%`).limit(20);
   if (myId) query = query.neq('id', myId);
   const { data, error } = await query;
   if (error) throw error;
@@ -340,6 +340,9 @@ export type PlayerAvatarMeta = {
   avatarPath: string | null;
   avatarUpdatedAt: string | null;
   profileIcon: string | null;
+  frameId: string | null;
+  backgroundId: string | null;
+  economyTitleId: string | null;
 };
 
 export async function getPlayerAvatarMap(playerIds: string[]) {
@@ -348,7 +351,7 @@ export async function getPlayerAvatarMap(playerIds: string[]) {
 
   const { data, error } = await supabase
     .from('players')
-    .select('id,profile_icon,avatar_path,avatar_updated_at')
+    .select('id,profile_icon,avatar_path,avatar_updated_at,equipped_frame_id,equipped_background_id,equipped_economy_title_id')
     .in('id', ids);
 
   if (error) throw error;
@@ -359,6 +362,9 @@ export async function getPlayerAvatarMap(playerIds: string[]) {
       avatarPath: row.avatar_path ? String(row.avatar_path) : null,
       avatarUpdatedAt: row.avatar_updated_at ? String(row.avatar_updated_at) : null,
       profileIcon: row.profile_icon ? String(row.profile_icon) : null,
+      frameId: row.equipped_frame_id ? String(row.equipped_frame_id) : null,
+      backgroundId: row.equipped_background_id ? String(row.equipped_background_id) : null,
+      economyTitleId: row.equipped_economy_title_id ? String(row.equipped_economy_title_id) : null,
     },
   ])) as Record<string, PlayerAvatarMeta>;
 }
