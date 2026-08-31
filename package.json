@@ -12,7 +12,8 @@
     "apk:download": "node scripts/android-apk.mjs download",
     "audit:project": "node scripts/project-audit.mjs",
     "verify": "npx tsc --noEmit && node scripts/project-audit.mjs && node scripts/regression-audit.mjs",
-    "audit:regression": "node scripts/regression-audit.mjs"
+    "audit:regression": "node scripts/regression-audit.mjs",
+    "economy:sim": "node scripts/economy-sim.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "14.1.0",
