@@ -166,7 +166,7 @@ export function CompactTrainerBanner({
         style,
       ]}
     >
-      <View style={styles.content}>{children}</View>
+      <View style={[styles.content,visual.galaxy&&styles.galaxyContent]}>{children}</View>
       {visual.galaxy?(
         <>
           <View pointerEvents="none" style={styles.galaxyTopEdge}>
@@ -297,7 +297,8 @@ const styles=StyleSheet.create({
     borderRadius:18,
     borderWidth:2,
   },
-  content:{position:'relative',zIndex:30},
+  content:{position:'relative',zIndex:2},
+  galaxyContent:{zIndex:30},
   outerPulse:{
     ...StyleSheet.absoluteFillObject,
     margin:1,
