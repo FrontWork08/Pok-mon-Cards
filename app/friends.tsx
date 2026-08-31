@@ -6,6 +6,7 @@ import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { findPlayers, getProfileAvatarUrl } from '@/services/player';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { CompactTrainerBanner } from '@/components/CompactTrainerBanner';
 import { runFriendAction } from '@/services/playerActions';
 import { getMySocial, type SocialPlayer, type SocialState } from '@/services/social';
 import { createTrade } from '@/services/trades';
@@ -118,7 +119,40 @@ export default function FriendsScreen() {
 }
 
 function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) { const {colors}=useAppTheme(); return <View style={styles.section}><View style={styles.sectionHeader}><Text style={[styles.sectionTitle,{color:colors.text}]}>{title}</Text><View style={[styles.countBadge,{backgroundColor:colors.accentSoft,borderColor:colors.border}]}><Text style={[styles.count,{color:colors.muted}]}>{count}</Text></View></View><View style={styles.sectionBody}>{children}</View></View>; }
-function PlayerRow({ player, children, online }: { player: SocialPlayer; children: React.ReactNode; online?: boolean }) { const router=useRouter(); const {colors}=useAppTheme(); const avatarUrl=getProfileAvatarUrl(player.avatar_path,player.avatar_updated_at); return <View style={[styles.playerRow,{backgroundColor:colors.surface,borderColor:colors.border}]}><View style={styles.avatarWrap}><TrainerAvatar icon={player.profile_icon} avatarUrl={avatarUrl} color={colors.accent} backgroundColor={colors.accentSoft} size={43}/>{online !== undefined ? <View style={[styles.presenceDot,{backgroundColor:online?'#5BDB9F':'#53647A',borderColor:colors.surface}]} /> : null}</View><View style={styles.playerInfo}><View style={styles.playerNameRow}><Pressable accessibilityRole="button" accessibilityLabel={`Abrir perfil de @${player.username}`} hitSlop={6} onPress={()=>router.push(`/player/${player.id}`)}><Text numberOfLines={2} style={[styles.playerName,{color:colors.text}]}>@{player.username}</Text></Pressable>{online !== undefined ? <View style={[styles.presenceBadge,{backgroundColor:online?'#153426':colors.surfaceAlt,borderColor:online?'#2F9E68':colors.border}]}><View style={[styles.presenceMiniDot,{backgroundColor:online?'#5BDB9F':'#6E7F94'}]} /><Text style={[styles.presenceText,{color:online?'#9CEFC1':colors.muted}]}>{online?'ONLINE':'OFFLINE'}</Text></View> : null}</View><Text style={[styles.playerLevel,{color:colors.muted}]}>Treinador nível {player.level}</Text></View>{children}</View>; }
+function PlayerRow({ player, children, online }: { player: SocialPlayer; children: React.ReactNode; online?: boolean }) {
+  const router=useRouter();
+  const {colors}=useAppTheme();
+  const avatarUrl=getProfileAvatarUrl(player.avatar_path,player.avatar_updated_at);
+  return (
+    <CompactTrainerBanner
+      frameId={player.equipped_frame_id}
+      backgroundId={player.equipped_background_id}
+      fallbackColor={colors.accent}
+    >
+      <View style={[styles.playerRow,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+        <View style={styles.avatarWrap}>
+          <TrainerAvatar icon={player.profile_icon} avatarUrl={avatarUrl} color={colors.accent} backgroundColor={colors.accentSoft} size={43}/>
+          {online !== undefined ? <View style={[styles.presenceDot,{backgroundColor:online?'#5BDB9F':'#53647A',borderColor:colors.surface}]} /> : null}
+        </View>
+        <View style={styles.playerInfo}>
+          <View style={styles.playerNameRow}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Abrir perfil de @${player.username}`} hitSlop={6} onPress={()=>router.push(`/player/${player.id}`)}>
+              <Text numberOfLines={2} style={[styles.playerName,{color:colors.text}]}>@{player.username}</Text>
+            </Pressable>
+            {online !== undefined ? (
+              <View style={[styles.presenceBadge,{backgroundColor:online?'#153426':colors.surfaceAlt,borderColor:online?'#2F9E68':colors.border}]}>
+                <View style={[styles.presenceMiniDot,{backgroundColor:online?'#5BDB9F':'#6E7F94'}]} />
+                <Text style={[styles.presenceText,{color:online?'#9CEFC1':colors.muted}]}>{online?'ONLINE':'OFFLINE'}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={[styles.playerLevel,{color:colors.muted}]}>Treinador nível {player.level}</Text>
+        </View>
+        {children}
+      </View>
+    </CompactTrainerBanner>
+  );
+}
 
 const styles = StyleSheet.create({
   backRow:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:7},backText:{fontSize:12,fontWeight:'800'},
