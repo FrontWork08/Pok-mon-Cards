@@ -170,6 +170,28 @@ export async function getEconomySinkHub():Promise<EconomySinkHub>{
   } as EconomySinkHub;
 }
 
+export async function getMyEquippedBoosterFx():Promise<{id:string;name:string;icon:string;rarity:string}|null>{
+  const {data:auth,error:authError}=await supabase.auth.getUser();
+  if(authError)throw authError;
+  const playerId=auth.user?.id;
+  if(!playerId)return null;
+  const {data:player,error}=await supabase
+    .from('players')
+    .select('equipped_booster_fx_id')
+    .eq('id',playerId)
+    .maybeSingle();
+  if(error)throw error;
+  const fxId=player?.equipped_booster_fx_id?String(player.equipped_booster_fx_id):'';
+  if(!fxId)return null;
+  const {data:item,error:itemError}=await supabase
+    .from('economy_store_items')
+    .select('id,name,icon,rarity')
+    .eq('id',fxId)
+    .maybeSingle();
+  if(itemError)throw itemError;
+  return item ? {id:String(item.id),name:String(item.name),icon:String(item.icon??'sparkles'),rarity:String(item.rarity??'standard')} : null;
+}
+
 export async function getMyCardEconomyStyle(cardId:string):Promise<{id:string;name:string;icon:string;rarity:string}|null>{
   const {data,error}=await supabase
     .from('player_card_customizations')
