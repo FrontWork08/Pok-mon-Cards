@@ -204,8 +204,14 @@ export default function EconomyScreen(){
   const allPermanentItems=hub?.storeItems??[];
   const galaxyItems=allPermanentItems.filter((item)=>item.metadata?.collection==='galaxy_flow');
   const permanentItems=allPermanentItems.filter((item)=>item.metadata?.collection!=='galaxy_flow');
-  const ownedCardStyles=(hub?.ownedItems??[]).filter((x)=>x.category==='card_style');
-  const ownedDeckStyles=(hub?.ownedItems??[]).filter((x)=>x.category==='deck_style');
+  const ownedCardStyles=(hub?.ownedItems??[]).filter((x)=>
+    x.category==='card_style'
+    || (['profile_frame','profile_background'].includes(x.category) && x.metadata?.cardCompatible===true)
+  );
+  const ownedDeckStyles=(hub?.ownedItems??[]).filter((x)=>
+    x.category==='deck_style'
+    || (['profile_frame','profile_background'].includes(x.category) && x.metadata?.deckCompatible===true)
+  );
   const equipCategories=new Set<EconomyStoreItem['category']>(['profile_frame','profile_background','shop_theme','booster_fx','title']);
 
   const museumSlots=useMemo(()=>{
@@ -404,26 +410,26 @@ export default function EconomyScreen(){
         </View>
       </Section>
 
-      <Section title="Personalização de cartas" icon="color-wand" subtitle="Compre o estilo uma vez e pague uma pequena aplicação sempre que quiser estilizar outra carta.">
+      <Section title="Personalização de cartas" icon="color-wand" subtitle="Estilos de carta e temas premium de identidade agora podem ser aplicados nas cartas da sua Bag.">
         {ownedCardStyles.length===0?<Text style={[styles.empty,{color:colors.muted}]}>Compre um estilo de carta na loja para começar.</Text>:(
           <View style={styles.storeGrid}>{ownedCardStyles.map((item)=>{
-            const applyCost=Number(item.metadata?.applyCost??15000);
+            const applyCost=Number(item.metadata?.applyCardCost??item.metadata?.applyCost??15000);
             return <View key={item.id} style={[styles.simpleCard,{backgroundColor:colors.surface,borderColor:colors.border}]}>
               <Ionicons name={(item.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={22} color={colors.yellow}/>
               <Text style={[styles.simpleTitle,{color:colors.text}]}>{item.name}</Text>
-              <Text style={[styles.body,{color:colors.muted}]}>Aplicação: {coins(applyCost)}</Text>
+              <Text style={[styles.body,{color:colors.muted}]}>{item.metadata?.universalTheme===true?'TEMA UNIVERSAL • ':''}Aplicação: {coins(applyCost)}</Text>
               <Pressable onPress={()=>{setBagSearch('');setPicker({mode:'card-style',itemId:item.id,itemName:item.name});}} style={[styles.smallButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.smallText,{color:colors.accent}]}>ESCOLHER CARTA</Text></Pressable>
             </View>;
           })}</View>
         )}
       </Section>
 
-      <Section title="Decks de prestígio" icon="albums" subtitle="Capas e estilos de deck também funcionam como sink recorrente de aplicação.">
+      <Section title="Decks de prestígio" icon="albums" subtitle="Capas de deck e temas premium de identidade também podem ser usados aqui.">
         {ownedDeckStyles.length===0?<Text style={[styles.empty,{color:colors.muted}]}>Compre um estilo de deck na loja para liberar esta área.</Text>:(
           <View style={styles.deckList}>{(hub?.decks??[]).map((deck)=><View key={deck.id} style={[styles.deckRow,{backgroundColor:colors.surface,borderColor:deck.isDefault?colors.yellow:colors.border}]}>
             <View style={{flex:1}}><Text style={[styles.simpleTitle,{color:colors.text}]}>{deck.name}{deck.isDefault?' • PRINCIPAL':''}</Text><Text style={[styles.body,{color:colors.muted}]}>{deck.styleName??'Sem estilo premium'}</Text></View>
             <View style={styles.deckStyleActions}>{ownedDeckStyles.map((style)=>{
-              const applyCost=Number(style.metadata?.applyCost??10000);
+              const applyCost=Number(style.metadata?.applyDeckCost??style.metadata?.applyCost??10000);
               return <Pressable key={style.id} disabled={Boolean(busy)} onPress={()=>confirmSpend('Aplicar estilo?',`${style.name} em ${deck.name}\nCusto de aplicação: ${coins(applyCost)}`,`deck:${deck.id}:${style.id}`,()=>applyDeckEconomyStyle(deck.id,style.id),`${style.name} aplicado ao deck.`)} style={[styles.tinyChip,{backgroundColor:deck.styleItemId===style.id?colors.accentSoft:colors.surfaceAlt,borderColor:deck.styleItemId===style.id?colors.accent:colors.border}]}><Text style={[styles.tinyText,{color:colors.text}]}>{style.name}</Text></Pressable>;
             })}</View>
           </View>)}</View>
