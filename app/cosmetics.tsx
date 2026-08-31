@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { AuraFrame } from '@/components/AuraFrame';
+import { PremiumProfileFrame } from '@/components/PremiumProfileFrame';
 import { equipCosmetic, getCosmeticsHub, type CosmeticsHub, type CosmeticItem } from '@/services/cosmetics';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -82,10 +83,25 @@ function Section({ title, items, equipped, working, onEquip }: {
               onPress={() => onEquip(item)}
               style={[styles.item, { backgroundColor: item.secondaryColor, borderColor: selected ? item.primaryColor : colors.border, opacity: item.unlocked ? 1 : .48 }]}
             >
-              <View style={[styles.preview, { borderColor: galaxy ? '#55E6FF' : item.primaryColor, backgroundColor: galaxy ? '#17102A' : undefined }]}>
-                <Ionicons name={(item.icon || 'sparkles') as keyof typeof Ionicons.glyphMap} size={28} color={galaxy ? '#8B5CFF' : item.primaryColor} />
-                {galaxy ? <View style={styles.galaxyDots}><View style={styles.galaxyDotA}/><View style={styles.galaxyDotB}/><View style={styles.galaxyDotC}/></View> : null}
-              </View>
+              {item.kind==='frame'&&flow ? (
+                <PremiumProfileFrame
+                  frameId={item.id}
+                  primaryColor={item.primaryColor}
+                  secondaryColor={item.secondaryColor}
+                  radius={19}
+                  compact
+                >
+                  <View style={[styles.preview, { borderColor: galaxy ? '#55E6FF' : item.primaryColor, backgroundColor: galaxy ? '#17102A' : item.secondaryColor }]}>
+                    <Ionicons name="person" size={26} color={galaxy ? '#55E6FF' : item.primaryColor} />
+                    {galaxy ? <View style={styles.galaxyDots}><View style={styles.galaxyDotA}/><View style={styles.galaxyDotB}/><View style={styles.galaxyDotC}/></View> : null}
+                  </View>
+                </PremiumProfileFrame>
+              ) : (
+                <View style={[styles.preview, { borderColor: galaxy ? '#55E6FF' : item.primaryColor, backgroundColor: galaxy ? '#17102A' : undefined }]}>
+                  <Ionicons name={(item.icon || 'sparkles') as keyof typeof Ionicons.glyphMap} size={28} color={galaxy ? '#8B5CFF' : item.primaryColor} />
+                  {galaxy ? <View style={styles.galaxyDots}><View style={styles.galaxyDotA}/><View style={styles.galaxyDotB}/><View style={styles.galaxyDotC}/></View> : null}
+                </View>
+              )}
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.desc}>{item.description}</Text>
               {flow ? <View style={[styles.flowBadge,{borderColor:galaxy?'#8B5CFF':item.primaryColor,backgroundColor:galaxy?'#1D1334':'rgba(255,255,255,.04)'}]}><Ionicons name={galaxy?'planet':'flash'} size={11} color={galaxy?'#55E6FF':item.primaryColor}/><Text style={[styles.flowBadgeText,{color:galaxy?'#D8B8FF':item.primaryColor}]}>{galaxy?'GALAXY FLOW':'AURA EM FLUXO'}</Text></View> : null}
