@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -431,7 +431,7 @@ export default function EconomyScreen(){
   );
 }
 
-function Section({title,subtitle,icon,children}:{title:string;subtitle:string;icon:keyof typeof Ionicons.glyphMap;children:React.ReactNode}){
+function Section({title,subtitle,icon,children}:{title:string;subtitle:string;icon:keyof typeof Ionicons.glyphMap;children:ReactNode}){
   const {colors}=useAppTheme();
   return <View style={styles.section}><View style={styles.sectionHead}><View style={[styles.sectionIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name={icon} size={21} color={colors.yellow}/></View><View style={{flex:1}}><Text style={[styles.sectionTitle,{color:colors.text}]}>{title}</Text><Text style={[styles.sectionSubtitle,{color:colors.muted}]}>{subtitle}</Text></View></View>{children}</View>;
 }
