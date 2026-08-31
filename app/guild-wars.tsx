@@ -273,13 +273,15 @@ export default function GuildWarsScreen() {
       ],
     );
   }
-  function requestGymFlare(gym: GuildWarGym, warId: string, flare: 'banner' | 'champion' | 'legendary') {
+  function requestGymFlare(gym: GuildWarGym, warId: string, flare: 'banner' | 'champion' | 'legendary' | 'galaxy' | 'galaxy') {
     if (actionBusy) return;
     const config = flare === 'banner'
       ? { label: 'Bandeira da Guilda', cost: 50000, duration: '24h' }
       : flare === 'champion'
         ? { label: 'Efeito Champion', cost: 150000, duration: '24h' }
-        : { label: 'Aura Lendária', cost: 400000, duration: '48h' };
+        : flare === 'legendary'
+          ? { label: 'Aura Lendária', cost: 400000, duration: '48h' }
+          : { label: 'Galaxy Flow', cost: 750000, duration: '48h' };
     Alert.alert(
       config.label,
       `Ativar ${config.label} em ${gym.name} por ${config.duration}?\n\nCusto: 🪙 ${config.cost.toLocaleString('pt-BR')}\n\nÉ um efeito puramente visual e não altera o combate.`,
@@ -441,7 +443,7 @@ function GymBoard({
   onDefend: (gym: GuildWarGym) => void;
   onAttack: (gym: GuildWarGym) => void;
   onHeal: (defender: GuildWarGymDefender) => void;
-  onFlare: (gym: GuildWarGym, flare: 'banner' | 'champion' | 'legendary') => void;
+  onFlare: (gym: GuildWarGym, flare: 'banner' | 'champion' | 'legendary' | 'galaxy') => void;
 }) {
   const { colors } = useAppTheme();
   const myDefense = board.gyms.flatMap((gym) => gym.defenders.map((defender) => ({ gym, defender }))).find((entry) => entry.defender.playerId === userId);
@@ -515,7 +517,7 @@ function GymTerritoryCard({
   onDefend: () => void;
   onAttack: () => void;
   onHeal: (defender: GuildWarGymDefender) => void;
-  onFlare: (flare: 'banner' | 'champion' | 'legendary') => void;
+  onFlare: (flare: 'banner' | 'champion' | 'legendary' | 'galaxy') => void;
 }) {
   const { colors } = useAppTheme();
   const ownerColor = gym.ownerGuild?.color ?? colors.border;
@@ -541,10 +543,17 @@ function GymTerritoryCard({
       </View>
 
       {gym.flareKey && gym.flareUntil ? (
-        <View style={[styles.flareActive,{backgroundColor:gym.flareKey==='legendary'?'#2A1740':gym.flareKey==='champion'?'#332B11':colors.accentSoft,borderColor:gym.flareKey==='legendary'?'#C493FF':gym.flareKey==='champion'?'#FFD447':colors.accent}]}>
-          <Ionicons name={gym.flareKey==='legendary'?'sparkles':gym.flareKey==='champion'?'trophy':'flag'} size={15} color={gym.flareKey==='legendary'?'#C493FF':gym.flareKey==='champion'?'#FFD447':colors.accent}/>
+        <View style={[styles.flareActive,{
+          backgroundColor:gym.flareKey==='galaxy'?'#17102A':gym.flareKey==='legendary'?'#2A1740':gym.flareKey==='champion'?'#332B11':colors.accentSoft,
+          borderColor:gym.flareKey==='galaxy'?'#8B5CFF':gym.flareKey==='legendary'?'#C493FF':gym.flareKey==='champion'?'#FFD447':colors.accent,
+        }]}>
+          <Ionicons
+            name={gym.flareKey==='galaxy'?'planet':gym.flareKey==='legendary'?'sparkles':gym.flareKey==='champion'?'trophy':'flag'}
+            size={15}
+            color={gym.flareKey==='galaxy'?'#55E6FF':gym.flareKey==='legendary'?'#C493FF':gym.flareKey==='champion'?'#FFD447':colors.accent}
+          />
           <Text style={[styles.flareActiveText,{color:colors.text}]}>
-            {gym.flareKey==='legendary'?'AURA LENDÁRIA':gym.flareKey==='champion'?'EFEITO CHAMPION':'BANDEIRA DA GUILDA'} • até {new Date(gym.flareUntil).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+            {gym.flareKey==='galaxy'?'GALAXY FLOW':gym.flareKey==='legendary'?'AURA LENDÁRIA':gym.flareKey==='champion'?'EFEITO CHAMPION':'BANDEIRA DA GUILDA'} • até {new Date(gym.flareUntil).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
           </Text>
         </View>
       ) : null}
@@ -576,6 +585,7 @@ function GymTerritoryCard({
             ['banner','BANDEIRA','50K','flag'],
             ['champion','CHAMPION','150K','trophy'],
             ['legendary','LENDÁRIA','400K','sparkles'],
+            ['galaxy','GALAXY','750K','planet'],
           ] as const).map(([id,label,cost,icon]) => (
             <Pressable
               key={id}
@@ -583,7 +593,7 @@ function GymTerritoryCard({
               onPress={() => onFlare(id)}
               style={[styles.flareButton,{backgroundColor:colors.surface,borderColor:colors.border},busy&&styles.disabled]}
             >
-              <Ionicons name={icon} size={13} color={id==='legendary'?'#C493FF':id==='champion'?colors.yellow:colors.accent}/>
+              <Ionicons name={icon} size={13} color={id==='galaxy'?'#55E6FF':id==='legendary'?'#C493FF':id==='champion'?colors.yellow:colors.accent}/>
               <Text style={[styles.flareButtonText,{color:colors.text}]}>{label} • {cost}</Text>
             </Pressable>
           ))}
@@ -607,13 +617,14 @@ function GymTerritoryCard({
     </View>
   );
   if (gym.flareKey) {
-    const auraColor = gym.flareKey==='legendary' ? '#C493FF' : gym.flareKey==='champion' ? '#FFD447' : ownerColor;
-    const auraSecond = gym.flareKey==='legendary' ? '#8EE7FF' : gym.flareKey==='champion' ? ownerColor : '#FFD447';
+    const auraColor = gym.flareKey==='galaxy' ? '#8B5CFF' : gym.flareKey==='legendary' ? '#C493FF' : gym.flareKey==='champion' ? '#FFD447' : ownerColor;
+    const auraSecond = gym.flareKey==='galaxy' ? '#55E6FF' : gym.flareKey==='legendary' ? '#8EE7FF' : gym.flareKey==='champion' ? ownerColor : '#FFD447';
     return (
       <AuraFrame
         primaryColor={auraColor}
         secondaryColor={auraSecond}
-        intensity={gym.flareKey==='legendary'?'master':'premium'}
+        intensity={gym.flareKey==='legendary'||gym.flareKey==='galaxy'?'master':'premium'}
+        variant={gym.flareKey==='galaxy'?'galaxy':'energy'}
         radius={20}
       >
         {card}
