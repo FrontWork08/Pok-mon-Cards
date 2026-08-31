@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'src/components/MarketplaceListingSurface.tsx',
   'src/components/CompactTrainerBanner.tsx',
   'src/components/PremiumProfileFrame.tsx',
   'supabase/migrations/20260831141844_trainer_shop_gift_reset_guard.sql',
@@ -427,11 +428,26 @@ if (existsSync('app/player/[id].tsx')) {
   assert(profile.includes('AuraBanner'), 'Regressão visual: Prestígio público perdeu a aura.');
 }
 
+if (existsSync('src/components/MarketplaceListingSurface.tsx')) {
+  const marketSurface = read('src/components/MarketplaceListingSurface.tsx');
+  assert(marketSurface.includes('MarketplaceListingSurface'), 'Regressão visual: superfície premium interna do Marketplace foi removida.');
+  assert(marketSurface.includes('const marketFlow=new Animated.Value(0)'), 'Regressão de performance: efeitos internos do Marketplace devem compartilhar uma única animação.');
+  assert(marketSurface.includes('styles.topRail') && marketSurface.includes('translateX:topRail'), 'Regressão visual: Marketplace perdeu fluxo interno superior.');
+  assert(marketSurface.includes('styles.bottomRail') && marketSurface.includes('translateX:bottomRail'), 'Regressão visual: Marketplace perdeu fluxo interno inferior.');
+  assert(marketSurface.includes('styles.shine'), 'Regressão visual: Marketplace perdeu reflexo interno premium.');
+  assert(marketSurface.includes('styles.nebula'), 'Regressão visual: Galaxy Market perdeu a nebulosa interna.');
+  assert(marketSurface.includes('<View style={styles.content}>{children}</View>'), 'Regressão visual: conteúdo do anúncio deixou de ser preservado abaixo dos efeitos.');
+}
+
 if (existsSync('app/marketplace.tsx')) {
   const marketUi = read('app/marketplace.tsx');
   assert(marketUi.includes('shopPreview'), 'Regressão visual: Marketplace perdeu a prévia do tema da loja.');
   assert(marketUi.includes('AuraBanner'), 'Regressão visual: Marketplace perdeu o banner premium.');
   assert(marketUi.includes('AuraFrame'), 'Regressão visual: anúncios deixaram de usar aura dinâmica.');
+  assert(marketplace.includes('MarketplaceListingSurface'), 'Regressão visual: cards do Marketplace não usam mais a superfície premium interna.');
+  assert(marketplace.includes('premiumInnerPanel'), 'Regressão visual: cabeçalho premium do anúncio voltou a ser chapado.');
+  assert(marketplace.includes('premiumCardPanel'), 'Regressão visual: área da carta no anúncio voltou a esconder os efeitos.');
+  assert(marketplace.includes('ownOfferButton'), 'Regressão visual: bloco SUA OFERTA perdeu o acabamento premium.');
 }
 
 if (existsSync('app/card/[id].tsx')) {
