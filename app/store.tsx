@@ -100,13 +100,13 @@ export default function TrainerStoreScreen(){
 
   const visible=useMemo(()=>{
     const term=search.trim().toLowerCase();
-    return allItems.filter((item)=>{
+    return (catalog?.items??[]).filter((item)=>{
       if(!matchesFilter(item,filter))return false;
       if(!term)return true;
       const category=CATEGORY_META[item.category]?.label??item.category;
       return [item.name,item.description,item.rarity,category].some((value)=>String(value??'').toLowerCase().includes(term));
     });
-  },[allItems,filter,search]);
+  },[catalog?.items,filter,search]);
 
   const categoryCount=useMemo(()=>new Set(allItems.map((item)=>item.category)).size,[allItems]);
   const buyableCount=useMemo(()=>allItems.filter((item)=>!item.owned||item.quantity<item.maxPurchases).length,[allItems]);
