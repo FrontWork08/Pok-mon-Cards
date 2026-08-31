@@ -7,6 +7,10 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260831135122_trainer_shop_catalog.sql',
+  'supabase/migrations/20260831135024_bulk_duplicate_sales.sql',
+  'src/services/store.ts',
+  'app/store.tsx',
   'app/friend-qr-scan.tsx',
   'app/reset-password.tsx',
   'src/components/FriendQrCard.tsx',
@@ -83,6 +87,41 @@ if (existsSync('app/(tabs)/index.tsx')) {
   const home = read('app/(tabs)/index.tsx');
   assert(home.includes('getHomeDashboard'), 'Regressão de performance: Home deixou de usar o dashboard compacto.');
   assert(!home.includes('getMyBag()') && !home.includes('getMyTrades()'), 'Regressão de performance: Home voltou a baixar Bag/Trocas completas.');
+}
+
+if (existsSync('app/sell-duplicates.tsx') && existsSync('src/services/cardSales.ts')) {
+  const salesUi = read('app/sell-duplicates.tsx');
+  const salesService = read('src/services/cardSales.ts');
+  assert(salesUi.includes('VENDER TODAS AS REPETIDAS'), 'Regressão: tela de repetidas perdeu a venda em lote.');
+  assert(salesUi.includes('sellAllDuplicateCards'), 'Regressão: botão de venda em lote não está conectado ao serviço.');
+  assert(salesService.includes("rpc('sell_all_duplicate_cards')"), 'Regressão: serviço perdeu a RPC de venda de todas as repetidas.');
+}
+
+if (existsSync('supabase/migrations/20260831135024_bulk_duplicate_sales.sql')) {
+  const bulkSales = read('supabase/migrations/20260831135024_bulk_duplicate_sales.sql');
+  assert(bulkSales.includes('set quantity=1'), 'Regressão: venda em lote precisa preservar uma cópia de cada carta.');
+  assert(bulkSales.includes('DUPLICATE_SALES_PAUSED_DURING_FREE_EVENT'), 'Regressão: venda em lote precisa respeitar bloqueio durante boosters grátis.');
+  assert(bulkSales.includes('private.duplicate_sale_coin_value'), 'Regressão: venda em lote deixou de usar a cotação econômica oficial.');
+  assert(bulkSales.includes('grant execute on function public.sell_all_duplicate_cards() to authenticated'), 'Regressão de segurança: venda em lote deve ficar restrita a autenticados.');
+}
+
+if (existsSync('app/store.tsx') && existsSync('src/services/store.ts')) {
+  const storeUi = read('app/store.tsx');
+  const storeService = read('src/services/store.ts');
+  assert(storeUi.includes('Trainer Shop'), 'Regressão: Trainer Shop perdeu a identidade principal.');
+  for (const category of ['profile_frame','profile_background','card_style','deck_style','shop_theme','booster_fx','title','trophy']) {
+    assert(storeService.includes(category), `Regressão: Trainer Shop perdeu a categoria ${category}.`);
+  }
+  assert(storeService.includes("rpc('get_trainer_shop_catalog')"), 'Regressão de performance: Trainer Shop deixou de usar catálogo leve.');
+  assert(storeService.includes("rpc('purchase_economy_item'"), 'Regressão: Trainer Shop não está conectada à compra oficial.');
+}
+
+if (existsSync('supabase/migrations/20260831135122_trainer_shop_catalog.sql')) {
+  const shopDb = read('supabase/migrations/20260831135122_trainer_shop_catalog.sql');
+  assert(shopDb.includes("notForDirectSale"), 'Regressão: catálogo pode exibir itens exclusivos de evento/leilão como venda direta.');
+  assert(shopDb.includes("luxuryOnly"), 'Regressão: catálogo permanente pode misturar itens exclusivos da rotação de luxo.');
+  assert(shopDb.includes('current_luxury_rotation_ids'), 'Regressão: loja de luxo semanal perdeu sua rotação.');
+  assert(shopDb.includes('grant execute on function public.get_trainer_shop_catalog() to authenticated'), 'Regressão de segurança: catálogo da loja deve ficar restrito a autenticados.');
 }
 
 if (existsSync('app/(tabs)/packs.tsx')) {
