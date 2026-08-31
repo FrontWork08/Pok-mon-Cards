@@ -170,6 +170,23 @@ export async function getEconomySinkHub():Promise<EconomySinkHub>{
   } as EconomySinkHub;
 }
 
+export async function getMyCardEconomyStyle(cardId:string):Promise<{id:string;name:string;icon:string;rarity:string}|null>{
+  const {data,error}=await supabase
+    .from('player_card_customizations')
+    .select('style_item_id')
+    .eq('card_id',cardId)
+    .maybeSingle();
+  if(error) throw error;
+  if(!data?.style_item_id)return null;
+  const {data:item,error:itemError}=await supabase
+    .from('economy_store_items')
+    .select('id,name,icon,rarity')
+    .eq('id',String(data.style_item_id))
+    .maybeSingle();
+  if(itemError) throw itemError;
+  return item ? {id:String(item.id),name:String(item.name),icon:String(item.icon??'color-wand'),rarity:String(item.rarity??'standard')} : null;
+}
+
 export const purchaseEconomyItem=(itemId:string)=>rpc('purchase_economy_item',{p_item_id:itemId});
 export const equipEconomyItem=(itemId:string)=>rpc('equip_economy_item',{p_item_id:itemId});
 export const purchaseTrainerPrestige=()=>rpc('purchase_trainer_prestige');
