@@ -27,11 +27,31 @@ import {
 } from '@/services/decks';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import {
+  applyDeckEconomyStyle,
+  clearDeckEconomyStyle,
+  getMyVisualStyleOptions,
+  type VisualStyleOption,
+} from '@/services/economy';
+import { useWallet } from '@/wallet/WalletProvider';
 
 type Selected = Record<string, number>;
 type PriceMap = Record<string, number | null>;
 
 const PAGE_SIZE = 36;
+
+function deckStylePalette(id:string,accent:string,yellow:string){
+  const key=id.toLowerCase();
+  if(key.includes('galaxy'))return {primary:'#8B5CFF',secondary:'#55E6FF'};
+  if(key.includes('master'))return {primary:'#C493FF',secondary:'#8EE7FF'};
+  if(key.includes('celestial'))return {primary:'#55E6FF',secondary:'#D8B8FF'};
+  if(key.includes('crimson')||key.includes('crown'))return {primary:'#FF667A',secondary:'#FFB36B'};
+  if(key.includes('champion')||key.includes('gold'))return {primary:'#FFD447',secondary:'#FFF0A8'};
+  if(key.includes('indigo'))return {primary:'#6A7CFF',secondary:'#55D9FF'};
+  if(key.includes('kanto')||key.includes('night'))return {primary:'#8B72FF',secondary:'#6EC8FF'};
+  if(key.includes('elite'))return {primary:accent,secondary:'#55D9FF'};
+  return {primary:accent,secondary:yellow};
+}
 
 function relationOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -43,6 +63,7 @@ export default function DeckEditorScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { colors } = useAppTheme();
+  const wallet = useWallet();
 
   const [deck, setDeck] = useState<any>(null);
   const [cards, setCards] = useState<DeckBuilderCardEntry[]>([]);
@@ -63,6 +84,10 @@ export default function DeckEditorScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [stylePickerOpen,setStylePickerOpen]=useState(false);
+  const [styleOptions,setStyleOptions]=useState<VisualStyleOption[]>([]);
+  const [styleOptionsLoading,setStyleOptionsLoading]=useState(false);
+  const [styleApplying,setStyleApplying]=useState<string|null>(null);
 
   const pageRequestId = useRef(0);
   const loadingMoreRef = useRef(false);
@@ -217,6 +242,53 @@ export default function DeckEditorScreen() {
     }
   }
 
+  async function openDeckStylePicker(){
+    setStylePickerOpen(true);
+    try{
+      setStyleOptionsLoading(true);
+      setStyleOptions(await getMyVisualStyleOptions('deck'));
+    }catch(err){
+      setNotice(err instanceof Error?err.message:'Não foi possível carregar seus temas.');
+    }finally{
+      setStyleOptionsLoading(false);
+    }
+  }
+
+  async function applyDeckStyle(option:VisualStyleOption){
+    if(!id||styleApplying)return;
+    try{
+      setStyleApplying(option.id);
+      await applyDeckEconomyStyle(id,option.id);
+      setDeck((current:any)=>current?{
+        ...current,
+        style_item_id:option.id,
+        economy_store_items:{name:option.name,icon:option.icon,rarity:option.rarity},
+      }:current);
+      await wallet.refresh();
+      setStylePickerOpen(false);
+      setNotice(`${option.name} aplicado ao deck.`);
+    }catch(err){
+      setNotice(err instanceof Error?err.message:'Não foi possível aplicar o tema.');
+    }finally{
+      setStyleApplying(null);
+    }
+  }
+
+  async function removeDeckStyle(){
+    if(!id||styleApplying)return;
+    try{
+      setStyleApplying('clear');
+      await clearDeckEconomyStyle(id);
+      setDeck((current:any)=>current?{...current,style_item_id:null,economy_store_items:null}:current);
+      setStylePickerOpen(false);
+      setNotice('Tema removido do deck.');
+    }catch(err){
+      setNotice(err instanceof Error?err.message:'Não foi possível remover o tema.');
+    }finally{
+      setStyleApplying(null);
+    }
+  }
+
   const columns = width >= 1100 ? 5 : width >= 760 ? 4 : 2;
   const horizontalPadding = width >= 760 ? 18 : 12;
   const usableWidth = Math.min(width, 1180) - horizontalPadding * 2;
@@ -259,9 +331,15 @@ export default function DeckEditorScreen() {
               />
               <Text style={[styles.deckValue, { color: colors.yellow }]}>Valor fixo do deck: {formatUsd(totalValue)}</Text>
             </View>
-            <View style={[styles.counter, { backgroundColor: colors.surfaceAlt }, total > 20 && styles.counterError]}>
-              <Text style={[styles.counterValue, { color: colors.text }]}>{total}/20</Text>
-              <Text style={[styles.counterLabel, { color: colors.muted }]}>CARTAS</Text>
+            <View style={styles.headerActions}>
+              <Pressable onPress={()=>{void openDeckStylePicker();}} style={[styles.themeButton,{backgroundColor:colors.accentSoft,borderColor:deck?.style_item_id?deckStylePalette(String(deck.style_item_id),colors.accent,colors.yellow).primary:colors.accent}]}>
+                <Ionicons name="color-wand" size={17} color={deck?.style_item_id?deckStylePalette(String(deck.style_item_id),colors.accent,colors.yellow).primary:colors.accent}/>
+                <Text style={[styles.themeButtonText,{color:colors.text}]}>{deck?.style_item_id?'TROCAR TEMA':'TEMA DO DECK'}</Text>
+              </Pressable>
+              <View style={[styles.counter, { backgroundColor: colors.surfaceAlt }, total > 20 && styles.counterError]}>
+                <Text style={[styles.counterValue, { color: colors.text }]}>{total}/20</Text>
+                <Text style={[styles.counterLabel, { color: colors.muted }]}>CARTAS</Text>
+              </View>
             </View>
           </View>
 
@@ -455,6 +533,49 @@ export default function DeckEditorScreen() {
           ) : null}
         </View>
       </Modal>
+
+      <Modal visible={stylePickerOpen} transparent animationType="fade" onRequestClose={()=>setStylePickerOpen(false)}>
+        <View style={styles.themeBackdrop}>
+          <View style={[styles.themeModal,{backgroundColor:colors.surface,borderColor:deck?.style_item_id?deckStylePalette(String(deck.style_item_id),colors.accent,colors.yellow).primary:colors.accent}]}>
+            <View style={styles.themeHeader}>
+              <View style={{flex:1}}>
+                <Text style={[styles.themeKicker,{color:colors.yellow}]}>TEMAS DA SUA COLEÇÃO</Text>
+                <Text style={[styles.themeTitle,{color:colors.text}]}>Personalizar deck</Text>
+                <Text style={[styles.themeSubtitle,{color:colors.muted}]}>Molduras e backgrounds premium também funcionam como temas universais de deck.</Text>
+              </View>
+              <Pressable onPress={()=>setStylePickerOpen(false)} style={[styles.previewClose,{backgroundColor:colors.surfaceAlt}]}><Ionicons name="close" size={20} color={colors.text}/></Pressable>
+            </View>
+            {styleOptionsLoading?<ActivityIndicator size="large" color={colors.yellow}/>:(
+              <FlatList
+                data={styleOptions}
+                keyExtractor={(item)=>item.id}
+                style={styles.themeList}
+                contentContainerStyle={styles.themeListContent}
+                ListHeaderComponent={deck?.style_item_id?(
+                  <Pressable disabled={Boolean(styleApplying)} onPress={()=>{void removeDeckStyle();}} style={[styles.themeOption,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                    <View style={[styles.themeOptionIcon,{backgroundColor:colors.surface}]}><Ionicons name="ban-outline" size={20} color={colors.muted}/></View>
+                    <View style={{flex:1}}><Text style={[styles.themeOptionName,{color:colors.text}]}>Sem tema</Text><Text style={[styles.themeOptionMeta,{color:colors.muted}]}>Remover personalização atual • grátis</Text></View>
+                    {styleApplying==='clear'?<ActivityIndicator color={colors.yellow}/>:null}
+                  </Pressable>
+                ):null}
+                renderItem={({item:option})=>{
+                  const palette=deckStylePalette(option.id,colors.accent,colors.yellow);
+                  const active=deck?.style_item_id===option.id;
+                  return <Pressable disabled={Boolean(styleApplying)} onPress={()=>{void applyDeckStyle(option);}} style={[styles.themeOption,{backgroundColor:active?colors.accentSoft:colors.surfaceAlt,borderColor:active?palette.primary:colors.border}]}>
+                    <View style={[styles.themeOptionIcon,{backgroundColor:`${palette.primary}18`,borderColor:palette.primary}]}><Ionicons name={(option.icon||'albums') as keyof typeof Ionicons.glyphMap} size={20} color={palette.primary}/></View>
+                    <View style={{flex:1,minWidth:0}}>
+                      <View style={styles.themeNameRow}><Text numberOfLines={1} style={[styles.themeOptionName,{color:colors.text}]}>{option.name}</Text>{option.universalTheme?<View style={[styles.themeUniversal,{borderColor:palette.secondary}]}><Text style={[styles.themeUniversalText,{color:palette.secondary}]}>UNIVERSAL</Text></View>:null}</View>
+                      <Text style={[styles.themeOptionMeta,{color:colors.muted}]}>{option.effect==='galaxy'?'GALAXY FLOW • ':''}Aplicação 🪙 {option.applyCost.toLocaleString('pt-BR')}</Text>
+                    </View>
+                    {styleApplying===option.id?<ActivityIndicator color={palette.primary}/>:<Ionicons name={active?'checkmark-circle':'chevron-forward'} size={19} color={active?palette.primary:colors.muted}/>}
+                  </Pressable>;
+                }}
+                ListEmptyComponent={<View style={styles.themeEmpty}><Ionicons name="color-wand-outline" size={28} color={colors.muted}/><Text style={[styles.themeSubtitle,{color:colors.muted,textAlign:'center'}]}>Você ainda não possui temas compatíveis. Eles podem ser comprados na Trainer Shop.</Text><Pressable onPress={()=>{setStylePickerOpen(false);router.push('/store');}} style={[styles.themeStoreButton,{backgroundColor:colors.yellow}]}><Text style={styles.themeStoreText}>ABRIR TRAINER SHOP</Text></Pressable></View>}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -561,6 +682,9 @@ const styles = StyleSheet.create({
   deckLoading: { minHeight: 74, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   loadingText: { fontSize: 9, fontWeight: '700' },
   headerCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 20, borderWidth: 1 },
+  headerActions:{alignItems:'flex-end',gap:7},
+  themeButton:{minHeight:36,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:6},
+  themeButtonText:{fontSize:7.5,fontWeight:'900'},
   kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
   nameInput: { fontSize: 24, fontWeight: '900', paddingVertical: 4, borderBottomWidth: 1 },
   deckValue: { fontSize: 11, fontWeight: '900', marginTop: 7 },
@@ -614,6 +738,24 @@ const styles = StyleSheet.create({
   empty: { marginTop: 8, borderRadius: 18, borderWidth: 1, padding: 26, alignItems: 'center', gap: 7 },
   emptyTitle: { fontSize: 15, fontWeight: '900' },
   emptyText: { fontSize: 9, textAlign: 'center' },
+  themeBackdrop:{flex:1,backgroundColor:'#05030ADC',alignItems:'center',justifyContent:'center',padding:16},
+  themeModal:{width:'100%',maxWidth:560,maxHeight:'86%',borderRadius:22,borderWidth:1,padding:14,gap:12},
+  themeHeader:{flexDirection:'row',alignItems:'flex-start',gap:10},
+  themeKicker:{fontSize:7,fontWeight:'900',letterSpacing:.9},
+  themeTitle:{fontSize:21,fontWeight:'900',marginTop:2},
+  themeSubtitle:{fontSize:8.5,lineHeight:13,marginTop:3},
+  themeList:{maxHeight:540},
+  themeListContent:{gap:7,paddingBottom:2},
+  themeOption:{minHeight:67,borderRadius:15,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:9,marginBottom:7},
+  themeOptionIcon:{width:44,height:44,borderRadius:13,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  themeOptionName:{fontSize:11,fontWeight:'900'},
+  themeOptionMeta:{fontSize:7.5,fontWeight:'700',marginTop:3},
+  themeNameRow:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},
+  themeUniversal:{borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:2},
+  themeUniversalText:{fontSize:5.5,fontWeight:'900',letterSpacing:.5},
+  themeEmpty:{padding:24,alignItems:'center',gap:8},
+  themeStoreButton:{minHeight:40,borderRadius:11,paddingHorizontal:14,alignItems:'center',justifyContent:'center'},
+  themeStoreText:{color:'#07111F',fontSize:8,fontWeight:'900'},
   previewBackdrop:{flex:1,backgroundColor:'#05030AD9',alignItems:'center',justifyContent:'center',padding:18},
   previewModal:{width:'100%',maxWidth:660,borderRadius:22,borderWidth:1,padding:14,gap:12},
   previewHeader:{flexDirection:'row',alignItems:'flex-start',gap:10},
