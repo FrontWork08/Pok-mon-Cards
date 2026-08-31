@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260831183747_bag_card_theme_preview.sql',
   'supabase/migrations/20260831171936_universal_visual_themes.sql',
   'src/components/MarketplaceListingSurface.tsx',
   'src/components/CompactTrainerBanner.tsx',
@@ -93,6 +94,23 @@ if (existsSync('app/(tabs)/index.tsx')) {
   const home = read('app/(tabs)/index.tsx');
   assert(home.includes('getHomeDashboard'), 'Regressão de performance: Home deixou de usar o dashboard compacto.');
   assert(!home.includes('getMyBag()') && !home.includes('getMyTrades()'), 'Regressão de performance: Home voltou a baixar Bag/Trocas completas.');
+}
+
+if (existsSync('supabase/migrations/20260831183747_bag_card_theme_preview.sql')) {
+  const bagThemeDb = read('supabase/migrations/20260831183747_bag_card_theme_preview.sql');
+  assert(bagThemeDb.includes('player_card_customizations pcc'), 'Regressão: paginação da Bag deixou de carregar temas aplicados às cartas.');
+  assert(bagThemeDb.includes("'economyStyle'"), 'Regressão: resposta da Bag perdeu metadados do tema da carta.');
+  assert(bagThemeDb.includes("style_metadata->>'effect'"), 'Regressão: Bag não identifica mais Galaxy Flow e outros efeitos.');
+}
+
+if (existsSync('app/(tabs)/bag.tsx')) {
+  const bagUi = read('app/(tabs)/bag.tsx');
+  assert(bagUi.includes('AuraFrame'), 'Regressão visual: cartas personalizadas da Bag perderam a moldura temática.');
+  assert(bagUi.includes('entry.economyStyle'), 'Regressão visual: Bag não usa mais o tema salvo por carta.');
+  assert(bagUi.includes('themeTag'), 'Regressão de UX: Bag deixou de identificar o nome do tema aplicado.');
+  assert(bagUi.includes('imageThemeTint') && bagUi.includes('imageThemeStroke'), 'Regressão visual: tema deixou de cobrir a imagem da carta na Bag.');
+  assert(bagUi.includes("variant={galaxy?'galaxy':'energy'}"), 'Regressão visual: Galaxy Flow da Bag perdeu o efeito cósmico.');
+  assert(bagUi.includes('cardThemed:{marginBottom:0}'), 'Regressão visual: cards temáticos voltaram a quebrar o espaçamento da grade.');
 }
 
 if (existsSync('app/sell-duplicates.tsx') && existsSync('src/services/cardSales.ts')) {
