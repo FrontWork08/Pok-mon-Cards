@@ -11,6 +11,42 @@ async function invokeAdmin(body: Record<string, unknown>) {
   return data?.data;
 }
 
+export type AdminEconomyHealth = {
+  version: string;
+  windowDays: number;
+  windowStart?: string;
+  releaseEpoch?: string;
+  status: 'healthy' | 'watch' | 'critical';
+  activePlayers: number;
+  balances: { coins: number; diamonds: number };
+  knownMint: {
+    missions: number;
+    battlePass: number;
+    guild: number;
+    duplicates: number;
+    codes: number;
+    milestones: number;
+    total: number;
+  };
+  knownBurn: {
+    packs: number;
+    diamondExchange: number;
+    marketFees: number;
+    gymHealing: number;
+    total: number;
+  };
+  burnToMintRatio: number | null;
+  packPrices: {
+    coinMin: number | null;
+    coinMedian: number | null;
+    coinMax: number | null;
+    diamondMin: number | null;
+    diamondMedian: number | null;
+    diamondMax: number | null;
+  };
+  coverageNote: string;
+};
+
 export type AdminOverview = {
   generatedAt: string;
   users: { total: number; created24h: number; coinsInCirculation: number };
@@ -345,6 +381,15 @@ export async function getAdminAccountAudit(
   }) as Promise<AdminAccountAudit>;
 }
 
+export async function getAdminEconomyHealth(): Promise<AdminEconomyHealth> {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  const actorId = auth.user?.id;
+  if (!actorId) throw new Error('Usuário não autenticado.');
+  const { data, error } = await supabase.rpc('server_get_economy_health', { p_actor_id: actorId });
+  if (error) throw error;
+  return data as AdminEconomyHealth;
+}
 export async function getAdminOverview() { return invokeAdmin({ action: 'overview' }) as Promise<AdminOverview>; }
 export async function getAdminPlayers() { return invokeAdmin({ action: 'players' }) as Promise<AdminPlayer[]>; }
 export async function moderatePlayer(targetId: string, moderationAction: AdminModerationAction, reason?: string, durationHours?: number | null) {
