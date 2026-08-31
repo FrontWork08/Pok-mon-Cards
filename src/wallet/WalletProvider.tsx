@@ -26,8 +26,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser();
-    const id = auth.user?.id ?? null;
+    const { data: auth } = await supabase.auth.getSession();
+    const id = auth.session?.user?.id ?? null;
     setUserId(id);
     if (!id) {
       setUsername(null);
