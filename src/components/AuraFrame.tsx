@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef } from 'react';
-import { Animated, Platform, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Platform, StyleSheet, View } from 'react-native';
+import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 
 export function AuraFrame({
   children,
@@ -7,18 +8,32 @@ export function AuraFrame({
   secondaryColor,
   intensity = 'premium',
   radius = 20,
+  variant = 'energy',
 }: {
   children: ReactNode;
   primaryColor: string;
   secondaryColor?: string;
   intensity?: 'soft'|'premium'|'master';
   radius?: number;
+  variant?: 'energy'|'galaxy';
 }) {
   const pulse=useRef(new Animated.Value(0)).current;
   const flow=useRef(new Animated.Value(0)).current;
   const second=secondaryColor??'#FFD447';
+  const reduceMotion=useRef(false);
 
   useEffect(()=>{
+    let mounted=true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((value)=>{ if(mounted) reduceMotion.current=Boolean(value); }).catch(()=>undefined);
+    return()=>{mounted=false;};
+  },[]);
+
+  useEffect(()=>{
+    if(reduceMotion.current){
+      pulse.setValue(.45);
+      flow.setValue(.35);
+      return;
+    }
     const native=Platform.OS!=='web';
     const pulseLoop=Animated.loop(Animated.sequence([
       Animated.timing(pulse,{toValue:1,duration:1800,useNativeDriver:native}),
@@ -65,7 +80,10 @@ export function AuraFrame({
         opacity,
         transform:[{translateX:bottomX}],
       }]}/>
-      <View style={[styles.content,{borderRadius:radius}]}>{children}</View>
+      <View style={[styles.content,{borderRadius:radius}]}>
+        {variant==='galaxy'?<GalaxyFlowOverlay intensity={intensity} opacity={intensity==='master'?1:.82}/>:null}
+        <View style={styles.inner}>{children}</View>
+      </View>
     </View>
   );
 }
@@ -77,4 +95,5 @@ const styles=StyleSheet.create({
   flowTop:{position:'absolute',top:-3,left:0,width:92,height:3,borderRadius:999,zIndex:4},
   flowBottom:{position:'absolute',bottom:-3,left:0,width:92,height:3,borderRadius:999,zIndex:4},
   content:{overflow:'hidden'},
+  inner:{position:'relative',zIndex:2},
 });
