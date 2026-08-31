@@ -18,6 +18,7 @@ export type AdminEconomyHealth = {
   releaseEpoch?: string;
   status: 'healthy' | 'watch' | 'critical';
   activePlayers: number;
+  coinsPerActivePlayer: number;
   balances: { coins: number; diamonds: number };
   knownMint: {
     missions: number;
@@ -33,9 +34,12 @@ export type AdminEconomyHealth = {
     diamondExchange: number;
     marketFees: number;
     gymHealing: number;
+    permanentSinks: number;
     total: number;
   };
   burnToMintRatio: number | null;
+  sinkBreakdown: Record<string, number>;
+  softCap: { enabled:boolean; dailyCoins:number; multiplier:number };
   packPrices: {
     coinMin: number | null;
     coinMedian: number | null;
@@ -45,6 +49,25 @@ export type AdminEconomyHealth = {
     diamondMax: number | null;
   };
   coverageNote: string;
+};
+
+export type AdminEconomyAdvisor = {
+  health: AdminEconomyHealth;
+  recommendations: Array<{
+    id:number;
+    generatedAt:string;
+    type:string;
+    currentValue:number|null;
+    suggestedValue:number|null;
+    rationale:string;
+  }>;
+  alerts: Array<{
+    id:number;
+    severity:'info'|'watch'|'critical';
+    message:string;
+    metrics:Record<string,unknown>;
+    createdAt:string;
+  }>;
 };
 
 export type AdminOverview = {
@@ -381,14 +404,26 @@ export async function getAdminAccountAudit(
   }) as Promise<AdminAccountAudit>;
 }
 
-export async function getAdminEconomyHealth(): Promise<AdminEconomyHealth> {
+async function getAdminActorId() {
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   const actorId = auth.user?.id;
   if (!actorId) throw new Error('Usuário não autenticado.');
+  return actorId;
+}
+
+export async function getAdminEconomyHealth(): Promise<AdminEconomyHealth> {
+  const actorId = await getAdminActorId();
   const { data, error } = await supabase.rpc('server_get_economy_health', { p_actor_id: actorId });
   if (error) throw error;
   return data as AdminEconomyHealth;
+}
+
+export async function refreshAdminEconomyAdvisor(): Promise<AdminEconomyAdvisor> {
+  const actorId = await getAdminActorId();
+  const { data, error } = await supabase.rpc('server_refresh_economy_advisor', { p_actor_id: actorId });
+  if (error) throw error;
+  return data as AdminEconomyAdvisor;
 }
 export async function getAdminOverview() { return invokeAdmin({ action: 'overview' }) as Promise<AdminOverview>; }
 export async function getAdminPlayers() { return invokeAdmin({ action: 'players' }) as Promise<AdminPlayer[]>; }
