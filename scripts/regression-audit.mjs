@@ -559,11 +559,13 @@ if (existsSync('src/components/CompactTrainerBanner.tsx')) {
   assert(compactIdentity.includes('let sharedLoop:Animated.CompositeAnimation|null=null'), 'Regressão de performance: animação compacta perdeu o loop compartilhado.');
   assert(compactIdentity.includes('sharedUsers'), 'Regressão de performance: animação compacta perdeu o controle global de assinantes.');
   assert(compactIdentity.includes('GalaxyFlowOverlay') && compactIdentity.includes('visual.galaxy'), 'Regressão visual: banner compacto Galaxy perdeu a atmosfera naturalista.');
-  assert(compactIdentity.includes('opacity={0.82}'), 'Regressão visual: Galaxy Flow ficou fraco demais nos banners compactos.');
+  assert(compactIdentity.includes('galaxyTopEdge') && compactIdentity.includes('galaxyBottomEdge'), 'Regressão visual: Galaxy Flow compacto precisa ficar restrito às bordas para não apagar nomes.');
+  assert(compactIdentity.includes('visual.galaxy&&styles.galaxyContent'), 'Regressão de legibilidade: conteúdo Galaxy precisa ficar acima da nebulosa.');
+  assert(compactIdentity.includes('galaxyContent:{zIndex:30}'), 'Regressão de legibilidade: nomes em banners Galaxy podem voltar a ser apagados.');
   assert(compactIdentity.includes('!visual.galaxy'), 'Regressão visual: banner Galaxy compacto voltou a misturar efeitos neon genéricos.');
   assert(compactIdentity.includes('styles.railTop') && compactIdentity.includes('translateX:railForward'), 'Regressão visual: fluxo animado superior do banner compacto foi removido.');
   assert(compactIdentity.includes('styles.railBottom') && compactIdentity.includes('translateX:railBackward'), 'Regressão visual: fluxo animado inferior do banner compacto foi removido.');
-  assert(compactIdentity.indexOf('<View style={styles.content}>{children}</View>') < compactIdentity.indexOf('styles.railTop'), 'Regressão visual: efeitos compactos precisam ser renderizados acima do fundo opaco dos cards.');
+  assert(compactIdentity.includes("content:{position:'relative',zIndex:2}"), 'Regressão visual: efeitos compactos não-Galaxy precisam continuar acima do conteúdo padrão.');
   assert(compactIdentity.includes('railTop') && compactIdentity.includes('railBottom'), 'Regressão visual: banner compacto perdeu trilhos de energia.');
 }
 
