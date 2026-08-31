@@ -62,16 +62,19 @@ export default function DecksScreen() {
           const total = (deck.deck_cards ?? []).reduce((sum: number, item: any) => sum + Number(item.quantity ?? 0), 0);
           const marketValue = (deck.deck_cards ?? []).reduce((sum: number, item: any) => sum + Number(item.cards?.market_price_usd ?? 0) * Number(item.quantity ?? 0), 0);
           const deckStyle = Array.isArray(deck.economy_store_items) ? deck.economy_store_items[0] : deck.economy_store_items;
+          const styleId=String(deck.style_item_id??'');
+          const galaxyDeck=styleId.includes('galaxy');
           const deckBorder = deckStyle
-            ? String(deck.style_item_id??'').includes('master') ? '#C493FF'
-              : String(deck.style_item_id??'').includes('elite') ? colors.accent
+            ? galaxyDeck ? '#8B5CFF'
+              : styleId.includes('master') ? '#C493FF'
+              : styleId.includes('elite') ? colors.accent
               : colors.yellow
             : deck.is_default ? colors.yellow : colors.border;
-          return <AuraFrame key={deck.id} primaryColor={deckBorder} secondaryColor={deckStyle && String(deck.style_item_id??'').includes('master')?'#8EE7FF':colors.yellow} intensity={deckStyle ? (String(deck.style_item_id??'').includes('master')?'master':'premium') : 'soft'} radius={19}><View style={[styles.deck,{backgroundColor:colors.surface,borderColor:deckBorder,borderWidth:deckStyle?2:1}]}>
+          return <AuraFrame key={deck.id} primaryColor={deckBorder} secondaryColor={galaxyDeck?'#55E6FF':deckStyle && styleId.includes('master')?'#8EE7FF':colors.yellow} intensity={deckStyle ? (galaxyDeck||styleId.includes('master')?'master':'premium') : 'soft'} variant={galaxyDeck?'galaxy':'energy'} radius={19}><View style={[styles.deck,{backgroundColor:colors.surface,borderColor:deckBorder,borderWidth:deckStyle?2:1}]}>
             <Pressable style={styles.deckMain} onPress={() => router.push(`/deck/${deck.id}`)}>
               <View style={[styles.preview,{backgroundColor:isLight?'#EDF2F7':colors.bg}]}>{(deck.deck_cards ?? []).slice(0, 3).map((item: any, index: number) => item.cards?.image_small ? <Image key={`${item.card_id}-${index}`} source={{ uri: item.cards.image_small }} style={[styles.previewCard, { marginLeft: index ? -25 : 0 }]} /> : null)}{total === 0 ? <Ionicons name="albums-outline" size={34} color={colors.muted} /> : null}</View>
               <View style={styles.deckInfo}><View style={styles.nameRow}><Text style={[styles.deckName,{color:colors.text}]}>{deck.name}</Text>{deck.is_default ? <View style={[styles.defaultBadge,{backgroundColor:colors.yellow}]}><Ionicons name="star" size={11} color="#07111F" /><Text style={styles.defaultText}>PRINCIPAL</Text></View> : null}{deckStyle?<View style={[styles.deckStyleBadge,{backgroundColor:colors.accentSoft,borderColor:deckBorder}]}><Ionicons name={(deckStyle.icon||'albums') as keyof typeof Ionicons.glyphMap} size={11} color={deckBorder}/><Text style={[styles.deckStyleText,{color:deckBorder}]}>{String(deckStyle.name).toUpperCase()}</Text></View>:null}</View><Text style={[styles.deckMeta,{color:colors.muted}]}>{total} cartas • {formatUsd(marketValue)} • toque para editar</Text></View>
-              <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+              <Ionicons name="chevron-forward" size={20} color={galaxyDeck?'#55E6FF':colors.muted} />
             </Pressable>
             <View style={[styles.deckActions,{borderTopColor:colors.border}]}>{!deck.is_default ? <Pressable style={[styles.secondary,{backgroundColor:colors.surfaceAlt}]} onPress={() => makeDefault(deck.id)} disabled={working}><Ionicons name="star-outline" size={15} color={colors.yellow} /><Text style={[styles.secondaryText,{color:colors.text}]}>TORNAR PRINCIPAL</Text></Pressable> : <View />}{!deck.is_default ? <Pressable style={styles.deleteButton} onPress={() => remove(deck.id)} disabled={working}><Ionicons name="trash-outline" size={16} color="#FF98A8" /></Pressable> : null}</View>
           </View></AuraFrame>;
