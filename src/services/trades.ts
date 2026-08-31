@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getSessionUserId } from '@/lib/session';
 import { normalizeFunctionError } from '@/services/functionErrors';
 
 export type TradeCardInput = {
