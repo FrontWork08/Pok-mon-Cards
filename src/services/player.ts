@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getSessionUserId } from '@/lib/session';
 
 export type PlayerProfile = {
   id: string;
@@ -84,14 +85,12 @@ export type CardDetailEntry = {
 };
 
 export async function getMyProfile() {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!userData.user) throw new Error('Usuário não autenticado.');
+  const userId = await getSessionUserId(true);
 
   const { data, error } = await supabase
     .from('players')
     .select('id, username, coins, diamonds, profile_icon, avatar_path, avatar_updated_at, level, xp, battle_rating, battle_wins, battle_losses, battle_streak, best_battle_streak, equipped_title_id, equipped_title:achievement_definitions!players_equipped_title_id_fkey(id,title,icon), equipped_frame_id, equipped_background_id, equipped_frame:cosmetic_definitions!players_equipped_frame_id_fkey(id,name,primary_color,secondary_color), equipped_background:cosmetic_definitions!players_equipped_background_id_fkey(id,name,primary_color,secondary_color), show_battle_rating, created_at, last_daily_claim_at, account_status, suspended_until, moderation_reason, warning_count')
-    .eq('id', userData.user.id)
+    .eq('id', userId)
     .single();
 
   if (error) throw error;
@@ -155,10 +154,7 @@ export async function uploadMyProfileAvatar(input: {
   mimeType?: string | null;
   previousPath?: string | null;
 }) {
-  const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError) throw authError;
-  const playerId = auth.user?.id;
-  if (!playerId) throw new Error('Usuário não autenticado.');
+  const playerId = await getSessionUserId(true);
 
   const body = base64ToArrayBuffer(input.base64);
   if (body.byteLength <= 0) throw new Error('A imagem selecionada está vazia.');
@@ -218,14 +214,12 @@ export async function removeMyProfileAvatar(previousPath?: string | null) {
 }
 
 export async function getMyBag(search?: string) {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!userData.user) throw new Error('Usuário não autenticado.');
+  const userId = await getSessionUserId(true);
 
   let query = supabase
     .from('player_cards')
     .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at, tcg_data)')
-    .eq('player_id', userData.user.id)
+    .eq('player_id', userId)
     .gt('quantity', 0)
     .order('first_obtained_at', { ascending: false });
 
@@ -236,10 +230,7 @@ export async function getMyBag(search?: string) {
 }
 
 export async function getMyLegacyCardPool(): Promise<OwnedCardEntry[]> {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  const userId = userData.user?.id;
-  if (!userId) throw new Error('Usuário não autenticado.');
+  const userId = await getSessionUserId(true);
 
   const [bag, listingResult] = await Promise.all([
     getMyBag(),
@@ -294,10 +285,7 @@ export async function getMyLegacyCardPool(): Promise<OwnedCardEntry[]> {
 }
 
 export async function getCardDetail(cardId: string): Promise<CardDetailEntry> {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  const userId = userData.user?.id;
-  if (!userId) throw new Error('Usuário não autenticado.');
+  const userId = await getSessionUserId(true);
 
   const [cardResult, ownershipResult] = await Promise.all([
     supabase
@@ -328,13 +316,11 @@ export async function getCardDetail(cardId: string): Promise<CardDetailEntry> {
 }
 
 export async function getOwnedCard(cardId: string): Promise<OwnedCardEntry> {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!userData.user) throw new Error('Usuário não autenticado.');
+  const userId = await getSessionUserId(true);
   const { data, error } = await supabase
     .from('player_cards')
     .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at, tcg_data)')
-    .eq('player_id', userData.user.id).eq('card_id', cardId).gt('quantity', 0).single();
+    .eq('player_id', userId).eq('card_id', cardId).gt('quantity', 0).single();
   if (error) throw error;
   return data as unknown as OwnedCardEntry;
 }
@@ -342,8 +328,7 @@ export async function getOwnedCard(cardId: string): Promise<OwnedCardEntry> {
 export async function findPlayers(username: string) {
   const term = username.trim();
   if (term.length < 2) return [];
-  const { data: userData } = await supabase.auth.getUser();
-  const myId = userData.user?.id;
+  const myId = await getSessionUserId(false);
   let query = supabase.from('players').select('id, username, level, battle_rating, show_battle_rating, equipped_title_id, profile_icon, avatar_path, avatar_updated_at').ilike('username', `%${term}%`).limit(20);
   if (myId) query = query.neq('id', myId);
   const { data, error } = await query;
@@ -379,14 +364,11 @@ export async function getPlayerAvatarMap(playerIds: string[]) {
 }
 
 export async function getMyProfileStats() {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  const user = userData.user;
-  if (!user) throw new Error('Usuário não autenticado.');
+  const userId = await getSessionUserId(true);
   const [bag, openings, trades] = await Promise.all([
     getMyBag(),
-    supabase.from('pack_openings').select('id', { count: 'exact', head: true }).eq('player_id', user.id),
-    supabase.from('trades').select('id', { count: 'exact', head: true }).eq('status', 'completed').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
+    supabase.from('pack_openings').select('id', { count: 'exact', head: true }).eq('player_id', userId),
+    supabase.from('trades').select('id', { count: 'exact', head: true }).eq('status', 'completed').or(`sender_id.eq.${userId},receiver_id.eq.${userId}`),
   ]);
   const totalCards = bag.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0);
   const uniqueCards = bag.length;
