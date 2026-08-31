@@ -149,7 +149,7 @@ function AppStack() {
       if (liveNotificationTimer.current) clearTimeout(liveNotificationTimer.current);
       liveNotificationTimer.current = setTimeout(() => {
         if (!disposed) setLiveNotification(null);
-      }, 6000);
+      }, notification?.type === 'store_gift' ? 11000 : 6000);
     };
 
     const unsubscribeRealtime = subscribeToMyNotifications(userId, showNotification);
@@ -431,23 +431,51 @@ function AppStack() {
       ) : null}
       {liveNotification && !accountRestriction ? (
         <View pointerEvents="box-none" style={[styles.liveNotificationHost, { top: showChrome ? Math.max(insets.top + 92, 98) : Math.max(insets.top + 8, 14) }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${liveNotification.title ?? 'Notificação'}: ${liveNotification.body ?? ''}`}
-            onPress={openLiveNotification}
-            style={[styles.liveNotification, { backgroundColor: colors.surface, borderColor: colors.accent }]}
-          >
-            <View style={[styles.liveNotificationDot, { backgroundColor: colors.yellow }]} />
-            <View style={styles.liveNotificationText}>
-              <Text numberOfLines={1} style={[styles.liveNotificationTitle, { color: colors.text }]}>
-                {liveNotification.title ?? 'Nova notificação'}
-              </Text>
-              <Text numberOfLines={2} style={[styles.liveNotificationBody, { color: colors.muted }]}>
-                {liveNotification.body ?? 'Toque para abrir.'}
-              </Text>
-            </View>
-            <Text style={[styles.liveNotificationOpen, { color: colors.accent }]}>ABRIR</Text>
-          </Pressable>
+          {liveNotification.type === 'store_gift' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${liveNotification.title ?? 'Presente recebido'}: ${liveNotification.body ?? ''}`}
+              onPress={openLiveNotification}
+              style={[styles.giftNotification, { backgroundColor: colors.surface, borderColor: '#FFD447' }]}
+            >
+              <View style={styles.giftNotificationGlow} />
+              <View style={[styles.giftNotificationIcon, { backgroundColor: colors.accentSoft }]}>
+                <Text style={styles.giftNotificationEmoji}>🎁</Text>
+              </View>
+              <View style={styles.giftNotificationText}>
+                <Text numberOfLines={1} style={[styles.giftNotificationKicker, { color: colors.yellow }]}>PRESENTE RECEBIDO</Text>
+                <Text numberOfLines={1} style={[styles.giftNotificationTitle, { color: colors.text }]}>
+                  {liveNotification.metadata?.itemName ?? liveNotification.title ?? 'Novo presente'}
+                </Text>
+                <Text numberOfLines={2} style={[styles.giftNotificationBody, { color: colors.muted }]}>
+                  {liveNotification.metadata?.giftMessage
+                    ? `@${liveNotification.metadata?.senderName ?? 'Trainer'}: “${liveNotification.metadata.giftMessage}”`
+                    : liveNotification.body ?? 'Um amigo enviou um presente para você.'}
+                </Text>
+              </View>
+              <View style={[styles.giftNotificationOpen, { borderColor: colors.border }]}>
+                <Text style={[styles.giftNotificationOpenText, { color: colors.yellow }]}>VER</Text>
+              </View>
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${liveNotification.title ?? 'Notificação'}: ${liveNotification.body ?? ''}`}
+              onPress={openLiveNotification}
+              style={[styles.liveNotification, { backgroundColor: colors.surface, borderColor: colors.accent }]}
+            >
+              <View style={[styles.liveNotificationDot, { backgroundColor: colors.yellow }]} />
+              <View style={styles.liveNotificationText}>
+                <Text numberOfLines={1} style={[styles.liveNotificationTitle, { color: colors.text }]}>
+                  {liveNotification.title ?? 'Nova notificação'}
+                </Text>
+                <Text numberOfLines={2} style={[styles.liveNotificationBody, { color: colors.muted }]}>
+                  {liveNotification.body ?? 'Toque para abrir.'}
+                </Text>
+              </View>
+              <Text style={[styles.liveNotificationOpen, { color: colors.accent }]}>ABRIR</Text>
+            </Pressable>
+          )}
         </View>
       ) : null}
     </View>
@@ -581,6 +609,16 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     alignItems: 'center',
   },
+  giftNotification:{width:'100%',maxWidth:560,minHeight:88,borderRadius:20,borderWidth:1.5,padding:11,flexDirection:'row',alignItems:'center',gap:10,overflow:'hidden'},
+  giftNotificationGlow:{position:'absolute',right:-55,top:-75,width:180,height:180,borderRadius:999,backgroundColor:'#FFD447',opacity:.11},
+  giftNotificationIcon:{width:52,height:52,borderRadius:17,alignItems:'center',justifyContent:'center',zIndex:2},
+  giftNotificationEmoji:{fontSize:27},
+  giftNotificationText:{flex:1,minWidth:0,zIndex:2},
+  giftNotificationKicker:{fontSize:7,fontWeight:'900',letterSpacing:1},
+  giftNotificationTitle:{fontSize:13,fontWeight:'900',marginTop:2},
+  giftNotificationBody:{fontSize:9,lineHeight:13,marginTop:3,fontWeight:'700'},
+  giftNotificationOpen:{minWidth:45,height:34,borderRadius:11,borderWidth:1,alignItems:'center',justifyContent:'center',zIndex:2},
+  giftNotificationOpenText:{fontSize:8,fontWeight:'900'},
   liveNotification: {
     width: '100%',
     maxWidth: 560,
