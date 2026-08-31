@@ -119,7 +119,7 @@ export async function getMyBattleHistory(limit = 50) {
   const id = await getSessionUserId(true);
   const { data, error } = await supabase
     .from('battles')
-    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,challenger_score,opponent_score,winner_id,reward_eligible,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,forfeited_by,forfeit_rating_neutral,forfeited_at,created_at,completed_at,challenger:players!battles_challenger_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id),opponent:players!battles_opponent_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id)')
+    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,challenger_score,opponent_score,winner_id,reward_eligible,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,forfeited_by,forfeit_rating_neutral,forfeited_at,created_at,completed_at,challenger:players!battles_challenger_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id,equipped_economy_title_id,equipped_frame_id,equipped_background_id,profile_icon,avatar_path,avatar_updated_at),opponent:players!battles_opponent_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id,equipped_economy_title_id,equipped_frame_id,equipped_background_id,profile_icon,avatar_path,avatar_updated_at)')
     .or(`challenger_id.eq.${id},opponent_id.eq.${id}`)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -130,7 +130,7 @@ export async function getMyBattleHistory(limit = 50) {
 export async function getBattleLeaderboard(limit = 50) {
   const { data, error } = await supabase
     .from('players')
-    .select('id,username,level,battle_rating,battle_wins,battle_losses,battle_streak,best_battle_streak,show_battle_rating,equipped_title_id,profile_icon,avatar_path,avatar_updated_at')
+    .select('id,username,level,battle_rating,battle_wins,battle_losses,battle_streak,best_battle_streak,show_battle_rating,equipped_title_id,equipped_economy_title_id,equipped_frame_id,equipped_background_id,profile_icon,avatar_path,avatar_updated_at')
     .order('battle_rating', { ascending: false })
     .order('battle_wins', { ascending: false })
     .limit(limit);
