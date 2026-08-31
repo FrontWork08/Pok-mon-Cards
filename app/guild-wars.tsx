@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
@@ -36,6 +36,8 @@ type PickerState = {
   gymId: string;
   gymName: string;
 };
+
+type PickerStatSort = 'recommended' | 'hp' | 'attack' | 'rating' | 'efficiency' | 'speed';
 
 export default function GuildWarsScreen() {
   const router = useRouter();
@@ -129,18 +131,33 @@ export default function GuildWarsScreen() {
     setBagLoading(true);
     setBagLoadError(null);
 
-    getMyBagPage(0, 100, {
-      search: '',
-      setQuery: '',
-      quickFilter: 'all',
-      typeFilter: null,
-      rarityFilter: null,
-      generation: null,
-      sortMode: 'damage',
-    })
-      .then((page) => {
+    (async () => {
+      const filters = {
+        search: '',
+        setQuery: '',
+        quickFilter: 'all' as const,
+        typeFilter: null,
+        rarityFilter: null,
+        generation: null,
+        sortMode: 'damage' as const,
+      };
+      const first = await getMyBagPage(0, 100, filters);
+      const pages = [first];
+      const remainingOffsets:number[] = [];
+      for (let offset = 100; offset < first.totalFiltered; offset += 100) {
+        remainingOffsets.push(offset);
+      }
+      if (remainingOffsets.length) {
+        const rest = await Promise.all(
+          remainingOffsets.map((offset) => getMyBagPage(offset, 100, filters)),
+        );
+        pages.push(...rest);
+      }
+      return pages.flatMap((page) => page.items).filter((item) => Boolean(item.cards));
+    })()
+      .then((items) => {
         if (disposed) return;
-        setBagCards(page.items.filter((item) => Boolean(item.cards)));
+        setBagCards(items);
         setBagLoaded(true);
       })
       .catch((e) => {
@@ -581,7 +598,87 @@ function CardPickerModal({
   onRetry: () => void;
 }) {
   const { colors } = useAppTheme();
+  const [search, setSearch] = useState('');
+  const [sortMode, setSortMode] = useState<PickerStatSort>('recommended');
+  const [minHp, setMinHp] = useState('');
+  const [minAttack, setMinAttack] = useState('');
+  const [minRating, setMinRating] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+
+  useEffect(() => {
+    if (!state) return;
+    setSearch('');
+    setMinHp('');
+    setMinAttack('');
+    setMinRating('');
+    setTypeFilter('all');
+    setSortMode(state.mode === 'defense' ? 'hp' : 'attack');
+  }, [state?.warId, state?.gymId, state?.mode]);
+
+  const candidates = useMemo(() => cards.flatMap((entry) => {
+    const card = entry.cards;
+    if (!card) return [];
+    return [{ entry, card, profile: getBattleCardPreview(card) }];
+  }), [cards]);
+
+  const types = useMemo(
+    () => [...new Set(candidates.flatMap(({ card }) => Array.isArray(card.types) ? card.types : []))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [candidates],
+  );
+
+  const filteredCandidates = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase('pt-BR');
+    const hpFloor = Number(minHp) || 0;
+    const attackFloor = Number(minAttack) || 0;
+    const ratingFloor = Number(minRating) || 0;
+
+    const visible = candidates.filter(({ card, profile }) => {
+      if (term) {
+        const haystack = [
+          card.pokemon_name,
+          card.set_name,
+          card.rarity,
+          ...(Array.isArray(card.types) ? card.types : []),
+        ].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+        if (!haystack.includes(term)) return false;
+      }
+      if (typeFilter !== 'all' && !(Array.isArray(card.types) && card.types.includes(typeFilter))) return false;
+      if (profile.hp < hpFloor) return false;
+      if (profile.maxDamage < attackFloor) return false;
+      if (profile.battleRating < ratingFloor) return false;
+      return true;
+    });
+
+    return [...visible].sort((a, b) => {
+      if (sortMode === 'hp') return b.profile.hp - a.profile.hp || b.profile.battleRating - a.profile.battleRating;
+      if (sortMode === 'attack') return b.profile.maxDamage - a.profile.maxDamage || b.profile.battleRating - a.profile.battleRating;
+      if (sortMode === 'rating') return b.profile.battleRating - a.profile.battleRating;
+      if (sortMode === 'efficiency') return b.profile.efficiencyScore - a.profile.efficiencyScore || b.profile.maxDamage - a.profile.maxDamage;
+      if (sortMode === 'speed') return b.profile.speedScore - a.profile.speedScore || b.profile.battleRating - a.profile.battleRating;
+      return b.profile.battleRating - a.profile.battleRating;
+    });
+  }, [candidates, search, typeFilter, minHp, minAttack, minRating, sortMode]);
+
+  const hasFilters = Boolean(search.trim() || minHp || minAttack || minRating || typeFilter !== 'all');
+
+  function clearFilters() {
+    setSearch('');
+    setMinHp('');
+    setMinAttack('');
+    setMinRating('');
+    setTypeFilter('all');
+  }
+
   if (!state) return null;
+
+  const sortOptions:{id:PickerStatSort;label:string}[] = [
+    { id:'recommended', label:'RATING' },
+    { id:'hp', label:'MAIOR HP' },
+    { id:'attack', label:'MAIOR ATK' },
+    { id:'efficiency', label:'EFICIÊNCIA' },
+    { id:'speed', label:'VELOCIDADE' },
+  ];
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -596,7 +693,7 @@ function CardPickerModal({
               <Text numberOfLines={1} style={[styles.pickerTitle,{color:colors.text}]}>{state.gymName}</Text>
               <Text style={[styles.pickerHint,{color:colors.muted}]}>
                 {state.mode==='defense'
-                  ? 'Escolha 1 Pokémon da sua Bag. Um membro só pode manter 1 defensor ativo nesta guerra.'
+                  ? 'Escolha 1 Pokémon da sua Bag. Use os filtros para encontrar a defesa com os atributos que você quer.'
                   : `Selecione de 1 a 6 Pokémon. A ordem de seleção define a ordem do ataque. ${attackTeam.length}/6 escolhidos.`}
               </Text>
             </View>
@@ -605,10 +702,126 @@ function CardPickerModal({
             </Pressable>
           </View>
 
+          {!loading && !loadError && cards.length ? (
+            <View style={[styles.statFilters,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+              <View style={[styles.pickerSearch,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                <Ionicons name="search" size={16} color={colors.muted}/>
+                <TextInput
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Buscar Pokémon, tipo ou raridade..."
+                  placeholderTextColor={colors.muted}
+                  autoCapitalize="none"
+                  style={[styles.pickerSearchInput,{color:colors.text}]}
+                />
+                {search ? (
+                  <Pressable hitSlop={8} onPress={() => setSearch('')}>
+                    <Ionicons name="close-circle" size={17} color={colors.muted}/>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <View style={styles.filterHeadingRow}>
+                <Text style={[styles.filterHeading,{color:colors.muted}]}>ORDENAR PELA ESTATÍSTICA</Text>
+                <Text style={[styles.filterCount,{color:colors.yellow}]}>{filteredCandidates.length} Pokémon</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipRow}>
+                {sortOptions.map((option) => {
+                  const active = sortMode === option.id;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      onPress={() => setSortMode(option.id)}
+                      style={[
+                        styles.statChip,
+                        {
+                          backgroundColor: active ? colors.accentSoft : colors.surfaceAlt,
+                          borderColor: active ? colors.accent : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.statChipText,{color:active?colors.accent:colors.muted}]}>{option.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              <Text style={[styles.filterHeading,{color:colors.muted}]}>ATRIBUTOS MÍNIMOS</Text>
+              <View style={styles.minimumRow}>
+                <View style={[styles.minimumBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                  <Text style={[styles.minimumLabel,{color:'#65D894'}]}>HP MÍN.</Text>
+                  <TextInput
+                    value={minHp}
+                    onChangeText={(value) => setMinHp(value.replace(/[^0-9]/g,''))}
+                    placeholder="0"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="number-pad"
+                    style={[styles.minimumInput,{color:colors.text}]}
+                  />
+                </View>
+                <View style={[styles.minimumBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                  <Text style={[styles.minimumLabel,{color:colors.yellow}]}>ATK MÍN.</Text>
+                  <TextInput
+                    value={minAttack}
+                    onChangeText={(value) => setMinAttack(value.replace(/[^0-9]/g,''))}
+                    placeholder="0"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="number-pad"
+                    style={[styles.minimumInput,{color:colors.text}]}
+                  />
+                </View>
+                <View style={[styles.minimumBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                  <Text style={[styles.minimumLabel,{color:colors.accent}]}>RATING MÍN.</Text>
+                  <TextInput
+                    value={minRating}
+                    onChangeText={(value) => setMinRating(value.replace(/[^0-9]/g,''))}
+                    placeholder="0"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="number-pad"
+                    style={[styles.minimumInput,{color:colors.text}]}
+                  />
+                </View>
+              </View>
+
+              {types.length ? (
+                <>
+                  <View style={styles.filterHeadingRow}>
+                    <Text style={[styles.filterHeading,{color:colors.muted}]}>TIPO</Text>
+                    {hasFilters ? (
+                      <Pressable onPress={clearFilters}>
+                        <Text style={[styles.clearFilterText,{color:colors.accent}]}>LIMPAR FILTROS</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipRow}>
+                    {['all', ...types].map((type) => {
+                      const active = typeFilter === type;
+                      return (
+                        <Pressable
+                          key={type}
+                          onPress={() => setTypeFilter(type)}
+                          style={[
+                            styles.statChip,
+                            {
+                              backgroundColor: active ? colors.accentSoft : colors.surfaceAlt,
+                              borderColor: active ? colors.accent : colors.border,
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.statChipText,{color:active?colors.accent:colors.muted}]}>{type==='all'?'TODOS':type.toUpperCase()}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+
           {loading ? (
             <View style={styles.pickerState}>
               <ActivityIndicator size="large" color={colors.yellow}/>
-              <Text style={[styles.pickerStateText,{color:colors.muted}]}>Carregando seus Pokémon...</Text>
+              <Text style={[styles.pickerStateText,{color:colors.muted}]}>Carregando todos os seus Pokémon...</Text>
             </View>
           ) : loadError ? (
             <View style={[styles.pickerError,{borderColor:'#C96B7A'}]}>
@@ -623,12 +836,17 @@ function CardPickerModal({
               <Ionicons name="albums-outline" size={28} color={colors.muted}/>
               <Text style={[styles.pickerStateText,{color:colors.muted}]}>Sua Bag não possui Pokémon disponíveis.</Text>
             </View>
+          ) : filteredCandidates.length === 0 ? (
+            <View style={styles.pickerState}>
+              <Ionicons name="options-outline" size={28} color={colors.muted}/>
+              <Text style={[styles.pickerStateText,{color:colors.muted}]}>Nenhum Pokémon corresponde a esses filtros.</Text>
+              <Pressable onPress={clearFilters} style={[styles.retryButton,{borderColor:colors.border,backgroundColor:colors.surfaceAlt}]}>
+                <Text style={[styles.retryText,{color:colors.text}]}>LIMPAR FILTROS</Text>
+              </Pressable>
+            </View>
           ) : (
-            <ScrollView style={styles.cardScroll} contentContainerStyle={styles.cardGrid} showsVerticalScrollIndicator={false}>
-              {cards.map((entry) => {
-                const card = entry.cards;
-                if (!card) return null;
-                const profile = getBattleCardPreview(card);
+            <ScrollView style={styles.cardScroll} contentContainerStyle={styles.cardGrid} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {filteredCandidates.map(({ card, profile }) => {
                 const selectedIndex = attackTeam.indexOf(card.id);
                 const selected = selectedIndex >= 0;
                 return (
@@ -649,6 +867,14 @@ function CardPickerModal({
                     <View style={styles.choiceStats}>
                       <Text style={[styles.choiceStat,{color:'#65D894'}]}>HP {profile.hp}</Text>
                       <Text style={[styles.choiceStat,{color:colors.yellow}]}>ATK {profile.maxDamage}</Text>
+                    </View>
+                    <View style={styles.choiceStats}>
+                      <Text style={[styles.choiceStatSecondary,{color:colors.accent}]}>RATING {profile.battleRating}</Text>
+                      <Text style={[styles.choiceStatSecondary,{color:colors.muted}]}>EFIC {profile.efficiencyScore}%</Text>
+                    </View>
+                    <View style={styles.choiceStats}>
+                      <Text style={[styles.choiceStatSecondary,{color:colors.muted}]}>VEL {profile.speedScore}</Text>
+                      <Text style={[styles.choiceStatSecondary,{color:colors.muted}]}>ENERGIA {profile.bestEnergy}</Text>
                     </View>
                   </Pressable>
                 );
@@ -783,6 +1009,20 @@ const styles = StyleSheet.create({
   pickerTitle:{fontSize:17,fontWeight:'900',marginTop:1},
   pickerHint:{fontSize:8,lineHeight:12,marginTop:2},
   modalClose:{width:38,height:38,alignItems:'center',justifyContent:'center'},
+  statFilters:{borderRadius:16,borderWidth:1,padding:9,gap:8},
+  pickerSearch:{minHeight:39,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},
+  pickerSearchInput:{flex:1,fontSize:9,fontWeight:'700',paddingVertical:8},
+  filterHeadingRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
+  filterHeading:{fontSize:7,fontWeight:'900',letterSpacing:.7},
+  filterCount:{fontSize:7,fontWeight:'900'},
+  filterChipRow:{gap:6,paddingRight:4},
+  statChip:{minHeight:31,borderRadius:9,borderWidth:1,paddingHorizontal:9,alignItems:'center',justifyContent:'center'},
+  statChipText:{fontSize:7,fontWeight:'900',letterSpacing:.35},
+  minimumRow:{flexDirection:'row',gap:6},
+  minimumBox:{flex:1,minWidth:0,borderRadius:10,borderWidth:1,paddingHorizontal:8,paddingVertical:5},
+  minimumLabel:{fontSize:6,fontWeight:'900',letterSpacing:.35},
+  minimumInput:{fontSize:11,fontWeight:'900',paddingVertical:2},
+  clearFilterText:{fontSize:7,fontWeight:'900'},
   pickerState:{minHeight:180,alignItems:'center',justifyContent:'center',gap:10,padding:16},
   pickerStateText:{fontSize:9,lineHeight:14,fontWeight:'800',textAlign:'center'},
   pickerError:{minHeight:180,borderWidth:1,borderRadius:16,alignItems:'center',justifyContent:'center',gap:10,padding:16},
@@ -796,6 +1036,7 @@ const styles = StyleSheet.create({
   choiceMeta:{fontSize:7},
   choiceStats:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:5,marginTop:2},
   choiceStat:{fontSize:7,fontWeight:'900'},
+  choiceStatSecondary:{fontSize:6.5,fontWeight:'800'},
   orderBadge:{position:'absolute',zIndex:3,right:6,top:6,width:25,height:25,borderRadius:13,alignItems:'center',justifyContent:'center'},
   orderText:{color:'#07111F',fontSize:10,fontWeight:'900'},
   attackConfirm:{minHeight:48,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
