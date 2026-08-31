@@ -543,11 +543,79 @@ function StoreCard({item,busy,canEquip,onBuy,onEquip}:{item:EconomyStoreItem;bus
       <View style={[styles.storeIcon,{backgroundColor:`${visual.primary}18`,borderColor:`${visual.primary}70`}]}><Ionicons name={(item.icon||'sparkles') as keyof typeof Ionicons.glyphMap} size={23} color={visual.primary}/></View>
       <View style={[styles.rarityBadge,{backgroundColor:`${visual.primary}15`,borderColor:`${visual.primary}55`}]}><View style={[styles.rarityDot,{backgroundColor:visual.primary}]}/><Text style={[styles.rarityText,{color:visual.primary}]}>{item.rarity.toUpperCase()}</Text></View>
     </View>
+    <StorePreview item={item} primary={visual.primary} secondary={visual.secondary} />
     <Text style={[styles.storeName,{color:colors.text}]}>{item.name}</Text>
     <Text style={[styles.storeCategory,{color:visual.primary}]}>{categoryLabel(item.category).toUpperCase()}</Text>
     <Text style={[styles.storeDesc,{color:colors.muted}]}>{item.description}</Text>
     {visual.tier>=3?<View style={styles.premiumSignature}><Ionicons name="sparkles" size={12} color={visual.secondary}/><Text style={[styles.premiumSignatureText,{color:visual.secondary}]}>PREMIUM VISUAL</Text></View>:null}
     {item.owned?<View style={styles.storeActions}><View style={[styles.ownedBadge,{backgroundColor:'#153426',borderColor:'#2F9E68'}]}><Ionicons name="checkmark" size={13} color="#65D894"/><Text style={styles.ownedText}>ADQUIRIDO</Text></View>{canEquip?<Pressable disabled={busy} onPress={onEquip} style={[styles.equipButton,{borderColor:visual.primary,backgroundColor:`${visual.primary}12`}]}>{busy?<ActivityIndicator size="small" color={visual.primary}/>:<Text style={[styles.equipText,{color:visual.primary}]}>EQUIPAR</Text>}</Pressable>:null}</View>:<Pressable disabled={busy} onPress={onBuy} style={[styles.buyButton,{backgroundColor:visual.tier>=3?visual.primary:colors.yellow}]}>{busy?<ActivityIndicator color="#07111F"/>:<Text style={styles.buyText}>COMPRAR • {coins(item.priceCoins)}</Text>}</Pressable>}
+  </View>;
+}
+
+function StorePreview({item,primary,secondary}:{item:EconomyStoreItem;primary:string;secondary:string}){
+  const {colors}=useAppTheme();
+  const common=<View pointerEvents="none" style={[styles.previewGlow,{backgroundColor:primary}]}/>;
+  if(item.category==='profile_frame'){
+    return <View style={[styles.storePreview,{backgroundColor:colors.surfaceAlt,borderColor:`${primary}70`}]}>
+      {common}
+      <View style={[styles.previewAvatarFrame,{borderColor:primary}]}>
+        <View style={[styles.previewAvatar,{backgroundColor:`${secondary}25`}]}><Ionicons name="person" size={21} color={secondary}/></View>
+      </View>
+      <Text style={[styles.previewLabel,{color:primary}]}>MOLDURA DE PERFIL</Text>
+    </View>;
+  }
+  if(item.category==='profile_background'){
+    return <View style={[styles.storePreview,{backgroundColor:`${primary}12`,borderColor:`${primary}70`}]}>
+      {common}
+      <View style={[styles.previewPlanet,{backgroundColor:secondary}]}/>
+      <View style={[styles.previewHorizon,{borderColor:primary}]}/>
+      <Ionicons name="sparkles" size={23} color={primary}/>
+      <Text style={[styles.previewLabel,{color:primary}]}>BACKGROUND PREMIUM</Text>
+    </View>;
+  }
+  if(item.category==='card_style'){
+    return <View style={[styles.storePreview,{backgroundColor:colors.surfaceAlt,borderColor:`${primary}70`}]}>
+      {common}
+      <View style={[styles.previewCard,{borderColor:primary,backgroundColor:colors.surface}]}>
+        <Ionicons name="image" size={23} color={secondary}/>
+        <View style={[styles.previewCardLine,{backgroundColor:primary}]}/>
+      </View>
+      <Ionicons name="color-wand" size={18} color={primary}/>
+      <Text style={[styles.previewLabel,{color:primary}]}>ESTILO DE CARTA</Text>
+    </View>;
+  }
+  if(item.category==='deck_style'){
+    return <View style={[styles.storePreview,{backgroundColor:colors.surfaceAlt,borderColor:`${primary}70`}]}>
+      {common}
+      <View style={styles.previewDeck}>
+        <View style={[styles.previewDeckCard,styles.previewDeckBack,{borderColor:secondary,backgroundColor:colors.surface}]}/>
+        <View style={[styles.previewDeckCard,{borderColor:primary,backgroundColor:colors.surface}]}><Ionicons name="albums" size={20} color={primary}/></View>
+      </View>
+      <Text style={[styles.previewLabel,{color:primary}]}>CAPA DE DECK</Text>
+    </View>;
+  }
+  if(item.category==='shop_theme'){
+    return <View style={[styles.storePreview,{backgroundColor:colors.surfaceAlt,borderColor:`${primary}70`}]}>
+      {common}
+      <View style={[styles.previewStore,{borderColor:primary,backgroundColor:colors.surface}]}>
+        <View style={[styles.previewStoreAwning,{backgroundColor:primary}]}/>
+        <Ionicons name="storefront" size={22} color={secondary}/>
+      </View>
+      <Text style={[styles.previewLabel,{color:primary}]}>TEMA DE LOJA</Text>
+    </View>;
+  }
+  if(item.category==='booster_fx'){
+    return <View style={[styles.storePreview,{backgroundColor:colors.surfaceAlt,borderColor:`${primary}70`}]}>
+      {common}
+      <View style={[styles.previewFxRing,{borderColor:primary}]}><View style={[styles.previewFxCore,{backgroundColor:secondary}]}><Ionicons name="cube" size={19} color="#07111F"/></View></View>
+      <Ionicons name="flash" size={18} color={primary}/>
+      <Text style={[styles.previewLabel,{color:primary}]}>EFEITO DE ABERTURA</Text>
+    </View>;
+  }
+  return <View style={[styles.storePreview,{backgroundColor:colors.surfaceAlt,borderColor:`${primary}70`}]}>
+    {common}
+    <View style={[styles.previewAward,{backgroundColor:`${primary}18`,borderColor:primary}]}><Ionicons name={(item.icon||'trophy') as keyof typeof Ionicons.glyphMap} size={24} color={primary}/></View>
+    <Text style={[styles.previewLabel,{color:primary}]}>{item.category==='title'?'TÍTULO DE PRESTÍGIO':'TROFÉU DE COLEÇÃO'}</Text>
   </View>;
 }
 
@@ -578,7 +646,7 @@ const styles=StyleSheet.create({
   section:{gap:10},sectionHead:{flexDirection:'row',alignItems:'center',gap:9},sectionIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},sectionTitle:{fontSize:19,fontWeight:'900'},sectionSubtitle:{fontSize:9,lineHeight:14,marginTop:2},
   heroCard:{borderRadius:20,borderWidth:1,padding:14,flexDirection:'row',alignItems:'center',gap:12,flexWrap:'wrap'},heroKicker:{fontSize:8,fontWeight:'900',letterSpacing:1},heroTitle:{fontSize:18,fontWeight:'900',marginTop:2},body:{fontSize:9,lineHeight:14},
   primary:{minHeight:44,borderRadius:13,paddingHorizontal:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},primaryText:{color:'#07111F',fontSize:8,fontWeight:'900'},disabled:{opacity:.45},maxed:{fontSize:9,fontWeight:'900'},
-  storeGrid:{flexDirection:'row',flexWrap:'wrap',gap:9},storeCard:{flexGrow:1,flexBasis:190,minWidth:180,maxWidth:310,minHeight:220,borderRadius:19,borderWidth:1,padding:12,position:'relative',overflow:'hidden'},storeGlow:{position:'absolute',width:170,height:170,borderRadius:999,right:-72,top:-78},storeEdge:{position:'absolute',left:0,right:0,top:0,height:2},storeTop:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',zIndex:2},storeIcon:{width:43,height:43,borderRadius:14,borderWidth:1,alignItems:'center',justifyContent:'center'},rarityBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},rarityDot:{width:5,height:5,borderRadius:999},rarityText:{fontSize:6.5,fontWeight:'900'},storeName:{fontSize:14,fontWeight:'900',marginTop:10},storeCategory:{fontSize:7,fontWeight:'900',letterSpacing:.7,marginTop:2},storeDesc:{fontSize:8,lineHeight:12,marginTop:5,flex:1},premiumSignature:{flexDirection:'row',alignItems:'center',gap:4,marginTop:7},premiumSignatureText:{fontSize:6,fontWeight:'900',letterSpacing:.6},buyButton:{minHeight:40,borderRadius:11,alignItems:'center',justifyContent:'center',marginTop:10},buyText:{color:'#07111F',fontSize:8,fontWeight:'900'},storeActions:{flexDirection:'row',gap:6,alignItems:'center',marginTop:10},ownedBadge:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:4},ownedText:{color:'#9CEFC1',fontSize:7,fontWeight:'900'},equipButton:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:10,alignItems:'center',justifyContent:'center'},equipText:{fontSize:7,fontWeight:'900'},
+  storeGrid:{flexDirection:'row',flexWrap:'wrap',gap:9},storeCard:{flexGrow:1,flexBasis:190,minWidth:180,maxWidth:310,minHeight:220,borderRadius:19,borderWidth:1,padding:12,position:'relative',overflow:'hidden'},storeGlow:{position:'absolute',width:170,height:170,borderRadius:999,right:-72,top:-78},storeEdge:{position:'absolute',left:0,right:0,top:0,height:2},storeTop:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',zIndex:2},storeIcon:{width:43,height:43,borderRadius:14,borderWidth:1,alignItems:'center',justifyContent:'center'},rarityBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},rarityDot:{width:5,height:5,borderRadius:999},rarityText:{fontSize:6.5,fontWeight:'900'},storePreview:{height:82,borderRadius:14,borderWidth:1,marginTop:10,position:'relative',overflow:'hidden',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9,paddingHorizontal:9},previewGlow:{position:'absolute',width:130,height:130,borderRadius:999,right:-55,top:-70,opacity:.13},previewLabel:{position:'absolute',left:8,bottom:5,fontSize:5.5,fontWeight:'900',letterSpacing:.55},previewAvatarFrame:{width:47,height:47,borderRadius:16,borderWidth:2,padding:4,alignItems:'center',justifyContent:'center'},previewAvatar:{width:'100%',height:'100%',borderRadius:11,alignItems:'center',justifyContent:'center'},previewPlanet:{position:'absolute',right:14,top:10,width:36,height:36,borderRadius:999,opacity:.18},previewHorizon:{position:'absolute',left:-15,right:-15,bottom:13,height:35,borderTopWidth:1,borderRadius:999,opacity:.55},previewCard:{width:39,height:54,borderRadius:7,borderWidth:2,alignItems:'center',justifyContent:'center'},previewCardLine:{position:'absolute',left:5,right:5,bottom:6,height:2,borderRadius:999},previewDeck:{width:58,height:56,position:'relative'},previewDeckCard:{position:'absolute',right:3,top:3,width:38,height:51,borderRadius:7,borderWidth:2,alignItems:'center',justifyContent:'center'},previewDeckBack:{left:2,right:undefined,top:0,transform:[{rotate:'-8deg'}],opacity:.65},previewStore:{width:58,height:47,borderRadius:9,borderWidth:1,alignItems:'center',justifyContent:'center',overflow:'hidden'},previewStoreAwning:{position:'absolute',left:0,right:0,top:0,height:9},previewFxRing:{width:52,height:52,borderRadius:999,borderWidth:2,alignItems:'center',justifyContent:'center'},previewFxCore:{width:30,height:30,borderRadius:10,alignItems:'center',justifyContent:'center'},previewAward:{width:52,height:52,borderRadius:17,borderWidth:1,alignItems:'center',justifyContent:'center'},storeName:{fontSize:14,fontWeight:'900',marginTop:10},storeCategory:{fontSize:7,fontWeight:'900',letterSpacing:.7,marginTop:2},storeDesc:{fontSize:8,lineHeight:12,marginTop:5,flex:1},premiumSignature:{flexDirection:'row',alignItems:'center',gap:4,marginTop:7},premiumSignatureText:{fontSize:6,fontWeight:'900',letterSpacing:.6},buyButton:{minHeight:40,borderRadius:11,alignItems:'center',justifyContent:'center',marginTop:10},buyText:{color:'#07111F',fontSize:8,fontWeight:'900'},storeActions:{flexDirection:'row',gap:6,alignItems:'center',marginTop:10},ownedBadge:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:4},ownedText:{color:'#9CEFC1',fontSize:7,fontWeight:'900'},equipButton:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:10,alignItems:'center',justifyContent:'center'},equipText:{fontSize:7,fontWeight:'900'},
   sectionHeaderRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap'},smallButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},smallText:{fontSize:7,fontWeight:'900'},
   museumGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},museumSlot:{width:122,minHeight:175,borderRadius:17,borderWidth:1,padding:8,alignItems:'center',justifyContent:'flex-end',position:'relative',overflow:'hidden'},museumSlotNumber:{position:'absolute',left:7,top:7,zIndex:3,borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:3},museumSlotNumberText:{fontSize:6,fontWeight:'900'},museumCardHalo:{position:'absolute',width:105,height:105,borderRadius:999,top:18,opacity:.13},museumEmptyIcon:{width:52,height:70,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center',marginBottom:14},museumImage:{width:78,height:108,zIndex:2},museumPedestal:{width:72,height:3,borderRadius:999,opacity:.75,marginTop:2},museumName:{fontSize:9,fontWeight:'900',marginTop:6,maxWidth:102},museumMeta:{fontSize:7,marginTop:2,textAlign:'center',maxWidth:102},
   simpleCard:{flexGrow:1,flexBasis:180,minWidth:170,maxWidth:280,borderRadius:17,borderWidth:1,padding:12,gap:6},simpleTitle:{fontSize:12,fontWeight:'900'},
