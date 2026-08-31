@@ -13,6 +13,18 @@ export type EconomyStoreItem = {
   quantity?: number;
 };
 
+export type VisualStyleOption = {
+  id:string;
+  category:EconomyStoreItem['category'];
+  name:string;
+  description:string;
+  icon:string;
+  rarity:string;
+  effect:string;
+  universalTheme:boolean;
+  applyCost:number;
+};
+
 export type EconomySinkHub = {
   live: boolean;
   adminPreview: boolean;
@@ -66,6 +78,8 @@ function economyError(message:string) {
     ['ITEM_NOT_FOR_SALE','Este item só pode ser obtido por evento ou leilão.'],
     ['ITEM_NOT_OWNED','Você ainda não possui este item.'],
     ['STYLE_NOT_OWNED','Compre este estilo antes de aplicá-lo.'],
+    ['STYLE_NOT_OWNED_OR_INCOMPATIBLE','Este tema não está disponível para esta carta/deck ou não pertence à sua coleção.'],
+    ['INVALID_STYLE_SURFACE','Superfície de personalização inválida.'],
     ['CARD_NOT_OWNED','Esta carta não está mais na sua Bag.'],
     ['DECK_NOT_OWNED','Este deck não pertence mais à sua conta.'],
     ['PRESTIGE_REQUIRES_LEVEL_5','O Prestígio de Trainer é liberado no nível 5.'],
@@ -220,6 +234,24 @@ export async function getMyCardEconomyStyle(cardId:string):Promise<{id:string;na
   if(itemError) throw itemError;
   return item ? {id:String(item.id),name:String(item.name),icon:String(item.icon??'color-wand'),rarity:String(item.rarity??'standard')} : null;
 }
+
+export async function getMyVisualStyleOptions(surface:'card'|'deck'):Promise<VisualStyleOption[]>{
+  const value:any=await rpc('get_my_visual_style_options',{p_surface:surface});
+  return Array.isArray(value)?value.map((item:any)=>({
+    id:String(item?.id??''),
+    category:String(item?.category??'card_style') as EconomyStoreItem['category'],
+    name:String(item?.name??'Tema'),
+    description:String(item?.description??''),
+    icon:String(item?.icon??'color-wand'),
+    rarity:String(item?.rarity??'standard'),
+    effect:String(item?.effect??'flow'),
+    universalTheme:Boolean(item?.universalTheme),
+    applyCost:Number(item?.applyCost??0),
+  })):[];
+}
+
+export const clearCardEconomyStyle=(cardId:string)=>rpc('clear_card_economy_style',{p_card_id:cardId});
+export const clearDeckEconomyStyle=(deckId:string)=>rpc('clear_deck_economy_style',{p_deck_id:deckId});
 
 export const purchaseEconomyItem=(itemId:string)=>rpc('purchase_economy_item',{p_item_id:itemId});
 export const equipEconomyItem=(itemId:string)=>rpc('equip_economy_item',{p_item_id:itemId});
