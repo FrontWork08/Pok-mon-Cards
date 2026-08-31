@@ -66,6 +66,7 @@ function simulate(model) {
     let packs = 0;
     let minted = START_COINS;
     let burned = 0;
+    let packBudget = 0;
 
     for (let day = 0; day < DAYS; day += 1) {
       const active = random() < Math.min(1, profile.activity + .12);
@@ -81,18 +82,20 @@ function simulate(model) {
       minted += eventLeak;
 
       const targetSpend = Math.floor(dailyMint * profile.spendShare);
+      packBudget += targetSpend;
       const packPriceNoise = .70 + random() * .75;
       const effectivePackPrice = Math.max(
         model.packFloor,
         Math.round(model.medianPack * packPriceNoise / 500) * 500,
       );
       const affordable = Math.floor(coins / effectivePackPrice);
-      const wanted = Math.max(0, Math.floor(targetSpend / effectivePackPrice));
+      const wanted = Math.max(0, Math.floor(packBudget / effectivePackPrice));
       const opened = Math.min(affordable, wanted);
 
       if (opened > 0) {
         const spend = opened * effectivePackPrice;
         coins -= spend;
+        packBudget = Math.max(0, packBudget - spend);
         burned += spend;
         packs += opened;
 
