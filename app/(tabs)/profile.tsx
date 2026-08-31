@@ -18,7 +18,7 @@ import { changeUsername } from '@/services/playerActions';
 import { getTrainerRank } from '@/services/ranks';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
-import { AuraFrame } from '@/components/AuraFrame';
+import { PremiumProfileFrame } from '@/components/PremiumProfileFrame';
 import { getThemeVisual } from '@/theme/themeCatalog';
 
 export default function ProfileScreen() {
@@ -189,11 +189,10 @@ export default function ProfileScreen() {
     {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={20} color="#FF9FAF" /><Text style={styles.errorText}>{error}</Text></View> : null}
 
     {premiumFlow ? (
-      <AuraFrame
+      <PremiumProfileFrame
+        frameId={frameDefinition?.id ?? backgroundDefinition?.id ?? null}
         primaryColor={galaxyFlow ? '#8B5CFF' : profileFrameColor}
         secondaryColor={galaxyFlow ? '#55E6FF' : (backgroundDefinition?.primary_color ?? colors.yellow)}
-        intensity={galaxyFlow ? 'master' : 'premium'}
-        variant={galaxyFlow ? 'galaxy' : 'energy'}
         radius={28}
       >
 <View style={[styles.hero, { backgroundColor: profileBackgroundColor, borderColor: profileFrameColor, borderWidth: frameDefinition ? 2 : 1 }]}><View style={[styles.heroGlow,{backgroundColor:profileFrameColor}]} /><Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/><View style={styles.avatarEditor}>
@@ -209,7 +208,7 @@ export default function ProfileScreen() {
     <Text style={[styles.avatarQuickEditText,{color:colors.text}]}>ALTERAR FOTO</Text>
   </Pressable>
 </View><View style={styles.heroInfo}><Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER CARD • 1.0</Text><View style={styles.usernameRow}><Text style={[styles.rankSymbol, { color: colors.yellow }]}>{trainerRank.symbol}</Text><Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>@{profile?.username ?? '---'}</Text><Pressable accessibilityLabel="Alterar nickname" onPress={openNicknameEditor} style={[styles.editNameButton, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="pencil" size={14} color={colors.yellow} /></Pressable></View>{equippedDefinition ? <Text style={[styles.equippedTitle, { color: colors.yellow }]}>{equippedDefinition.icon} {equippedDefinition.title}</Text> : null}{frameDefinition || backgroundDefinition ? <Text style={[styles.cosmeticLabel, { color: profileFrameColor }]}>{frameDefinition?.name ?? 'Sem moldura'} • {backgroundDefinition?.name ?? 'Sem background'}</Text> : null}<Text style={[styles.meta, { color: colors.muted }]}>Nível {profile?.level ?? 1} • {xp.toLocaleString('pt-BR')} XP • {trainerRank.displayName} • ELO {profile?.battle_rating ?? 1000}</Text></View><View style={[styles.coinBox, { backgroundColor: colors.surface }]}><Text style={[styles.coinLabel, { color: colors.muted }]}>CARTEIRA</Text><Text style={[styles.coins, { color: colors.yellow }]}>🪙 {coins.toLocaleString('pt-BR')}</Text><Text style={[styles.coins, { color: '#68D9FF' }]}>💎 {Number(profile?.diamonds ?? 0).toLocaleString('pt-BR')}</Text></View></View>
-      </AuraFrame>
+      </PremiumProfileFrame>
     ) : (
 <View style={[styles.hero, { backgroundColor: profileBackgroundColor, borderColor: profileFrameColor, borderWidth: frameDefinition ? 2 : 1 }]}><View style={[styles.heroGlow,{backgroundColor:profileFrameColor}]} /><Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/><View style={styles.avatarEditor}>
   <TrainerAvatar icon={profile?.profile_icon} avatarUrl={avatarUrl} color={profileFrameColor} backgroundColor={backgroundDefinition?.primary_color ? backgroundDefinition.primary_color + '22' : colors.surfaceAlt} size={70}/>
