@@ -166,33 +166,8 @@ export function CompactTrainerBanner({
         style,
       ]}
     >
-      <View style={[styles.content,visual.galaxy&&styles.galaxyContent]}>{children}</View>
-      {visual.galaxy?(
-        <>
-          <View pointerEvents="none" style={styles.galaxyTopEdge}>
-            <GalaxyFlowOverlay intensity="master" opacity={0.92}/>
-          </View>
-          <View pointerEvents="none" style={styles.galaxyBottomEdge}>
-            <GalaxyFlowOverlay intensity="master" opacity={0.82}/>
-          </View>
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.galaxyCornerGlow,
-              styles.galaxyCornerLeft,
-              {backgroundColor:visual.primary,opacity:Animated.multiply(pulse,.22)},
-            ]}
-          />
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.galaxyCornerGlow,
-              styles.galaxyCornerRight,
-              {backgroundColor:visual.secondary,opacity:Animated.multiply(pulse,.18)},
-            ]}
-          />
-        </>
-      ):null}
+      <View style={styles.content}>{children}</View>
+      {visual.galaxy?<GalaxyFlowOverlay intensity="premium" opacity={0.72}/>:null}
 
       <Animated.View
         pointerEvents="none"
@@ -298,7 +273,6 @@ const styles=StyleSheet.create({
     borderWidth:2,
   },
   content:{position:'relative',zIndex:2},
-  galaxyContent:{zIndex:30},
   outerPulse:{
     ...StyleSheet.absoluteFillObject,
     margin:1,
@@ -347,35 +321,8 @@ const styles=StyleSheet.create({
     margin:4,
     borderRadius:13,
     borderWidth:.8,
-    zIndex:31,
+    zIndex:7,
   },
-  galaxyTopEdge:{
-    position:'absolute',
-    left:0,
-    right:0,
-    top:0,
-    height:7,
-    overflow:'hidden',
-    zIndex:35,
-  },
-  galaxyBottomEdge:{
-    position:'absolute',
-    left:0,
-    right:0,
-    bottom:0,
-    height:7,
-    overflow:'hidden',
-    zIndex:35,
-  },
-  galaxyCornerGlow:{
-    position:'absolute',
-    width:32,
-    height:32,
-    borderRadius:999,
-    zIndex:34,
-  },
-  galaxyCornerLeft:{left:-20,top:-13},
-  galaxyCornerRight:{right:-20,bottom:-13},
   gem:{position:'absolute',width:7,height:7,borderRadius:2,zIndex:12},
   gemTL:{left:7,top:7},
   gemBR:{right:7,bottom:7},
