@@ -15,7 +15,7 @@ export function Screen({ title, subtitle, children }: PropsWithChildren<{ title:
         contentContainerStyle={[
           styles.content,
           Platform.OS !== 'web' && styles.contentMobile,
-          { paddingTop: 12 },
+          { paddingTop: 9 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -31,7 +31,7 @@ export function Screen({ title, subtitle, children }: PropsWithChildren<{ title:
 const styles = StyleSheet.create({
   safe: { flex: 1, overflow: 'hidden' },
   scroll: { flex: 1, backgroundColor: 'transparent' },
-  content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 118 },
+  content: { paddingHorizontal: 14, paddingTop: 9, paddingBottom: 108 },
   contentMobile: { paddingBottom: 28 },
-  inner: { width: '100%', maxWidth: 1280, alignSelf: 'center', gap: 16 },
+  inner: { width: '100%', maxWidth: 1220, alignSelf: 'center', gap: 12 },
 });
