@@ -234,7 +234,7 @@ export const boostMyMarketShop=(tier:'24h'|'72h'|'168h')=>rpc('boost_my_market_s
 export const contributeGuildProject=(amount:number)=>rpc('contribute_guild_project',{p_amount:amount});
 export const contributeGlobalProject=(projectId:string,amount:number)=>rpc('contribute_global_economy_project',{p_project_id:projectId,p_amount:amount});
 export const placeEconomyAuctionBid=(auctionId:string,amount:number)=>rpc('place_economy_auction_bid',{p_auction_id:auctionId,p_amount:amount});
-export const purchaseGuildWarGymFlare=(gymId:string,flare:'banner'|'champion'|'legendary')=>rpc('purchase_guild_war_gym_flare',{p_gym_id:gymId,p_flare:flare});
+export const purchaseGuildWarGymFlare=(gymId:string,flare:'banner'|'champion'|'legendary'|'galaxy')=>rpc('purchase_guild_war_gym_flare',{p_gym_id:gymId,p_flare:flare});
 
 export function subscribeEconomySinks(onChange:()=>void){
   const channel=supabase.channel(`economy-sinks-${Date.now()}`)
