@@ -450,7 +450,12 @@ if (existsSync('src/components/CompactTrainerBanner.tsx')) {
   for (const theme of ['galaxy','master','crimson','champion','indigo']) {
     assert(compactIdentity.includes(`key.includes('${theme}')`) || compactIdentity.includes(`frame.includes('${theme}')`), `Regressão de identidade: banner compacto perdeu o tema ${theme}.`);
   }
-  assert(!compactIdentity.includes('Animated.loop'), 'Regressão de performance: banners de ranking não devem criar loops Animated por jogador.');
+  assert(compactIdentity.includes('const sharedFlow=new Animated.Value(0)'), 'Regressão de performance: banners densos devem compartilhar um único valor animado.');
+  assert(compactIdentity.includes('let sharedLoop:Animated.CompositeAnimation|null=null'), 'Regressão de performance: animação compacta perdeu o loop compartilhado.');
+  assert(compactIdentity.includes('sharedUsers'), 'Regressão de performance: animação compacta perdeu o controle global de assinantes.');
+  assert(compactIdentity.includes('styles.railTop') && compactIdentity.includes('translateX:railForward'), 'Regressão visual: fluxo animado superior do banner compacto foi removido.');
+  assert(compactIdentity.includes('styles.railBottom') && compactIdentity.includes('translateX:railBackward'), 'Regressão visual: fluxo animado inferior do banner compacto foi removido.');
+  assert(compactIdentity.indexOf('<View style={styles.content}>{children}</View>') < compactIdentity.indexOf('styles.railTop'), 'Regressão visual: efeitos compactos precisam ser renderizados acima do fundo opaco dos cards.');
   assert(compactIdentity.includes('railTop') && compactIdentity.includes('railBottom'), 'Regressão visual: banner compacto perdeu trilhos de energia.');
 }
 
