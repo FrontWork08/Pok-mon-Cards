@@ -206,22 +206,30 @@ export default function BattlesHubScreen() {
             const challenger = Array.isArray(item.challenger) ? item.challenger[0] : item.challenger;
             const cardStake = item.stake_type === 'card';
             return (
-              <View key={item.id} style={[styles.inviteRow, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]}>
-                <Pressable style={styles.grow} onPress={() => router.push(`/battle/${item.id}`)}>
-                  <Text style={[styles.name, { color: colors.text }]}>@{challenger?.username ?? 'Treinador'} desafiou você</Text>
-                  <Text style={[styles.sub, { color: colors.muted }]}>
-                    {item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {cardStake ? '🎴 valendo carta' : item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : 'Casual'}
-                  </Text>
-                </Pressable>
-                <View style={styles.inviteActions}>
-                  <Pressable disabled={working === item.id} onPress={() => { void respondInvite(item.id, false); }} style={[styles.inviteButton, { borderColor: '#69313A' }]}><Text style={{ color: '#FF8290', fontWeight: '900', fontSize: 9 }}>RECUSAR</Text></Pressable>
-                  {cardStake ? (
-                    <Pressable onPress={() => router.push(`/battle/${item.id}`)} style={[styles.inviteButton, { borderColor: colors.accent }]}><Text style={{ color: colors.accent, fontWeight: '900', fontSize: 9 }}>ABRIR</Text></Pressable>
-                  ) : (
-                    <Pressable disabled={working === item.id} onPress={() => { void respondInvite(item.id, true); }} style={[styles.inviteButton, { borderColor: colors.yellow, backgroundColor: colors.yellow }]}><Text style={{ color: '#07111F', fontWeight: '900', fontSize: 9 }}>ACEITAR</Text></Pressable>
-                  )}
+              <CompactTrainerBanner
+                key={item.id}
+                frameId={challenger?.equipped_frame_id}
+                backgroundId={challenger?.equipped_background_id}
+                fallbackColor={colors.yellow}
+              >
+                <View style={[styles.inviteRow, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]}>
+                  <TrainerAvatar icon={challenger?.profile_icon} avatarUrl={getProfileAvatarUrl(challenger?.avatar_path,challenger?.avatar_updated_at)} color={colors.yellow} backgroundColor={colors.accentSoft} size={39}/>
+                  <Pressable style={styles.grow} onPress={() => router.push(`/battle/${item.id}`)}>
+                    <Text style={[styles.name, { color: colors.text }]}>@{challenger?.username ?? 'Treinador'} desafiou você</Text>
+                    <Text style={[styles.sub, { color: colors.muted }]}>
+                      {item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {cardStake ? '🎴 valendo carta' : item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : 'Casual'}
+                    </Text>
+                  </Pressable>
+                  <View style={styles.inviteActions}>
+                    <Pressable disabled={working === item.id} onPress={() => { void respondInvite(item.id, false); }} style={[styles.inviteButton, { borderColor: '#69313A' }]}><Text style={{ color: '#FF8290', fontWeight: '900', fontSize: 9 }}>RECUSAR</Text></Pressable>
+                    {cardStake ? (
+                      <Pressable onPress={() => router.push(`/battle/${item.id}`)} style={[styles.inviteButton, { borderColor: colors.accent }]}><Text style={{ color: colors.accent, fontWeight: '900', fontSize: 9 }}>ABRIR</Text></Pressable>
+                    ) : (
+                      <Pressable disabled={working === item.id} onPress={() => { void respondInvite(item.id, true); }} style={[styles.inviteButton, { borderColor: colors.yellow, backgroundColor: colors.yellow }]}><Text style={{ color: '#07111F', fontWeight: '900', fontSize: 9 }}>ACEITAR</Text></Pressable>
+                    )}
+                  </View>
                 </View>
-              </View>
+              </CompactTrainerBanner>
             );
           })}
         </View>
@@ -416,7 +424,11 @@ export default function BattlesHubScreen() {
     <Modal visible={Boolean(opponent)} transparent animationType="fade" onRequestClose={() => setOpponent(null)}>
       <View style={styles.modalBackdrop}>
         <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.modalHeader}>{opponent ? <TrainerAvatar icon={opponent.profile_icon} avatarUrl={getProfileAvatarUrl(opponent.avatar_path,opponent.avatar_updated_at)} color={colors.yellow} backgroundColor={colors.accentSoft} size={46}/> : null}<View style={styles.grow}><Text style={[styles.modalTitle, { color: colors.text }]}>Desafiar @{opponent?.username}</Text><Text style={[styles.modalSubtitle, { color: colors.muted }]}>Configure o formato e o que estará valendo.</Text></View><Pressable onPress={() => setOpponent(null)}><Ionicons name="close" size={23} color={colors.muted}/></Pressable></View>
+          {opponent ? (
+            <CompactTrainerBanner frameId={opponent.equipped_frame_id} backgroundId={opponent.equipped_background_id} fallbackColor={colors.yellow}>
+              <View style={styles.modalHeader}><TrainerAvatar icon={opponent.profile_icon} avatarUrl={getProfileAvatarUrl(opponent.avatar_path,opponent.avatar_updated_at)} color={colors.yellow} backgroundColor={colors.accentSoft} size={46}/><View style={styles.grow}><Text style={[styles.modalTitle, { color: colors.text }]}>Desafiar @{opponent.username}</Text><Text style={[styles.modalSubtitle, { color: colors.muted }]}>Configure o formato e o que estará valendo.</Text></View><Pressable onPress={() => setOpponent(null)}><Ionicons name="close" size={23} color={colors.muted}/></Pressable></View>
+            </CompactTrainerBanner>
+          ) : null}
           <Text style={[styles.optionLabel, { color: colors.muted }]}>MODO</Text>
           <View style={styles.optionGrid}>{MODES.map((item) => <Pressable key={item.id} onPress={() => setMode(item.id)} style={[styles.option, { backgroundColor: mode === item.id ? colors.accentSoft : colors.surfaceAlt, borderColor: mode === item.id ? colors.accent : colors.border }]}><Text style={[styles.optionTitle, { color: colors.text }]}>{item.label}</Text><Text style={[styles.optionDetail, { color: colors.muted }]}>{item.detail}</Text></Pressable>)}</View>
           <Text style={[styles.optionLabel, { color: colors.muted }]}>APOSTA</Text>
