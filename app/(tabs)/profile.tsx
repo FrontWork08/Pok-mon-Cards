@@ -12,7 +12,7 @@ import {
   removeMyProfileAvatar,
   type PlayerProfile,
 } from '@/services/player';
-import { getMySocial } from '@/services/social';
+import { getMyFriendCount } from '@/services/social';
 import { formatUsd } from '@/services/market';
 import { changeUsername } from '@/services/playerActions';
 import { getTrainerRank } from '@/services/ranks';
@@ -39,14 +39,14 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     try {
       if (!loadedOnce.current) setLoading(true); setError(null);
-      const [p, s, social] = await Promise.all([
+      const [p, s, friends] = await Promise.all([
         getMyProfile(),
         getMyProfileStats(),
-        getMySocial(),
+        getMyFriendCount(),
       ]);
       setProfile(p);
       setStats(s);
-      setFriendCount(social.friends.length);
+      setFriendCount(friends);
       loadedOnce.current = true;
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível atualizar seu perfil.'); }
     finally { setLoading(false); }
