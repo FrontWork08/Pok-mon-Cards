@@ -18,6 +18,7 @@ import { Screen } from '@/components/Screen';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { AuraBanner } from '@/components/AuraBanner';
 import { GuildHeadquartersShowcase } from '@/components/GuildHeadquartersShowcase';
+import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { getMyBagPage } from '@/services/bag';
 import type { OwnedCardEntry } from '@/services/player';
@@ -61,6 +62,7 @@ function pct(value:number,target:number){
 
 function itemVisual(item:EconomyStoreItem){
   const key=`${item.rarity} ${item.id}`.toLowerCase();
+  if(item.metadata?.effect==='galaxy'||key.includes('galaxy')) return {primary:'#8B5CFF',secondary:'#55E6FF',tier:5};
   if(key.includes('legend')||key.includes('master')) return {primary:'#C493FF',secondary:'#8EE7FF',tier:4};
   if(key.includes('luxury')||key.includes('auction')) return {primary:'#FFD447',secondary:'#FF9F43',tier:3};
   if(key.includes('epic')) return {primary:'#B982FF',secondary:'#6A7CFF',tier:2};
@@ -199,7 +201,9 @@ export default function EconomyScreen(){
     );
   }
 
-  const permanentItems=hub?.storeItems??[];
+  const allPermanentItems=hub?.storeItems??[];
+  const galaxyItems=allPermanentItems.filter((item)=>item.metadata?.collection==='galaxy_flow');
+  const permanentItems=allPermanentItems.filter((item)=>item.metadata?.collection!=='galaxy_flow');
   const ownedCardStyles=(hub?.ownedItems??[]).filter((x)=>x.category==='card_style');
   const ownedDeckStyles=(hub?.ownedItems??[]).filter((x)=>x.category==='deck_style');
   const equipCategories=new Set<EconomyStoreItem['category']>(['profile_frame','profile_background','shop_theme','booster_fx','title']);
@@ -305,6 +309,37 @@ export default function EconomyScreen(){
           </View>
         </AuraBanner>
       </Section>
+
+      {galaxyItems.length ? <Section title="Coleção Galaxy Flow" icon="planet" subtitle="Linha lendária com nebulosa viva, partículas estelares, órbitas e fluxo cósmico.">
+        <AuraBanner
+          eyebrow="GALAXY FLOW COLLECTION"
+          title="O espaço agora flui pela sua coleção."
+          subtitle="Moldura, background, carta, deck, loja, booster e título com identidade galáctica. Os efeitos são visuais e não dão vantagem competitiva."
+          icon="planet"
+          primaryColor="#8B5CFF"
+          secondaryColor="#55E6FF"
+          intensity="master"
+          variant="galaxy"
+          badge="LEGENDARY"
+          minHeight={205}
+        >
+          <View style={styles.galaxyCollectionMeta}>
+            <View style={[styles.galaxyCollectionPill,{borderColor:'#8B5CFF',backgroundColor:'#1A1130'}]}><Ionicons name="sparkles" size={13} color="#D8B8FF"/><Text style={styles.galaxyCollectionText}>NEBULOSA VIVA</Text></View>
+            <View style={[styles.galaxyCollectionPill,{borderColor:'#55E6FF',backgroundColor:'#0D2430'}]}><Ionicons name="star" size={13} color="#8EE7FF"/><Text style={styles.galaxyCollectionText}>PARTÍCULAS ESTELARES</Text></View>
+            <View style={[styles.galaxyCollectionPill,{borderColor:'#E056FD',backgroundColor:'#28112C'}]}><Ionicons name="sync" size={13} color="#F3A5FF"/><Text style={styles.galaxyCollectionText}>FLUXO CÓSMICO</Text></View>
+          </View>
+        </AuraBanner>
+        <View style={styles.storeGrid}>
+          {galaxyItems.map((item)=><StoreCard
+            key={item.id}
+            item={item}
+            busy={busy===`buy:${item.id}`||busy===`equip:${item.id}`}
+            canEquip={item.owned&&equipCategories.has(item.category)}
+            onBuy={()=>buy(item)}
+            onEquip={()=>void run(`equip:${item.id}`,()=>equipEconomyItem(item.id),`${item.name} equipado.`)}
+          />)}
+        </View>
+      </Section> : null}
 
       <Section title="Loja permanente" icon="bag-handle" subtitle="Cosméticos, temas, efeitos, títulos e estilos. Tudo puramente visual.">
         <View style={styles.storeGrid}>
@@ -549,7 +584,9 @@ function Metric({label,value,icon}:{label:string;value:string;icon:keyof typeof 
 function StoreCard({item,busy,canEquip,onBuy,onEquip}:{item:EconomyStoreItem;busy:boolean;canEquip:boolean;onBuy:()=>void;onEquip:()=>void}){
   const {colors}=useAppTheme();
   const visual=itemVisual(item);
+  const galaxy=item.metadata?.effect==='galaxy'||item.id.includes('galaxy');
   return <View style={[styles.storeCard,{backgroundColor:colors.surface,borderColor:item.owned?visual.primary:visual.tier>=2?`${visual.primary}99`:colors.border,borderWidth:visual.tier>=3?1.5:1}]}>
+    {galaxy?<GalaxyFlowOverlay intensity="master" opacity={.78}/>:null}
     <View pointerEvents="none" style={[styles.storeGlow,{backgroundColor:visual.primary,opacity:visual.tier>=3?.18:visual.tier>=1?.10:.05}]}/>
     <View pointerEvents="none" style={[styles.storeEdge,{backgroundColor:visual.secondary,opacity:visual.tier>=3?.75:.28}]}/>
     <View style={styles.storeTop}>
@@ -560,14 +597,15 @@ function StoreCard({item,busy,canEquip,onBuy,onEquip}:{item:EconomyStoreItem;bus
     <Text style={[styles.storeName,{color:colors.text}]}>{item.name}</Text>
     <Text style={[styles.storeCategory,{color:visual.primary}]}>{categoryLabel(item.category).toUpperCase()}</Text>
     <Text style={[styles.storeDesc,{color:colors.muted}]}>{item.description}</Text>
-    {visual.tier>=3?<View style={styles.premiumSignature}><Ionicons name="sparkles" size={12} color={visual.secondary}/><Text style={[styles.premiumSignatureText,{color:visual.secondary}]}>PREMIUM VISUAL</Text></View>:null}
+    {visual.tier>=3?<View style={styles.premiumSignature}><Ionicons name={galaxy?'planet':'sparkles'} size={12} color={visual.secondary}/><Text style={[styles.premiumSignatureText,{color:visual.secondary}]}>{galaxy?'GALAXY FLOW':'PREMIUM VISUAL'}</Text></View>:null}
     {item.owned?<View style={styles.storeActions}><View style={[styles.ownedBadge,{backgroundColor:'#153426',borderColor:'#2F9E68'}]}><Ionicons name="checkmark" size={13} color="#65D894"/><Text style={styles.ownedText}>ADQUIRIDO</Text></View>{canEquip?<Pressable disabled={busy} onPress={onEquip} style={[styles.equipButton,{borderColor:visual.primary,backgroundColor:`${visual.primary}12`}]}>{busy?<ActivityIndicator size="small" color={visual.primary}/>:<Text style={[styles.equipText,{color:visual.primary}]}>EQUIPAR</Text>}</Pressable>:null}</View>:<Pressable disabled={busy} onPress={onBuy} style={[styles.buyButton,{backgroundColor:visual.tier>=3?visual.primary:colors.yellow}]}>{busy?<ActivityIndicator color="#07111F"/>:<Text style={styles.buyText}>COMPRAR • {coins(item.priceCoins)}</Text>}</Pressable>}
   </View>;
 }
 
 function StorePreview({item,primary,secondary}:{item:EconomyStoreItem;primary:string;secondary:string}){
   const {colors}=useAppTheme();
-  const common=<View pointerEvents="none" style={[styles.previewGlow,{backgroundColor:primary}]}/>;
+  const galaxy=item.metadata?.effect==='galaxy'||item.id.includes('galaxy');
+  const common=<>{galaxy?<GalaxyFlowOverlay intensity="master" opacity={.72}/>:null}<View pointerEvents="none" style={[styles.previewGlow,{backgroundColor:primary}]}/></>;
   if(item.category==='profile_frame'){
     return <View style={[styles.storePreview,{backgroundColor:colors.surfaceAlt,borderColor:`${primary}70`}]}>
       {common}
@@ -668,6 +706,9 @@ function ProgressSink({title,subtitle,current,target,my,colors,onSpend,busy}:{ti
 const styles=StyleSheet.create({
   topRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'},
   bannerStats:{flexDirection:'row',flexWrap:'wrap',gap:7},
+  galaxyCollectionMeta:{flexDirection:'row',flexWrap:'wrap',gap:7},
+  galaxyCollectionPill:{minHeight:34,borderRadius:999,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},
+  galaxyCollectionText:{color:'#F6F8FC',fontSize:6.5,fontWeight:'900',letterSpacing:.5},
   bannerStat:{flexGrow:1,minWidth:135,borderRadius:13,borderWidth:1,padding:10},
   bannerStatLabel:{fontSize:6.5,fontWeight:'900',letterSpacing:.65},
   bannerStatValue:{fontSize:13,fontWeight:'900',marginTop:3},
