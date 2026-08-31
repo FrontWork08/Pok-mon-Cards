@@ -90,6 +90,11 @@ function storeError(message:string){
     ['NOT_ENOUGH_COINS','Você não tem Coins suficientes para esta compra.'],
     ['ITEM_NOT_OWNED','Você ainda não possui este item.'],
     ['ITEM_NOT_EQUIPPABLE','Este item é aplicado em uma tela específica, como Carta ou Deck.'],
+    ['INVALID_GIFT_RECIPIENT','Escolha um amigo válido para receber o presente.'],
+    ['GIFT_RECIPIENT_NOT_FRIEND','Você só pode presentear pessoas da sua lista de amigos.'],
+    ['GIFT_RECIPIENT_NOT_AVAILABLE','Esse amigo não está disponível para receber presentes agora.'],
+    ['ITEM_NOT_GIFTABLE','Este item não pode ser enviado como presente.'],
+    ['GIFT_RECIPIENT_ALREADY_OWNS','Esse amigo já possui a quantidade máxima deste item.'],
   ];
   return new Error(known.find(([key])=>message.includes(key))?.[1]??message);
 }
@@ -104,4 +109,25 @@ export async function equipTrainerStoreItem(itemId:string){
   const {data,error}=await supabase.rpc('equip_economy_item',{p_item_id:itemId});
   if(error) throw storeError(error.message);
   return data as {ok:boolean;itemId:string;category:string};
+}
+
+export async function giftTrainerStoreItem(itemId:string,recipientId:string,message:string){
+  const cleanMessage=message.trim().slice(0,180);
+  const {data,error}=await supabase.rpc('gift_trainer_store_item',{
+    p_item_id:itemId,
+    p_recipient_id:recipientId,
+    p_message:cleanMessage,
+  });
+  if(error) throw storeError(error.message);
+  return data as {
+    ok:boolean;
+    giftId:string;
+    recipientId:string;
+    recipientName:string;
+    itemId:string;
+    itemName:string;
+    spentCoins:number;
+    coins:number;
+    message:string;
+  };
 }
