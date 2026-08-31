@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -48,20 +48,21 @@ export default function GuildsScreen() {
   const [results, setResults] = useState<any[]>([]);
   const [collectiveOpen, setCollectiveOpen] = useState(false);
   const [avatars, setAvatars] = useState<Record<string, PlayerAvatarMeta>>({});
+  const loadedOnce = useRef(false);
 
   const load = useCallback(async (silent = false) => {
     try {
-      if (!silent) setLoading(true);
+      if (!silent && !loadedOnce.current) setLoading(true);
       setError(null);
-      const [next, economy] = await Promise.all([
-        getGuildHub(),
-        getEconomySinkHub().catch(() => null),
-      ]);
+      const next = await getGuildHub();
       setHub(next);
-      setEconomyHub(economy);
       setSelectedId((current) => current ?? next.myMembership?.guildId ?? next.guilds[0]?.id ?? null);
+      loadedOnce.current = true;
+      if (!silent) setLoading(false);
+
       const memberIds = next.guilds.flatMap((guild) => guild.members.map((member) => member.id));
-      setAvatars(await getPlayerAvatarMap(memberIds).catch(() => ({})));
+      void getPlayerAvatarMap(memberIds).then(setAvatars).catch(() => null);
+      void getEconomySinkHub().then(setEconomyHub).catch(() => null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível carregar as guildas.');
     } finally {
