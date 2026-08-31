@@ -19,6 +19,7 @@ import {
   type VisualStyleOption,
 } from '@/services/economy';
 import { AuraFrame } from '@/components/AuraFrame';
+import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { useWallet } from '@/wallet/WalletProvider';
 
 function economyStylePalette(id:string,accent:string,yellow:string){
@@ -157,13 +158,43 @@ export default function CardDetailScreen() {
     <View style={[
       styles.imagePanel,
       {
-        backgroundColor: colors.surface,
+        backgroundColor: economyStyle ? '#15111C' : colors.surface,
         borderColor: stylePrimary,
         borderWidth: economyStyle ? 2 : 1,
       },
     ]}>
-      {economyStyle ? <View style={[styles.economyStyleBadge,{backgroundColor:colors.surfaceAlt,borderColor:stylePrimary}]}><Ionicons name={(economyStyle.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={14} color={stylePrimary}/><Text style={[styles.economyStyleBadgeText,{color:colors.text}]}>{economyStyle.name.toUpperCase()}</Text></View> : null}
-      {card.image_large || card.image_small ? <Image source={{ uri: card.image_large ?? card.image_small ?? '' }} resizeMode="contain" style={[styles.image,economyStyle&&styles.styledCardImage]} /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.surfaceAlt }]}><Ionicons name="image-outline" size={56} color={colors.muted} /></View>}
+      {economyStyle ? (
+        <>
+          <View pointerEvents="none" style={[styles.panelThemeWash,{backgroundColor:stylePrimary}]} />
+          <View pointerEvents="none" style={[styles.panelThemeGlowA,{backgroundColor:stylePrimary}]} />
+          <View pointerEvents="none" style={[styles.panelThemeGlowB,{backgroundColor:styleSecondary}]} />
+        </>
+      ) : null}
+
+      {economyStyle ? <View style={[styles.economyStyleBadge,{backgroundColor:'#15111CDD',borderColor:stylePrimary}]}><Ionicons name={(economyStyle.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={14} color={stylePrimary}/><Text style={[styles.economyStyleBadgeText,{color:colors.text}]}>{economyStyle.name.toUpperCase()}</Text></View> : null}
+
+      <View style={[
+        styles.cardImageStage,
+        economyStyle && {
+          borderColor: stylePrimary,
+          backgroundColor: '#09070D',
+        },
+      ]}>
+        {card.image_large || card.image_small ? (
+          <Image source={{ uri: card.image_large ?? card.image_small ?? '' }} resizeMode="contain" style={styles.image} />
+        ) : (
+          <View style={[styles.imagePlaceholder, { backgroundColor: colors.surfaceAlt }]}><Ionicons name="image-outline" size={56} color={colors.muted} /></View>
+        )}
+
+        {economyStyle ? (
+          <>
+            <View pointerEvents="none" style={[styles.cardThemeWash,{backgroundColor:stylePrimary}]} />
+            <View pointerEvents="none" style={[styles.cardThemeEdge,{borderColor:styleSecondary}]} />
+            {galaxyStyle ? <GalaxyFlowOverlay intensity="master" opacity={0.72} /> : null}
+          </>
+        ) : null}
+      </View>
+
       {economyStyle ? <View pointerEvents="none" style={[styles.economyStyleGlow,{borderColor:stylePrimary}]} /> : null}
     </View>
   ) : null;
@@ -180,17 +211,20 @@ export default function CardDetailScreen() {
         {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={20} color="#FF9C9C" /><Text style={styles.errorText}>{error}</Text></View> : null}
 
         {!loading && card ? <View style={styles.layout}>
-          {economyStyle ? (
-            <AuraFrame
-              primaryColor={stylePrimary}
-              secondaryColor={styleSecondary}
-              intensity={economyStyle.id.includes('master')||galaxyStyle?'master':'premium'}
-              variant={galaxyStyle?'galaxy':'energy'}
-              radius={26}
-            >
-              {cardArt}
-            </AuraFrame>
-          ) : cardArt}
+          <View style={styles.imageColumn}>
+            {economyStyle ? (
+              <AuraFrame
+                primaryColor={stylePrimary}
+                secondaryColor={styleSecondary}
+                intensity={economyStyle.id.includes('master')||economyStyle.id.includes('celestial')||galaxyStyle?'master':'premium'}
+                variant={galaxyStyle?'galaxy':'energy'}
+                radius={26}
+                style={styles.cardAuraShell}
+              >
+                {cardArt}
+              </AuraFrame>
+            ) : cardArt}
+          </View>
           <View style={[styles.infoPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>#{card.pokedex_numbers?.[0] ?? '---'} • {card.set_id.toUpperCase()}</Text>
             <Text style={[styles.name, { color: colors.text }]}>{card.pokemon_name}</Text>
@@ -289,7 +323,22 @@ function Info({ label, value }: { label: string; value: string }) { const { colo
 
 const styles = StyleSheet.create({
   safe: { flex: 1 }, content: { width: '100%', maxWidth: 1180, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 44, gap: 18 }, topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, topTitle: { fontSize: 11, fontWeight: '900', letterSpacing: 1.5 }, iconButton: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 }, errorBox: { flexDirection: 'row', gap: 9, alignItems: 'center', borderRadius: 16, padding: 13, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' }, errorText: { color: '#FFD7D7', fontWeight: '700', flex: 1 },
-  layout: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start', justifyContent: 'center' }, imagePanel: { flexGrow: 1, flexBasis: 330, maxWidth: 480, minHeight: 470, borderRadius: 26, padding: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, position:'relative', overflow:'hidden' }, economyStyleBadge:{position:'absolute',zIndex:3,left:14,top:14,borderRadius:999,borderWidth:1,paddingHorizontal:9,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:5},economyStyleBadgeText:{fontSize:7,fontWeight:'900',letterSpacing:.5},economyStyleGlow:{position:'absolute',left:8,right:8,top:8,bottom:8,borderRadius:21,borderWidth:2,opacity:.45},styledCardImage:{transform:[{scale:.98}]}, image: { width: '100%', height: 570, maxHeight: 570 }, imagePlaceholder: { width: '100%', height: 480, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, infoPanel: { flexGrow: 1, flexBasis: 320, maxWidth: 560, borderRadius: 26, padding: 22, borderWidth: 1 }, kicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }, name: { fontSize: 34, lineHeight: 40, fontWeight: '900', marginTop: 5 }, rarity: { fontSize: 14, fontWeight: '700', marginTop: 4 },
+  layout: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start', justifyContent: 'center' },
+  imageColumn:{flexGrow:1,flexBasis:330,maxWidth:480,minWidth:280,width:'100%',alignSelf:'stretch'},
+  cardAuraShell:{width:'100%',alignSelf:'stretch'},
+  imagePanel:{width:'100%',minHeight:590,borderRadius:26,padding:16,alignItems:'center',justifyContent:'center',borderWidth:1,position:'relative',overflow:'hidden'},
+  economyStyleBadge:{position:'absolute',zIndex:20,left:14,top:14,borderRadius:999,borderWidth:1,paddingHorizontal:9,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:5},
+  economyStyleBadgeText:{fontSize:7,fontWeight:'900',letterSpacing:.5},
+  economyStyleGlow:{position:'absolute',left:8,right:8,top:8,bottom:8,borderRadius:21,borderWidth:2,opacity:.58,zIndex:12},
+  panelThemeWash:{...StyleSheet.absoluteFillObject,opacity:.10,zIndex:0},
+  panelThemeGlowA:{position:'absolute',width:250,height:250,borderRadius:999,right:-80,top:-95,opacity:.18,zIndex:0},
+  panelThemeGlowB:{position:'absolute',width:220,height:220,borderRadius:999,left:-75,bottom:-85,opacity:.14,zIndex:0},
+  cardImageStage:{width:'100%',height:570,maxHeight:570,borderRadius:20,borderWidth:1,borderColor:'transparent',overflow:'hidden',position:'relative',alignItems:'center',justifyContent:'center',zIndex:2},
+  cardThemeWash:{...StyleSheet.absoluteFillObject,opacity:.065,zIndex:4},
+  cardThemeEdge:{...StyleSheet.absoluteFillObject,borderWidth:2,borderRadius:18,opacity:.72,zIndex:6},
+  image:{width:'100%',height:'100%'},
+  imagePlaceholder:{width:'100%',height:'100%',borderRadius:18,alignItems:'center',justifyContent:'center'},
+  infoPanel: { flexGrow: 1, flexBasis: 320, maxWidth: 560, borderRadius: 26, padding: 22, borderWidth: 1 }, kicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }, name: { fontSize: 34, lineHeight: 40, fontWeight: '900', marginTop: 5 }, rarity: { fontSize: 14, fontWeight: '700', marginTop: 4 },
   cardActions: { flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:20 },
   flexAction: { flexGrow:1, minWidth:190, marginTop:0 },
   styleInfo:{marginTop:10,borderRadius:14,borderWidth:1,padding:10,flexDirection:'row',alignItems:'center',gap:8},styleInfoTitle:{fontSize:8,fontWeight:'900',letterSpacing:.65},styleInfoText:{fontSize:8,lineHeight:12,marginTop:2},
