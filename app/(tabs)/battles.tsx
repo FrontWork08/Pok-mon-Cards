@@ -7,6 +7,7 @@ import { Screen } from '@/components/Screen';
 import { createBattle, getBattleLeaderboard, getMyActiveBattle, getMyBattleHistory, rematchBattle, respondToBattle, type BattleMode, type BattleStakeType } from '@/services/battles';
 import { getMyBag, getMyProfile, getProfileAvatarUrl, type OwnedCardEntry } from '@/services/player';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { CompactTrainerBanner } from '@/components/CompactTrainerBanner';
 import { getTrainerRank } from '@/services/ranks';
 import { getMySocial, type SocialPlayer } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -336,14 +337,81 @@ export default function BattlesHubScreen() {
     </View>
 
     <View style={styles.sectionHead}><View><Text style={[styles.sectionTitle, { color: colors.text }]}>Desafiar um amigo</Text><Text style={[styles.sectionDescription, { color: colors.muted }]}>Escolha o treinador e configure a batalha aqui mesmo.</Text></View><Pressable onPress={() => router.push('/friends')}><Text style={[styles.sectionLink, { color: colors.accent }]}>AMIGOS</Text></Pressable></View>
-    {friends.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendList}>{friends.map((friend) => <Pressable key={friend.id} onPress={() => setOpponent(friend)} style={[styles.friend, { backgroundColor: colors.surface, borderColor: colors.border }]}><TrainerAvatar icon={friend.profile_icon} avatarUrl={getProfileAvatarUrl(friend.avatar_path,friend.avatar_updated_at)} color={colors.accent} backgroundColor={colors.accentSoft} size={48}/><Text numberOfLines={1} style={[styles.friendName, { color: colors.text }]}>@{friend.username}</Text><Text style={[styles.friendLevel, { color: colors.muted }]}>Nível {friend.level}</Text><View style={[styles.challengeTag, { backgroundColor: colors.yellow }]}><Ionicons name="flash" size={13} color="#07111F"/><Text style={styles.challengeTagText}>DESAFIAR</Text></View></Pressable>)}</ScrollView> : !loading ? <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="people-outline" size={32} color={colors.muted}/><Text style={[styles.emptyTitle, { color: colors.text }]}>Adicione amigos para desafiar</Text><Pressable onPress={() => router.push('/friends')} style={[styles.findFriends, { borderColor: colors.accent }]}><Text style={[styles.rematchText, { color: colors.accent }]}>ENCONTRAR TREINADORES</Text></Pressable></View> : null}
+    {friends.length ? (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendList}>
+        {friends.map((friend) => (
+          <CompactTrainerBanner
+            key={friend.id}
+            frameId={friend.equipped_frame_id}
+            backgroundId={friend.equipped_background_id}
+            fallbackColor={colors.accent}
+            style={styles.friendBanner}
+          >
+            <Pressable onPress={() => setOpponent(friend)} style={[styles.friend, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TrainerAvatar icon={friend.profile_icon} avatarUrl={getProfileAvatarUrl(friend.avatar_path,friend.avatar_updated_at)} color={colors.accent} backgroundColor={colors.accentSoft} size={48}/>
+              <Text numberOfLines={1} style={[styles.friendName, { color: colors.text }]}>@{friend.username}</Text>
+              <Text style={[styles.friendLevel, { color: colors.muted }]}>Nível {friend.level}</Text>
+              <View style={[styles.challengeTag, { backgroundColor: colors.yellow }]}><Ionicons name="flash" size={13} color="#07111F"/><Text style={styles.challengeTagText}>DESAFIAR</Text></View>
+            </Pressable>
+          </CompactTrainerBanner>
+        ))}
+      </ScrollView>
+    ) : !loading ? <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="people-outline" size={32} color={colors.muted}/><Text style={[styles.emptyTitle, { color: colors.text }]}>Adicione amigos para desafiar</Text><Pressable onPress={() => router.push('/friends')} style={[styles.findFriends, { borderColor: colors.accent }]}><Text style={[styles.rematchText, { color: colors.accent }]}>ENCONTRAR TREINADORES</Text></Pressable></View> : null}
 
     <View style={styles.sectionHead}><Text style={[styles.sectionTitle, { color: colors.text }]}>Ranking de Batalhas</Text><Text style={[styles.sectionMeta, { color: colors.muted }]}>TOP {leaderboard.length}</Text></View>
-    <View style={styles.list}>{leaderboard.map((player, index) => { const visible = player.id === profile?.id || player.show_battle_rating !== false; const rank = getTrainerRank(player.battle_rating); return <Pressable key={player.id} accessibilityRole="button" accessibilityLabel={`Abrir perfil de @${player.username}`} onPress={() => router.push(`/player/${player.id}`)} style={[styles.rankRow, { backgroundColor: colors.surface, borderColor: player.id === profile?.id ? colors.accent : colors.border }]}><View style={[styles.position, { backgroundColor: index < 3 ? colors.accentSoft : colors.surfaceAlt }]}><Text style={[styles.positionText, { color: index < 3 ? colors.accent : colors.muted }]}>{index + 1}</Text></View><TrainerAvatar icon={player.profile_icon} avatarUrl={getProfileAvatarUrl(player.avatar_path,player.avatar_updated_at)} color={colors.accent} backgroundColor={colors.accentSoft} size={42}/><View style={styles.grow}><Text style={[styles.name, { color: colors.text }]}>{visible ? rank.symbol + ' ' : ''}@{player.username}{player.id === profile?.id ? ' • você' : ''}</Text><Text style={[styles.sub, { color: colors.muted }]}>{visible ? rank.displayName : 'ELO oculto'} • {player.battle_wins}V • {player.battle_losses}D • streak {player.battle_streak}</Text></View><Text style={[styles.elo, { color: colors.yellow }]}>{visible ? player.battle_rating : '•••'}</Text><Ionicons name="chevron-forward" size={16} color={colors.muted}/></Pressable>; })}</View>
+    <View style={styles.list}>{leaderboard.map((player, index) => {
+      const visible = player.id === profile?.id || player.show_battle_rating !== false;
+      const rank = getTrainerRank(player.battle_rating);
+      const mine = player.id === profile?.id;
+      return (
+        <CompactTrainerBanner
+          key={player.id}
+          frameId={player.equipped_frame_id}
+          backgroundId={player.equipped_background_id}
+          fallbackColor={index < 3 ? colors.yellow : colors.accent}
+          selected={mine}
+        >
+          <Pressable accessibilityRole="button" accessibilityLabel={`Abrir perfil de @${player.username}`} onPress={() => router.push(`/player/${player.id}`)} style={[styles.rankRow, { backgroundColor: colors.surface, borderColor: mine ? colors.accent : colors.border }]}>
+            <View style={[styles.position, { backgroundColor: index < 3 ? colors.accentSoft : colors.surfaceAlt }]}><Text style={[styles.positionText, { color: index < 3 ? colors.accent : colors.muted }]}>{index + 1}</Text></View>
+            <TrainerAvatar icon={player.profile_icon} avatarUrl={getProfileAvatarUrl(player.avatar_path,player.avatar_updated_at)} color={colors.accent} backgroundColor={colors.accentSoft} size={42}/>
+            <View style={styles.grow}>
+              <Text style={[styles.name, { color: colors.text }]}>{visible ? rank.symbol + ' ' : ''}@{player.username}{mine ? ' • você' : ''}</Text>
+              <Text style={[styles.sub, { color: colors.muted }]}>{visible ? rank.displayName : 'ELO oculto'} • {player.battle_wins}V • {player.battle_losses}D • streak {player.battle_streak}</Text>
+            </View>
+            <Text style={[styles.elo, { color: colors.yellow }]}>{visible ? player.battle_rating : '•••'}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted}/>
+          </Pressable>
+        </CompactTrainerBanner>
+      );
+    })}</View>
 
     <View style={styles.sectionHead}><Text style={[styles.sectionTitle, { color: colors.text }]}>Minhas batalhas</Text><Text style={[styles.sectionMeta, { color: colors.muted }]}>{history.length}</Text></View>
     {!loading && history.length === 0 ? <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="game-controller-outline" size={35} color={colors.muted}/><Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma batalha ainda</Text><Text style={[styles.emptyText, { color: colors.muted }]}>Escolha um amigo acima e envie o primeiro desafio.</Text></View> : null}
-    <View style={styles.list}>{history.map((item) => { const mineChallenger = item.challenger_id === profile?.id; const other = mineChallenger ? (Array.isArray(item.opponent) ? item.opponent[0] : item.opponent) : (Array.isArray(item.challenger) ? item.challenger[0] : item.challenger); const won = item.status === 'completed' && item.winner_id === profile?.id; const before = mineChallenger ? item.challenger_rating_before : item.opponent_rating_before; const after = mineChallenger ? item.challenger_rating_after : item.opponent_rating_after; const delta = before != null && after != null ? Number(after) - Number(before) : 0; return <View key={item.id} style={[styles.battleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}><Pressable style={styles.battleBody} onPress={() => router.push(`/battle/${item.id}`)}><View style={[styles.resultIcon, { backgroundColor: won ? '#163426' : item.status === 'completed' ? '#391D26' : colors.surfaceAlt }]}><Ionicons name={won ? 'trophy' : item.status === 'completed' ? 'close-circle' : 'hourglass'} size={21} color={won ? '#63D99A' : item.status === 'completed' ? '#FF8290' : colors.muted}/></View><View style={styles.grow}><Text style={[styles.name, { color: colors.text }]}>{item.status === 'completed' ? (won ? 'Vitória' : 'Derrota') : 'Batalha ' + item.status} vs @{other?.username ?? 'Treinador'}</Text><Text style={[styles.sub, { color: colors.muted }]}>{item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : item.stake_type === 'card' ? '🎴 valendo carta' : 'Casual'} • {item.challenger_score}–{item.opponent_score}</Text><Text style={[styles.sub, { color: item.reward_eligible === false ? '#E6A15A' : colors.muted }]}>{item.completed_at ? new Date(item.completed_at).toLocaleString('pt-BR') : new Date(item.created_at).toLocaleString('pt-BR')}{item.status === 'completed' ? ` • ELO ${delta >= 0 ? '+' : ''}${delta}` : ''}{item.reward_eligible === false ? ' • sem XP/ELO anti-farm' : ''}</Text></View><Ionicons name="chevron-forward" size={18} color={colors.muted}/></Pressable>{item.status === 'completed' ? <Pressable style={[styles.rematch, { borderColor: colors.accent }]} onPress={() => rematch(item.id)} disabled={working === item.id}><Ionicons name="refresh" size={15} color={colors.accent}/><Text style={[styles.rematchText, { color: colors.accent }]}>{working === item.id ? 'CRIANDO...' : 'REVANCHE'}</Text></Pressable> : null}</View>; })}</View>
+    <View style={styles.list}>{history.map((item) => {
+      const mineChallenger = item.challenger_id === profile?.id;
+      const other:any = mineChallenger ? (Array.isArray(item.opponent) ? item.opponent[0] : item.opponent) : (Array.isArray(item.challenger) ? item.challenger[0] : item.challenger);
+      const won = item.status === 'completed' && item.winner_id === profile?.id;
+      const before = mineChallenger ? item.challenger_rating_before : item.opponent_rating_before;
+      const after = mineChallenger ? item.challenger_rating_after : item.opponent_rating_after;
+      const delta = before != null && after != null ? Number(after) - Number(before) : 0;
+      return (
+        <CompactTrainerBanner key={item.id} frameId={other?.equipped_frame_id} backgroundId={other?.equipped_background_id} fallbackColor={colors.accent}>
+          <View style={[styles.battleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Pressable style={styles.battleBody} onPress={() => router.push(`/battle/${item.id}`)}>
+              <View style={[styles.resultIcon, { backgroundColor: won ? '#163426' : item.status === 'completed' ? '#391D26' : colors.surfaceAlt }]}><Ionicons name={won ? 'trophy' : item.status === 'completed' ? 'close-circle' : 'hourglass'} size={21} color={won ? '#63D99A' : item.status === 'completed' ? '#FF8290' : colors.muted}/></View>
+              <TrainerAvatar icon={other?.profile_icon} avatarUrl={getProfileAvatarUrl(other?.avatar_path,other?.avatar_updated_at)} color={colors.accent} backgroundColor={colors.accentSoft} size={38}/>
+              <View style={styles.grow}>
+                <Text style={[styles.name, { color: colors.text }]}>{item.status === 'completed' ? (won ? 'Vitória' : 'Derrota') : 'Batalha ' + item.status} vs @{other?.username ?? 'Treinador'}</Text>
+                <Text style={[styles.sub, { color: colors.muted }]}>{item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : item.stake_type === 'card' ? '🎴 valendo carta' : 'Casual'} • {item.challenger_score}–{item.opponent_score}</Text>
+                <Text style={[styles.sub, { color: item.reward_eligible === false ? '#E6A15A' : colors.muted }]}>{item.completed_at ? new Date(item.completed_at).toLocaleString('pt-BR') : new Date(item.created_at).toLocaleString('pt-BR')}{item.status === 'completed' ? ` • ELO ${delta >= 0 ? '+' : ''}${delta}` : ''}{item.reward_eligible === false ? ' • sem XP/ELO anti-farm' : ''}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted}/>
+            </Pressable>
+            {item.status === 'completed' ? <Pressable style={[styles.rematch, { borderColor: colors.accent }]} onPress={() => rematch(item.id)} disabled={working === item.id}><Ionicons name="refresh" size={15} color={colors.accent}/><Text style={[styles.rematchText, { color: colors.accent }]}>{working === item.id ? 'CRIANDO...' : 'REVANCHE'}</Text></Pressable> : null}
+          </View>
+        </CompactTrainerBanner>
+      );
+    })}</View>
 
     <Modal visible={Boolean(opponent)} transparent animationType="fade" onRequestClose={() => setOpponent(null)}>
       <View style={styles.modalBackdrop}>
@@ -426,7 +494,7 @@ const styles = StyleSheet.create({
   arenaStatusText:{fontSize:7,fontWeight:'900',letterSpacing:.55},
   kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, rating: { fontSize: 38, fontWeight: '900' }, rankLabel: { fontSize: 10 }, heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, zIndex:2, paddingRight:85 }, miniValue: { fontSize: 17, fontWeight: '900' }, miniLabel: { fontSize: 8, fontWeight: '800' },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }, sectionTitle: { fontSize: 20, fontWeight: '900' }, sectionDescription: { fontSize: 9, marginTop: 2 }, sectionMeta: { fontSize: 9, fontWeight: '900' }, sectionLink: { fontSize: 9, fontWeight: '900' },
-  friendList: { gap: 9, paddingRight: 8 }, friend: { width: 150, borderRadius: 19, borderWidth: 1, padding: 12, alignItems: 'flex-start' }, friendAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, friendName: { width: '100%', fontSize: 12, fontWeight: '900', marginTop: 8 }, friendLevel: { fontSize: 8, marginTop: 2 }, challengeTag: { marginTop: 10, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }, challengeTagText: { color: '#07111F', fontSize: 7, fontWeight: '900' },
+  friendList: { gap: 9, paddingRight: 8 }, friendBanner:{width:150}, friend: { width: 150, borderRadius: 19, borderWidth: 1, padding: 12, alignItems: 'flex-start' }, friendAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, friendName: { width: '100%', fontSize: 12, fontWeight: '900', marginTop: 8 }, friendLevel: { fontSize: 8, marginTop: 2 }, challengeTag: { marginTop: 10, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }, challengeTagText: { color: '#07111F', fontSize: 7, fontWeight: '900' },
   list: { gap: 8 }, rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, borderWidth: 1 }, position: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, positionText: { fontWeight: '900' }, grow: { flex: 1, minWidth: 0 }, name: { fontSize: 12, fontWeight: '900' }, sub: { fontSize: 9, marginTop: 3 }, elo: { fontSize: 16, fontWeight: '900' },
   battleRow: { borderRadius: 17, borderWidth: 1, overflow: 'hidden' }, battleBody: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11 }, resultIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, rematch: { alignSelf: 'flex-end', marginRight: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1 }, rematchText: { fontSize: 8, fontWeight: '900' },
   empty: { padding: 24, borderRadius: 18, borderWidth: 1, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 15, fontWeight: '900' }, emptyText: { fontSize: 10, textAlign: 'center' }, findFriends: { marginTop: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
