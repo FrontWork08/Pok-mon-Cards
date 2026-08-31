@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Platform, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Platform, StyleSheet, type StyleProp, View, type ViewStyle } from 'react-native';
 import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 
 export function AuraFrame({
@@ -9,6 +9,7 @@ export function AuraFrame({
   intensity = 'premium',
   radius = 20,
   variant = 'energy',
+  style,
 }: {
   children: ReactNode;
   primaryColor: string;
@@ -16,6 +17,7 @@ export function AuraFrame({
   intensity?: 'soft'|'premium'|'master';
   radius?: number;
   variant?: 'energy'|'galaxy';
+  style?: StyleProp<ViewStyle>;
 }) {
   const pulse=useRef(new Animated.Value(0)).current;
   const flow=useRef(new Animated.Value(0)).current;
@@ -58,7 +60,7 @@ export function AuraFrame({
   const bottomX=flow.interpolate({inputRange:[0,1],outputRange:[520,-90]});
 
   return (
-    <View style={[styles.shell,{borderRadius:radius}]}>
+    <View style={[styles.shell,{borderRadius:radius},style]}>
       <Animated.View pointerEvents="none" style={[styles.outer,{
         borderRadius:radius+4,
         borderColor:primaryColor,
