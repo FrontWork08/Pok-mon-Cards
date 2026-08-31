@@ -10,6 +10,7 @@ const ALLOWED_NOTIFICATION_ROUTES = [
   '/guilds',
   '/guild-wars',
   '/marketplace',
+  '/store',
   '/market-offers',
   '/tournaments',
   '/battle-pass',
@@ -64,6 +65,7 @@ export function resolveNotificationRoute(data?: Record<string, any> | null) {
   const type = String(value.type ?? value.notificationType ?? '').toLowerCase();
   if (type.includes('battle') || type.includes('match')) return '/(tabs)/battles';
   if (type.includes('trade')) return '/(tabs)/trade';
+  if (type.includes('gift') || type.includes('present')) return '/store';
   if (type.includes('market') || type.includes('listing') || type.includes('offer')) return '/marketplace';
   if (type.includes('friend') || type.includes('social')) return '/friends';
   if (type.includes('guild')) return '/guilds';
