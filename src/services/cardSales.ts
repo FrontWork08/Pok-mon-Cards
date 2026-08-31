@@ -69,6 +69,7 @@ export async function getDuplicateCardsForSale(): Promise<DuplicateSaleCard[]> {
 function duplicateSaleError(message: string) {
   const known: Array<[string, string]> = [
     ['APP_MAINTENANCE', 'As vendas estão pausadas enquanto o jogo está em manutenção.'],
+    ['DUPLICATE_SALES_PAUSED_DURING_FREE_EVENT', 'A venda de repetidas fica pausada durante boosters grátis para impedir geração infinita de Coins e proteger a economia.'],
     ['NO_DUPLICATES', 'Você não possui uma cópia repetida desta carta.'],
     ['KEEP_ONE_COPY', 'A primeira cópia é protegida. Só é possível vender as repetidas.'],
     ['CARD_WITHOUT_MARKET_PRICE', 'Esta carta ainda não possui preço de mercado e não pode ser vendida agora.'],
