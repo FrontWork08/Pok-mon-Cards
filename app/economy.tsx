@@ -430,6 +430,13 @@ export default function EconomyScreen(){
           badge={hub.globalProject.completedAt?'CONCLUÍDO':`${pct(hub.globalProject.contributedCoins,hub.globalProject.targetCoins).toFixed(1)}%`}
           minHeight={245}
         >
+          <GlobalProjectVisual
+            current={hub.globalProject.contributedCoins}
+            target={hub.globalProject.targetCoins}
+            completed={Boolean(hub.globalProject.completedAt)}
+            primary={hub.globalProject.completedAt?'#65D894':colors.accent}
+            secondary={colors.yellow}
+          />
           <ProgressSink
             title="Construção comunitária"
             subtitle={hub.globalProject.completedAt?'A obra foi concluída e ficará registrada como marco da comunidade.':'Cada contribuição alimenta visualmente a construção até a conclusão.'}
@@ -471,6 +478,12 @@ export default function EconomyScreen(){
           badge={hub.auction.amIHighest?'VOCÊ ESTÁ NA FRENTE':'LEILÃO OFICIAL'}
           minHeight={255}
         >
+          <View style={styles.auctionPedestal}>
+            <View style={[styles.auctionOrbit,styles.auctionOrbitOuter,{borderColor:'#C493FF'}]}/>
+            <View style={[styles.auctionOrbit,styles.auctionOrbitInner,{borderColor:colors.yellow}]}/>
+            <View style={[styles.auctionPrize,{backgroundColor:colors.surfaceAlt,borderColor:hub.auction.amIHighest?'#65D894':'#C493FF'}]}><Ionicons name={(hub.auction.itemIcon||'trophy') as keyof typeof Ionicons.glyphMap} size={34} color={hub.auction.amIHighest?'#65D894':'#C493FF'}/></View>
+            <View style={[styles.auctionStatusPill,{backgroundColor:hub.auction.amIHighest?'#153426':'#2A1740',borderColor:hub.auction.amIHighest?'#2F9E68':'#6E43A4'}]}><Ionicons name={hub.auction.amIHighest?'checkmark-circle':'time'} size={13} color={hub.auction.amIHighest?'#65D894':'#D8B8FF'}/><Text style={[styles.auctionStatusText,{color:hub.auction.amIHighest?'#9CEFC1':'#D8B8FF'}]}>{hub.auction.amIHighest?'VOCÊ LIDERA':'DISPUTA ATIVA'}</Text></View>
+          </View>
           <View style={[styles.auction,{backgroundColor:colors.surface+'D9',borderColor:hub.auction.amIHighest?'#65D894':colors.yellow}]}>
           <View style={[styles.auctionIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name={(hub.auction.itemIcon||'trophy') as keyof typeof Ionicons.glyphMap} size={28} color={colors.yellow}/></View>
           <View style={{flex:1,minWidth:200}}>
@@ -619,6 +632,30 @@ function StorePreview({item,primary,secondary}:{item:EconomyStoreItem;primary:st
   </View>;
 }
 
+function GlobalProjectVisual({current,target,completed,primary,secondary}:{current:number;target:number;completed:boolean;primary:string;secondary:string}){
+  const {colors}=useAppTheme();
+  const percent=pct(current,target);
+  const stages=[20,40,60,80,100];
+  return <View style={[styles.globalVisual,{backgroundColor:colors.surface+'D8',borderColor:`${primary}70`}]}>
+    <View style={[styles.globalSkyGlow,{backgroundColor:primary}]}/>
+    <View style={styles.globalBuildRow}>
+      {stages.map((stage,index)=>{
+        const active=percent>=stage||completed;
+        const height=35+index*12;
+        return <View key={stage} style={[styles.globalTower,{height,borderColor:active?primary:colors.border,backgroundColor:active?`${primary}18`:colors.surfaceAlt,opacity:active?1:.5}]}>
+          <Ionicons name={index===4?'trophy':index===3?'business':index===2?'shield':'construct'} size={14+index} color={active?(index===4?secondary:primary):colors.muted}/>
+          {active?<View style={[styles.globalTowerLight,{backgroundColor:index===4?secondary:primary}]}/>:null}
+        </View>;
+      })}
+    </View>
+    <View style={[styles.globalGround,{borderColor:`${primary}55`}]} />
+    <View style={styles.globalVisualCopy}>
+      <Text style={[styles.globalVisualTitle,{color:colors.text}]}>{completed?'OBRA CONCLUÍDA':'CONSTRUÇÃO EM ANDAMENTO'}</Text>
+      <Text style={[styles.globalVisualMeta,{color:completed?'#65D894':primary}]}>{percent.toFixed(1)}% • {coins(current)} investidas pela comunidade</Text>
+    </View>
+  </View>;
+}
+
 function ProgressSink({title,subtitle,current,target,my,colors,onSpend,busy}:{title:string;subtitle:string;current:number;target:number;my:number;colors:any;onSpend:(amount:number)=>void;busy:boolean}){
   return <View style={[styles.progressBox,{backgroundColor:colors.surface,borderColor:colors.border}]}>
     <View style={styles.progressTop}><View style={{flex:1}}><Text style={[styles.simpleTitle,{color:colors.text}]}>{title}</Text><Text style={[styles.body,{color:colors.muted}]}>{subtitle}</Text></View><Text style={[styles.progressPct,{color:colors.yellow}]}>{pct(current,target).toFixed(1)}%</Text></View>
@@ -651,10 +688,11 @@ const styles=StyleSheet.create({
   museumGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},museumSlot:{width:122,minHeight:175,borderRadius:17,borderWidth:1,padding:8,alignItems:'center',justifyContent:'flex-end',position:'relative',overflow:'hidden'},museumSlotNumber:{position:'absolute',left:7,top:7,zIndex:3,borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:3},museumSlotNumberText:{fontSize:6,fontWeight:'900'},museumCardHalo:{position:'absolute',width:105,height:105,borderRadius:999,top:18,opacity:.13},museumEmptyIcon:{width:52,height:70,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center',marginBottom:14},museumImage:{width:78,height:108,zIndex:2},museumPedestal:{width:72,height:3,borderRadius:999,opacity:.75,marginTop:2},museumName:{fontSize:9,fontWeight:'900',marginTop:6,maxWidth:102},museumMeta:{fontSize:7,marginTop:2,textAlign:'center',maxWidth:102},
   simpleCard:{flexGrow:1,flexBasis:180,minWidth:170,maxWidth:280,borderRadius:17,borderWidth:1,padding:12,gap:6},simpleTitle:{fontSize:12,fontWeight:'900'},
   deckList:{gap:8},deckRow:{borderRadius:16,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'},deckStyleActions:{flexDirection:'row',flexWrap:'wrap',gap:5},tinyChip:{minHeight:31,borderRadius:9,borderWidth:1,paddingHorizontal:8,alignItems:'center',justifyContent:'center'},tinyText:{fontSize:6.5,fontWeight:'900'},
+  globalVisual:{minHeight:150,borderRadius:18,borderWidth:1,padding:12,position:'relative',overflow:'hidden',justifyContent:'flex-end'},globalSkyGlow:{position:'absolute',right:-65,top:-90,width:220,height:220,borderRadius:999,opacity:.14},globalBuildRow:{minHeight:95,flexDirection:'row',alignItems:'flex-end',justifyContent:'center',gap:6,zIndex:2,paddingBottom:18},globalTower:{width:42,borderRadius:11,borderWidth:1,alignItems:'center',justifyContent:'center',position:'relative'},globalTowerLight:{position:'absolute',width:7,height:7,borderRadius:999,top:7,right:7,opacity:.8},globalGround:{position:'absolute',left:-25,right:-25,bottom:35,height:45,borderTopWidth:1,borderRadius:999},globalVisualCopy:{zIndex:3,alignItems:'center'},globalVisualTitle:{fontSize:9,fontWeight:'900',letterSpacing:.7},globalVisualMeta:{fontSize:7.5,fontWeight:'900',marginTop:3},
   progressBox:{borderRadius:18,borderWidth:1,padding:13,gap:9},progressTop:{flexDirection:'row',alignItems:'flex-start',gap:10},progressPct:{fontSize:14,fontWeight:'900'},track:{height:9,borderRadius:999,overflow:'hidden'},fill:{height:'100%',borderRadius:999},progressNumbers:{flexDirection:'row',justifyContent:'space-between',gap:8,flexWrap:'wrap'},quickRow:{flexDirection:'row',flexWrap:'wrap',gap:6},quickChip:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:9,alignItems:'center',justifyContent:'center'},quickText:{fontSize:7,fontWeight:'900'},
   rankBox:{borderRadius:16,borderWidth:1,padding:11,gap:6},rankTitle:{fontSize:7,fontWeight:'900',letterSpacing:.7},rankRow:{flexDirection:'row',alignItems:'center',gap:7},rankPos:{width:25,fontSize:8,fontWeight:'900'},rankName:{flex:1,fontSize:9,fontWeight:'900'},rankCoins:{fontSize:8,fontWeight:'800'},
   marketBox:{borderRadius:17,borderWidth:1,padding:12,gap:8},
-  auction:{borderRadius:20,borderWidth:1,padding:14,flexDirection:'row',alignItems:'center',gap:12,flexWrap:'wrap'},auctionIcon:{width:52,height:52,borderRadius:17,alignItems:'center',justifyContent:'center'},bidBox:{minWidth:190,flexGrow:1,gap:7},bidInput:{minHeight:44,borderRadius:12,borderWidth:1,paddingHorizontal:11,fontSize:12,fontWeight:'900'},
+  auctionPedestal:{minHeight:118,alignItems:'center',justifyContent:'center',position:'relative'},auctionOrbit:{position:'absolute',borderRadius:999,borderWidth:1},auctionOrbitOuter:{width:104,height:104,opacity:.35},auctionOrbitInner:{width:76,height:76,opacity:.6},auctionPrize:{width:66,height:66,borderRadius:22,borderWidth:1.5,alignItems:'center',justifyContent:'center',zIndex:2},auctionStatusPill:{position:'absolute',bottom:0,borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:4,zIndex:3},auctionStatusText:{fontSize:6.5,fontWeight:'900'},auction:{borderRadius:20,borderWidth:1,padding:14,flexDirection:'row',alignItems:'center',gap:12,flexWrap:'wrap'},auctionIcon:{width:52,height:52,borderRadius:17,alignItems:'center',justifyContent:'center'},bidBox:{minWidth:190,flexGrow:1,gap:7},bidInput:{minHeight:44,borderRadius:12,borderWidth:1,paddingHorizontal:11,fontSize:12,fontWeight:'900'},
   breakdown:{borderRadius:17,borderWidth:1,padding:12,gap:7},breakRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8},breakType:{fontSize:8,fontWeight:'900'},breakValue:{fontSize:9,fontWeight:'900'},softCap:{borderRadius:14,borderWidth:1,padding:10,flexDirection:'row',alignItems:'center',gap:8},empty:{fontSize:9,lineHeight:14},
   pickerSafe:{flex:1},pickerHeader:{padding:14,flexDirection:'row',alignItems:'center',gap:10},pickerTitle:{fontSize:22,fontWeight:'900'},searchBox:{marginHorizontal:14,minHeight:48,borderRadius:14,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',gap:7},searchInput:{flex:1,minHeight:46,fontSize:12},pickerList:{padding:14,paddingBottom:40,gap:8},pickerRow:{borderRadius:15,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:10},pickerImage:{width:50,height:68,borderRadius:6},
 });
