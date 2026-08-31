@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,7 +31,6 @@ import {
   type OpenedCard,
   type Pack,
 } from '@/services/packs';
-import { getMyProfile } from '@/services/player';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
@@ -63,9 +62,9 @@ export default function PacksScreen() {
   const { colors, isLight, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
   const wallet = useWallet();
+  const coins = wallet.coins;
+  const diamonds = wallet.diamonds;
   const [packs, setPacks] = useState<Pack[]>([]);
-  const [coins, setCoins] = useState(0);
-  const [diamonds, setDiamonds] = useState(0);
   const [diamondCost, setDiamondCost] = useState(25);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoriteOnly, setFavoriteOnly] = useState(false);
@@ -77,6 +76,7 @@ export default function PacksScreen() {
   const [contentsPack, setContentsPack] = useState<Pack | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [clock, setClock] = useState(Date.now());
+  const loadedOnce = useRef(false);
 
   const isMobile = width < 560;
   const columns = isMobile ? 1 : width >= 1100 ? 3 : 2;
@@ -87,19 +87,17 @@ export default function PacksScreen() {
 
   const load = useCallback(async () => {
     try {
-      setLoading(true);
-      const [packRows, profile, favorites, legendaryConfig] = await Promise.all([
+      if (!loadedOnce.current) setLoading(true);
+      const [packRows, favorites, legendaryConfig] = await Promise.all([
         listPacks(),
-        getMyProfile(),
         getFavoritePackIds(),
         getLegendaryPackConfig(),
       ]);
       setPacks(packRows);
       setSelectedPack((current) => current ? packRows.find((pack) => pack.id === current.id) ?? null : null);
-      setCoins(profile.coins);
-      setDiamonds(profile.diamonds);
       setDiamondCost(legendaryConfig.costDiamonds);
       setFavoriteIds(new Set(favorites));
+      loadedOnce.current = true;
     } catch {
       setNotice({ kind: 'error', text: 'Não foi possível atualizar a loja agora.' });
     } finally {
@@ -200,7 +198,7 @@ export default function PacksScreen() {
   async function exchangeOneDiamond() {
     const cost=100000;
     if(coins<cost){setNotice({kind:'error',text:'Você precisa de 🪙 100.000 para trocar por 💎 1 Diamante.'});return;}
-    const run=async()=>{try{const result=await exchangeCoinsForDiamonds(1);setCoins(result.coins);setDiamonds(result.diamonds);await wallet.refresh();setNotice({kind:'success',text:'Câmbio concluído: 🪙 100.000 → 💎 1.'});}catch(e){setNotice({kind:'error',text:e instanceof Error?e.message:'Não foi possível fazer o câmbio.'});}};
+    const run=async()=>{try{await exchangeCoinsForDiamonds(1);await wallet.refresh();setNotice({kind:'success',text:'Câmbio concluído: 🪙 100.000 → 💎 1.'});}catch(e){await wallet.refresh().catch(()=>null);setNotice({kind:'error',text:e instanceof Error?e.message:'Não foi possível fazer o câmbio.'});}};
     if(Platform.OS==='web') void run();
     else Alert.alert('Trocar por 1 Diamante?','O câmbio custa 🪙 100.000 e não pode ser desfeito.',[{text:'Cancelar',style:'cancel'},{text:'TROCAR',onPress:()=>{void run();}}]);
   }
@@ -231,43 +229,32 @@ export default function PacksScreen() {
     if (!selectedPack) throw new Error('Nenhum booster selecionado.');
 
     if (selectedPack.id === DIAMOND_PACK_BASE.id) {
-      const before = await getMyProfile();
-      setDiamonds(before.diamonds);
       const currentLegendaryPrice = freeUntil ? Math.ceil(diamondCost / 2) : diamondCost;
-      if (before.diamonds < currentLegendaryPrice) {
-        throw new Error(`Diamantes insuficientes. Seu saldo atual é 💎 ${before.diamonds.toLocaleString('pt-BR')} e o Cofre custa 💎 ${currentLegendaryPrice.toLocaleString('pt-BR')}.`);
+      if (wallet.diamonds < currentLegendaryPrice) {
+        throw new Error(`Diamantes insuficientes. Seu saldo atual é 💎 ${wallet.diamonds.toLocaleString('pt-BR')} e o Cofre custa 💎 ${currentLegendaryPrice.toLocaleString('pt-BR')}.`);
       }
       try {
         const result = await openLegendaryDiamondPack();
-        setDiamonds(result.diamonds);
         await wallet.refresh();
         return result.cards;
       } catch (error) {
-        const refreshed = await getMyProfile().catch(() => null);
-        if (refreshed) setDiamonds(refreshed.diamonds);
+        await wallet.refresh().catch(() => null);
         throw error;
       }
     }
 
-    const [before, latestPacks] = await Promise.all([getMyProfile(), listPacks()]);
-    const latestPack = latestPacks.find((pack) => pack.id === selectedPack.id);
-    if (!latestPack) throw new Error('Este booster não está mais disponível.');
-    setSelectedPack(latestPack);
-    setCoins(before.coins); setDiamonds(before.diamonds);
-    const balance = latestPack.currency === 'diamonds' ? before.diamonds : before.coins;
-    if (balance < latestPack.price) {
-      throw new Error(`${latestPack.currency === 'diamonds' ? 'Diamantes' : 'Moedas'} insuficientes. Seu saldo atual é ${latestPack.currency === 'diamonds' ? '💎' : '🪙'} ${balance.toLocaleString('pt-BR')}.`);
+    const balance = selectedPack.currency === 'diamonds' ? wallet.diamonds : wallet.coins;
+    if (balance < selectedPack.price) {
+      throw new Error(`${selectedPack.currency === 'diamonds' ? 'Diamantes' : 'Moedas'} insuficientes. Seu saldo atual é ${selectedPack.currency === 'diamonds' ? '💎' : '🪙'} ${balance.toLocaleString('pt-BR')}.`);
     }
 
     try {
-      const result = await openPack(latestPack.id);
-      const after = await getMyProfile();
-      setCoins(after.coins); setDiamonds(after.diamonds);
+      const result = await openPack(selectedPack.id);
       await wallet.refresh();
       return result.cards;
     } catch (error) {
-      const refreshed = await getMyProfile().catch(() => null);
-      if (refreshed) setCoins(refreshed.coins);
+      await wallet.refresh().catch(() => null);
+      void load();
       throw error;
     }
   }
