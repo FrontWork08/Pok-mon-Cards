@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260831202010_booster_quality_pull_boost.sql',
   'supabase/migrations/20260831201910_booster_luck_small_raise.sql',
   'supabase/migrations/20260831183747_bag_card_theme_preview.sql',
   'supabase/migrations/20260831171936_universal_visual_themes.sql',
@@ -321,6 +322,17 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
+}
+
+if (existsSync('supabase/migrations/20260831202010_booster_quality_pull_boost.sql')) {
+  const qualityBoost = read('supabase/migrations/20260831202010_booster_quality_pull_boost.sql');
+  assert(qualityBoost.includes('private.pack_quality_pull_multiplier'), 'Regressão de balanceamento: boost de qualidade por preço foi removido dos boosters.');
+  assert(qualityBoost.includes("coalesce(p_price,0)>=50000") && qualityBoost.includes("coalesce(p_price,0)>=25000"), 'Regressão de balanceamento: boosters caros deixaram de receber boost adicional.');
+  assert(qualityBoost.includes("coalesce(p_cards_per_pack,0)<=4 then 1.12"), 'Regressão de balanceamento: mini-boosters perderam o pequeno bônus extra.');
+  assert(qualityBoost.includes("* private.pack_quality_pull_multiplier(v_currency,v_pack.price,v_pack.cards_per_pack,rarity)"), 'Regressão de balanceamento: algoritmo de abertura deixou de aplicar o boost de qualidade.');
+  assert(qualityBoost.includes("'qualityBoost',jsonb_build_object"), 'Regressão de auditoria: abertura não registra mais o boost de qualidade aplicado.');
+  assert(qualityBoost.includes("grant execute on function private.pack_quality_pull_multiplier(text,bigint,integer,text) to service_role"), 'Regressão de segurança: helper de sorte deve permanecer restrito ao service role.');
+  assert(!qualityBoost.includes('select private.refresh_pack_economy()'), 'Regressão econômica: aumentar sorte não deve aumentar automaticamente o preço dos boosters.');
 }
 
 if (existsSync('supabase/migrations/20260831201910_booster_luck_small_raise.sql')) {
