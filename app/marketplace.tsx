@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -64,6 +64,8 @@ export default function MarketplaceScreen() {
   const [price,setPrice]=useState('1000');
   const [offerListing,setOfferListing]=useState<MarketplaceListing|null>(null);
   const [offerAmount,setOfferAmount]=useState('');
+  const loadedOnce=useRef(false);
+  const realtimeRefreshTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const load=useCallback(async()=>{
     try{
@@ -72,11 +74,21 @@ export default function MarketplaceScreen() {
       setHub(next);
       setShopName((current)=>current||next.myShop?.name||'');
       setShopTheme(next.myShop?.themeStyle||'guild');
+      loadedOnce.current=true;
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível abrir o mercado.');}
     finally{setLoading(false);}
   },[]);
-  useFocusEffect(useCallback(()=>{setLoading(true);void load();},[load]));
-  useEffect(()=>subscribeMarketplace(()=>{void load();}),[load]);
+  useFocusEffect(useCallback(()=>{if(!loadedOnce.current)setLoading(true);void load();},[load]));
+  useEffect(()=>{
+    const unsubscribe=subscribeMarketplace(()=>{
+      if(realtimeRefreshTimer.current)clearTimeout(realtimeRefreshTimer.current);
+      realtimeRefreshTimer.current=setTimeout(()=>{void load();},180);
+    });
+    return()=>{
+      if(realtimeRefreshTimer.current)clearTimeout(realtimeRefreshTimer.current);
+      unsubscribe();
+    };
+  },[load]);
 
   const loadInventory=useCallback(async(term='')=>{
     try{
