@@ -35,6 +35,9 @@ export type EconomySinkHub = {
   };
   guild: null|{
     guildId:string;
+    guildName:string;
+    guildColor:string;
+    guildLevel:number;
     project:null|{
       id:string; projectNo:number; name:string; description:string; targetCoins:number; contributedCoins:number; myContribution:number;
       topContributors:Array<{playerId:string;username:string;coins:number}>;
@@ -96,6 +99,12 @@ function numberizeItem(item:any):EconomyStoreItem {
 
 export async function getEconomySinkHub():Promise<EconomySinkHub>{
   const value:any=await rpc('get_economy_sink_hub');
+  let guildMeta:{name:string;color:string;level:number}|null=null;
+  const guildId=value?.guild?.guildId?String(value.guild.guildId):'';
+  if(guildId){
+    const {data,error}=await supabase.from('guilds').select('name,color,level').eq('id',guildId).maybeSingle();
+    if(!error&&data)guildMeta={name:String(data.name),color:String(data.color),level:Number(data.level??1)};
+  }
   return {
     ...value,
     live:Boolean(value?.live),
@@ -137,6 +146,9 @@ export async function getEconomySinkHub():Promise<EconomySinkHub>{
     },
     guild:value?.guild?{
       ...value.guild,
+      guildName:guildMeta?.name??String(value.guild.guildId??'Guilda'),
+      guildColor:guildMeta?.color??'#6A7CFF',
+      guildLevel:guildMeta?.level??1,
       project:value.guild.project?{
         ...value.guild.project,
         projectNo:Number(value.guild.project.projectNo??0),
