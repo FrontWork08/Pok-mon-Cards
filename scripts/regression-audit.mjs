@@ -49,6 +49,7 @@ const requiredFiles = [
   'supabase/migrations/20260831132415_home_dashboard_fast_path.sql',
   'supabase/migrations/20260831133220_profile_stats_fast_path.sql',
   'supabase/migrations/20260831133329_profile_stats_fast_path_v2.sql',
+  'supabase/migrations/20260831133803_profile_stats_compact_payload.sql',
 ];
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
@@ -101,6 +102,12 @@ if (existsSync('supabase/migrations/20260831133329_profile_stats_fast_path_v2.sq
   assert(profileDb.includes('get_my_profile_stats_fast'), 'Regressão de performance: perfil perdeu a RPC compacta de estatísticas.');
   assert(profileDb.includes('mostValuableMarketCard'), 'Regressão: perfil compacto perdeu a carta mais valiosa de mercado.');
   assert(profileDb.includes('grant execute on function public.get_my_profile_stats_fast() to authenticated'), 'Regressão de segurança: stats de perfil devem continuar restritas a autenticados.');
+}
+
+if (existsSync('supabase/migrations/20260831133803_profile_stats_compact_payload.sql')) {
+  const compactProfile = read('supabase/migrations/20260831133803_profile_stats_compact_payload.sql');
+  assert(!compactProfile.includes("'tcg_data'"), 'Regressão de performance: resumo do perfil não deve carregar tcg_data completo das cartas.');
+  assert(compactProfile.includes("'image_small'"), 'Regressão: resumo compacto precisa manter a imagem do card mais valioso.');
 }
 
 if (existsSync('src/services/player.ts')) {
