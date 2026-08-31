@@ -9,6 +9,7 @@ import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { AuraBanner } from '@/components/AuraBanner';
 import { AuraFrame } from '@/components/AuraFrame';
 import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
+import { MarketplaceListingSurface } from '@/components/MarketplaceListingSurface';
 import { getMyBagPage } from '@/services/bag';
 import type { OwnedCardEntry } from '@/services/player';
 import { buyListing, cancelListing, createListing, createMarketOffer, getMarketplaceHub, saveMyShop, subscribeMarketplace, type MarketplaceHub, type MarketplaceListing, type ShopTheme } from '@/services/marketplace';
@@ -239,20 +240,70 @@ function ListingCard({item,myId,working,onBuy,onOffer}:{item:MarketplaceListing;
     colors.yellow;
   const listingBoosted=Boolean(item.boostedUntil&&new Date(item.boostedUntil).getTime()>Date.now());
   const shopBoosted=Boolean(item.shopHighlightUntil&&new Date(item.shopHighlightUntil).getTime()>Date.now());
-  return <AuraFrame primaryColor={listingBoosted?colors.yellow:themeColor} secondaryColor={item.shopTheme==='galaxy'?'#55E6FF':themeColor} intensity={listingBoosted||item.shopTheme==='galaxy'?'premium':'soft'} variant={item.shopTheme==='galaxy'?'galaxy':'energy'} radius={19}><View style={[styles.listing,{backgroundColor:colors.surface,borderColor:listingBoosted?colors.yellow:themeColor,borderWidth:listingBoosted||['royal','neon','master','celestial','galaxy'].includes(item.shopTheme)?1.5:1}]}>
-    <View pointerEvents="none" style={[styles.listingThemeGlow,{backgroundColor:themeColor,opacity:['royal','neon','master','celestial','galaxy'].includes(item.shopTheme)?.13:.055}]}/>
-    <View pointerEvents="none" style={[styles.listingThemeEdge,{backgroundColor:listingBoosted?colors.yellow:themeColor,opacity:listingBoosted?.9:.45}]}/>
-    <View style={styles.sellerRow}>
-      <TrainerAvatar icon={item.sellerIcon} size={38} color={themeColor} backgroundColor={colors.surfaceAlt}/>
-      <View style={{flex:1}}>
-        <View style={styles.shopTitleRow}><Text style={[styles.shopName,{color:colors.text}]}>{item.shopName}</Text>{shopBoosted?<View style={[styles.premiumBadge,{backgroundColor:colors.accentSoft}]}><Ionicons name="sparkles" size={11} color={colors.yellow}/><Text style={[styles.premiumText,{color:colors.yellow}]}>LOJA EM DESTAQUE</Text></View>:null}</View>
-        <Text style={[styles.sellerName,{color:colors.muted}]}>@{item.sellerName}{item.guild?` • ${item.guild.name}`:''}</Text>
+  const premiumTheme=['night','royal','neon','master','celestial','galaxy'].includes(item.shopTheme);
+  return <AuraFrame primaryColor={listingBoosted?colors.yellow:themeColor} secondaryColor={item.shopTheme==='galaxy'?'#55E6FF':themeColor} intensity={listingBoosted||item.shopTheme==='galaxy'?'premium':'soft'} variant={item.shopTheme==='galaxy'?'galaxy':'energy'} radius={19}>
+    <MarketplaceListingSurface theme={item.shopTheme} accent={themeColor} boosted={listingBoosted} style={styles.listingSurface}>
+      <View style={[
+        styles.listing,
+        {
+          backgroundColor:item.shopTheme==='galaxy'
+            ? 'rgba(23,12,37,.91)'
+            : premiumTheme
+              ? 'rgba(20,22,34,.94)'
+              : colors.surface,
+          borderColor:listingBoosted?colors.yellow:themeColor,
+          borderWidth:listingBoosted||premiumTheme?1.5:1,
+        },
+      ]}>
+        <View pointerEvents="none" style={[styles.listingThemeGlow,{backgroundColor:themeColor,opacity:premiumTheme?.16:.055}]}/>
+        <View pointerEvents="none" style={[styles.listingThemeEdge,{backgroundColor:listingBoosted?colors.yellow:themeColor,opacity:listingBoosted?.95:premiumTheme?.68:.45}]}/>
+        <View style={[
+          styles.sellerRow,
+          premiumTheme&&styles.premiumInnerPanel,
+          premiumTheme&&{borderColor:`${themeColor}38`},
+        ]}>
+          <TrainerAvatar icon={item.sellerIcon} size={38} color={themeColor} backgroundColor={premiumTheme?`${themeColor}18`:colors.surfaceAlt}/>
+          <View style={{flex:1}}>
+            <View style={styles.shopTitleRow}><Text style={[styles.shopName,{color:colors.text}]}>{item.shopName}</Text>{shopBoosted?<View style={[styles.premiumBadge,{backgroundColor:colors.accentSoft}]}><Ionicons name="sparkles" size={11} color={colors.yellow}/><Text style={[styles.premiumText,{color:colors.yellow}]}>LOJA EM DESTAQUE</Text></View>:null}</View>
+            <Text style={[styles.sellerName,{color:colors.muted}]}>@{item.sellerName}{item.guild?` • ${item.guild.name}`:''}</Text>
+          </View>
+          {listingBoosted?<View style={[styles.boostBadge,{backgroundColor:'#332B11'}]}><Ionicons name="rocket" size={13} color="#FFD447"/><Text style={styles.boostText}>IMPULSIONADO</Text></View>:null}
+        </View>
+
+        <View style={[
+          styles.cardRow,
+          premiumTheme&&styles.premiumCardPanel,
+          premiumTheme&&{borderColor:`${themeColor}2F`},
+        ]}>
+          {item.card.image?<Image source={{uri:item.card.image}} resizeMode="contain" style={[styles.cardImage,premiumTheme&&{borderWidth:1,borderColor:`${themeColor}88`} ]}/>:<View style={[styles.cardImage,{backgroundColor:colors.surfaceAlt}]}/>}
+          <View style={{flex:1}}>
+            <Text style={[styles.cardName,{color:colors.text}]}>{item.card.name}</Text>
+            <Text style={[styles.cardMeta,{color:colors.muted}]}>{item.card.rarity??'Sem raridade'} • {item.quantity} cópia(s)</Text>
+            <Text style={[styles.price,{color:item.shopTheme==='royal'?themeColor:colors.yellow}]}>🪙 {item.price.toLocaleString('pt-BR')}</Text>
+            <Text style={[styles.marketUsd,{color:colors.muted}]}>Mercado USD: {item.card.marketPriceUsd == null ? '—' : formatUsd(item.card.marketPriceUsd * item.quantity)}{item.quantity > 1 && item.card.marketPriceUsd != null ? ` • ${formatUsd(item.card.marketPriceUsd)} cada` : ''}</Text>
+          </View>
+        </View>
+
+        <View style={styles.listingActions}>
+          <Pressable
+            disabled={item.sellerId===myId||working}
+            onPress={()=>onBuy(item)}
+            style={[
+              styles.buyButton,
+              styles.flexButton,
+              item.sellerId===myId
+                ? [styles.ownOfferButton,{backgroundColor:`${themeColor}14`,borderColor:`${themeColor}72`}]
+                : {backgroundColor:colors.yellow},
+            ]}
+          >
+            <Ionicons name={item.sellerId===myId?'storefront':'cart'} size={18} color={item.sellerId===myId?themeColor:'#07111F'}/>
+            <Text style={[styles.buyText,item.sellerId===myId&&{color:themeColor}]}>{item.sellerId===myId?'SUA OFERTA':'COMPRAR'}</Text>
+          </Pressable>
+          {item.sellerId!==myId?<Pressable disabled={working} onPress={()=>onOffer(item)} style={[styles.buyButton,styles.flexButton,{backgroundColor:premiumTheme?`${themeColor}12`:colors.accentSoft,borderWidth:1,borderColor:premiumTheme?themeColor:colors.accent}]}><Ionicons name="chatbubble-ellipses" size={18} color={premiumTheme?themeColor:colors.accent}/><Text style={[styles.buyText,{color:colors.text}]}>FAZER OFERTA</Text></Pressable>:null}
+        </View>
       </View>
-      {listingBoosted?<View style={[styles.boostBadge,{backgroundColor:'#332B11'}]}><Ionicons name="rocket" size={13} color="#FFD447"/><Text style={styles.boostText}>IMPULSIONADO</Text></View>:null}
-    </View>
-    <View style={styles.cardRow}>{item.card.image?<Image source={{uri:item.card.image}} resizeMode="contain" style={styles.cardImage}/>:<View style={[styles.cardImage,{backgroundColor:colors.surfaceAlt}]}/>}<View style={{flex:1}}><Text style={[styles.cardName,{color:colors.text}]}>{item.card.name}</Text><Text style={[styles.cardMeta,{color:colors.muted}]}>{item.card.rarity??'Sem raridade'} • {item.quantity} cópia(s)</Text><Text style={[styles.price,{color:colors.yellow}]}>🪙 {item.price.toLocaleString('pt-BR')}</Text><Text style={[styles.marketUsd,{color:colors.muted}]}>Mercado USD: {item.card.marketPriceUsd == null ? '—' : formatUsd(item.card.marketPriceUsd * item.quantity)}{item.quantity > 1 && item.card.marketPriceUsd != null ? ` • ${formatUsd(item.card.marketPriceUsd)} cada` : ''}</Text></View></View>
-    <View style={styles.listingActions}><Pressable disabled={item.sellerId===myId||working} onPress={()=>onBuy(item)} style={[styles.buyButton,styles.flexButton,{backgroundColor:item.sellerId===myId?colors.surfaceAlt:colors.yellow}]}><Ionicons name={item.sellerId===myId?'storefront':'cart'} size={18} color={item.sellerId===myId?colors.muted:'#07111F'}/><Text style={[styles.buyText,item.sellerId===myId&&{color:colors.muted}]}>{item.sellerId===myId?'SUA OFERTA':'COMPRAR'}</Text></Pressable>{item.sellerId!==myId?<Pressable disabled={working} onPress={()=>onOffer(item)} style={[styles.buyButton,styles.flexButton,{backgroundColor:colors.accentSoft,borderWidth:1,borderColor:colors.accent}]}><Ionicons name="chatbubble-ellipses" size={18} color={colors.accent}/><Text style={[styles.buyText,{color:colors.text}]}>FAZER OFERTA</Text></Pressable>:null}</View>
-  </View></AuraFrame>;
+    </MarketplaceListingSurface>
+  </AuraFrame>;
 }
 
 const styles=StyleSheet.create({
@@ -262,7 +313,7 @@ const styles=StyleSheet.create({
   shopPanel:{borderRadius:20,borderWidth:1,padding:14,gap:10},shopPreview:{minHeight:88,borderRadius:16,borderWidth:1,padding:11,position:'relative',overflow:'hidden',flexDirection:'row',alignItems:'center',gap:9},shopPreviewGlow:{position:'absolute',right:-55,top:-75,width:180,height:180,borderRadius:999,opacity:.16},shopPreviewIcon:{width:45,height:45,borderRadius:14,borderWidth:1,alignItems:'center',justifyContent:'center',zIndex:2},shopPreviewKicker:{fontSize:6.5,fontWeight:'900',letterSpacing:.65},shopPreviewName:{fontSize:13,fontWeight:'900',marginTop:2},shopPreviewMeta:{fontSize:7.5,marginTop:2},shopPreviewPremium:{borderRadius:999,borderWidth:1,paddingHorizontal:7,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:4,zIndex:2},shopPreviewPremiumText:{fontSize:6,fontWeight:'900'},sectionHead:{flexDirection:'row',alignItems:'center',gap:10},sectionIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},sectionTitle:{fontSize:17,fontWeight:'900'},sectionHint:{fontSize:9,lineHeight:14,marginTop:2},input:{minHeight:48,borderRadius:14,borderWidth:1,paddingHorizontal:12,fontSize:13,fontWeight:'800'},themeRow:{flexDirection:'row',flexWrap:'wrap',gap:7},themeChip:{borderRadius:11,borderWidth:1,paddingHorizontal:10,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:5},themeText:{fontSize:8,fontWeight:'900'},secondaryButton:{minHeight:46,borderRadius:14,borderWidth:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},secondaryText:{fontSize:9,fontWeight:'900'},
   cardSelector:{borderRadius:15,borderWidth:1,minHeight:72,padding:8,flexDirection:'row',alignItems:'center',gap:10},selectorImage:{width:43,height:57},selectorTitle:{fontSize:13,fontWeight:'900'},selectorHint:{fontSize:9,marginTop:3},formRow:{flexDirection:'row',flexWrap:'wrap',gap:8},formField:{flexGrow:1,flexBasis:150,minWidth:140,gap:5},label:{fontSize:7,fontWeight:'900',letterSpacing:.9},feePreview:{minHeight:40,borderRadius:12,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},feePreviewText:{fontSize:9,fontWeight:'800',flex:1},primaryButton:{minHeight:51,borderRadius:15,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},primaryText:{color:'#07111F',fontSize:10,fontWeight:'900'},
   searchBox:{minHeight:49,borderRadius:15,borderWidth:1,paddingHorizontal:12,flexDirection:'row',alignItems:'center',gap:8},searchInput:{flex:1,minHeight:47,fontSize:12},listTitleRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},listTitle:{fontSize:20,fontWeight:'900'},count:{fontSize:14,fontWeight:'900'},
-  listing:{borderRadius:19,borderWidth:1,padding:12,gap:10,marginBottom:9,position:'relative',overflow:'hidden'},listingThemeGlow:{position:'absolute',right:-70,top:-85,width:190,height:190,borderRadius:999},listingThemeEdge:{position:'absolute',left:0,right:0,top:0,height:2},sellerRow:{flexDirection:'row',alignItems:'center',gap:9},shopTitleRow:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},shopName:{fontSize:13,fontWeight:'900'},sellerName:{fontSize:8,marginTop:2},premiumBadge:{borderRadius:999,paddingHorizontal:6,paddingVertical:3,flexDirection:'row',alignItems:'center',gap:3},premiumText:{fontSize:6,fontWeight:'900'},boostBadge:{borderRadius:999,paddingHorizontal:7,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:4},boostText:{color:'#FFD447',fontSize:6,fontWeight:'900'},cardRow:{flexDirection:'row',alignItems:'center',gap:11},cardImage:{width:65,height:87,borderRadius:7},cardName:{fontSize:16,fontWeight:'900'},cardMeta:{fontSize:9,marginTop:3},price:{fontSize:15,fontWeight:'900',marginTop:8},buyButton:{minHeight:45,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},buyText:{color:'#07111F',fontSize:9,fontWeight:'900'},
+  listingSurface:{marginBottom:9},listing:{borderRadius:19,borderWidth:1,padding:12,gap:10,position:'relative',overflow:'hidden'},listingThemeGlow:{position:'absolute',right:-70,top:-85,width:190,height:190,borderRadius:999},listingThemeEdge:{position:'absolute',left:0,right:0,top:0,height:2},sellerRow:{flexDirection:'row',alignItems:'center',gap:9},premiumInnerPanel:{borderWidth:1,borderRadius:15,padding:9,backgroundColor:'rgba(255,255,255,.025)'},premiumCardPanel:{borderWidth:1,borderRadius:16,padding:9,backgroundColor:'rgba(255,255,255,.018)'},shopTitleRow:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},shopName:{fontSize:13,fontWeight:'900'},sellerName:{fontSize:8,marginTop:2},premiumBadge:{borderRadius:999,paddingHorizontal:6,paddingVertical:3,flexDirection:'row',alignItems:'center',gap:3},premiumText:{fontSize:6,fontWeight:'900'},boostBadge:{borderRadius:999,paddingHorizontal:7,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:4},boostText:{color:'#FFD447',fontSize:6,fontWeight:'900'},cardRow:{flexDirection:'row',alignItems:'center',gap:11},cardImage:{width:65,height:87,borderRadius:7},cardName:{fontSize:16,fontWeight:'900'},cardMeta:{fontSize:9,marginTop:3},price:{fontSize:15,fontWeight:'900',marginTop:8},buyButton:{minHeight:45,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},ownOfferButton:{borderWidth:1.2,overflow:'hidden'},buyText:{color:'#07111F',fontSize:9,fontWeight:'900'},
   footer:{gap:8,marginTop:12},myRow:{borderRadius:14,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:8},myName:{flex:1,fontSize:11,fontWeight:'900'},status:{fontSize:8,fontWeight:'900'},removeButton:{width:32,height:32,borderRadius:10,backgroundColor:'#351A24',alignItems:'center',justifyContent:'center'},empty:{borderRadius:18,borderWidth:1,padding:24,alignItems:'center',gap:8},emptyText:{fontSize:10,lineHeight:15},
   pickerSafe:{flex:1},pickerHeader:{padding:14,flexDirection:'row',alignItems:'center',gap:10},pickerList:{padding:14,gap:8},inventoryRow:{borderRadius:15,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:10},inventoryImage:{width:49,height:66,borderRadius:6},inventoryName:{fontSize:13,fontWeight:'900'},inventoryMeta:{fontSize:9,marginTop:3},
 });
