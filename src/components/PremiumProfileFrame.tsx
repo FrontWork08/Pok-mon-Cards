@@ -278,7 +278,7 @@ export function PremiumProfileFrame({
         ]}
       >
         {preset.theme === 'galaxy' ? (
-          <GalaxyFlowOverlay intensity="master" opacity={compact ? .52 : .74} />
+          <GalaxyFlowOverlay intensity="master" opacity={compact ? .74 : .88} />
         ) : null}
 
         <Animated.View
