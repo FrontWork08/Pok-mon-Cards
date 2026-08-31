@@ -10,7 +10,7 @@ async function invoke(body: Record<string, unknown>) {
 export async function getMyDecks() {
   const { data, error } = await supabase
     .from('decks')
-    .select('id,name,is_default,created_at,updated_at,deck_cards(card_id,quantity,cards(id,pokemon_name,rarity,types,image_small,image_large,set_name,game_value,market_price_usd,market_price_variant))')
+    .select('id,name,is_default,style_item_id,created_at,updated_at,economy_store_items(name,icon,rarity),deck_cards(card_id,quantity,cards(id,pokemon_name,rarity,types,image_small,image_large,set_name,game_value,market_price_usd,market_price_variant))')
     .order('is_default', { ascending: false })
     .order('updated_at', { ascending: false });
   if (error) throw error;
@@ -86,7 +86,7 @@ export type DeckBuilderPage = {
 export async function getMyDeck(deckId: string) {
   const { data, error } = await supabase
     .from('decks')
-    .select('id,name,is_default,created_at,updated_at,deck_cards(card_id,quantity,cards(id,pokemon_name,rarity,image_small,market_price_usd))')
+    .select('id,name,is_default,style_item_id,created_at,updated_at,economy_store_items(name,icon,rarity),deck_cards(card_id,quantity,cards(id,pokemon_name,rarity,image_small,market_price_usd))')
     .eq('id', deckId)
     .single();
   if (error) throw error;
