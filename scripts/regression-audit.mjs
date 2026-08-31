@@ -130,6 +130,10 @@ if (existsSync('app/store.tsx') && existsSync('src/services/store.ts')) {
   const giftStoreUi = read('app/store.tsx');
   const giftStoreService = read('src/services/store.ts');
   assert(giftStoreUi.includes('PRESENTEAR UM AMIGO'), 'Regressão: Trainer Shop perdeu o botão de presentear.');
+  assert(giftStoreUi.includes('setGiftItem(item);'), 'Regressão: botão de presentear deve abrir o modal imediatamente.');
+  assert(giftStoreUi.indexOf('setGiftItem(item);') < giftStoreUi.indexOf("if(!catalog?.live&&!catalog?.adminPreview)"), 'Regressão de UX: gate da Economy não pode fazer o botão de presente parecer quebrado.');
+  assert(giftStoreUi.includes('giftInlineError'), 'Regressão de UX: erros de presente precisam aparecer dentro do modal.');
+  assert(giftStoreUi.includes('DISPONÍVEL APÓS A MIGRAÇÃO 1.0'), 'Regressão de UX: presente bloqueado precisa explicar claramente a fase de liberação.');
   assert(giftStoreUi.includes('Escolha quem vai receber'), 'Regressão: fluxo de presente perdeu o seletor de amigos.');
   assert(giftStoreUi.includes('Escreva um recado'), 'Regressão: fluxo de presente perdeu o recado personalizado.');
   assert(giftStoreUi.includes('maxLength={180}'), 'Regressão: recado de presente perdeu o limite de segurança.');
