@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -34,10 +34,11 @@ export default function ProfileScreen() {
   const [nicknameSaving, setNicknameSaving] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [avatarSaving, setAvatarSaving] = useState(false);
+  const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     try {
-      setLoading(true); setError(null);
+      if (!loadedOnce.current) setLoading(true); setError(null);
       const [p, s, social] = await Promise.all([
         getMyProfile(),
         getMyProfileStats(),
@@ -46,6 +47,7 @@ export default function ProfileScreen() {
       setProfile(p);
       setStats(s);
       setFriendCount(social.friends.length);
+      loadedOnce.current = true;
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível atualizar seu perfil.'); }
     finally { setLoading(false); }
   }, []);
