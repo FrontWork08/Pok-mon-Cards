@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -17,8 +17,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const { colors, isLight, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
-  const [profile,setProfile]=useState<any>(null);const[stats,setStats]=useState({totalCards:0,species:0,completedTrades:0});const[battlePass,setBattlePass]=useState<BattlePassState|null>(null);const[loading,setLoading]=useState(true);const[claiming,setClaiming]=useState(false);const[notice,setNotice]=useState<string|null>(null);
-  const load=useCallback(async()=>{try{setLoading(true);const[dashboard,pass]=await Promise.all([getHomeDashboard(),getBattlePass().catch(()=>null)]);setProfile(dashboard.profile);setStats(dashboard.stats);setBattlePass(pass);}finally{setLoading(false);}},[]);
+  const [profile,setProfile]=useState<any>(null);const[stats,setStats]=useState({totalCards:0,species:0,completedTrades:0});const[battlePass,setBattlePass]=useState<BattlePassState|null>(null);const[loading,setLoading]=useState(true);const[claiming,setClaiming]=useState(false);const[notice,setNotice]=useState<string|null>(null);const loadedOnce=useRef(false);
+  const load=useCallback(async()=>{try{if(!loadedOnce.current)setLoading(true);const[dashboard,pass]=await Promise.all([getHomeDashboard(),getBattlePass().catch(()=>null)]);setProfile(dashboard.profile);setStats(dashboard.stats);setBattlePass(pass);loadedOnce.current=true;}finally{setLoading(false);}},[]);
   useFocusEffect(useCallback(()=>{void load();},[load]));
   const avatarUrl=getProfileAvatarUrl(profile?.avatar_path,profile?.avatar_updated_at);
   const canClaimDaily=useMemo(()=>!profile?.last_daily_claim_at||Date.now()-new Date(profile.last_daily_claim_at).getTime()>=24*60*60*1000,[profile?.last_daily_claim_at]);
