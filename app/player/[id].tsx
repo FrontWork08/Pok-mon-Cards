@@ -12,7 +12,16 @@ import { runFriendAction } from '@/services/playerActions';
 import { getRelationshipWith, type PublicRelationshipState } from '@/services/social';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { AuraBanner } from '@/components/AuraBanner';
 import { getThemeVisual } from '@/theme/themeCatalog';
+
+function trophyColor(rarity:string){
+  const value=rarity.toLowerCase();
+  if(value.includes('legend')||value.includes('master')||value.includes('auction'))return '#C493FF';
+  if(value.includes('luxury')||value.includes('epic'))return '#FFD447';
+  if(value.includes('rare'))return '#55D9FF';
+  return '#65D894';
+}
 
 export default function PlayerShowcaseScreen() {
   const router = useRouter();
@@ -88,20 +97,30 @@ export default function PlayerShowcaseScreen() {
       {friendNotice ? <Pressable style={[styles.friendNotice,{backgroundColor:colors.surface,borderColor:colors.border}]} onPress={() => setFriendNotice(null)}><Ionicons name="people" size={17} color={colors.accent}/><Text style={[styles.friendNoticeText,{color:colors.text}]}>{friendNotice}</Text><Ionicons name="close" size={16} color={colors.muted}/></Pressable> : null}
 
       {player && collection ? <>
-        <View style={[styles.hero, { backgroundColor, borderColor: frameColor, borderWidth: player.frame ? 2 : 1 }]}>
-          <View style={[styles.heroGlow,{backgroundColor:frameColor}]} />
-          <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/>
-          <TrainerAvatar icon={player.profileIcon} avatarUrl={avatarUrl} color={frameColor} backgroundColor={player.background?.primaryColor ? player.background.primaryColor + '22' : colors.surfaceAlt} size={66} />
-          <View style={styles.heroInfo}>
-            <Text style={[styles.kicker, { color: colors.yellow }]}>TRAINER SHOWCASE • 1.0</Text>
-            <Text style={[styles.username, { color: colors.text }]}>@{player.username}</Text>
-            {player.economyTitle ? <Text style={[styles.economyTitle,{color:colors.yellow}]}>{player.economyTitle.icon} {player.economyTitle.title}</Text> : player.equippedTitle ? <Text style={[styles.titleText, { color: colors.yellow }]}>{player.equippedTitle.icon} {player.equippedTitle.title}</Text> : null}
-            <Text style={[styles.meta, { color: colors.muted }]}>Nível {player.level} • {rank ? `${rank.symbol} ${rank.displayName}` : 'ELO oculto'}</Text>
-            {player.prestige.level>0?<View style={[styles.prestigeBadge,{backgroundColor:colors.surface,borderColor:colors.yellow}]}><Ionicons name="ribbon" size={13} color={colors.yellow}/><Text style={[styles.prestigeText,{color:colors.yellow}]}>PRESTÍGIO {player.prestige.level}{player.prestige.stars>0?` • ★${player.prestige.stars}`:''}</Text></View>:null}
-            {player.frame || player.background ? <Text style={[styles.cosmeticMeta, { color: frameColor }]}>{player.frame?.name ?? 'Sem moldura'} • {player.background?.name ?? 'Sem background'}</Text> : null}
+        <AuraBanner
+          eyebrow="TRAINER SHOWCASE • 1.0"
+          title={`@${player.username}`}
+          subtitle={player.economyTitle ? `${player.economyTitle.icon} ${player.economyTitle.title}` : player.equippedTitle ? `${player.equippedTitle.icon} ${player.equippedTitle.title}` : `Nível ${player.level} • identidade pública do treinador`}
+          icon={player.prestige.level>=5?'diamond':'person'}
+          primaryColor={frameColor}
+          secondaryColor={player.background?.primaryColor??colors.yellow}
+          intensity={player.prestige.level>=5?'master':player.prestige.level>0?'premium':'soft'}
+          badge={player.prestige.level>0?`PRESTÍGIO ${player.prestige.level}`:'TRAINER'}
+          minHeight={220}
+        >
+          <View style={[styles.heroInner,{backgroundColor:`${backgroundColor}CC`,borderColor:`${frameColor}70`}]}>
+            <View style={[styles.heroGlow,{backgroundColor:frameColor}]} />
+            <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/>
+            <TrainerAvatar icon={player.profileIcon} avatarUrl={avatarUrl} color={frameColor} backgroundColor={player.background?.primaryColor ? player.background.primaryColor + '22' : colors.surfaceAlt} size={72} />
+            <View style={styles.heroInfo}>
+              <Text style={[styles.usernameSmall,{color:colors.text}]}>@{player.username}</Text>
+              <Text style={[styles.meta, { color: colors.muted }]}>Nível {player.level} • {rank ? `${rank.symbol} ${rank.displayName}` : 'ELO oculto'}</Text>
+              {player.prestige.level>0?<View style={styles.prestigeStars}>{Array.from({length:Math.min(5,Math.max(1,player.prestige.level))},(_,i)=><View key={i} style={[styles.prestigeStar,{backgroundColor:player.prestige.level>=5?'#C493FF':colors.yellow}]}><Ionicons name="star" size={11} color="#07111F"/></View>)}</View>:null}
+              {player.frame || player.background ? <Text style={[styles.cosmeticMeta, { color: frameColor }]}>{player.frame?.name ?? 'Sem moldura'} • {player.background?.name ?? 'Sem background'}</Text> : null}
+            </View>
+            {player.guild ? <Pressable onPress={() => router.push('/guilds')} style={[styles.guildBadge, { backgroundColor: player.guild.color + '25', borderColor: player.guild.color }]}><Ionicons name="shield" size={16} color={player.guild.color} /><Text style={[styles.guildText, { color: player.guild.color }]}>{player.guild.name} • Nv. {player.guild.level}</Text></Pressable> : null}
           </View>
-          {player.guild ? <Pressable onPress={() => router.push('/guilds')} style={[styles.guildBadge, { backgroundColor: player.guild.color + '25', borderColor: player.guild.color }]}><Ionicons name="shield" size={16} color={player.guild.color} /><Text style={[styles.guildText, { color: player.guild.color }]}>{player.guild.name} • Nv. {player.guild.level}</Text></Pressable> : null}
-        </View>
+        </AuraBanner>
 
         {relationship !== 'self' ? (
           <View style={[styles.friendPanel,{backgroundColor:colors.surface,borderColor:relationship==='friend'?'#2F9E68':colors.border}]}>
@@ -145,6 +164,33 @@ export default function PlayerShowcaseScreen() {
           <Metric icon="trophy" label="VITÓRIAS" value={player.battleWins.toLocaleString('pt-BR')} />
           <Metric icon="analytics" label="WIN RATE" value={`${winRate}%`} />
         </View>
+
+        {collection.trophies.length ? (
+          <AuraBanner
+            eyebrow="TROPHY ROOM"
+            title="Sala de Troféus"
+            subtitle="Conquistas permanentes de prestígio econômico, leilões e marcos especiais."
+            icon="trophy"
+            primaryColor="#FFD447"
+            secondaryColor={player.prestige.level>=5?'#C493FF':frameColor}
+            intensity={collection.trophies.some((item)=>/legend|master|auction/i.test(item.rarity))?'master':'premium'}
+            badge={`${collection.trophies.length} TROFÉU(S)`}
+            minHeight={220}
+          >
+            <View style={styles.trophyGrid}>
+              {collection.trophies.map((item)=>{
+                const color=trophyColor(item.rarity);
+                return <View key={item.id} style={[styles.trophyCard,{backgroundColor:colors.surface+'D8',borderColor:color}]}>
+                  <View style={[styles.trophyGlow,{backgroundColor:color}]}/>
+                  <View style={[styles.trophyIcon,{backgroundColor:`${color}18`,borderColor:`${color}70`}]}><Ionicons name={(item.icon||'trophy') as keyof typeof Ionicons.glyphMap} size={24} color={color}/></View>
+                  <Text numberOfLines={1} style={[styles.trophyName,{color:colors.text}]}>{item.name}</Text>
+                  <Text numberOfLines={2} style={[styles.trophyDescription,{color:colors.muted}]}>{item.description}</Text>
+                  <View style={[styles.trophyRarity,{backgroundColor:`${color}15`,borderColor:`${color}55`}]}><Text style={[styles.trophyRarityText,{color}]}>{item.rarity.toUpperCase()}</Text></View>
+                </View>;
+              })}
+            </View>
+          </AuraBanner>
+        ) : null}
 
         {collection.museum.cards.length ? <>
           <View style={styles.sectionHead}><View><Text style={[styles.sectionTitle,{color:colors.text}]}>Museu da Coleção</Text><Text style={[styles.sectionHint,{color:colors.muted}]}>Galeria permanente • nível {collection.museum.level} • {collection.museum.cards.length}/{collection.museum.slots} espaços usados.</Text></View><View style={[styles.museumLevelBadge,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name="library" size={14} color={colors.accent}/><Text style={[styles.museumLevelText,{color:colors.accent}]}>NV. {collection.museum.level}</Text></View></View>
@@ -214,6 +260,7 @@ const styles = StyleSheet.create({
   friendConfirmedBadge:{borderRadius:999,borderWidth:1,borderColor:'#2F9E68',backgroundColor:'#153426',paddingHorizontal:10,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:5},
   friendConfirmedText:{color:'#9CEFC1',fontSize:7,fontWeight:'900'},
   hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 13, padding: 17, borderRadius: 28, borderWidth: 1, overflow:'hidden', position:'relative', minHeight:145 },
+  heroInner:{minHeight:112,borderRadius:18,borderWidth:1,padding:12,flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:12,position:'relative',overflow:'hidden'},
   heroGlow:{position:'absolute',right:-70,top:-90,width:260,height:260,borderRadius:999,opacity:.13},
   heroPokemon:{position:'absolute',right:-22,bottom:-45,width:190,height:205,opacity:.18,transform:[{rotate:'6deg'}]},
   avatar: { width: 66, height: 66, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
@@ -221,9 +268,12 @@ const styles = StyleSheet.create({
   heroInfo: { flex: 1, minWidth: 180, zIndex:2 },
   kicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
   username: { fontSize: 24, fontWeight: '900', marginTop: 2 },
+  usernameSmall:{fontSize:18,fontWeight:'900'},
   titleText: { fontSize: 11, fontWeight: '900', marginTop: 2 },
   economyTitle:{fontSize:11,fontWeight:'900',marginTop:2,letterSpacing:.25},
   prestigeBadge:{alignSelf:'flex-start',marginTop:6,borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:4},
+  prestigeStars:{flexDirection:'row',gap:4,marginTop:6},
+  prestigeStar:{width:24,height:24,borderRadius:8,alignItems:'center',justifyContent:'center'},
   prestigeText:{fontSize:7,fontWeight:'900',letterSpacing:.55},
   meta: { fontSize: 10, marginTop: 4 },
   cosmeticMeta: { fontSize: 8, fontWeight: '900', marginTop: 4, letterSpacing: .4 },
@@ -235,6 +285,14 @@ const styles = StyleSheet.create({
   valueHint: { fontSize: 9, marginTop: 2 },
   valueIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  trophyGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  trophyCard:{flexGrow:1,flexBasis:145,minWidth:135,maxWidth:210,minHeight:150,borderRadius:17,borderWidth:1,padding:10,position:'relative',overflow:'hidden'},
+  trophyGlow:{position:'absolute',right:-55,top:-65,width:145,height:145,borderRadius:999,opacity:.13},
+  trophyIcon:{width:46,height:46,borderRadius:15,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  trophyName:{fontSize:11,fontWeight:'900',marginTop:8},
+  trophyDescription:{fontSize:7.5,lineHeight:11,marginTop:3,minHeight:24},
+  trophyRarity:{alignSelf:'flex-start',borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:4,marginTop:8},
+  trophyRarityText:{fontSize:6,fontWeight:'900',letterSpacing:.5},
   metric: { flexGrow: 1, flexBasis: 135, minWidth: 125, borderRadius: 17, borderWidth: 1, padding: 13 },
   metricValue: { fontSize: 18, fontWeight: '900', marginTop: 7 },
   metricLabel: { fontSize: 7, fontWeight: '900', letterSpacing: .9, marginTop: 2 },
