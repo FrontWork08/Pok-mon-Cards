@@ -13,6 +13,7 @@ import { getRelationshipWith, type PublicRelationshipState } from '@/services/so
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { AuraBanner } from '@/components/AuraBanner';
+import { PremiumProfileFrame } from '@/components/PremiumProfileFrame';
 import { getThemeVisual } from '@/theme/themeCatalog';
 
 function trophyColor(rarity:string){
@@ -63,6 +64,7 @@ export default function PlayerShowcaseScreen() {
   const frameColor = player?.frame?.primaryColor ?? player?.guild?.color ?? colors.accent;
   const backgroundColor = player?.background?.secondaryColor ?? colors.accentSoft;
   const galaxyProfile = [player?.frame?.id, player?.background?.id].some((value) => String(value ?? '').includes('galaxy'));
+  const premiumFrame = /^(coin_|lux_|galaxy_)/.test(String(player?.frame?.id ?? ''));
   const avatarUrl = getProfileAvatarUrl(player?.avatarPath ?? null);
 
   async function updateFriendship(action: 'send' | 'accept') {
@@ -98,6 +100,13 @@ export default function PlayerShowcaseScreen() {
       {friendNotice ? <Pressable style={[styles.friendNotice,{backgroundColor:colors.surface,borderColor:colors.border}]} onPress={() => setFriendNotice(null)}><Ionicons name="people" size={17} color={colors.accent}/><Text style={[styles.friendNoticeText,{color:colors.text}]}>{friendNotice}</Text><Ionicons name="close" size={16} color={colors.muted}/></Pressable> : null}
 
       {player && collection ? <>
+        <PremiumProfileFrame
+          enabled={premiumFrame}
+          frameId={player.frame?.id ?? null}
+          primaryColor={frameColor}
+          secondaryColor={galaxyProfile?'#55E6FF':(player.background?.primaryColor??colors.yellow)}
+          radius={30}
+        >
         <AuraBanner
           eyebrow="TRAINER SHOWCASE • 1.0"
           title={`@${player.username}`}
@@ -123,6 +132,7 @@ export default function PlayerShowcaseScreen() {
             {player.guild ? <Pressable onPress={() => router.push('/guilds')} style={[styles.guildBadge, { backgroundColor: player.guild.color + '25', borderColor: player.guild.color }]}><Ionicons name="shield" size={16} color={player.guild.color} /><Text style={[styles.guildText, { color: player.guild.color }]}>{player.guild.name} • Nv. {player.guild.level}</Text></Pressable> : null}
           </View>
         </AuraBanner>
+        </PremiumProfileFrame>
 
         {relationship !== 'self' ? (
           <View style={[styles.friendPanel,{backgroundColor:colors.surface,borderColor:relationship==='friend'?'#2F9E68':colors.border}]}>
