@@ -408,6 +408,18 @@ if (existsSync('app/guild-wars.tsx')) {
   assert(!wars.includes('[picker, bagCards.length, bagLoading]'), 'Regressão: bagLoading não pode voltar a cancelar a própria requisição do picker.');
 }
 
+if (existsSync('src/components/AuraFrame.tsx')) {
+  const auraFrame = read('src/components/AuraFrame.tsx');
+  assert(auraFrame.includes('const sharedAuraFlow=new Animated.Value(0)'), 'Regressão de performance: AuraFrame deve compartilhar uma única animação entre cards.');
+  assert(auraFrame.includes('sharedAuraUsers'), 'Regressão de performance: AuraFrame perdeu o controle global de assinantes.');
+  assert(auraFrame.includes('<View style={styles.inner}>{children}</View>'), 'Regressão visual: AuraFrame perdeu o conteúdo interno.');
+  assert(auraFrame.indexOf('<View style={styles.inner}>{children}</View>') < auraFrame.indexOf('styles.flowTop'), 'Regressão visual: efeitos do AuraFrame precisam ser renderizados acima de cards opacos.');
+  assert(auraFrame.includes('styles.glowA') && auraFrame.includes('styles.glowB'), 'Regressão visual: AuraFrame perdeu o brilho interno.');
+  assert(auraFrame.includes('styles.shine'), 'Regressão visual: AuraFrame perdeu o reflexo interno.');
+  assert(auraFrame.includes('styles.nebula') && auraFrame.includes("variant==='galaxy'"), 'Regressão visual: AuraFrame Galaxy perdeu a nebulosa interna.');
+  assert(auraFrame.includes('AccessibilityInfo.isReduceMotionEnabled'), 'Regressão de acessibilidade: AuraFrame não respeita redução de movimento.');
+}
+
 if (existsSync('src/components/AuraBanner.tsx')) {
   const aura = read('src/components/AuraBanner.tsx');
   assert(aura.includes('Animated.loop'), 'Regressão visual: aura de banner deixou de ter fluxo contínuo.');
