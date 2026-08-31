@@ -37,6 +37,14 @@ export type OwnedCardEntry = {
   marketplace_quantity?: number;
   favorite: boolean;
   first_obtained_at: string;
+  economyStyle?: {
+    id:string;
+    name:string;
+    icon:string;
+    rarity:string;
+    category:string;
+    effect:string;
+  } | null;
   cards: {
     id: string;
     pokemon_name: string;
