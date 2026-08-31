@@ -265,6 +265,7 @@ export default function ProfileScreen() {
       <FeatureLink icon="sparkles" color={colors.yellow} title="Minha Vitrine" text="Escolha as 6 cartas que aparecem no seu perfil público." onPress={() => router.push('/showcase')} />
       <FeatureLink icon="star" color={colors.accent} title="Card Chase" text="Wishlist e alertas quando suas cartas desejadas aparecem." onPress={() => router.push('/wishlist')} />
       <FeatureLink icon="trophy" color={colors.yellow} title="Copa Trainer" text="Entre no torneio de 8 jogadores e acompanhe o bracket." onPress={() => router.push('/tournaments')} />
+      <FeatureLink icon="bag-handle" color={colors.yellow} title="Trainer Shop" text="Molduras, backgrounds, estilos de carta e deck, efeitos, temas, títulos e troféus em uma loja única." onPress={() => router.push('/store')} />
       <FeatureLink icon="cash" color={colors.yellow} title="Economy 2.0" text="Prestígio, Loja de Luxo, Museu, projetos coletivos e sinks permanentes de Coins." onPress={() => router.push('/economy')} />
       <FeatureLink icon="color-wand" color={colors.accent} title="Cosméticos" text="Equipe molduras e backgrounds conquistados pelo seu progresso." onPress={() => router.push('/cosmetics')} />
       <FeatureLink icon="color-palette" color={colors.accent} title="Personalização" text="Modo claro/escuro, temas, push, som e vibração." onPress={() => router.push('/settings')} />
