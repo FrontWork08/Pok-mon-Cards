@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getSessionUserId } from '@/lib/session';
 import { normalizeFunctionError } from '@/services/functionErrors';
 
 export type BattleStakeType = 'none' | 'coins' | 'card';
@@ -95,9 +96,7 @@ export async function getBattleEvents(battleId: string) {
 }
 
 export async function getMyActiveBattle() {
-  const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError) throw authError;
-  const id = auth.user?.id;
+  const id = await getSessionUserId(false);
   if (!id) return null;
   const { data, error } = await supabase
     .from('battles')
@@ -117,10 +116,7 @@ export async function getMyActiveBattle() {
 }
 
 export async function getMyBattleHistory(limit = 50) {
-  const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError) throw authError;
-  const id = auth.user?.id;
-  if (!id) throw new Error('Usuário não autenticado.');
+  const id = await getSessionUserId(true);
   const { data, error } = await supabase
     .from('battles')
     .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,challenger_score,opponent_score,winner_id,reward_eligible,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,forfeited_by,forfeit_rating_neutral,forfeited_at,created_at,completed_at,challenger:players!battles_challenger_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id),opponent:players!battles_opponent_id_fkey(id,username,battle_rating,show_battle_rating,equipped_title_id)')
