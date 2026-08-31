@@ -8,6 +8,7 @@ import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { formatUsd } from '@/services/market';
 import { getMyEquippedBoosterFx } from '@/services/economy';
+import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 
 type Props = { visible: boolean; pack: Pack | null; onClose: () => void; onPurchase: () => Promise<OpenedCard[]>; onFinished?: () => void };
 type Stage = 'sealed' | 'opening' | 'cards' | 'summary';
@@ -285,11 +286,14 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const sparkTravel = shockwave.interpolate({ inputRange: [0, 1], outputRange: [0, highTier ? -265 : -210] });
   const sparkOpacity = shockwave.interpolate({ inputRange: [0, .12, .62, 1], outputRange: [0, 1, .55, 0] });
   const rayScale = revealBurst.interpolate({ inputRange: [0, 1], outputRange: [.2, highTier ? 2.45 : 1.8] });
-  const boosterFxColor = boosterFx?.id.includes('master') || boosterFx?.id.includes('legend')
-    ? '#C493FF'
-    : boosterFx?.id.includes('champion')
-      ? '#FFD447'
-      : '#55D9FF';
+  const isGalaxyBoosterFx = Boolean(boosterFx?.id.includes('galaxy'));
+  const boosterFxColor = isGalaxyBoosterFx
+    ? '#8B5CFF'
+    : boosterFx?.id.includes('master') || boosterFx?.id.includes('legend')
+      ? '#C493FF'
+      : boosterFx?.id.includes('champion')
+        ? '#FFD447'
+        : '#55D9FF';
   const boosterFxIcon = (boosterFx?.icon || 'sparkles') as keyof typeof Ionicons.glyphMap;
   const boosterFxScale = openingCore.interpolate({ inputRange: [0, 1], outputRange: [.6, 2.5] });
   const boosterFxOpacity = openingFlash.interpolate({ inputRange: [0, .25, 1], outputRange: [.12, .52, .9] });
@@ -298,6 +302,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     <View style={styles.container}>
       <PremiumBackground />
       <View style={styles.shadeTop} /><View style={styles.shadeBottom} />
+      {isGalaxyBoosterFx && (stage==='sealed'||stage==='opening') ? <GalaxyFlowOverlay intensity="master" opacity={stage==='opening'?.96:.56}/> : null}
       {boosterFx ? <View pointerEvents="none" style={[styles.boosterFxFrame,{borderColor:boosterFxColor}]} /> : null}
       {boosterFx ? <View pointerEvents="none" style={[styles.boosterFxBadge,{borderColor:boosterFxColor,backgroundColor:'#0A0F18E8'}]}><Ionicons name={boosterFxIcon} size={14} color={boosterFxColor}/><Text style={[styles.boosterFxBadgeText,{color:boosterFxColor}]}>{boosterFx.name.toUpperCase()}</Text></View> : null}
       <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 17), minHeight: 66 + insets.top }]}><View style={{ flex: 1 }}><Text style={styles.kicker}>PACK OPENING</Text><Text numberOfLines={1} style={styles.title}>{pack.name}</Text></View>{stage !== 'opening' ? <Pressable style={styles.closeButton} onPress={onClose}><Ionicons name="close" size={21} color="#F4F4F4" /></Pressable> : null}</View>
@@ -305,6 +310,11 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
       {(stage === 'sealed' || stage === 'opening') ? <View style={styles.openingStage}>
         {boosterFx ? <Animated.View pointerEvents="none" style={[styles.boosterFxBurst,{borderColor:boosterFxColor,opacity:boosterFxOpacity,transform:[{scale:boosterFxScale}]}]} /> : null}
         {boosterFx && stage==='opening' ? <Animated.View pointerEvents="none" style={[styles.boosterFxCore,{backgroundColor:boosterFxColor,opacity:boosterFxOpacity,transform:[{scale:boosterFxScale}]}]} /> : null}
+        {isGalaxyBoosterFx ? <>
+          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalOuter,{borderColor:'#8B5CFF',opacity:boosterFxOpacity,transform:[{scale:boosterFxScale},{rotate:'18deg'}]}]} />
+          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalMid,{borderColor:'#55E6FF',opacity:boosterFxOpacity,transform:[{scale:boosterFxScale},{rotate:'-22deg'}]}]} />
+          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalInner,{borderColor:'#E056FD',opacity:boosterFxOpacity,transform:[{scale:boosterFxScale}]}]} />
+        </> : null}
         <Animated.View pointerEvents="none" style={[styles.floorHalo, { opacity: floorPulse, transform: [{ scaleX: floorScale }] }]} />
         <Animated.View pointerEvents="none" style={[styles.openingCore, { opacity: openingCoreOpacity, transform: [{ scale: openingCoreScale }] }]} />
         <Animated.View pointerEvents="none" style={[styles.openingShock, { opacity: openingShockOpacity, transform: [{ scale: openingShockScale }] }]} />
@@ -393,6 +403,10 @@ const styles = StyleSheet.create({
   boosterFxBadgeText:{fontSize:7,fontWeight:'900',letterSpacing:.6},
   boosterFxBurst:{position:'absolute',width:250,height:250,borderRadius:999,borderWidth:3,zIndex:1},
   boosterFxCore:{position:'absolute',width:95,height:95,borderRadius:999,zIndex:1},
+  galaxyPortal:{position:'absolute',borderRadius:999,borderWidth:2,zIndex:2},
+  galaxyPortalOuter:{width:330,height:180},
+  galaxyPortalMid:{width:265,height:145},
+  galaxyPortalInner:{width:205,height:112},
   rewardPriceRow:{marginTop:7,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
   rewardPrice:{color:'#65D894',fontSize:13,fontWeight:'900'},
   summaryPrice:{color:'#65D894',fontSize:10,fontWeight:'900',marginTop:4},
