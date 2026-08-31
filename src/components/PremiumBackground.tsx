@@ -50,18 +50,13 @@ export const PremiumBackground = memo(function PremiumBackground() {
         resizeMode="contain"
         style={[styles.themePokemonRight, { opacity: isLight ? .13 : .20 }]}
       />
-      <Image
-        source={{ uri: visual.image }}
-        resizeMode="contain"
-        style={[styles.themePokemonLeft, { opacity: isLight ? .055 : .09 }]}
-      />
       <View style={[styles.landMass, { backgroundColor: colors.accent, opacity: isLight ? .045 : .08 }]} />
       <View style={[styles.landMassTwo, { backgroundColor: colors.yellow, opacity: isLight ? .035 : .055 }]} />
       {Platform.OS !== 'web' ? (
         <>
           <CaptureOrb top="4%" right="-42" size={178} color={colors.accent} opacity={isLight ? .10 : .15} />
           <CaptureOrb top="61%" left="-62" size={205} color={colors.yellow} opacity={isLight ? .07 : .10} />
-          {PATTERN_POSITIONS.map(([left, top, rotation], index) => (
+          {PATTERN_POSITIONS.slice(0, 4).map(([left, top, rotation], index) => (
             <View key={`type-${index}`} style={{ position:'absolute', left:left as any, top:top as any, transform:[{ rotate:`${rotation}deg` }], opacity:isLight ? .055 : .075 }}>
               <Ionicons name={patternIcon} size={index % 2 ? 29 : 22} color={index % 3 ? colors.accent : colors.yellow} />
             </View>
@@ -77,7 +72,7 @@ export const PremiumBackground = memo(function PremiumBackground() {
 const styles = StyleSheet.create({
   layer: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', pointerEvents: 'none' } as any,
   pokemonGlowRight: { position:'absolute', right:-90, top:'3%', width:330, height:330, borderRadius:999 },
-  pokemonGlowLeft: { position:'absolute', left:-100, bottom:'-3%', width:280, height:280, borderRadius:999 },
+  pokemonGlowLeft: { position:'absolute', left:-100, bottom:'-3%', width:240, height:240, borderRadius:999 },
   themePokemonRight:{position:'absolute',right:-38,top:'2%',width:300,height:370,transform:[{rotate:'6deg'}]},
   themePokemonLeft:{position:'absolute',left:-70,bottom:'-3%',width:245,height:320,transform:[{rotate:'-8deg'}]},
   orb: { position: 'absolute', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
