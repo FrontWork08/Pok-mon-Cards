@@ -6,6 +6,7 @@ import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { getMyProfile, getPlayerAvatarMap, getProfileAvatarUrl, type PlayerAvatarMeta } from '@/services/player';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { CompactTrainerBanner } from '@/components/CompactTrainerBanner';
 import {
   formatUsd,
   getCollectionValueLeaderboard,
@@ -239,9 +240,16 @@ export default function CollectionRankingScreen() {
           {weeklyRows.map((row) => {
             const mine = row.player_id === myId;
             const medal = medalFor(row.weekly_rank);
+            const identityMeta=avatars[row.player_id];
             return (
-              <Pressable
+              <CompactTrainerBanner
                 key={row.player_id}
+                frameId={identityMeta?.frameId}
+                backgroundId={identityMeta?.backgroundId}
+                fallbackColor={colors.accent}
+                selected={mine}
+              >
+              <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={'Abrir perfil de @' + row.username}
                 onPress={() => router.push('/player/' + row.player_id)}
@@ -284,6 +292,7 @@ export default function CollectionRankingScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={17} color={colors.muted} />
               </Pressable>
+              </CompactTrainerBanner>
             );
           })}
         </View>
@@ -294,9 +303,16 @@ export default function CollectionRankingScreen() {
           {globalRows.map((row) => {
             const mine = row.player_id === myId;
             const medal = medalFor(row.global_rank);
+            const identityMeta=avatars[row.player_id];
             return (
-              <Pressable
+              <CompactTrainerBanner
                 key={row.player_id}
+                frameId={identityMeta?.frameId}
+                backgroundId={identityMeta?.backgroundId}
+                fallbackColor={colors.accent}
+                selected={mine}
+              >
+              <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={'Abrir perfil de @' + row.username}
                 onPress={() => router.push('/player/' + row.player_id)}
@@ -311,6 +327,14 @@ export default function CollectionRankingScreen() {
                 <View style={[styles.rankBox, { backgroundColor: colors.surfaceAlt }]}>
                   <Text style={[styles.rank, { color: colors.text }]}>{medal ?? '#' + row.global_rank}</Text>
                 </View>
+
+                <TrainerAvatar
+                  icon={identityMeta?.profileIcon}
+                  avatarUrl={getProfileAvatarUrl(identityMeta?.avatarPath, identityMeta?.avatarUpdatedAt)}
+                  color={colors.accent}
+                  backgroundColor={colors.accentSoft}
+                  size={46}
+                />
 
                 <View style={styles.identity}>
                   <Text numberOfLines={1} style={[styles.username, { color: colors.text }]}>
@@ -327,6 +351,7 @@ export default function CollectionRankingScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={17} color={colors.muted} />
               </Pressable>
+              </CompactTrainerBanner>
             );
           })}
         </View>
