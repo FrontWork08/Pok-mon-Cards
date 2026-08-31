@@ -16,6 +16,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import {
   getDuplicateCardsForSale,
+  sellAllDuplicateCards,
   sellDuplicateCards,
   type DuplicateSaleCard,
 } from '@/services/cardSales';
@@ -30,6 +31,7 @@ export default function SellDuplicatesScreen() {
   const [cards, setCards] = useState<DuplicateSaleCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [sellingCardId, setSellingCardId] = useState<string | null>(null);
+  const [sellingAll, setSellingAll] = useState(false);
   const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
@@ -62,15 +64,56 @@ export default function SellDuplicatesScreen() {
 
   const summary = useMemo(() => {
     let copies = 0;
+    let sellableCopies = 0;
+    let skippedCopies = 0;
     let estimatedCoins = 0;
+    let sellableUnique = 0;
     for (const entry of cards) {
       const available = Math.max(0, Number(entry.quantity ?? 0) - 1);
       const unit = Number(entry.sale?.unitCoins ?? 0);
       copies += available;
-      estimatedCoins += available * unit;
+      if (unit > 0) {
+        sellableCopies += available;
+        sellableUnique += 1;
+        estimatedCoins += available * unit;
+      } else {
+        skippedCopies += available;
+      }
     }
-    return { copies, estimatedCoins };
+    return { copies, sellableCopies, skippedCopies, sellableUnique, estimatedCoins };
   }, [cards]);
+
+  const confirmSellAll = useCallback(() => {
+    if (sellingAll || sellingCardId || summary.sellableCopies <= 0) return;
+    Alert.alert(
+      'Vender todas as repetidas?',
+      `Serão vendidas ${summary.sellableCopies.toLocaleString('pt-BR')} cópias extras de ${summary.sellableUnique.toLocaleString('pt-BR')} carta(s), por aproximadamente 🪙 ${summary.estimatedCoins.toLocaleString('pt-BR')}.\n\nO servidor recalcula os valores na confirmação e mantém 1 cópia de cada carta na sua coleção.${summary.skippedCopies ? `\n\n${summary.skippedCopies} cópia(s) sem cotação serão ignoradas.` : ''}`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'VENDER TODAS',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                setSellingAll(true);
+                const result = await sellAllDuplicateCards();
+                await Promise.all([refreshWallet(), load()]);
+                Alert.alert(
+                  'Venda em lote concluída',
+                  `Você vendeu ${result.quantitySold.toLocaleString('pt-BR')} repetida(s) de ${result.uniqueCardsSold.toLocaleString('pt-BR')} carta(s) e recebeu 🪙 ${result.coinsEarned.toLocaleString('pt-BR')}.${result.skippedCopies ? `\n\n${result.skippedCopies.toLocaleString('pt-BR')} cópia(s) sem cotação foram preservadas.` : ''}`,
+                );
+              } catch (error) {
+                Alert.alert('Não foi possível vender tudo', error instanceof Error ? error.message : 'Tente novamente.');
+              } finally {
+                setSellingAll(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [load, refreshWallet, sellingAll, sellingCardId, summary]);
 
   const confirmSale = useCallback((entry: DuplicateSaleCard, quantity: number) => {
     const card = entry.cards;
@@ -169,6 +212,31 @@ export default function SellDuplicatesScreen() {
               </View>
             </View>
 
+            <Pressable
+              disabled={sellingAll || Boolean(sellingCardId) || summary.sellableCopies <= 0}
+              onPress={confirmSellAll}
+              style={[
+                styles.sellAllButton,
+                { backgroundColor: colors.yellow, borderColor: colors.yellow },
+                (sellingAll || Boolean(sellingCardId) || summary.sellableCopies <= 0) && styles.disabled,
+              ]}
+            >
+              {sellingAll ? <ActivityIndicator size="small" color="#07111F" /> : <Ionicons name="flash" size={19} color="#07111F" />}
+              <View style={styles.sellAllCopy}>
+                <Text style={styles.sellAllTitle}>{sellingAll ? 'VENDENDO COM SEGURANÇA…' : 'VENDER TODAS AS REPETIDAS'}</Text>
+                <Text style={styles.sellAllMeta}>
+                  {summary.sellableCopies.toLocaleString('pt-BR')} cópias • estimado 🪙 {summary.estimatedCoins.toLocaleString('pt-BR')}
+                </Text>
+              </View>
+              {!sellingAll ? <Ionicons name="chevron-forward" size={19} color="#07111F" /> : null}
+            </Pressable>
+
+            {summary.skippedCopies > 0 ? (
+              <Text style={[styles.skipHint, { color: colors.muted }]}>
+                {summary.skippedCopies.toLocaleString('pt-BR')} repetida(s) sem cotação não entram na venda em lote e continuarão na sua Bag.
+              </Text>
+            ) : null}
+
             <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Ionicons name="search" size={19} color={colors.muted} />
               <TextInput
@@ -238,24 +306,24 @@ export default function SellDuplicatesScreen() {
 
                 <View style={styles.actions}>
                   <Pressable
-                    disabled={selling || unitCoins <= 0}
+                    disabled={sellingAll || selling || unitCoins <= 0}
                     onPress={() => confirmSale(item, 1)}
                     style={[
                       styles.secondaryButton,
                       { borderColor: colors.border, backgroundColor: colors.surfaceAlt },
-                      (selling || unitCoins <= 0) && styles.disabled,
+                      (sellingAll || selling || unitCoins <= 0) && styles.disabled,
                     ]}
                   >
                     {selling ? <ActivityIndicator size="small" color={colors.muted} /> : <Ionicons name="cash-outline" size={16} color={colors.text} />}
                     <Text style={[styles.secondaryText, { color: colors.text }]}>VENDER 1</Text>
                   </Pressable>
                   <Pressable
-                    disabled={selling || unitCoins <= 0 || available <= 0}
+                    disabled={sellingAll || selling || unitCoins <= 0 || available <= 0}
                     onPress={() => confirmSale(item, available)}
                     style={[
                       styles.primaryButton,
                       { backgroundColor: colors.yellow },
-                      (selling || unitCoins <= 0 || available <= 0) && styles.disabled,
+                      (sellingAll || selling || unitCoins <= 0 || available <= 0) && styles.disabled,
                     ]}
                   >
                     <Ionicons name="layers-outline" size={16} color="#07111F" />
@@ -303,6 +371,11 @@ const styles = StyleSheet.create({
   summaryCard: { flex: 1, borderRadius: 17, borderWidth: 1, padding: 13 },
   summaryLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   summaryValue: { fontSize: 20, fontWeight: '900', marginTop: 5 },
+  sellAllButton: { minHeight: 58, borderRadius: 17, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sellAllCopy: { flex: 1, minWidth: 0 },
+  sellAllTitle: { color: '#07111F', fontSize: 10, fontWeight: '900', letterSpacing: .4 },
+  sellAllMeta: { color: '#4A4011', fontSize: 8, fontWeight: '800', marginTop: 2 },
+  skipHint: { fontSize: 8, lineHeight: 12, fontWeight: '700', marginTop: -5 },
   searchBox: { minHeight: 50, borderRadius: 16, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 9 },
   searchInput: { flex: 1, minHeight: 48, fontSize: 13 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
