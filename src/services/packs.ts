@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getSessionUserId } from '@/lib/session';
 import { normalizeFunctionError } from '@/services/functionErrors';
 import { getPhysicalPackshots } from '@/data/physicalPackshots';
 import { getActiveFreeBoosterEvent } from '@/services/liveEvents';
@@ -171,8 +172,7 @@ export async function openLegendaryDiamondPack() {
 
 
 export async function getFavoritePackIds() {
-  const { data: auth } = await supabase.auth.getUser();
-  const userId = auth.user?.id;
+  const userId = await getSessionUserId(false);
   if (!userId) return [] as string[];
 
   const { data, error } = await supabase
@@ -186,9 +186,7 @@ export async function getFavoritePackIds() {
 }
 
 export async function setPackFavorite(packId: string, favorite: boolean) {
-  const { data: auth } = await supabase.auth.getUser();
-  const userId = auth.user?.id;
-  if (!userId) throw new Error('Sessão não encontrada.');
+  const userId = await getSessionUserId(true);
 
   if (favorite) {
     const { error } = await supabase
