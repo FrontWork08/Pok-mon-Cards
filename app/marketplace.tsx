@@ -20,6 +20,7 @@ function themeAccent(theme:ShopTheme,fallback:string){
   if(theme==='neon')return '#45F3FF';
   if(theme==='master')return '#C493FF';
   if(theme==='celestial')return '#8EE7FF';
+  if(theme==='galaxy')return '#8B5CFF';
   if(theme==='night')return '#9B7BFF';
   return fallback;
 }
@@ -38,6 +39,7 @@ const THEMES: Array<{id:ShopTheme;label:string;icon:keyof typeof Ionicons.glyphM
   {id:'neon',label:'NEON',icon:'flash',premium:true},
   {id:'master',label:'MASTER',icon:'diamond',premium:true},
   {id:'celestial',label:'CELESTIAL',icon:'planet',premium:true},
+  {id:'galaxy',label:'GALAXY FLOW',icon:'sparkles',premium:true},
 ];
 
 export default function MarketplaceScreen() {
@@ -152,8 +154,9 @@ export default function MarketplaceScreen() {
       icon="storefront"
       primaryColor={themeAccent(shopTheme,colors.accent)}
       secondaryColor={colors.yellow}
-      intensity={(['master','celestial','royal','neon'] as ShopTheme[]).includes(shopTheme)?'master':'premium'}
-      badge={(['master','celestial','royal','neon'] as ShopTheme[]).includes(shopTheme)?`${shopTheme.toUpperCase()} THEME`:'MARKET LIVE'}
+      intensity={(['master','celestial','royal','neon','galaxy'] as ShopTheme[]).includes(shopTheme)?'master':'premium'}
+      variant={shopTheme==='galaxy'?'galaxy':'energy'}
+      badge={(['master','celestial','royal','neon','galaxy'] as ShopTheme[]).includes(shopTheme)?`${shopTheme.toUpperCase()} THEME`:'MARKET LIVE'}
       minHeight={190}
     >
       <View style={styles.marketHeroStats}>
@@ -172,7 +175,7 @@ export default function MarketplaceScreen() {
         <View style={[styles.shopPreviewGlow,{backgroundColor:themeAccent(shopTheme,colors.accent)}]}/>
         <View style={[styles.shopPreviewIcon,{backgroundColor:`${themeAccent(shopTheme,colors.accent)}18`,borderColor:`${themeAccent(shopTheme,colors.accent)}75`}]}><Ionicons name={THEMES.find((item)=>item.id===shopTheme)?.icon??'storefront'} size={22} color={themeAccent(shopTheme,colors.accent)}/></View>
         <View style={{flex:1,zIndex:2}}><Text style={[styles.shopPreviewKicker,{color:themeAccent(shopTheme,colors.accent)}]}>{shopTheme.toUpperCase()} STORE</Text><Text style={[styles.shopPreviewName,{color:colors.text}]}>{shopName.trim()||hub?.myShop?.name||'Sua Trainer Shop'}</Text><Text style={[styles.shopPreviewMeta,{color:colors.muted}]}>Prévia pública • tema {shopTheme}</Text></View>
-        {(['royal','neon','master','celestial'] as ShopTheme[]).includes(shopTheme)?<View style={[styles.shopPreviewPremium,{backgroundColor:`${colors.yellow}18`,borderColor:`${colors.yellow}60`}]}><Ionicons name="diamond" size={12} color={colors.yellow}/><Text style={[styles.shopPreviewPremiumText,{color:colors.yellow}]}>PREMIUM</Text></View>:null}
+        {(['royal','neon','master','celestial','galaxy'] as ShopTheme[]).includes(shopTheme)?<View style={[styles.shopPreviewPremium,{backgroundColor:`${colors.yellow}18`,borderColor:`${colors.yellow}60`}]}><Ionicons name="diamond" size={12} color={colors.yellow}/><Text style={[styles.shopPreviewPremiumText,{color:colors.yellow}]}>PREMIUM</Text></View>:null}
       </View>
       <TextInput value={shopName} onChangeText={setShopName} maxLength={32} placeholder="Nome da sua loja" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
       <View style={styles.themeRow}>{THEMES.filter((item)=>!item.premium||(hub?.ownedShopThemes??[]).includes(item.id)||shopTheme===item.id).map((item)=><Pressable key={item.id} onPress={()=>setShopTheme(item.id)} style={[styles.themeChip,{backgroundColor:shopTheme===item.id?colors.accentSoft:colors.surfaceAlt,borderColor:shopTheme===item.id?colors.accent:colors.border}]}><Ionicons name={item.icon} size={15} color={shopTheme===item.id?colors.accent:colors.muted}/><Text style={[styles.themeText,{color:colors.text}]}>{item.label}</Text>{item.premium?<Ionicons name="diamond" size={11} color={colors.yellow}/>:null}</Pressable>)}</View>
@@ -218,11 +221,12 @@ function ListingCard({item,myId,working,onBuy,onOffer}:{item:MarketplaceListing;
     item.shopTheme==='neon'?'#45F3FF':
     item.shopTheme==='master'?'#C493FF':
     item.shopTheme==='celestial'?'#8EE7FF':
+    item.shopTheme==='galaxy'?'#8B5CFF':
     colors.yellow;
   const listingBoosted=Boolean(item.boostedUntil&&new Date(item.boostedUntil).getTime()>Date.now());
   const shopBoosted=Boolean(item.shopHighlightUntil&&new Date(item.shopHighlightUntil).getTime()>Date.now());
-  return <AuraFrame primaryColor={listingBoosted?colors.yellow:themeColor} secondaryColor={themeColor} intensity={listingBoosted?'premium':'soft'} radius={19}><View style={[styles.listing,{backgroundColor:colors.surface,borderColor:listingBoosted?colors.yellow:themeColor,borderWidth:listingBoosted||['royal','neon','master','celestial'].includes(item.shopTheme)?1.5:1}]}>
-    <View pointerEvents="none" style={[styles.listingThemeGlow,{backgroundColor:themeColor,opacity:['royal','neon','master','celestial'].includes(item.shopTheme)?.13:.055}]}/>
+  return <AuraFrame primaryColor={listingBoosted?colors.yellow:themeColor} secondaryColor={item.shopTheme==='galaxy'?'#55E6FF':themeColor} intensity={listingBoosted||item.shopTheme==='galaxy'?'premium':'soft'} variant={item.shopTheme==='galaxy'?'galaxy':'energy'} radius={19}><View style={[styles.listing,{backgroundColor:colors.surface,borderColor:listingBoosted?colors.yellow:themeColor,borderWidth:listingBoosted||['royal','neon','master','celestial','galaxy'].includes(item.shopTheme)?1.5:1}]}>
+    <View pointerEvents="none" style={[styles.listingThemeGlow,{backgroundColor:themeColor,opacity:['royal','neon','master','celestial','galaxy'].includes(item.shopTheme)?.13:.055}]}/>
     <View pointerEvents="none" style={[styles.listingThemeEdge,{backgroundColor:listingBoosted?colors.yellow:themeColor,opacity:listingBoosted?.9:.45}]}/>
     <View style={styles.sellerRow}>
       <TrainerAvatar icon={item.sellerIcon} size={38} color={themeColor} backgroundColor={colors.surfaceAlt}/>
