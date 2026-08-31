@@ -22,6 +22,16 @@ export type DuplicateSaleCard = {
   };
 };
 
+export type BulkDuplicateSaleResult = {
+  ok: boolean;
+  uniqueCardsSold: number;
+  quantitySold: number;
+  coinsEarned: number;
+  skippedUniqueCards: number;
+  skippedCopies: number;
+  coins: number;
+};
+
 export type DuplicateSaleResult = {
   ok: boolean;
   cardId: string;
@@ -79,6 +89,20 @@ function duplicateSaleError(message: string) {
     ['LEGACY_CARD_LOCKED', 'A última cópia desta carta está protegida pelo seu Legado Beta até a migração 1.0.'],
   ];
   return new Error(known.find(([key]) => message.includes(key))?.[1] ?? message);
+}
+
+export async function sellAllDuplicateCards(): Promise<BulkDuplicateSaleResult> {
+  const { data, error } = await supabase.rpc('sell_all_duplicate_cards');
+  if (error) throw duplicateSaleError(error.message);
+  return {
+    ok: Boolean(data?.ok),
+    uniqueCardsSold: Number(data?.uniqueCardsSold ?? 0),
+    quantitySold: Number(data?.quantitySold ?? 0),
+    coinsEarned: Number(data?.coinsEarned ?? 0),
+    skippedUniqueCards: Number(data?.skippedUniqueCards ?? 0),
+    skippedCopies: Number(data?.skippedCopies ?? 0),
+    coins: Number(data?.coins ?? 0),
+  };
 }
 
 export async function sellDuplicateCards(cardId: string, quantity: number): Promise<DuplicateSaleResult> {
