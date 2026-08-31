@@ -6,6 +6,8 @@ import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
 import { GuildChatPanel } from '@/components/GuildChatPanel';
+import { AuraBanner } from '@/components/AuraBanner';
+import { GuildHeadquartersShowcase } from '@/components/GuildHeadquartersShowcase';
 import type { Pack, OpenedCard } from '@/services/packs';
 import {
   getGuildHub,
@@ -26,6 +28,7 @@ import {
 import { findPlayers, getPlayerAvatarMap, getProfileAvatarUrl, type PlayerAvatarMeta } from '@/services/player';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { formatUsd } from '@/services/market';
+import { getEconomySinkHub, type EconomySinkHub } from '@/services/economy';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
 
@@ -34,6 +37,7 @@ export default function GuildsScreen() {
   const { colors, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
   const [hub, setHub] = useState<GuildHub | null>(null);
+  const [economyHub, setEconomyHub] = useState<EconomySinkHub | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
@@ -49,8 +53,12 @@ export default function GuildsScreen() {
     try {
       if (!silent) setLoading(true);
       setError(null);
-      const next = await getGuildHub();
+      const [next, economy] = await Promise.all([
+        getGuildHub(),
+        getEconomySinkHub().catch(() => null),
+      ]);
       setHub(next);
+      setEconomyHub(economy);
       setSelectedId((current) => current ?? next.myMembership?.guildId ?? next.guilds[0]?.id ?? null);
       const memberIds = next.guilds.flatMap((guild) => guild.members.map((member) => member.id));
       setAvatars(await getPlayerAvatarMap(memberIds).catch(() => ({})));
@@ -162,20 +170,36 @@ export default function GuildsScreen() {
         <Pressable style={[styles.refresh, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={() => void load()}><Ionicons name="refresh" size={17} color={colors.yellow} /><Text style={[styles.refreshText, { color: colors.yellow }]}>ATUALIZAR</Text></Pressable>
       </View>
 
-      <View style={[styles.guildHero,{backgroundColor:colors.accentSoft,borderColor:selected?.color ?? colors.accent}]}>
-        <View style={[styles.guildHeroGlow,{backgroundColor:selected?.color ?? colors.accent}]} />
-        <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.guildHeroPokemon}/>
-        <View style={styles.guildHeroCopy}>
-          <Text style={[styles.guildHeroKicker,{color:colors.yellow}]}>TRAINER ALLIANCE NETWORK</Text>
-          <Text style={[styles.guildHeroTitle,{color:colors.text}]}>{myMembership && selected ? selected.name : 'Escolha sua equipe'}</Text>
-          <Text style={[styles.guildHeroText,{color:colors.muted}]}>{myMembership && selected ? `Você faz parte desta guilda como ${myMembership.role === 'leader' ? 'Chefe' : myMembership.role === 'officer' ? 'Oficial' : 'Membro'}.` : 'Compare as quatro equipes, entre em uma guilda e evolua junto com outros treinadores.'}</Text>
-          <View style={styles.guildHeroStats}>
-            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:colors.text}]}>{hub?.guilds.length ?? 0}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>GUILDAS</Text></View>
-            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:colors.text}]}>{selected?.memberCount ?? 0}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>MEMBROS</Text></View>
-            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:selected?.color ?? colors.yellow}]}>#{selected?.rank ?? '—'}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>RANK</Text></View>
+      <AuraBanner
+        eyebrow="TRAINER ALLIANCE NETWORK"
+        title={myMembership && selected ? selected.name : 'Escolha sua equipe'}
+        subtitle={myMembership && selected ? `Você faz parte desta guilda como ${myMembership.role === 'leader' ? 'Chefe' : myMembership.role === 'officer' ? 'Oficial' : 'Membro'}. Evolua a sede, domine ginásios e construa prestígio coletivo.` : 'Compare as quatro equipes, entre em uma guilda e evolua junto com outros treinadores.'}
+        icon="shield"
+        primaryColor={selected?.color ?? colors.accent}
+        secondaryColor={colors.yellow}
+        intensity={(selected?.level??1)>=5?'master':'premium'}
+        badge={selected?`RANK #${selected.rank}`:'GUILD HQ'}
+        minHeight={205}
+      >
+        <View style={styles.guildAuraContent}>
+          <View style={styles.guildAuraStats}>
+            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface+'D8',borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:colors.text}]}>{hub?.guilds.length ?? 0}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>GUILDAS</Text></View>
+            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface+'D8',borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:colors.text}]}>{selected?.memberCount ?? 0}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>MEMBROS</Text></View>
+            <View style={[styles.guildHeroStat,{backgroundColor:colors.surface+'D8',borderColor:colors.border}]}><Text style={[styles.guildHeroStatValue,{color:selected?.color ?? colors.yellow}]}>NV. {selected?.level ?? 1}</Text><Text style={[styles.guildHeroStatLabel,{color:colors.muted}]}>SEDE</Text></View>
           </View>
+          <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.guildAuraPokemon}/>
         </View>
-      </View>
+      </AuraBanner>
+
+      {selected && myMembership?.guildId===selected.id ? (
+        <GuildHeadquartersShowcase
+          guildName={selected.name}
+          guildColor={selected.color}
+          guildLevel={selected.level}
+          upgrades={economyHub?.guild?.guildId===selected.id ? economyHub.guild.upgrades : {}}
+          compact
+        />
+      ) : null}
 
       {notice ? <Pressable onPress={() => setNotice(null)} style={[styles.notice, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Ionicons name="checkmark-circle" size={19} color={colors.yellow} /><Text style={[styles.noticeText, { color: colors.text }]}>{notice}</Text><Ionicons name="close" size={18} color={colors.muted} /></Pressable> : null}
       {error ? <Pressable onPress={() => setError(null)} style={styles.error}><Ionicons name="alert-circle" size={19} color="#FF9FAF" /><Text style={styles.errorText}>{error}</Text><Ionicons name="close" size={18} color="#FF9FAF" /></Pressable> : null}
@@ -342,6 +366,9 @@ function GuildDetail({
 const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   guildHero:{minHeight:180,borderRadius:28,borderWidth:1,padding:17,overflow:'hidden',position:'relative'},
+  guildAuraContent:{minHeight:90,position:'relative',justifyContent:'center'},
+  guildAuraStats:{flexDirection:'row',flexWrap:'wrap',gap:7,paddingRight:115,zIndex:2},
+  guildAuraPokemon:{position:'absolute',right:-10,bottom:-25,width:150,height:150,opacity:.34,transform:[{rotate:'6deg'}]},
   guildHeroGlow:{position:'absolute',right:-75,top:-95,width:280,height:280,borderRadius:999,opacity:.14},
   guildHeroPokemon:{position:'absolute',right:-22,bottom:-40,width:205,height:215,opacity:.22,transform:[{rotate:'6deg'}]},
   guildHeroCopy:{maxWidth:650,zIndex:2},
