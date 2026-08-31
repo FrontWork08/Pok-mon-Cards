@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 
 type AuraIntensity = 'soft' | 'premium' | 'master';
 
@@ -19,6 +20,7 @@ type AuraBannerProps = {
   primaryColor: string;
   secondaryColor?: string;
   intensity?: AuraIntensity;
+  variant?: 'energy' | 'galaxy';
   badge?: string;
   children?: ReactNode;
   minHeight?: number;
@@ -42,6 +44,7 @@ export function AuraBanner({
   primaryColor,
   secondaryColor,
   intensity = 'premium',
+  variant = 'energy',
   badge,
   children,
   minHeight = 170,
@@ -145,6 +148,7 @@ export function AuraBanner({
       />
 
       <View style={[styles.card, { borderColor: `${primaryColor}A8` }, webBackdrop]}>
+        {variant === 'galaxy' ? <GalaxyFlowOverlay intensity={intensity} opacity={intensity==='master'?1:.82}/> : null}
         <Animated.View pointerEvents="none" style={[styles.glowOrbA, {
           backgroundColor: primaryColor,
           opacity: glowOpacity,
