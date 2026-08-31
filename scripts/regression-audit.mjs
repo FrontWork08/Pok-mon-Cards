@@ -21,6 +21,20 @@ const requiredFiles = [
   'supabase/migrations/20260831024112_economy_v2_core_balance.sql',
   'supabase/migrations/20260831024233_economy_v2_sinks_and_guardrails.sql',
   'supabase/migrations/20260831025059_economy_v2_release_guard.sql',
+  'app/economy.tsx',
+  'src/services/economy.ts',
+  'supabase/migrations/20260831030951_economy_v21_permanent_sinks_schema.sql',
+  'supabase/migrations/20260831031041_economy_v21_luxury_and_museum_schema.sql',
+  'supabase/migrations/20260831031133_economy_v21_core_sink_actions.sql',
+  'supabase/migrations/20260831031156_economy_v21_guild_and_global_projects.sql',
+  'supabase/migrations/20260831031221_economy_v21_luxury_auctions.sql',
+  'supabase/migrations/20260831031322_economy_v21_sink_hub_gym_and_health.sql',
+  'supabase/migrations/20260831031343_economy_v21_reset_asset_laundering_guard.sql',
+  'supabase/migrations/20260831031407_economy_v21_adaptive_advisor.sql',
+  'supabase/migrations/20260831031803_economy_v21_premium_market_themes.sql',
+  'supabase/migrations/20260831031837_economy_v21_gym_flare_payload.sql',
+  'supabase/migrations/20260831032310_economy_v21_public_prestige_and_museum.sql',
+  'supabase/migrations/20260831032715_economy_v21_allow_gym_cosmetic_events.sql',
 ];
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
@@ -141,6 +155,81 @@ if (existsSync('supabase/migrations/20260831025059_economy_v2_release_guard.sql'
   assert(economyRelease.includes('update public.admin_game_events set active=false'), 'Regressão: eventos Beta não são encerrados no reset 1.0.');
 }
 
+if (existsSync('app/economy.tsx') && existsSync('src/services/economy.ts')) {
+  const economyScreen = read('app/economy.tsx');
+  const economyService = read('src/services/economy.ts');
+  assert(economyScreen.includes('Prestígio de Trainer'), 'Regressão: hub da Economy 2.1 perdeu o Prestígio de Trainer.');
+  assert(economyScreen.includes('Loja semanal de luxo'), 'Regressão: hub da Economy 2.1 perdeu a Loja semanal de luxo.');
+  assert(economyScreen.includes('Museu da Coleção'), 'Regressão: hub da Economy 2.1 perdeu o Museu da Coleção.');
+  assert(economyScreen.includes('Tesouro e Projetos da Guilda'), 'Regressão: hub da Economy 2.1 perdeu projetos de guilda.');
+  assert(economyScreen.includes('Construção Global'), 'Regressão: hub da Economy 2.1 perdeu o projeto global.');
+  assert(economyScreen.includes('Leilão oficial'), 'Regressão: hub da Economy 2.1 perdeu o leilão oficial.');
+  assert(economyService.includes("ECONOMY_V2_NOT_LIVE"), 'Regressão: cliente não explica o bloqueio pré-reset da Economy 2.1.');
+  assert(economyService.includes("purchase_economy_item"), 'Regressão: compra atômica da Economy 2.1 não está conectada.');
+  assert(economyService.includes("contribute_guild_project"), 'Regressão: contribuição de guilda não está conectada.');
+  assert(economyService.includes("place_economy_auction_bid"), 'Regressão: leilão oficial não está conectado.');
+}
+
+if (existsSync('supabase/migrations/20260831031133_economy_v21_core_sink_actions.sql')) {
+  const actions = read('supabase/migrations/20260831031133_economy_v21_core_sink_actions.sql');
+  assert(actions.includes('private.spend_player_coins'), 'Regressão: sinks deixaram de usar o débito atômico central.');
+  assert(actions.includes('private.economy_v2_actor_allowed'), 'Regressão: compras permanentes podem ignorar o gate da migração 1.0.');
+  assert(actions.includes("'trainer_prestige'"), 'Regressão: Prestígio deixou de registrar burn permanente.');
+  assert(actions.includes("'museum_upgrade'"), 'Regressão: Museu deixou de registrar burn permanente.');
+  assert(actions.includes("'market_listing_boost'"), 'Regressão: boost do Marketplace deixou de registrar burn permanente.');
+}
+
+if (existsSync('supabase/migrations/20260831031221_economy_v21_luxury_auctions.sql')) {
+  const auctions = read('supabase/migrations/20260831031221_economy_v21_luxury_auctions.sql');
+  assert(auctions.includes('coins=coins+v_auction.highest_bid_coins'), 'Regressão: lance superado precisa ser devolvido integralmente.');
+  assert(auctions.includes("'luxury_auction'"), 'Regressão: somente o lance vencedor deve ser registrado como sink de leilão.');
+  assert(auctions.includes("status='settled'"), 'Regressão: encerramento do leilão oficial não liquida o vencedor.');
+}
+
+if (existsSync('supabase/migrations/20260831031343_economy_v21_reset_asset_laundering_guard.sql')) {
+  const resetGuard = read('supabase/migrations/20260831031343_economy_v21_reset_asset_laundering_guard.sql');
+  assert(resetGuard.includes('delete from public.player_economy_items'), 'Regressão: reset pode deixar ativos permanentes comprados com Coins do Beta.');
+  assert(resetGuard.includes('delete from public.player_prestige'), 'Regressão: Prestígio de teste pode sobreviver ao reset 1.0.');
+  assert(resetGuard.includes('delete from public.guild_project_contributions'), 'Regressão: contribuições de guilda do Beta podem sobreviver ao reset.');
+  assert(resetGuard.includes('delete from public.economy_global_project_contributions'), 'Regressão: contribuições globais do Beta podem sobreviver ao reset.');
+}
+
+if (existsSync('supabase/migrations/20260831031322_economy_v21_sink_hub_gym_and_health.sql')) {
+  const health = read('supabase/migrations/20260831031322_economy_v21_sink_hub_gym_and_health.sql');
+  assert(health.includes('soft_cap_enabled boolean not null default false'), 'Regressão: soft cap deve nascer DESATIVADO.');
+  assert(health.includes("'permanentSinks'"), 'Regressão: painel Admin deixou de medir os sinks permanentes.');
+  assert(health.includes("'coinsPerActivePlayer'"), 'Regressão: diagnóstico econômico perdeu a concentração média de Coins.');
+}
+
+if (existsSync('supabase/migrations/20260831031407_economy_v21_adaptive_advisor.sql')) {
+  const advisor = read('supabase/migrations/20260831031407_economy_v21_adaptive_advisor.sql');
+  assert(advisor.includes("'soft_cap_review'"), 'Regressão: advisor deixou de sinalizar cenário extremo de inflação.');
+  assert(advisor.includes('continua DESATIVADO'), 'Regressão: advisor não deixa explícito que o soft cap é somente recomendação.');
+}
+
+if (existsSync('supabase/migrations/20260831031803_economy_v21_premium_market_themes.sql')) {
+  const market = read('supabase/migrations/20260831031803_economy_v21_premium_market_themes.sql');
+  assert(market.includes('PREMIUM_SHOP_THEME_LOCKED'), 'Regressão: Marketplace pode equipar tema premium sem posse.');
+}
+
+if (existsSync('supabase/migrations/20260831032715_economy_v21_allow_gym_cosmetic_events.sql')) {
+  const gymEvents = read('supabase/migrations/20260831032715_economy_v21_allow_gym_cosmetic_events.sql');
+  assert(gymEvents.includes("'cosmetic'"), 'Regressão: evento visual do ginásio não está permitido pela constraint.');
+}
+
+if (existsSync('app/guild-wars.tsx')) {
+  const wars = read('app/guild-wars.tsx');
+  assert(wars.includes('onFlare={(flare) => onFlare(gym, flare)}'), 'Regressão: cards de ginásio perderam o handler de cosmético.');
+  assert(wars.includes('if (!picker || bagLoaded) return;'), 'Regressão: picker de Pokémon pode voltar ao loop infinito de loading.');
+  assert(!wars.includes('[picker, bagCards.length, bagLoading]'), 'Regressão: bagLoading não pode voltar a cancelar a própria requisição do picker.');
+}
+
+if (existsSync('app/(tabs)/packs.tsx')) {
+  const packs = read('app/(tabs)/packs.tsx');
+  assert(packs.includes('removeClippedSubviews={false}'), 'Regressão: clipping Android pode voltar a causar jitter na rolagem de Packs.');
+  assert(packs.includes('overScrollMode="never"'), 'Regressão: overscroll Android voltou a ficar livre na lista de Packs.');
+}
+
 if (failures.length) {
   console.error('\n❌ Auditoria de regressão falhou:');
   failures.forEach((failure) => console.error(' - ' + failure));
@@ -148,4 +237,4 @@ if (failures.length) {
 }
 
 console.log('✅ Auditoria de regressão passou.');
-console.log('   Batalha, guilda, QR, Legado, Admin Abuse, atualização obrigatória e PWA permanecem protegidos.');
+console.log('   Batalha, guilda, QR, Legado, Economy 2.1, reset, ginásios, Packs, Admin Abuse, atualização obrigatória e PWA permanecem protegidos.');
