@@ -160,7 +160,7 @@ export function MarketplaceListingSurface({
   return (
     <View style={[styles.shell,style]}>
       <View style={styles.content}>{children}</View>
-      {visual.galaxy?<GalaxyFlowOverlay intensity="premium" opacity={0.50}/>:null}
+      {visual.galaxy?<GalaxyFlowOverlay intensity="premium" opacity={0.76}/>:null}
 
       <Animated.View
         pointerEvents="none"
