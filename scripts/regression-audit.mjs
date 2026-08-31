@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'src/components/CompactTrainerBanner.tsx',
   'src/components/PremiumProfileFrame.tsx',
   'supabase/migrations/20260831141844_trainer_shop_gift_reset_guard.sql',
   'supabase/migrations/20260831141513_trainer_shop_friend_gifts.sql',
@@ -441,6 +442,54 @@ if (existsSync('app/card/[id].tsx')) {
 if (existsSync('app/decks.tsx')) {
   const decks = read('app/decks.tsx');
   assert(decks.includes('AuraFrame'), 'Regressão visual: estilos premium de deck perderam a aura.');
+}
+
+if (existsSync('src/components/CompactTrainerBanner.tsx')) {
+  const compactIdentity = read('src/components/CompactTrainerBanner.tsx');
+  assert(compactIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: banner compacto premium foi removido.');
+  for (const theme of ['galaxy','master','crimson','champion','indigo']) {
+    assert(compactIdentity.includes(`key.includes('${theme}')`) || compactIdentity.includes(`frame.includes('${theme}')`), `Regressão de identidade: banner compacto perdeu o tema ${theme}.`);
+  }
+  assert(!compactIdentity.includes('Animated.loop'), 'Regressão de performance: banners de ranking não devem criar loops Animated por jogador.');
+  assert(compactIdentity.includes('railTop') && compactIdentity.includes('railBottom'), 'Regressão visual: banner compacto perdeu trilhos de energia.');
+}
+
+if (existsSync('src/services/player.ts')) {
+  const playerIdentity = read('src/services/player.ts');
+  assert(playerIdentity.includes('equipped_frame_id,equipped_background_id,equipped_economy_title_id'), 'Regressão de identidade: mapa de avatares não carrega cosméticos equipados.');
+  assert(playerIdentity.includes('frameId:'), 'Regressão de identidade: metadados de avatar perderam frameId.');
+}
+
+if (existsSync('app/collection-ranking.tsx')) {
+  const collectionIdentity = read('app/collection-ranking.tsx');
+  assert(collectionIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: ranking de coleções perdeu banners dos jogadores.');
+  assert(collectionIdentity.includes('identityMeta?.frameId'), 'Regressão de identidade: ranking de coleções não usa a moldura equipada.');
+}
+
+if (existsSync('app/(tabs)/battles.tsx')) {
+  const battleIdentity = read('app/(tabs)/battles.tsx');
+  assert(battleIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: Battle Arena perdeu banners premium.');
+  assert(battleIdentity.includes('frameId={player.equipped_frame_id}'), 'Regressão de identidade: ranking ranqueado não usa moldura equipada.');
+  assert(battleIdentity.includes('frameId={friend.equipped_frame_id}'), 'Regressão de identidade: cards de amigos na Battle Arena perderam a moldura.');
+  assert(battleIdentity.includes('frameId={challenger?.equipped_frame_id}'), 'Regressão de identidade: convites de batalha perderam o banner do desafiante.');
+}
+
+if (existsSync('app/friends.tsx')) {
+  const friendsIdentity = read('app/friends.tsx');
+  assert(friendsIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: lista de amigos perdeu banners premium.');
+  assert(friendsIdentity.includes('player.equipped_frame_id'), 'Regressão de identidade: lista de amigos não usa moldura equipada.');
+}
+
+if (existsSync('app/guilds.tsx')) {
+  const guildIdentity = read('app/guilds.tsx');
+  assert(guildIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: membros de guilda perderam banners premium.');
+  assert(guildIdentity.includes('frameId={identity?.frameId}'), 'Regressão de identidade: membro da guilda não usa moldura equipada.');
+}
+
+if (existsSync('app/battle/[id].tsx')) {
+  const activeBattleIdentity = read('app/battle/[id].tsx');
+  assert(activeBattleIdentity.includes('CompactTrainerBanner'), 'Regressão de identidade: batalha ativa perdeu banners dos jogadores.');
+  assert(activeBattleIdentity.includes('equipped_frame_id,equipped_background_id'), 'Regressão de identidade: batalha ativa não carrega os cosméticos dos jogadores.');
 }
 
 if (existsSync('src/components/PremiumProfileFrame.tsx')) {
