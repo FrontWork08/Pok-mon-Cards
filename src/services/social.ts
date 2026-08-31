@@ -8,6 +8,9 @@ export type SocialPlayer = {
   profile_icon?: string | null;
   avatar_path?: string | null;
   avatar_updated_at?: string | null;
+  equipped_frame_id?: string | null;
+  equipped_background_id?: string | null;
+  equipped_economy_title_id?: string | null;
 };
 
 export type SocialState = {
@@ -34,7 +37,7 @@ export async function getMySocial(): Promise<SocialState> {
 
   const { data: players, error: playersError } = await supabase
     .from('players')
-    .select('id,username,level,profile_icon,avatar_path,avatar_updated_at')
+    .select('id,username,level,profile_icon,avatar_path,avatar_updated_at,equipped_frame_id,equipped_background_id,equipped_economy_title_id')
     .in('id', otherIds);
 
   if (playersError) throw playersError;
