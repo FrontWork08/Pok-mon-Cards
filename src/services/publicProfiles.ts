@@ -25,6 +25,8 @@ export type PublicPlayerProfile = {
     battleRating: number | null;
     showBattleRating: boolean;
     equippedTitle: { id: string; title: string; icon: string } | null;
+    economyTitle: { id:string; title:string; icon:string; rarity:string } | null;
+    prestige: { level:number; stars:number; totalSpentCoins:number };
     guild: { id: string; name: string; color: string; role: 'leader' | 'officer' | 'member'; level: number; xp: number } | null;
     frame: { id:string; name:string; primaryColor:string; secondaryColor:string; icon:string } | null;
     background: { id:string; name:string; primaryColor:string; secondaryColor:string; icon:string } | null;
@@ -44,6 +46,21 @@ export type PublicPlayerProfile = {
       imageLarge: string | null;
       marketPriceUsd: number | null;
     }>;
+    museum: {
+      level:number;
+      slots:number;
+      cards:Array<{
+        slot:number;
+        id:string;
+        name:string;
+        setName:string;
+        rarity:string|null;
+        imageSmall:string|null;
+        imageLarge:string|null;
+        marketPriceUsd:number|null;
+        style:{id:string;name:string;icon:string;rarity:string}|null;
+      }>;
+    };
   };
 };
 
@@ -62,6 +79,12 @@ export async function getPublicPlayerProfile(playerId: string): Promise<PublicPl
       battleLosses: Number(value.player?.battleLosses ?? 0),
       battleStreak: Number(value.player?.battleStreak ?? 0),
       battleRating: value.player?.battleRating == null ? null : Number(value.player.battleRating),
+      economyTitle: value.player?.economyTitle ?? null,
+      prestige: {
+        level:Number(value.player?.prestige?.level??0),
+        stars:Number(value.player?.prestige?.stars??0),
+        totalSpentCoins:Number(value.player?.prestige?.totalSpentCoins??0),
+      },
       guild: value.player?.guild ? {
         ...value.player.guild,
         level: Number(value.player.guild.level ?? 1),
@@ -89,6 +112,18 @@ export async function getPublicPlayerProfile(playerId: string): Promise<PublicPl
           marketPriceUsd: card.marketPriceUsd == null ? null : Number(card.marketPriceUsd),
         }))
         : [],
+      museum: {
+        level:Number(value.collection?.museum?.level??0),
+        slots:Number(value.collection?.museum?.slots??3),
+        cards:Array.isArray(value.collection?.museum?.cards)
+          ? value.collection.museum.cards.map((card:any)=>({
+            ...card,
+            slot:Number(card.slot??0),
+            marketPriceUsd:card.marketPriceUsd==null?null:Number(card.marketPriceUsd),
+            style:card.style??null,
+          }))
+          : [],
+      },
     },
   };
 }
