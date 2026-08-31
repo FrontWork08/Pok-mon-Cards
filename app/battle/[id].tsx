@@ -11,12 +11,14 @@ import { cancelBattle, forfeitBattle, getBattle, getBattleCardStakes, getBattleD
 import { isFunctionErrorCode } from '@/services/functionErrors';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { useWallet } from '@/wallet/WalletProvider';
 
 export default function BattleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors, settings } = useAppTheme();
-  const [userId, setUserId] = useState('');
+  const { userId: walletUserId } = useWallet();
+  const userId = walletUserId ?? '';
   const [battle, setBattle] = useState<any>(null);
   const [rounds, setRounds] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -36,47 +38,105 @@ export default function BattleScreen() {
   const timeoutRound = useRef<string | null>(null);
   const revealAnim = useRef(new Animated.Value(1)).current;
   const animatedRound = useRef(0);
+  const battleLoadPromise = useRef<Promise<void> | null>(null);
+  const battleLoadPending = useRef(false);
+  const battleLoadRef = useRef<(silent?: boolean) => Promise<void>>(async () => undefined);
+  const realtimeRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playerPairKey = useRef('');
 
-  const load = useCallback(async () => {
+  const loadBattleState = useCallback(async (silent = false) => {
     if (!id) return;
+    if (battleLoadPromise.current) {
+      battleLoadPending.current = true;
+      await battleLoadPromise.current;
+      return;
+    }
+
+    const task = (async () => {
+      try {
+        const [battleData, roundData, eventData, stakeData, draftData] = await Promise.all([
+          getBattle(String(id)),
+          getBattleRounds(String(id)),
+          getBattleEvents(String(id)),
+          getBattleCardStakes(String(id)).catch(() => []),
+          getBattleDraftCards(String(id)).catch(() => []),
+        ]);
+        setBattle(battleData);
+        setRounds(roundData);
+        setEvents(eventData);
+        setStakes(stakeData ?? []);
+        setDraftCards(draftData ?? []);
+
+        const ids = [String(battleData.challenger_id), String(battleData.opponent_id)];
+        const pairKey = [...ids].sort().join(':');
+        if (playerPairKey.current !== pairKey) {
+          playerPairKey.current = pairKey;
+          const { data: playerRows } = await supabase
+            .from('players')
+            .select('id,username,level,battle_rating')
+            .in('id', ids);
+          setPlayers(Object.fromEntries((playerRows ?? []).map((player) => [player.id, player])));
+        }
+      } catch (error) {
+        if (!silent) setNotice(error instanceof Error ? error.message : 'Não foi possível carregar a batalha.');
+      }
+    })();
+
+    battleLoadPromise.current = task;
     try {
-      const [{ data: auth }, battleData, roundData, eventData, stakeData, draftData, bagData, deckData] = await Promise.all([
-        supabase.auth.getUser(),
-        getBattle(String(id)),
-        getBattleRounds(String(id)),
-        getBattleEvents(String(id)),
-        getBattleCardStakes(String(id)).catch(() => []),
-        getBattleDraftCards(String(id)).catch(() => []),
-        getMyBag(),
-        getMyDecks(),
-      ]);
-      const uid = auth.user?.id ?? '';
-      setUserId(uid);
-      setBattle(battleData);
-      setRounds(roundData);
-      setEvents(eventData);
-      setStakes(stakeData ?? []);
-      setDraftCards(draftData ?? []);
-      setBag(bagData ?? []);
-      setDecks(deckData ?? []);
-      const ids = [battleData.challenger_id, battleData.opponent_id];
-      const { data: playerRows } = await supabase.from('players').select('id,username,level,battle_rating').in('id', ids);
-      setPlayers(Object.fromEntries((playerRows ?? []).map((p) => [p.id, p])));
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Não foi possível carregar a batalha.');
+      await task;
     } finally {
-      setLoading(false);
+      battleLoadPromise.current = null;
+      if (battleLoadPending.current) {
+        battleLoadPending.current = false;
+        setTimeout(() => { void battleLoadRef.current(true); }, 0);
+      }
     }
   }, [id]);
+  battleLoadRef.current = loadBattleState;
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (!id) return; return subscribeToBattle(String(id), () => load()); }, [id, load]);
+  const loadStaticBattleResources = useCallback(async () => {
+    const [bagData, deckData] = await Promise.all([
+      getMyBag(),
+      getMyDecks(),
+    ]);
+    setBag(bagData ?? []);
+    setDecks(deckData ?? []);
+  }, []);
+
+  useEffect(() => {
+    let disposed = false;
+    setLoading(true);
+    void Promise.all([
+      loadBattleState(false),
+      loadStaticBattleResources().catch((error) => {
+        if (!disposed) setNotice(error instanceof Error ? error.message : 'Não foi possível carregar suas cartas.');
+      }),
+    ]).finally(() => {
+      if (!disposed) setLoading(false);
+    });
+    return () => { disposed = true; };
+  }, [loadBattleState, loadStaticBattleResources]);
+
+  useEffect(() => {
+    if (!id) return;
+    const unsubscribe = subscribeToBattle(String(id), () => {
+      if (realtimeRefreshTimer.current) clearTimeout(realtimeRefreshTimer.current);
+      realtimeRefreshTimer.current = setTimeout(() => {
+        void loadBattleState(true);
+      }, 140);
+    });
+    return () => {
+      if (realtimeRefreshTimer.current) clearTimeout(realtimeRefreshTimer.current);
+      unsubscribe();
+    };
+  }, [id, loadBattleState]);
 
   useEffect(() => {
     if (!battle?.selection_deadline || !['drafting', 'selecting'].includes(battle.status)) { setRemaining(0); return; }
     const tick = () => setRemaining(Math.max(0, Math.ceil((new Date(battle.selection_deadline).getTime() - Date.now()) / 1000)));
     tick();
-    const timer = setInterval(tick, 250);
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [battle?.selection_deadline, battle?.status]);
 
@@ -86,13 +146,13 @@ export default function BattleScreen() {
     if (timeoutRound.current === timeoutKey) return;
     timeoutRound.current = timeoutKey;
     resolveBattleTimeout(String(id))
-      .then(() => load())
+      .then(() => loadBattleState())
       .catch(async (error) => {
-        if (isFunctionErrorCode(error, 'NOT_EXPIRED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) { await load(); return; }
+        if (isFunctionErrorCode(error, 'NOT_EXPIRED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) { await loadBattleState(); return; }
         setNotice(error instanceof Error ? error.message : 'O servidor está concluindo a rodada.');
-        await load().catch(() => null);
+        await loadBattleState().catch(() => null);
       });
-  }, [battle, id, load, remaining]);
+  }, [battle, id, loadBattleState, remaining]);
 
   const currentRound = Number(battle?.active_round ?? 1);
   const isDrafting = battle?.status === 'drafting';
@@ -140,10 +200,10 @@ export default function BattleScreen() {
       setWorking(true); setNotice(null);
       await respondToBattle(String(id), accept, accept && battle?.stake_type === 'card' ? stakeCardId : null);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(70);
-      await load();
+      await loadBattleState();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível responder ao desafio.');
-      await load().catch(() => null);
+      await loadBattleState().catch(() => null);
     } finally { setWorking(false); }
   }
 
@@ -154,9 +214,9 @@ export default function BattleScreen() {
       await pickBattleDraftCard(String(id), selectedId);
       setSelectedId(null); setPickerMode(null);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
-      await load();
+      await loadBattleState();
     } catch (error) {
-      if (isFunctionErrorCode(error, 'NOT_YOUR_TURN', 'CARD_ALREADY_DRAFTED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) await load().catch(() => null);
+      if (isFunctionErrorCode(error, 'NOT_YOUR_TURN', 'CARD_ALREADY_DRAFTED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) await loadBattleState().catch(() => null);
       setNotice(error instanceof Error ? error.message : 'Não foi possível escolher a carta do draft.');
     } finally { setWorking(false); }
   }
@@ -168,11 +228,11 @@ export default function BattleScreen() {
       const result = await lockBattleCard(String(id), selectedId);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
       if (result?.resolved) setNotice('As duas cartas foram travadas. Resultado revelado!');
-      await load();
+      await loadBattleState();
     } catch (error) {
       if (isFunctionErrorCode(error, 'ALREADY_LOCKED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) {
         setNotice(error instanceof Error ? error.message : 'A rodada foi atualizada.');
-        await load();
+        await loadBattleState();
       } else {
         setNotice(error instanceof Error ? error.message : 'Não foi possível travar a carta.');
       }
@@ -198,10 +258,10 @@ export default function BattleScreen() {
           : 'Você desistiu da batalha. A vitória foi concedida ao adversário.',
       );
       if (settings?.battle_vibration ?? true) Vibration.vibrate(80);
-      await load();
+      await loadBattleState();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível desistir da batalha.');
-      await load().catch(() => null);
+      await loadBattleState().catch(() => null);
     } finally {
       setWorking(false);
     }
