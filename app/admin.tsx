@@ -16,7 +16,7 @@ import { Screen } from '@/components/Screen';
 import {
   getMyAdminAccess,
   getAdminOverview,
-  getAdminEconomyHealth,
+  refreshAdminEconomyAdvisor,
   getAdminPlayers,
   getCurrencyAdjustmentHistory,
   getAdminEvents,
@@ -59,6 +59,7 @@ import {
   type AdminModerationAction,
   type AdminOverview,
   type AdminEconomyHealth,
+  type AdminEconomyAdvisor,
   type AdminPlayer,
   type AdminCurrencyAdjustmentHistory,
   type AdminRedeemCode,
@@ -87,6 +88,8 @@ export default function AdminScreen() {
   const themeVisual = getThemeVisual(themeName);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [economyHealth, setEconomyHealth] = useState<AdminEconomyHealth | null>(null);
+  const [economyAdvisor, setEconomyAdvisor] = useState<AdminEconomyAdvisor | null>(null);
+  const [economyAdvisorLoading, setEconomyAdvisorLoading] = useState(false);
   const [adminAccess, setAdminAccessState] = useState<AdminAccess | null>(null);
   const [players, setPlayers] = useState<AdminPlayer[]>([]);
   const [selfId, setSelfId] = useState('');
@@ -176,7 +179,7 @@ export default function AdminScreen() {
       const [accessState, status, economyState, grants, events, guildState, codes, runtime, announcements, testerState, releaseState] = await Promise.all([
         getMyAdminAccess(),
         getAdminOverview(),
-        getAdminEconomyHealth(),
+        refreshAdminEconomyAdvisor(),
         getCurrencyAdjustmentHistory(),
         getAdminEvents(),
         getGuildHub(),
@@ -189,7 +192,8 @@ export default function AdminScreen() {
       ]);
       setAdminAccessState(accessState);
       setOverview(status);
-      setEconomyHealth(economyState);
+      setEconomyAdvisor(economyState);
+      setEconomyHealth(economyState.health);
       setHistory(grants);
       setActiveEvent(events.find((event) => event.event_type === 'free_boosters') ?? null);
       setGameEvents(events.filter((event) => event.event_type !== 'free_boosters'));
@@ -350,6 +354,22 @@ export default function AdminScreen() {
       ? String(minutes) + 'm ' + String(rest).padStart(2, '0') + 's'
       : String(rest) + 's';
   }, [activeEvent, clock]);
+
+  async function refreshEconomyAdvisor() {
+    if (economyAdvisorLoading) return;
+    try {
+      setEconomyAdvisorLoading(true);
+      setError(null);
+      const next = await refreshAdminEconomyAdvisor();
+      setEconomyAdvisor(next);
+      setEconomyHealth(next.health);
+      setNotice('Diagnóstico da Economy 2.0 atualizado. Sugestões continuam manuais e não alteram preços automaticamente.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível atualizar o diagnóstico econômico.');
+    } finally {
+      setEconomyAdvisorLoading(false);
+    }
+  }
 
   async function refreshLegacyProgress() {
     if (legacyProgressLoading || !adminAccess?.isOwner) return;
@@ -1867,22 +1887,70 @@ export default function AdminScreen() {
                     <Ionicons name={economyHealth.status==='healthy'?'shield-checkmark':economyHealth.status==='watch'?'warning':'alert-circle'} size={22} color={economyHealth.status==='healthy'?'#65D894':economyHealth.status==='watch'?'#FFD447':'#FF8290'}/>
                   </View>
                   <View style={{flex:1}}>
-                    <Text style={[styles.economyHealthTitle,{color:colors.text}]}>Economy 2.0 • {economyHealth.status==='healthy'?'SAUDÁVEL':economyHealth.status==='watch'?'ATENÇÃO':'CRÍTICA'}</Text>
-                    <Text style={[styles.economyHealthText,{color:colors.muted}]}>Janela móvel de {economyHealth.windowDays} dias • burn/mint conhecido {economyHealth.burnToMintRatio==null?'—':(economyHealth.burnToMintRatio*100).toFixed(1)+'%'}</Text>
+                    <Text style={[styles.economyHealthTitle,{color:colors.text}]}>Economy 2.1 • {economyHealth.status==='healthy'?'SAUDÁVEL':economyHealth.status==='watch'?'ATENÇÃO':'CRÍTICA'}</Text>
+                    <Text style={[styles.economyHealthText,{color:colors.muted}]}>Janela móvel de {economyHealth.windowDays} dias • burn/mint conhecido {economyHealth.burnToMintRatio==null?'—':(economyHealth.burnToMintRatio*100).toFixed(1)+'%'} • média 🪙 {Number(economyHealth.coinsPerActivePlayer??0).toLocaleString('pt-BR')} por jogador ativo</Text>
                   </View>
+                  <Pressable disabled={economyAdvisorLoading} onPress={()=>{void refreshEconomyAdvisor();}} style={[styles.economyRefreshButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
+                    {economyAdvisorLoading?<ActivityIndicator size="small" color={colors.accent}/>:<Ionicons name="analytics" size={15} color={colors.accent}/>}
+                    <Text style={[styles.economyRefreshText,{color:colors.accent}]}>REANALISAR</Text>
+                  </Pressable>
                 </View>
                 <View style={styles.metricGrid}>
                   <Metric icon="wallet" label="COINS EM CIRCULAÇÃO" value={economyHealth.balances.coins} coin />
                   <Metric icon="arrow-up-circle" label="COINS CRIADAS" value={economyHealth.knownMint.total} hint="fontes conhecidas na janela" />
-                  <Metric icon="flame" label="COINS REMOVIDAS" value={economyHealth.knownBurn.total} hint="packs + taxas + sinks" />
+                  <Metric icon="flame" label="COINS REMOVIDAS" value={economyHealth.knownBurn.total} hint="packs + taxas + sinks permanentes" />
                   <Metric icon="cube" label="PACK MEDIANO" value={Number(economyHealth.packPrices.coinMedian??0)} coin />
                 </View>
                 <View style={[styles.economyFlowBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
                   <Text style={[styles.economyFlowTitle,{color:colors.text}]}>FONTES • 7 DIAS</Text>
                   <Text style={[styles.economyFlowText,{color:colors.muted}]}>Missões 🪙 {economyHealth.knownMint.missions.toLocaleString('pt-BR')} • Passe 🪙 {economyHealth.knownMint.battlePass.toLocaleString('pt-BR')} • Guilda 🪙 {economyHealth.knownMint.guild.toLocaleString('pt-BR')} • Repetidas 🪙 {economyHealth.knownMint.duplicates.toLocaleString('pt-BR')} • Códigos 🪙 {economyHealth.knownMint.codes.toLocaleString('pt-BR')}</Text>
                   <Text style={[styles.economyFlowTitle,{color:colors.text,marginTop:7}]}>SUMIDOUROS • 7 DIAS</Text>
-                  <Text style={[styles.economyFlowText,{color:colors.muted}]}>Packs 🪙 {economyHealth.knownBurn.packs.toLocaleString('pt-BR')} • Mercado 🪙 {economyHealth.knownBurn.marketFees.toLocaleString('pt-BR')} • Diamantes 🪙 {economyHealth.knownBurn.diamondExchange.toLocaleString('pt-BR')} • Ginásios 🪙 {economyHealth.knownBurn.gymHealing.toLocaleString('pt-BR')}</Text>
+                  <Text style={[styles.economyFlowText,{color:colors.muted}]}>Packs 🪙 {economyHealth.knownBurn.packs.toLocaleString('pt-BR')} • Mercado 🪙 {economyHealth.knownBurn.marketFees.toLocaleString('pt-BR')} • Diamantes 🪙 {economyHealth.knownBurn.diamondExchange.toLocaleString('pt-BR')} • Ginásios 🪙 {economyHealth.knownBurn.gymHealing.toLocaleString('pt-BR')} • Permanentes 🪙 {Number(economyHealth.knownBurn.permanentSinks??0).toLocaleString('pt-BR')}</Text>
                 </View>
+
+                {Object.keys(economyHealth.sinkBreakdown??{}).length ? (
+                  <View style={[styles.economyAdvisorBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                    <Text style={[styles.economyFlowTitle,{color:colors.text}]}>SINKS PERMANENTES MAIS USADOS</Text>
+                    {Object.entries(economyHealth.sinkBreakdown).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,6).map(([key,value])=>(
+                      <View key={key} style={styles.economyAdvisorRow}>
+                        <Text style={[styles.economyAdvisorType,{color:colors.muted}]}>{key.replaceAll('_',' ').toUpperCase()}</Text>
+                        <Text style={[styles.economyAdvisorValue,{color:colors.yellow}]}>🪙 {Number(value).toLocaleString('pt-BR')}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {(economyAdvisor?.alerts.length??0)>0 ? (
+                  <View style={styles.economyAdvisorStack}>
+                    {economyAdvisor!.alerts.map((alert)=>(
+                      <View key={alert.id} style={[styles.economyAlert,{backgroundColor:alert.severity==='critical'?'#351A24':alert.severity==='watch'?'#362B13':colors.surfaceAlt,borderColor:alert.severity==='critical'?'#A84250':alert.severity==='watch'?'#D9A441':colors.border}]}>
+                        <Ionicons name={alert.severity==='critical'?'alert-circle':alert.severity==='watch'?'warning':'information-circle'} size={17} color={alert.severity==='critical'?'#FF8290':alert.severity==='watch'?'#FFD447':colors.accent}/>
+                        <Text style={[styles.economyAlertText,{color:colors.text}]}>{alert.message}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {(economyAdvisor?.recommendations.length??0)>0 ? (
+                  <View style={[styles.economyAdvisorBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                    <View style={styles.economyAdviceHeader}><Ionicons name="bulb" size={17} color={colors.yellow}/><Text style={[styles.economyFlowTitle,{color:colors.text}]}>RECOMENDAÇÕES AUTOMÁTICAS • NÃO APLICADAS</Text></View>
+                    {economyAdvisor!.recommendations.map((rec)=>(
+                      <View key={rec.id} style={[styles.economyAdviceCard,{borderColor:colors.border}]}>
+                        <Text style={[styles.economyAdvisorType,{color:colors.accent}]}>{rec.type.replaceAll('_',' ').toUpperCase()}</Text>
+                        <Text style={[styles.economyFlowText,{color:colors.muted}]}>{rec.rationale}</Text>
+                        {rec.suggestedValue!=null?<Text style={[styles.economyAdvisorValue,{color:colors.yellow}]}>Sugestão: {Number(rec.suggestedValue).toFixed(2)}×</Text>:null}
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={[styles.economyHealthText,{color:'#65D894'}]}>Nenhum ajuste econômico recomendado neste momento.</Text>
+                )}
+
+                <View style={[styles.softCapStatus,{backgroundColor:economyHealth.softCap?.enabled?'#3B2313':'#153426',borderColor:economyHealth.softCap?.enabled?'#D97732':'#2F9E68'}]}>
+                  <Ionicons name={economyHealth.softCap?.enabled?'speedometer':'shield-checkmark'} size={16} color={economyHealth.softCap?.enabled?'#FFD447':'#65D894'}/>
+                  <Text style={[styles.economyHealthText,{color:economyHealth.softCap?.enabled?'#FFE4B8':'#9CEFC1',flex:1}]}>Soft cap: {economyHealth.softCap?.enabled?'ATIVO':'DESATIVADO'} • limite preparado 🪙 {Number(economyHealth.softCap?.dailyCoins??0).toLocaleString('pt-BR')} / dia. O sistema só recomenda revisão em inflação extrema; nunca ativa sozinho.</Text>
+                </View>
+
                 {releaseStatus?.phase!=='completed'?<Text style={[styles.economyHealthText,{color:colors.muted}]}>O indicador ainda inclui atividade do Beta. Depois do reset, a janela passa a respeitar o novo marco da economia 1.0.</Text>:null}
               </View>
             ) : (
@@ -2953,6 +3021,18 @@ const styles = StyleSheet.create({
   economyFlowBox:{borderRadius:14,borderWidth:1,padding:10},
   economyFlowTitle:{fontSize:7,fontWeight:'900',letterSpacing:.6},
   economyFlowText:{fontSize:8,lineHeight:13,marginTop:3},
+  economyRefreshButton:{minHeight:37,borderRadius:11,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},
+  economyRefreshText:{fontSize:6.5,fontWeight:'900'},
+  economyAdvisorBox:{borderRadius:14,borderWidth:1,padding:10,gap:7},
+  economyAdvisorRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
+  economyAdvisorType:{fontSize:6.5,fontWeight:'900',letterSpacing:.45,flex:1},
+  economyAdvisorValue:{fontSize:7.5,fontWeight:'900'},
+  economyAdvisorStack:{gap:6},
+  economyAlert:{borderRadius:12,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:7},
+  economyAlertText:{fontSize:8,lineHeight:12,fontWeight:'800',flex:1},
+  economyAdviceHeader:{flexDirection:'row',alignItems:'center',gap:6},
+  economyAdviceCard:{borderTopWidth:1,paddingTop:7,gap:3},
+  softCapStatus:{borderRadius:12,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:7},
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   metric: { flexGrow: 1, flexBasis: 155, minWidth: 145, borderRadius: 17, borderWidth: 1, padding: 12 },
   metricIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
