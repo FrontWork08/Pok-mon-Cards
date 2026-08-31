@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'src/components/PremiumProfileFrame.tsx',
   'supabase/migrations/20260831141844_trainer_shop_gift_reset_guard.sql',
   'supabase/migrations/20260831141513_trainer_shop_friend_gifts.sql',
   'supabase/migrations/20260831135122_trainer_shop_catalog.sql',
@@ -440,6 +441,35 @@ if (existsSync('app/card/[id].tsx')) {
 if (existsSync('app/decks.tsx')) {
   const decks = read('app/decks.tsx');
   assert(decks.includes('AuraFrame'), 'Regressão visual: estilos premium de deck perderam a aura.');
+}
+
+if (existsSync('src/components/PremiumProfileFrame.tsx')) {
+  const premiumFrame = read('src/components/PremiumProfileFrame.tsx');
+  for (const theme of ['indigo','champion','crimson','master','galaxy']) {
+    assert(premiumFrame.includes(`theme: '${theme}'`), `Regressão visual: moldura premium perdeu o preset ${theme}.`);
+  }
+  assert(premiumFrame.includes('energyRail'), 'Regressão visual: molduras premium perderam o fluxo de energia.');
+  assert(premiumFrame.includes('shine'), 'Regressão visual: molduras premium perderam o reflexo de luxo.');
+  assert(premiumFrame.includes('cornerGem'), 'Regressão visual: molduras premium perderam os cristais de canto.');
+  assert(premiumFrame.includes('GalaxyFlowOverlay'), 'Regressão visual: Galaxy Flow perdeu a nebulosa integrada à moldura.');
+  assert(premiumFrame.includes('AccessibilityInfo.isReduceMotionEnabled'), 'Regressão de acessibilidade: molduras premium não respeitam redução de movimento.');
+}
+
+if (existsSync('app/(tabs)/profile.tsx')) {
+  const profileFrameUi = read('app/(tabs)/profile.tsx');
+  assert(profileFrameUi.includes('PremiumProfileFrame'), 'Regressão visual: perfil próprio deixou de renderizar moldura premium.');
+}
+
+if (existsSync('app/player/[id].tsx')) {
+  const publicFrameUi = read('app/player/[id].tsx');
+  assert(publicFrameUi.includes('PremiumProfileFrame'), 'Regressão visual: perfil público deixou de exibir molduras premium.');
+}
+
+if (existsSync('app/cosmetics.tsx') && existsSync('app/store.tsx')) {
+  const cosmeticsFrames = read('app/cosmetics.tsx');
+  const storeFrames = read('app/store.tsx');
+  assert(cosmeticsFrames.includes('PremiumProfileFrame'), 'Regressão visual: tela de cosméticos perdeu preview premium das molduras.');
+  assert(storeFrames.includes('PremiumProfileFrame'), 'Regressão visual: Trainer Shop perdeu preview premium das molduras.');
 }
 
 if (existsSync('src/components/GalaxyFlowOverlay.tsx')) {
