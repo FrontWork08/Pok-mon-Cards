@@ -18,6 +18,9 @@ const requiredFiles = [
   'supabase/migrations/20260828225000_guild_chat_and_battle_forfeit.sql',
   'supabase/migrations/20260828233356_admin_abuse_coin_free_diamond_half.sql',
   'supabase/migrations/20260829203710_auto_fill_legacy_with_most_valuable_cards.sql',
+  'supabase/migrations/20260831024112_economy_v2_core_balance.sql',
+  'supabase/migrations/20260831024233_economy_v2_sinks_and_guardrails.sql',
+  'supabase/migrations/20260831025059_economy_v2_release_guard.sql',
 ];
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
@@ -119,6 +122,23 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
+}
+
+if (existsSync('supabase/migrations/20260831024112_economy_v2_core_balance.sql')) {
+  const economyCore = read('supabase/migrations/20260831024112_economy_v2_core_balance.sql');
+  assert(economyCore.includes("'economy_v2',35000,5000,100000,800,15000"), 'Regressão: política-base da Economy 2.0 foi alterada sem auditoria.');
+  assert(economyCore.includes('private.refresh_pack_economy()'), 'Regressão: preços dos boosters deixaram de acompanhar a Economy 2.0.');
+}
+if (existsSync('supabase/migrations/20260831024233_economy_v2_sinks_and_guardrails.sql')) {
+  const economySinks = read('supabase/migrations/20260831024233_economy_v2_sinks_and_guardrails.sql');
+  assert(economySinks.includes('DUPLICATE_SALES_PAUSED_DURING_FREE_EVENT'), 'Regressão: Admin Abuse voltou a permitir converter booster grátis em Coins.');
+  assert(economySinks.includes('marketFeePercent') && economySinks.includes('*.08'), 'Regressão: taxa econômica de 8% do mercado foi removida.');
+  assert(economySinks.includes('price::numeric*1.5'), 'Regressão: venda de repetidas perdeu o teto ligado ao booster.');
+}
+if (existsSync('supabase/migrations/20260831025059_economy_v2_release_guard.sql')) {
+  const economyRelease = read('supabase/migrations/20260831025059_economy_v2_release_guard.sql');
+  assert(economyRelease.includes('update public.redeem_codes set active=false'), 'Regressão: códigos Beta não são encerrados no reset 1.0.');
+  assert(economyRelease.includes('update public.admin_game_events set active=false'), 'Regressão: eventos Beta não são encerrados no reset 1.0.');
 }
 
 if (failures.length) {
