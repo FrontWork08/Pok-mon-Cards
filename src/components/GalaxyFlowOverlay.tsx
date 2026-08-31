@@ -9,6 +9,9 @@ import {
 
 type GalaxyIntensity='soft'|'premium'|'master';
 
+const GALAXY_ACCENT_VIOLET='#8B5CFF';
+const GALAXY_ACCENT_CYAN='#55E6FF';
+
 const sharedDrift=new Animated.Value(.42);
 const sharedTwinkle=new Animated.Value(.35);
 let driftLoop:Animated.CompositeAnimation|null=null;
@@ -238,8 +241,8 @@ const styles=StyleSheet.create({
   cloudIndigo:{width:285,height:130,right:'9%',bottom:'12%',backgroundColor:'#3A3F86'},
 
   filament:{position:'absolute',borderRadius:999},
-  filamentA:{width:390,height:36,left:-105,top:'24%',backgroundColor:'#9B78B7'},
-  filamentB:{width:350,height:28,right:-110,bottom:'25%',backgroundColor:'#4E92AD'},
+  filamentA:{width:390,height:36,left:-105,top:'24%',backgroundColor:GALAXY_ACCENT_VIOLET},
+  filamentB:{width:350,height:28,right:-110,bottom:'25%',backgroundColor:GALAXY_ACCENT_CYAN},
 
   dust:{position:'absolute',borderRadius:999,backgroundColor:'#02030A'},
   dustA:{width:320,height:72,left:'12%',top:'42%'},
