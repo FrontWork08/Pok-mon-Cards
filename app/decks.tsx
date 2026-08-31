@@ -67,10 +67,23 @@ export default function DecksScreen() {
           const deckBorder = deckStyle
             ? galaxyDeck ? '#8B5CFF'
               : styleId.includes('master') ? '#C493FF'
+              : styleId.includes('celestial') ? '#55E6FF'
+              : styleId.includes('crimson') || styleId.includes('crown') ? '#FF667A'
+              : styleId.includes('champion') || styleId.includes('gold') ? '#FFD447'
+              : styleId.includes('indigo') ? '#6A7CFF'
+              : styleId.includes('kanto') || styleId.includes('night') ? '#8B72FF'
               : styleId.includes('elite') ? colors.accent
               : colors.yellow
             : deck.is_default ? colors.yellow : colors.border;
-          return <AuraFrame key={deck.id} primaryColor={deckBorder} secondaryColor={galaxyDeck?'#55E6FF':deckStyle && styleId.includes('master')?'#8EE7FF':colors.yellow} intensity={deckStyle ? (galaxyDeck||styleId.includes('master')?'master':'premium') : 'soft'} variant={galaxyDeck?'galaxy':'energy'} radius={19}><View style={[styles.deck,{backgroundColor:colors.surface,borderColor:deckBorder,borderWidth:deckStyle?2:1}]}>
+          const deckSecond = galaxyDeck ? '#55E6FF'
+            : styleId.includes('master') ? '#8EE7FF'
+            : styleId.includes('celestial') ? '#D8B8FF'
+            : styleId.includes('crimson') || styleId.includes('crown') ? '#FFB36B'
+            : styleId.includes('champion') || styleId.includes('gold') ? '#FFF0A8'
+            : styleId.includes('indigo') ? '#55D9FF'
+            : styleId.includes('kanto') || styleId.includes('night') ? '#6EC8FF'
+            : colors.yellow;
+          return <AuraFrame key={deck.id} primaryColor={deckBorder} secondaryColor={deckSecond} intensity={deckStyle ? (galaxyDeck||styleId.includes('master')||styleId.includes('celestial')?'master':'premium') : 'soft'} variant={galaxyDeck?'galaxy':'energy'} radius={19}><View style={[styles.deck,{backgroundColor:colors.surface,borderColor:deckBorder,borderWidth:deckStyle?2:1}]}>
             <Pressable style={styles.deckMain} onPress={() => router.push(`/deck/${deck.id}`)}>
               <View style={[styles.preview,{backgroundColor:isLight?'#EDF2F7':colors.bg}]}>{(deck.deck_cards ?? []).slice(0, 3).map((item: any, index: number) => item.cards?.image_small ? <Image key={`${item.card_id}-${index}`} source={{ uri: item.cards.image_small }} style={[styles.previewCard, { marginLeft: index ? -25 : 0 }]} /> : null)}{total === 0 ? <Ionicons name="albums-outline" size={34} color={colors.muted} /> : null}</View>
               <View style={styles.deckInfo}><View style={styles.nameRow}><Text style={[styles.deckName,{color:colors.text}]}>{deck.name}</Text>{deck.is_default ? <View style={[styles.defaultBadge,{backgroundColor:colors.yellow}]}><Ionicons name="star" size={11} color="#07111F" /><Text style={styles.defaultText}>PRINCIPAL</Text></View> : null}{deckStyle?<View style={[styles.deckStyleBadge,{backgroundColor:colors.accentSoft,borderColor:deckBorder}]}><Ionicons name={(deckStyle.icon||'albums') as keyof typeof Ionicons.glyphMap} size={11} color={deckBorder}/><Text style={[styles.deckStyleText,{color:deckBorder}]}>{String(deckStyle.name).toUpperCase()}</Text></View>:null}</View><Text style={[styles.deckMeta,{color:colors.muted}]}>{total} cartas • {formatUsd(marketValue)} • toque para editar</Text></View>
