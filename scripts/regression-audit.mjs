@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260831171936_universal_visual_themes.sql',
   'src/components/MarketplaceListingSurface.tsx',
   'src/components/CompactTrainerBanner.tsx',
   'src/components/PremiumProfileFrame.tsx',
@@ -406,6 +407,57 @@ if (existsSync('app/guild-wars.tsx')) {
   assert(wars.includes('AuraFrame'), 'Regressão visual: flare de ginásio perdeu a aura animada.');
   assert(wars.includes('if (!picker || bagLoaded) return;'), 'Regressão: picker de Pokémon pode voltar ao loop infinito de loading.');
   assert(!wars.includes('[picker, bagCards.length, bagLoading]'), 'Regressão: bagLoading não pode voltar a cancelar a própria requisição do picker.');
+}
+
+if (existsSync('supabase/migrations/20260831171936_universal_visual_themes.sql')) {
+  const universalThemes = read('supabase/migrations/20260831171936_universal_visual_themes.sql');
+  assert(universalThemes.includes("'universalTheme', true"), 'Regressão: temas premium deixaram de ser universais.');
+  assert(universalThemes.includes("'cardCompatible', true"), 'Regressão: molduras/backgrounds perderam compatibilidade com cartas.');
+  assert(universalThemes.includes("'deckCompatible', true"), 'Regressão: molduras/backgrounds perderam compatibilidade com decks.');
+  assert(universalThemes.includes("i.category in ('profile_frame','profile_background')"), 'Regressão: RPC não aceita temas de identidade em cartas/decks.');
+  assert(universalThemes.includes('get_my_visual_style_options'), 'Regressão: seletor leve de temas visuais foi removido.');
+  assert(universalThemes.includes('clear_card_economy_style'), 'Regressão: cartas perderam a opção de remover tema.');
+  assert(universalThemes.includes('clear_deck_economy_style'), 'Regressão: decks perderam a opção de remover tema.');
+  assert(universalThemes.includes("'alreadyApplied',true"), 'Regressão econômica: reaplicar o mesmo tema pode voltar a cobrar Coins.');
+  assert(universalThemes.includes('revoke execute on function public.get_my_visual_style_options(text) from public,anon'), 'Regressão de segurança: opções de tema não podem ser anônimas.');
+}
+
+if (existsSync('src/services/economy.ts')) {
+  const economyThemeService = read('src/services/economy.ts');
+  assert(economyThemeService.includes('getMyVisualStyleOptions'), 'Regressão: cliente perdeu seletor de temas compatíveis.');
+  assert(economyThemeService.includes('clearCardEconomyStyle'), 'Regressão: cliente perdeu remoção de tema de carta.');
+  assert(economyThemeService.includes('clearDeckEconomyStyle'), 'Regressão: cliente perdeu remoção de tema de deck.');
+}
+
+if (existsSync('app/economy.tsx')) {
+  const economyThemeUi = read('app/economy.tsx');
+  assert(economyThemeUi.includes("x.metadata?.cardCompatible===true"), 'Regressão: Economy Hub não mostra temas universais em cartas.');
+  assert(economyThemeUi.includes("x.metadata?.deckCompatible===true"), 'Regressão: Economy Hub não mostra temas universais em decks.');
+  assert(economyThemeUi.includes('applyCardCost'), 'Regressão: Economy Hub não usa custo correto para tema universal em cartas.');
+  assert(economyThemeUi.includes('applyDeckCost'), 'Regressão: Economy Hub não usa custo correto para tema universal em decks.');
+}
+
+if (existsSync('app/card/[id].tsx')) {
+  const cardThemeUi = read('app/card/[id].tsx');
+  assert(cardThemeUi.includes('TEMAS DA SUA COLEÇÃO'), 'Regressão: carta perdeu o seletor direto de temas.');
+  assert(cardThemeUi.includes("getMyVisualStyleOptions('card')"), 'Regressão: carta não carrega temas universais.');
+  assert(cardThemeUi.includes('applyCardEconomyStyle'), 'Regressão: carta não aplica tema escolhido.');
+  assert(cardThemeUi.includes('clearCardEconomyStyle'), 'Regressão: carta não consegue remover tema.');
+  assert(cardThemeUi.includes('UNIVERSAL'), 'Regressão de UX: carta não identifica temas universais.');
+}
+
+if (existsSync('app/deck/[id].tsx')) {
+  const deckThemeUi = read('app/deck/[id].tsx');
+  assert(deckThemeUi.includes('Personalizar deck'), 'Regressão: editor de deck perdeu seletor de temas.');
+  assert(deckThemeUi.includes("getMyVisualStyleOptions('deck')"), 'Regressão: deck não carrega temas universais.');
+  assert(deckThemeUi.includes('applyDeckEconomyStyle'), 'Regressão: deck não aplica tema escolhido.');
+  assert(deckThemeUi.includes('clearDeckEconomyStyle'), 'Regressão: deck não consegue remover tema.');
+}
+
+if (existsSync('app/store.tsx')) {
+  const universalStoreUi = read('app/store.tsx');
+  assert(universalStoreUi.includes('compatibilityRow'), 'Regressão de UX: Trainer Shop deixou de mostrar onde o tema pode ser usado.');
+  assert(universalStoreUi.includes('CARTAS') && universalStoreUi.includes('DECKS'), 'Regressão de UX: usos universais sumiram da Trainer Shop.');
 }
 
 if (existsSync('src/components/AuraFrame.tsx')) {
