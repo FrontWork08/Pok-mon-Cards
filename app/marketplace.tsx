@@ -8,6 +8,7 @@ import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { AuraBanner } from '@/components/AuraBanner';
 import { AuraFrame } from '@/components/AuraFrame';
+import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { getMyBagPage } from '@/services/bag';
 import type { OwnedCardEntry } from '@/services/player';
 import { buyListing, cancelListing, createListing, createMarketOffer, getMarketplaceHub, saveMyShop, subscribeMarketplace, type MarketplaceHub, type MarketplaceListing, type ShopTheme } from '@/services/marketplace';
@@ -172,6 +173,7 @@ export default function MarketplaceScreen() {
     <View style={[styles.shopPanel,{backgroundColor:colors.surface,borderColor:colors.accent}]}>
       <View style={styles.sectionHead}><View style={[styles.sectionIcon,{backgroundColor:`${themeAccent(shopTheme,colors.accent)}18`}]}><Ionicons name="storefront" size={22} color={themeAccent(shopTheme,colors.accent)}/></View><View style={{flex:1}}><Text style={[styles.sectionTitle,{color:colors.text}]}>Minha loja</Text><Text style={[styles.sectionHint,{color:colors.muted}]}>A cor GUILD acompanha automaticamente sua guilda. Temas premium mudam o destaque visual público da loja.</Text></View></View>
       <View style={[styles.shopPreview,{borderColor:themeAccent(shopTheme,colors.accent),backgroundColor:colors.surfaceAlt}]}>
+        {shopTheme==='galaxy'?<GalaxyFlowOverlay intensity="master" opacity={.82}/>:null}
         <View style={[styles.shopPreviewGlow,{backgroundColor:themeAccent(shopTheme,colors.accent)}]}/>
         <View style={[styles.shopPreviewIcon,{backgroundColor:`${themeAccent(shopTheme,colors.accent)}18`,borderColor:`${themeAccent(shopTheme,colors.accent)}75`}]}><Ionicons name={THEMES.find((item)=>item.id===shopTheme)?.icon??'storefront'} size={22} color={themeAccent(shopTheme,colors.accent)}/></View>
         <View style={{flex:1,zIndex:2}}><Text style={[styles.shopPreviewKicker,{color:themeAccent(shopTheme,colors.accent)}]}>{shopTheme.toUpperCase()} STORE</Text><Text style={[styles.shopPreviewName,{color:colors.text}]}>{shopName.trim()||hub?.myShop?.name||'Sua Trainer Shop'}</Text><Text style={[styles.shopPreviewMeta,{color:colors.muted}]}>Prévia pública • tema {shopTheme}</Text></View>
