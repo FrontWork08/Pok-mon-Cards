@@ -57,7 +57,12 @@ export function TrainerNavigation() {
   const [rankSnapshot, setRankSnapshot] = useState<RankSnapshot | null>(null);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setIsAdmin(false);
+      setUnread(0);
+      setRankSnapshot(null);
+      return;
+    }
     Promise.all([
       isCurrentUserAdmin().catch(() => false),
       getUnreadConversationCount().catch(() => 0),
@@ -67,7 +72,12 @@ export function TrainerNavigation() {
       setUnread(count);
       setRankSnapshot(snapshot);
     });
-  }, [userId, open]);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !open) return;
+    void getUnreadConversationCount().then(setUnread).catch(() => null);
+  }, [open, userId]);
 
   if (!userId) return null;
 
