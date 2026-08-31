@@ -128,6 +128,7 @@ export function PremiumProfileFrame({
   radius = 28,
   style,
   compact = false,
+  enabled = true,
 }: {
   children: ReactNode;
   frameId?: string | null;
@@ -136,6 +137,7 @@ export function PremiumProfileFrame({
   radius?: number;
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
+  enabled?: boolean;
 }) {
   const preset = useMemo(
     () => presetFor(frameId, primaryColor, secondaryColor),
@@ -203,6 +205,8 @@ export function PremiumProfileFrame({
   const border = compact ? 2 : preset.tier >= 4 ? 3 : 2;
   const railHeight = compact ? 2 : preset.tier >= 4 ? 4 : 3;
   const particleCount = compact ? Math.min(5, preset.particles) : preset.particles;
+
+  if (!enabled) return <View style={style}>{children}</View>;
 
   return (
     <View style={[styles.shell, { borderRadius: radius }, style]}>
