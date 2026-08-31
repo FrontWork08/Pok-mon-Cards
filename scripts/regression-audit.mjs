@@ -7,6 +7,8 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260831141844_trainer_shop_gift_reset_guard.sql',
+  'supabase/migrations/20260831141513_trainer_shop_friend_gifts.sql',
   'supabase/migrations/20260831135122_trainer_shop_catalog.sql',
   'supabase/migrations/20260831135024_bulk_duplicate_sales.sql',
   'src/services/store.ts',
@@ -122,6 +124,45 @@ if (existsSync('supabase/migrations/20260831135122_trainer_shop_catalog.sql')) {
   assert(shopDb.includes("luxuryOnly"), 'Regressão: catálogo permanente pode misturar itens exclusivos da rotação de luxo.');
   assert(shopDb.includes('current_luxury_rotation_ids'), 'Regressão: loja de luxo semanal perdeu sua rotação.');
   assert(shopDb.includes('grant execute on function public.get_trainer_shop_catalog() to authenticated'), 'Regressão de segurança: catálogo da loja deve ficar restrito a autenticados.');
+}
+
+if (existsSync('app/store.tsx') && existsSync('src/services/store.ts')) {
+  const giftStoreUi = read('app/store.tsx');
+  const giftStoreService = read('src/services/store.ts');
+  assert(giftStoreUi.includes('PRESENTEAR UM AMIGO'), 'Regressão: Trainer Shop perdeu o botão de presentear.');
+  assert(giftStoreUi.includes('Escolha quem vai receber'), 'Regressão: fluxo de presente perdeu o seletor de amigos.');
+  assert(giftStoreUi.includes('Escreva um recado'), 'Regressão: fluxo de presente perdeu o recado personalizado.');
+  assert(giftStoreUi.includes('maxLength={180}'), 'Regressão: recado de presente perdeu o limite de segurança.');
+  assert(giftStoreUi.includes('getMySocial'), 'Regressão: Trainer Shop deixou de carregar a lista real de amigos.');
+  assert(giftStoreService.includes("rpc('gift_trainer_store_item'"), 'Regressão: serviço de presentes perdeu a RPC oficial.');
+}
+
+if (existsSync('supabase/migrations/20260831141513_trainer_shop_friend_gifts.sql')) {
+  const giftsDb = read('supabase/migrations/20260831141513_trainer_shop_friend_gifts.sql');
+  assert(giftsDb.includes("f.status='accepted'"), 'Regressão de segurança: presentes devem exigir amizade aceita.');
+  assert(giftsDb.includes('GIFT_RECIPIENT_ALREADY_OWNS'), 'Regressão: presente deve proteger o limite de posse do destinatário.');
+  assert(giftsDb.includes("'store_gift'"), 'Regressão econômica: compra para presente deve ser registrada como store_gift.');
+  assert(giftsDb.includes("'🎁 Você recebeu um presente!'"), 'Regressão: destinatário perdeu a mensagem visual de presente recebido.');
+  assert(giftsDb.includes("'giftMessage'"), 'Regressão: notificação do presente perdeu o recado do remetente.');
+  assert(giftsDb.includes("char_length(message)<=180"), 'Regressão de segurança: recado no banco perdeu limite de 180 caracteres.');
+  assert(giftsDb.includes('grant execute on function public.gift_trainer_store_item(text,uuid,text) to authenticated'), 'Regressão de segurança: RPC de presentes deve ser apenas para autenticados.');
+  assert(giftsDb.includes('revoke execute on function public.gift_trainer_store_item(text,uuid,text) from public,anon'), 'Regressão de segurança: RPC de presentes não pode ser anônima.');
+}
+
+if (existsSync('src/services/notifications.ts') && existsSync('app/_layout.tsx')) {
+  const giftNotifications = read('src/services/notifications.ts');
+  const rootLayout = read('app/_layout.tsx');
+  assert(giftNotifications.includes("'/store'"), 'Regressão: notificação de presente não consegue abrir a Trainer Shop.');
+  assert(giftNotifications.includes("type.includes('gift')"), 'Regressão: roteador não reconhece notificações de presente.');
+  assert(rootLayout.includes("liveNotification.type === 'store_gift'"), 'Regressão: presente recebido deixou de aparecer como aviso especial na tela.');
+  assert(rootLayout.includes('giftNotificationEmoji'), 'Regressão visual: aviso de presente perdeu sua identidade especial.');
+  assert(rootLayout.includes("notification?.type === 'store_gift' ? 11000 : 6000"), 'Regressão: presente recebido deve permanecer mais tempo visível.');
+}
+
+if (existsSync('supabase/migrations/20260831141844_trainer_shop_gift_reset_guard.sql')) {
+  const giftReset = read('supabase/migrations/20260831141844_trainer_shop_gift_reset_guard.sql');
+  assert(giftReset.includes("delete from public.notifications where type='store_gift'"), 'Regressão do reset: notificações Beta de presentes não são limpas.');
+  assert(giftReset.includes('delete from public.trainer_store_gifts'), 'Regressão do reset: presentes Beta não são limpos.');
 }
 
 if (existsSync('app/(tabs)/packs.tsx')) {
