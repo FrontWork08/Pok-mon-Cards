@@ -61,6 +61,15 @@ export type PublicPlayerProfile = {
         style:{id:string;name:string;icon:string;rarity:string}|null;
       }>;
     };
+    trophies:Array<{
+      id:string;
+      name:string;
+      description:string;
+      icon:string;
+      rarity:string;
+      quantity:number;
+      acquiredAt:string;
+    }>;
   };
 };
 
@@ -124,6 +133,17 @@ export async function getPublicPlayerProfile(playerId: string): Promise<PublicPl
           }))
           : [],
       },
+      trophies:Array.isArray(value.collection?.trophies)
+        ? value.collection.trophies.map((item:any)=>({
+          id:String(item.id),
+          name:String(item.name),
+          description:String(item.description??''),
+          icon:String(item.icon??'trophy'),
+          rarity:String(item.rarity??'standard'),
+          quantity:Number(item.quantity??1),
+          acquiredAt:String(item.acquiredAt??''),
+        }))
+        : [],
     },
   };
 }
