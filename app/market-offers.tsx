@@ -102,6 +102,7 @@ function OfferSection({ title, items, incoming, working, onRespond, onCancel }: 
             <Text style={[styles.name, { color: colors.text }]}>{item.card.name}</Text>
             <Text style={[styles.meta, { color: colors.muted }]}>{incoming ? '@' + item.buyerUsername : 'para @' + item.sellerUsername} • anúncio 🪙 {item.listingPrice.toLocaleString('pt-BR')}</Text>
             <Text style={[styles.amount, { color: colors.yellow }]}>OFERTA 🪙 {item.amountCoins.toLocaleString('pt-BR')}</Text>
+            {incoming && item.status==='pending'?<Text style={[styles.feeHint,{color:colors.muted}]}>Ao aceitar: taxa 8% • você recebe 🪙 {Math.max(0,item.amountCoins-Math.min(item.amountCoins,Math.max(1,Math.ceil(item.amountCoins*.08)))).toLocaleString('pt-BR')}</Text>:null}
             <Text style={[styles.status, { color: item.status === 'pending' ? '#65D894' : colors.muted }]}>{item.status.toUpperCase()}</Text>
           </View>
           {item.status === 'pending' ? incoming ? (
@@ -136,6 +137,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 12, fontWeight: '900' },
   meta: { fontSize: 8, marginTop: 2 },
   amount: { fontSize: 10, fontWeight: '900', marginTop: 5 },
+  feeHint: { fontSize: 7, fontWeight: '800', marginTop: 3 },
   status: { fontSize: 7, fontWeight: '900', marginTop: 3 },
   actions: { flexDirection: 'row', gap: 5 },
   action: { width: 39, height: 39, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
