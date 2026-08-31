@@ -266,3 +266,178 @@ begin
   raise exception 'INVALID_MARKETPLACE_ACTION';
 end;
 $$;
+
+
+create or replace function private.respond_market_offer(p_offer_id uuid,p_accept boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_actor uuid:=auth.uid(); v_offer public.market_offers%rowtype; v_listing public.market_listings%rowtype;
+  v_buyer_coins bigint; v_buyer_after bigint; v_seller_after bigint; v_card_name text;
+  v_fee bigint; v_seller_credit bigint;
+begin
+  if v_actor is null then raise exception 'UNAUTHORIZED'; end if;
+
+  select * into v_offer from public.market_offers where id=p_offer_id for update;
+  if not found then raise exception 'OFFER_NOT_FOUND'; end if;
+  select * into v_listing from public.market_listings where id=v_offer.listing_id for update;
+  if not found then raise exception 'LISTING_NOT_FOUND'; end if;
+  if v_listing.seller_id<>v_actor then raise exception 'FORBIDDEN'; end if;
+  if v_offer.status<>'pending' then raise exception 'OFFER_NOT_PENDING'; end if;
+
+  if v_offer.expires_at<=now() then
+    update public.market_offers set status='expired',updated_at=now() where id=v_offer.id;
+    raise exception 'OFFER_EXPIRED';
+  end if;
+
+  select pokemon_name into v_card_name from public.cards where id=v_listing.card_id;
+
+  if not coalesce(p_accept,false) then
+    update public.market_offers set status='rejected',updated_at=now() where id=v_offer.id;
+    perform public.server_queue_notification(
+      v_offer.buyer_id,'market_offer_rejected','Oferta recusada',
+      'Sua oferta por '||coalesce(v_card_name,'uma carta')||' foi recusada.',
+      jsonb_build_object('offerId',v_offer.id,'listingId',v_listing.id)
+    );
+    return jsonb_build_object('id',v_offer.id,'status','rejected');
+  end if;
+
+  if v_listing.status<>'active' then raise exception 'LISTING_NOT_ACTIVE'; end if;
+  perform 1 from public.players where id in (v_offer.buyer_id,v_actor) order by id for update;
+
+  select coins into v_buyer_coins from public.players
+  where id=v_offer.buyer_id and account_status='active';
+  if not found then raise exception 'BUYER_NOT_AVAILABLE'; end if;
+  if v_buyer_coins<v_offer.amount_coins then raise exception 'BUYER_NOT_ENOUGH_COINS'; end if;
+
+  v_fee:=least(v_offer.amount_coins,greatest(1,ceil(v_offer.amount_coins::numeric*.08)::bigint));
+  v_seller_credit:=v_offer.amount_coins-v_fee;
+
+  update public.players set coins=coins-v_offer.amount_coins
+  where id=v_offer.buyer_id returning coins into v_buyer_after;
+  update public.players set coins=coins+v_seller_credit
+  where id=v_actor returning coins into v_seller_after;
+
+  insert into public.player_cards(player_id,card_id,quantity)
+  values(v_offer.buyer_id,v_listing.card_id,v_listing.quantity)
+  on conflict(player_id,card_id) do update set quantity=public.player_cards.quantity+excluded.quantity;
+
+  update public.market_listings set status='sold',buyer_id=v_offer.buyer_id,sold_at=now(),updated_at=now()
+  where id=v_listing.id;
+  update public.market_offers
+  set status=case when id=v_offer.id then 'accepted' else 'rejected' end,updated_at=now()
+  where listing_id=v_listing.id and status='pending';
+
+  insert into private.market_fee_log(
+    listing_id,offer_id,buyer_id,seller_id,gross_coins,fee_coins,seller_net_coins,sale_kind
+  ) values(
+    v_listing.id,v_offer.id,v_offer.buyer_id,v_actor,v_offer.amount_coins,v_fee,v_seller_credit,'offer'
+  );
+
+  perform public.server_queue_notification(
+    v_offer.buyer_id,'market_offer_accepted','Oferta aceita!',
+    'Sua oferta por '||coalesce(v_card_name,'uma carta')||' foi aceita. A carta já está na sua Bag.',
+    jsonb_build_object('offerId',v_offer.id,'listingId',v_listing.id,'cardId',v_listing.card_id,'amountCoins',v_offer.amount_coins)
+  );
+
+  return jsonb_build_object(
+    'id',v_offer.id,'status','accepted','listingId',v_listing.id,
+    'cardId',v_listing.card_id,'quantity',v_listing.quantity,'amountCoins',v_offer.amount_coins,
+    'buyerCoins',v_buyer_after,'sellerCoins',v_seller_after,
+    'marketFeeCoins',v_fee,'marketFeePercent',8,'sellerNetCoins',v_seller_credit
+  );
+end;
+$$;
+
+create or replace function public.server_get_economy_health(p_actor_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_since timestamptz:=now()-interval '7 days';
+  v_active_players bigint:=0; v_total_coins numeric:=0; v_total_diamonds numeric:=0;
+  v_mission_mint bigint:=0; v_bp_mint bigint:=0; v_guild_mint bigint:=0;
+  v_duplicate_mint bigint:=0; v_code_mint bigint:=0; v_milestone_mint bigint:=0;
+  v_pack_burn bigint:=0; v_exchange_burn bigint:=0; v_market_fee_burn bigint:=0; v_gym_burn bigint:=0;
+  v_known_mint bigint:=0; v_known_burn bigint:=0; v_status text:='healthy';
+begin
+  if not exists(select 1 from public.admin_members where player_id=p_actor_id) then raise exception 'FORBIDDEN'; end if;
+
+  select count(*),coalesce(sum(coins),0),coalesce(sum(diamonds),0)
+  into v_active_players,v_total_coins,v_total_diamonds
+  from public.players where account_status='active';
+
+  select coalesce(sum(d.reward_coins),0)::bigint into v_mission_mint
+  from public.player_missions_v2 pm join public.mission_definitions_v2 d on d.id=pm.mission_id
+  where pm.claimed=true and pm.period_start>=current_date-7;
+
+  select coalesce(sum(coalesce((c.reward->>'coins')::bigint,0)),0)::bigint into v_bp_mint
+  from public.battle_pass_reward_claims c where c.claimed_at>=v_since;
+
+  select coalesce(sum(c.reward_coins),0)::bigint into v_guild_mint
+  from public.guild_weekly_reward_claims c where c.claimed_at>=v_since;
+
+  select coalesce(sum(s.total_coins),0)::bigint into v_duplicate_mint
+  from private.card_duplicate_sales s where s.created_at>=v_since;
+
+  select coalesce(sum(coalesce((r.reward_snapshot->>'coins')::bigint,0)),0)::bigint into v_code_mint
+  from public.code_redemptions r where r.redeemed_at>=v_since;
+
+  select coalesce(sum(c.reward_coins),0)::bigint into v_milestone_mint
+  from public.collection_milestone_claims c where c.claimed_at>=v_since;
+
+  select coalesce(sum(o.price_paid),0)::bigint into v_pack_burn
+  from public.pack_openings o where o.currency_at_open='coins' and o.opened_at>=v_since;
+
+  select coalesce(sum(x.coins_spent),0)::bigint into v_exchange_burn
+  from public.diamond_exchange_log x where x.created_at>=v_since;
+
+  select coalesce(sum(f.fee_coins),0)::bigint into v_market_fee_burn
+  from private.market_fee_log f where f.created_at>=v_since;
+
+  select coalesce(sum(coalesce((e.metadata->>'costCoins')::bigint,0)),0)::bigint into v_gym_burn
+  from public.guild_war_gym_events e where e.event_type='heal' and e.created_at>=v_since;
+
+  v_known_mint:=v_mission_mint+v_bp_mint+v_guild_mint+v_duplicate_mint+v_code_mint+v_milestone_mint;
+  v_known_burn:=v_pack_burn+v_exchange_burn+v_market_fee_burn+v_gym_burn;
+
+  v_status:=case
+    when v_known_mint=0 then 'healthy'
+    when v_known_burn::numeric/v_known_mint>=.75 then 'healthy'
+    when v_known_burn::numeric/v_known_mint>=.55 then 'watch'
+    else 'critical'
+  end;
+
+  return jsonb_build_object(
+    'version',(select version from public.economy_policy where id=1),
+    'windowDays',7,'status',v_status,'activePlayers',v_active_players,
+    'balances',jsonb_build_object('coins',v_total_coins,'diamonds',v_total_diamonds),
+    'knownMint',jsonb_build_object(
+      'missions',v_mission_mint,'battlePass',v_bp_mint,'guild',v_guild_mint,
+      'duplicates',v_duplicate_mint,'codes',v_code_mint,'milestones',v_milestone_mint,'total',v_known_mint
+    ),
+    'knownBurn',jsonb_build_object(
+      'packs',v_pack_burn,'diamondExchange',v_exchange_burn,'marketFees',v_market_fee_burn,
+      'gymHealing',v_gym_burn,'total',v_known_burn
+    ),
+    'burnToMintRatio',case when v_known_mint=0 then null else round(v_known_burn::numeric/v_known_mint,3) end,
+    'packPrices',(select jsonb_build_object(
+      'coinMin',min(price) filter(where currency='coins'),
+      'coinMedian',percentile_cont(.5) within group(order by price) filter(where currency='coins'),
+      'coinMax',max(price) filter(where currency='coins'),
+      'diamondMin',min(price) filter(where currency='diamonds'),
+      'diamondMedian',percentile_cont(.5) within group(order by price) filter(where currency='diamonds'),
+      'diamondMax',max(price) filter(where currency='diamonds')
+    ) from public.packs where active),
+    'coverageNote','Known ledger excludes daily-login history, season payouts, tournament payouts and explicit admin grants.'
+  );
+end;
+$$;
+
+revoke all on function public.server_get_economy_health(uuid) from public,anon;
+grant execute on function public.server_get_economy_health(uuid) to authenticated;
