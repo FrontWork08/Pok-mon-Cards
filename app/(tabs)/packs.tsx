@@ -608,9 +608,9 @@ export default function PacksScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, overflow: 'hidden' },
-  listContent: { paddingHorizontal: 10, paddingTop: 10 },
+  listContent: { paddingHorizontal: 10, paddingTop: 8, width:'100%', maxWidth:1220, alignSelf:'center' },
   columnWrap: { alignItems: 'stretch' },
-  headerStack: { gap: 14, paddingHorizontal: 6, paddingBottom: 14 },
+  headerStack: { gap: 11, paddingHorizontal: 4, paddingBottom: 11 },
   headerTop: { flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between', alignItems:'flex-start', gap:10 },
   header: { gap: 5, marginBottom: 2 },
   brandRow:{flexDirection:'row',alignItems:'center',gap:7},
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { fontSize: 14, lineHeight: 20 },
 
-  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 13, borderWidth: 1 },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, paddingHorizontal: 13, paddingVertical: 10, borderWidth: 1 },
   balanceLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   balanceValue: { fontSize: 22, fontWeight: '900', marginTop: 2 },
   balanceActions:{flexDirection:'row',alignItems:'center',gap:7},exchangeButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},exchangeText:{fontSize:8,fontWeight:'900'},balanceBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
   notice: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
   noticeText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
 
-  shopHero: { borderRadius: 26, padding: 16, borderWidth: 1, overflow:'hidden', position:'relative', gap:13 },
+  shopHero: { borderRadius: 21, padding: 13, borderWidth: 1, overflow:'hidden', position:'relative', gap:10 },
   shopHeroGlow:{position:'absolute',right:-65,top:-80,width:250,height:250,borderRadius:999,opacity:.15},
   shopHeroPokemon:{position:'absolute',right:-18,bottom:-34,width:180,height:190,opacity:.25,transform:[{rotate:'7deg'}]},
   shopHeroContent:{flexDirection:'row',alignItems:'center',gap:14,zIndex:2},
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
   catalogStatValue:{fontSize:17,fontWeight:'900'},
   catalogStatLabel:{fontSize:7,fontWeight:'900',letterSpacing:.8,marginTop:1},
 
-  searchBox: { height: 52, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderWidth: 1 },
+  searchBox: { height: 48, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 14, height: '100%' },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   favoriteFilter: { minHeight: 39, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
