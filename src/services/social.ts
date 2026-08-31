@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getSessionUserId } from '@/lib/session';
 
 export type SocialPlayer = {
   id: string;
@@ -16,21 +17,18 @@ export type SocialState = {
 };
 
 export async function getMySocial(): Promise<SocialState> {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  const user = userData.user;
-  if (!user) throw new Error('Usuário não autenticado.');
+  const userId = await getSessionUserId(true);
 
   const { data: relationships, error } = await supabase
     .from('friendships')
     .select('requester_id,addressee_id,status,created_at')
-    .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`)
+    .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
 
   const rows = relationships ?? [];
-  const otherIds = Array.from(new Set(rows.map((row) => row.requester_id === user.id ? row.addressee_id : row.requester_id)));
+  const otherIds = Array.from(new Set(rows.map((row) => row.requester_id === userId ? row.addressee_id : row.requester_id)));
 
   if (otherIds.length === 0) return { friends: [], incoming: [], outgoing: [] };
 
@@ -47,26 +45,34 @@ export async function getMySocial(): Promise<SocialState> {
   const outgoing: SocialPlayer[] = [];
 
   for (const row of rows) {
-    const otherId = row.requester_id === user.id ? row.addressee_id : row.requester_id;
+    const otherId = row.requester_id === userId ? row.addressee_id : row.requester_id;
     const player = byId.get(otherId);
     if (!player) continue;
 
     if (row.status === 'accepted') friends.push(player);
-    else if (row.status === 'pending' && row.addressee_id === user.id) incoming.push(player);
-    else if (row.status === 'pending' && row.requester_id === user.id) outgoing.push(player);
+    else if (row.status === 'pending' && row.addressee_id === userId) incoming.push(player);
+    else if (row.status === 'pending' && row.requester_id === userId) outgoing.push(player);
   }
 
   return { friends, incoming, outgoing };
 }
 
 
+export async function getMyFriendCount(): Promise<number> {
+  const userId = await getSessionUserId(true);
+  const { count, error } = await supabase
+    .from('friendships')
+    .select('requester_id', { count: 'exact', head: true })
+    .eq('status', 'accepted')
+    .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+  if (error) throw error;
+  return Number(count ?? 0);
+}
+
 export type PublicRelationshipState = 'self' | 'friend' | 'incoming' | 'outgoing' | 'none';
 
 export async function getRelationshipWith(playerId: string): Promise<PublicRelationshipState> {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  const myId = userData.user?.id;
-  if (!myId) throw new Error('Usuário não autenticado.');
+  const myId = await getSessionUserId(true);
   if (myId === playerId) return 'self';
 
   const { data, error } = await supabase
