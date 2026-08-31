@@ -302,7 +302,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     <View style={styles.container}>
       <PremiumBackground />
       <View style={styles.shadeTop} /><View style={styles.shadeBottom} />
-      {isGalaxyBoosterFx && stage!=='summary' ? <GalaxyFlowOverlay intensity="master" opacity={stage==='opening'?.96:stage==='cards'?.42:.56}/> : null}
+      {isGalaxyBoosterFx && stage!=='summary' ? <GalaxyFlowOverlay intensity="master" opacity={stage==='opening'?.86:stage==='cards'?.60:.70}/> : null}
       {boosterFx ? <View pointerEvents="none" style={[styles.boosterFxFrame,{borderColor:boosterFxColor}]} /> : null}
       {boosterFx ? <View pointerEvents="none" style={[styles.boosterFxBadge,{borderColor:boosterFxColor,backgroundColor:'#0A0F18E8'}]}><Ionicons name={boosterFxIcon} size={14} color={boosterFxColor}/><Text style={[styles.boosterFxBadgeText,{color:boosterFxColor}]}>{boosterFx.name.toUpperCase()}</Text></View> : null}
       <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 17), minHeight: 66 + insets.top }]}><View style={{ flex: 1 }}><Text style={styles.kicker}>PACK OPENING</Text><Text numberOfLines={1} style={styles.title}>{pack.name}</Text></View>{stage !== 'opening' ? <Pressable style={styles.closeButton} onPress={onClose}><Ionicons name="close" size={21} color="#F4F4F4" /></Pressable> : null}</View>
