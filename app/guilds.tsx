@@ -27,6 +27,7 @@ import {
 } from '@/services/guilds';
 import { findPlayers, getPlayerAvatarMap, getProfileAvatarUrl, type PlayerAvatarMeta } from '@/services/player';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { CompactTrainerBanner } from '@/components/CompactTrainerBanner';
 import { formatUsd } from '@/services/market';
 import { getEconomySinkHub, type EconomySinkHub } from '@/services/economy';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -272,7 +273,24 @@ export default function GuildsScreen() {
       {isLeader ? <View style={[styles.managePanel, { backgroundColor: colors.surface, borderColor: selected?.color ?? colors.border }]}>
         <View style={styles.manageHeader}><View style={[styles.manageIcon, { backgroundColor: selected!.color + '22' }]}><Ionicons name="person-add" size={20} color={selected!.color} /></View><View style={{ flex: 1 }}><Text style={[styles.manageTitle, { color: colors.text }]}>Convidar treinador</Text><Text style={[styles.manageText, { color: colors.muted }]}>Somente você, como chefe, pode convidar e administrar membros.</Text></View></View>
         <View style={[styles.searchBox, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Ionicons name="search" size={18} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} onSubmitEditing={searchPlayers} placeholder="Buscar por nickname..." placeholderTextColor={colors.muted} autoCapitalize="none" style={[styles.searchInput, { color: colors.text }]} /><Pressable onPress={() => void searchPlayers()} style={[styles.searchButton, { backgroundColor: selected!.color }]}><Text style={styles.searchText}>{searching ? '...' : 'BUSCAR'}</Text></Pressable></View>
-        {results.map((player) => <View key={player.id} style={[styles.searchResult, { borderColor: colors.border }]}><Pressable style={{ flex: 1 }} onPress={() => router.push(`/player/${player.id}`)}><Text style={[styles.memberName, { color: colors.text }]}>@{player.username}</Text><Text style={[styles.memberMeta, { color: colors.muted }]}>Nível {player.level}</Text></Pressable><Pressable disabled={working === `invite:${player.id}`} onPress={() => void run(`invite:${player.id}`, () => inviteToGuild(selected!.id, player.id), 'Convite enviado.')} style={[styles.inviteButton, { backgroundColor: selected!.color }]}><Ionicons name="send" size={14} color="#fff" /><Text style={styles.inviteButtonText}>CONVIDAR</Text></Pressable></View>)}
+        {results.map((player) => (
+          <CompactTrainerBanner
+            key={player.id}
+            frameId={player.equipped_frame_id}
+            backgroundId={player.equipped_background_id}
+            fallbackColor={selected!.color}
+          >
+            <View style={[styles.searchResult, { borderColor: colors.border }]}>
+              <Pressable style={{ flex: 1 }} onPress={() => router.push(`/player/${player.id}`)}>
+                <Text style={[styles.memberName, { color: colors.text }]}>@{player.username}</Text>
+                <Text style={[styles.memberMeta, { color: colors.muted }]}>Nível {player.level}</Text>
+              </Pressable>
+              <Pressable disabled={working === `invite:${player.id}`} onPress={() => void run(`invite:${player.id}`, () => inviteToGuild(selected!.id, player.id), 'Convite enviado.')} style={[styles.inviteButton, { backgroundColor: selected!.color }]}>
+                <Ionicons name="send" size={14} color="#fff" /><Text style={styles.inviteButtonText}>CONVIDAR</Text>
+              </Pressable>
+            </View>
+          </CompactTrainerBanner>
+        ))}
       </View> : null}
       <PackOpeningModal
         visible={collectiveOpen}
@@ -360,7 +378,35 @@ function GuildDetail({
     </View> : null}
 
     <View style={styles.subHeader}><Text style={[styles.subTitle, { color: colors.text }]}>Membros</Text><Text style={[styles.subMeta, { color: colors.muted }]}>{guild.members.length}</Text></View>
-    <View style={styles.memberList}>{guild.members.length === 0 ? <Text style={[styles.noMembers, { color: colors.muted }]}>Nenhum membro ainda. Seja o primeiro a entrar.</Text> : guild.members.map((member) => <View key={member.id} style={[styles.memberRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Pressable style={styles.memberIdentity} onPress={() => onOpenPlayer(member.id)}><TrainerAvatar icon={avatars[member.id]?.profileIcon} avatarUrl={getProfileAvatarUrl(avatars[member.id]?.avatarPath,avatars[member.id]?.avatarUpdatedAt)} color={guild.color} backgroundColor={guild.color + '25'} size={38}/><View style={{ flex: 1 }}><Text style={[styles.memberName, { color: colors.text }]}>@{member.username}</Text><Text style={[styles.memberMeta, { color: colors.muted }]}>Nível {member.level} • {member.role === 'leader' ? 'Chefe' : member.role === 'officer' ? 'Oficial' : 'Membro'}</Text></View></Pressable>{leader && member.role !== 'leader' ? <View style={styles.memberActions}><Pressable disabled={working === `role:${member.id}`} onPress={() => onSetRole(member, member.role === 'officer' ? 'member' : 'officer')} style={[styles.roleButton, { borderColor: guild.color }]}><Text style={[styles.roleText, { color: guild.color }]}>{member.role === 'officer' ? 'MEMBRO' : 'OFICIAL'}</Text></Pressable><Pressable disabled={working === `kick:${member.id}`} onPress={() => onKick(member)} style={styles.kick}><Ionicons name="person-remove" size={16} color="#FF9FAF" /></Pressable></View> : <Ionicons name="chevron-forward" size={17} color={colors.muted} />}</View>)}</View>
+    <View style={styles.memberList}>
+      {guild.members.length === 0 ? <Text style={[styles.noMembers, { color: colors.muted }]}>Nenhum membro ainda. Seja o primeiro a entrar.</Text> : guild.members.map((member) => {
+        const identity=avatars[member.id];
+        return (
+          <CompactTrainerBanner
+            key={member.id}
+            frameId={identity?.frameId}
+            backgroundId={identity?.backgroundId}
+            fallbackColor={guild.color}
+          >
+            <View style={[styles.memberRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+              <Pressable style={styles.memberIdentity} onPress={() => onOpenPlayer(member.id)}>
+                <TrainerAvatar icon={identity?.profileIcon} avatarUrl={getProfileAvatarUrl(identity?.avatarPath,identity?.avatarUpdatedAt)} color={guild.color} backgroundColor={guild.color + '25'} size={38}/>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.memberName, { color: colors.text }]}>@{member.username}</Text>
+                  <Text style={[styles.memberMeta, { color: colors.muted }]}>Nível {member.level} • {member.role === 'leader' ? 'Chefe' : member.role === 'officer' ? 'Oficial' : 'Membro'}</Text>
+                </View>
+              </Pressable>
+              {leader && member.role !== 'leader' ? (
+                <View style={styles.memberActions}>
+                  <Pressable disabled={working === `role:${member.id}`} onPress={() => onSetRole(member, member.role === 'officer' ? 'member' : 'officer')} style={[styles.roleButton, { borderColor: guild.color }]}><Text style={[styles.roleText, { color: guild.color }]}>{member.role === 'officer' ? 'MEMBRO' : 'OFICIAL'}</Text></Pressable>
+                  <Pressable disabled={working === `kick:${member.id}`} onPress={() => onKick(member)} style={styles.kick}><Ionicons name="person-remove" size={16} color="#FF9FAF" /></Pressable>
+                </View>
+              ) : <Ionicons name="chevron-forward" size={17} color={colors.muted} />}
+            </View>
+          </CompactTrainerBanner>
+        );
+      })}
+    </View>
   </View>;
 }
 
