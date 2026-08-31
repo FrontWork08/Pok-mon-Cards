@@ -364,45 +364,23 @@ export async function getPlayerAvatarMap(playerIds: string[]) {
 }
 
 export async function getMyProfileStats() {
-  const userId = await getSessionUserId(true);
-  const [bag, openings, trades] = await Promise.all([
-    getMyBag(),
-    supabase.from('pack_openings').select('id', { count: 'exact', head: true }).eq('player_id', userId),
-    supabase.from('trades').select('id', { count: 'exact', head: true }).eq('status', 'completed').or(`sender_id.eq.${userId},receiver_id.eq.${userId}`),
-  ]);
-  const totalCards = bag.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0);
-  const uniqueCards = bag.length;
-  const favorites = bag.filter((item) => item.favorite).length;
-  const species = new Set(bag.map((item) => item.cards?.pokedex_numbers?.[0]).filter((value): value is number => typeof value === 'number')).size;
-  const collectionValue = bag.reduce((sum, item) => sum + Number(item.cards?.game_value ?? 0) * Number(item.quantity ?? 0), 0);
-  const collectionMarketValueUsd = bag.reduce((sum, item) => sum + Number(item.cards?.market_price_usd ?? 0) * Number(item.quantity ?? 0), 0);
-  const totalCardCopies = bag.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0);
-  const pricedCardCopies = bag.reduce((sum, item) => item.cards?.market_price_usd == null ? sum : sum + Number(item.quantity ?? 0), 0);
-  const priceCoveragePct = totalCardCopies > 0 ? (pricedCardCopies / totalCardCopies) * 100 : 0;
-  const mostValuable = bag.reduce<OwnedCardEntry | null>((best, item) => {
-    if (!item.cards) return best;
-    if (!best?.cards || Number(item.cards.game_value ?? 0) > Number(best.cards.game_value ?? 0)) return item;
-    return best;
-  }, null);
-  const mostValuableMarket = bag.reduce<OwnedCardEntry | null>((best, item) => {
-    if (!item.cards?.market_price_usd) return best;
-    if (!best?.cards || Number(item.cards.market_price_usd ?? 0) > Number(best.cards.market_price_usd ?? 0)) return item;
-    return best;
-  }, null);
+  const { data, error } = await supabase.rpc('get_my_profile_stats_fast');
+  if (error) throw error;
+  const value:any = data ?? {};
   return {
-    totalCards,
-    uniqueCards,
-    favorites,
-    species,
-    collectionValue,
-    collectionMarketValueUsd,
-    pricedCardCopies,
-    totalCardCopies,
-    priceCoveragePct,
-    mostValuableCard: mostValuable?.cards ?? null,
-    mostValuableMarketCard: mostValuableMarket?.cards ?? null,
-    packsOpened: openings.count ?? 0,
-    completedTrades: trades.count ?? 0,
+    totalCards:Number(value.totalCards ?? 0),
+    uniqueCards:Number(value.uniqueCards ?? 0),
+    favorites:Number(value.favorites ?? 0),
+    species:Number(value.species ?? 0),
+    collectionValue:Number(value.collectionValue ?? 0),
+    collectionMarketValueUsd:Number(value.collectionMarketValueUsd ?? 0),
+    pricedCardCopies:Number(value.pricedCardCopies ?? 0),
+    totalCardCopies:Number(value.totalCardCopies ?? 0),
+    priceCoveragePct:Number(value.priceCoveragePct ?? 0),
+    mostValuableCard:value.mostValuableCard ?? null,
+    mostValuableMarketCard:value.mostValuableMarketCard ?? null,
+    packsOpened:Number(value.packsOpened ?? 0),
+    completedTrades:Number(value.completedTrades ?? 0),
   };
 }
 
