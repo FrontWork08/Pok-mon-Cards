@@ -475,6 +475,7 @@ function GymBoard({
               onDefend={() => onDefend(gym)}
               onAttack={() => onAttack(gym)}
               onHeal={onHeal}
+              onFlare={(flare) => onFlare(gym, flare)}
             />
           );
         })}
