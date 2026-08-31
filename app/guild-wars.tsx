@@ -520,7 +520,7 @@ function GymTerritoryCard({
   const ownerColor = gym.ownerGuild?.color ?? colors.border;
   const alive = gym.defenders.filter((defender) => defender.currentHp > 0).length;
 
-  return (
+  const card = (
     <View style={[styles.gymCard,{backgroundColor:colors.surfaceAlt,borderColor:ownerColor}]}>
       <View style={styles.gymTop}>
         <View style={[styles.gymIcon,{backgroundColor:ownerColor+'22',borderColor:ownerColor}]}>
@@ -605,6 +605,21 @@ function GymTerritoryCard({
       </Pressable>
     </View>
   );
+  if (gym.flareKey) {
+    const auraColor = gym.flareKey==='legendary' ? '#C493FF' : gym.flareKey==='champion' ? '#FFD447' : ownerColor;
+    const auraSecond = gym.flareKey==='legendary' ? '#8EE7FF' : gym.flareKey==='champion' ? ownerColor : '#FFD447';
+    return (
+      <AuraFrame
+        primaryColor={auraColor}
+        secondaryColor={auraSecond}
+        intensity={gym.flareKey==='legendary'?'master':'premium'}
+        radius={20}
+      >
+        {card}
+      </AuraFrame>
+    );
+  }
+  return card;
 }
 
 function DefenderCard({
