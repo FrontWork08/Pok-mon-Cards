@@ -71,8 +71,8 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     };
 
     void refresh();
-    supabase.auth.getUser().then(({ data }) => {
-      void attachSettingsRealtime(data.user?.id ?? null);
+    supabase.auth.getSession().then(({ data }) => {
+      void attachSettingsRealtime(data.session?.user?.id ?? null);
     }).catch(() => null);
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
