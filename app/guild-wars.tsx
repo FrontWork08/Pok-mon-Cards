@@ -19,6 +19,7 @@ import {
   type GuildWarGymDefender,
 } from '@/services/guilds';
 import { getMyBagPage } from '@/services/bag';
+import { purchaseGuildWarGymFlare } from '@/services/economy';
 import type { OwnedCardEntry } from '@/services/player';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -42,7 +43,8 @@ type PickerStatSort = 'recommended' | 'hp' | 'attack' | 'rating' | 'efficiency' 
 export default function GuildWarsScreen() {
   const router = useRouter();
   const { colors, themeName } = useAppTheme();
-  const { userId, coins } = useWallet();
+  const wallet = useWallet();
+  const { userId, coins } = wallet;
   const themeVisual = getThemeVisual(themeName);
   const [hub, setHub] = useState<GuildHub | null>(null);
   const [boards, setBoards] = useState<Record<string, GuildWarGymBoard>>({});
@@ -270,6 +272,42 @@ export default function GuildWarsScreen() {
       ],
     );
   }
+  function requestGymFlare(gym: GuildWarGym, warId: string, flare: 'banner' | 'champion' | 'legendary') {
+    if (actionBusy) return;
+    const config = flare === 'banner'
+      ? { label: 'Bandeira da Guilda', cost: 50000, duration: '24h' }
+      : flare === 'champion'
+        ? { label: 'Efeito Champion', cost: 150000, duration: '24h' }
+        : { label: 'Aura Lendária', cost: 400000, duration: '48h' };
+    Alert.alert(
+      config.label,
+      `Ativar ${config.label} em ${gym.name} por ${config.duration}?\n\nCusto: 🪙 ${config.cost.toLocaleString('pt-BR')}\n\nÉ um efeito puramente visual e não altera o combate.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Ativar',
+          onPress: () => {
+            void (async () => {
+              try {
+                setActionBusy(`flare:${gym.id}`);
+                setError(null);
+                await purchaseGuildWarGymFlare(gym.id, flare);
+                await Promise.all([refreshBoard(warId, true), wallet.refresh()]);
+                Alert.alert('Ginásio decorado', `${config.label} ativado em ${gym.name}.`);
+              } catch (e) {
+                const message = e instanceof Error ? e.message : 'Não foi possível decorar o ginásio.';
+                setError(message);
+                Alert.alert('Decoração do Ginásio', message);
+              } finally {
+                setActionBusy(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
+
 
   return (
     <Screen title="Guild Wars Arena" subtitle="Conquiste ginásios, monte defesas coletivas e domine territórios em tempo real.">
@@ -309,7 +347,7 @@ export default function GuildWarsScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.ruleTitle, { color: colors.text }]}>Regras dos Ginásios</Text>
           <Text style={[styles.ruleText, { color: colors.muted }]}>
-            1 defensor ativo por membro em cada guerra. Pokémon feridos não podem ser trocados. Qualquer membro da guilda dominante pode gastar 🪙 25.000 para restaurar até 50 HP de um defensor ainda vivo.
+            1 defensor ativo por membro em cada guerra. Pokémon feridos não podem ser trocados. Qualquer membro da guilda dominante pode gastar 🪙 25.000 para restaurar até 50 HP e, na Economy 2.0, comprar efeitos visuais para o ginásio sem vantagem de combate.
           </Text>
         </View>
       </View>
@@ -335,6 +373,7 @@ export default function GuildWarsScreen() {
             onDefend={(gym) => openDefensePicker(war.id, gym)}
             onAttack={(gym) => openAttackPicker(war.id, gym)}
             onHeal={(defender) => requestHeal(defender, war.id)}
+            onFlare={(gym, flare) => requestGymFlare(gym, war.id, flare)}
           />
         ) : (
           <View key={war.id} style={[styles.notice,{backgroundColor:colors.surface,borderColor:colors.border}]}>
@@ -392,6 +431,7 @@ function GymBoard({
   onDefend,
   onAttack,
   onHeal,
+  onFlare,
 }: {
   board: GuildWarGymBoard;
   myGuildId: string | null;
@@ -400,6 +440,7 @@ function GymBoard({
   onDefend: (gym: GuildWarGym) => void;
   onAttack: (gym: GuildWarGym) => void;
   onHeal: (defender: GuildWarGymDefender) => void;
+  onFlare: (gym: GuildWarGym, flare: 'banner' | 'champion' | 'legendary') => void;
 }) {
   const { colors } = useAppTheme();
   const myDefense = board.gyms.flatMap((gym) => gym.defenders.map((defender) => ({ gym, defender }))).find((entry) => entry.defender.playerId === userId);
@@ -464,6 +505,7 @@ function GymTerritoryCard({
   onDefend,
   onAttack,
   onHeal,
+  onFlare,
 }: {
   gym: GuildWarGym;
   mine: boolean;
@@ -471,6 +513,7 @@ function GymTerritoryCard({
   onDefend: () => void;
   onAttack: () => void;
   onHeal: (defender: GuildWarGymDefender) => void;
+  onFlare: (flare: 'banner' | 'champion' | 'legendary') => void;
 }) {
   const { colors } = useAppTheme();
   const ownerColor = gym.ownerGuild?.color ?? colors.border;
@@ -495,6 +538,15 @@ function GymTerritoryCard({
         </Text>
       </View>
 
+      {gym.flareKey && gym.flareUntil ? (
+        <View style={[styles.flareActive,{backgroundColor:gym.flareKey==='legendary'?'#2A1740':gym.flareKey==='champion'?'#332B11':colors.accentSoft,borderColor:gym.flareKey==='legendary'?'#C493FF':gym.flareKey==='champion'?'#FFD447':colors.accent}]}>
+          <Ionicons name={gym.flareKey==='legendary'?'sparkles':gym.flareKey==='champion'?'trophy':'flag'} size={15} color={gym.flareKey==='legendary'?'#C493FF':gym.flareKey==='champion'?'#FFD447':colors.accent}/>
+          <Text style={[styles.flareActiveText,{color:colors.text}]}>
+            {gym.flareKey==='legendary'?'AURA LENDÁRIA':gym.flareKey==='champion'?'EFEITO CHAMPION':'BANDEIRA DA GUILDA'} • até {new Date(gym.flareUntil).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+          </Text>
+        </View>
+      ) : null}
+
       {gym.defenders.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.defenderList}>
           {gym.defenders.map((defender) => (
@@ -515,6 +567,26 @@ function GymTerritoryCard({
           </Text>
         </View>
       )}
+
+      {mine ? (
+        <View style={styles.flareActions}>
+          {([
+            ['banner','BANDEIRA','50K','flag'],
+            ['champion','CHAMPION','150K','trophy'],
+            ['legendary','LENDÁRIA','400K','sparkles'],
+          ] as const).map(([id,label,cost,icon]) => (
+            <Pressable
+              key={id}
+              disabled={Boolean(busy)}
+              onPress={() => onFlare(id)}
+              style={[styles.flareButton,{backgroundColor:colors.surface,borderColor:colors.border},busy&&styles.disabled]}
+            >
+              <Ionicons name={icon} size={13} color={id==='legendary'?'#C493FF':id==='champion'?colors.yellow:colors.accent}/>
+              <Text style={[styles.flareButtonText,{color:colors.text}]}>{label} • {cost}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <Pressable
         disabled={Boolean(busy)}
@@ -978,6 +1050,11 @@ const styles = StyleSheet.create({
   gymMeta:{fontSize:8,marginTop:2},
   dominance:{borderRadius:12,borderWidth:1,paddingHorizontal:9,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:6},
   dominanceText:{fontSize:9,fontWeight:'900',flex:1},
+  flareActive:{borderRadius:11,borderWidth:1,paddingHorizontal:9,paddingVertical:7,flexDirection:'row',alignItems:'center',gap:6},
+  flareActiveText:{fontSize:7,fontWeight:'900',flex:1},
+  flareActions:{flexDirection:'row',flexWrap:'wrap',gap:6},
+  flareButton:{flexGrow:1,minWidth:92,minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:8,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4},
+  flareButtonText:{fontSize:6.5,fontWeight:'900'},
   defenderList:{gap:8,paddingVertical:1},
   defender:{width:138,borderRadius:15,borderWidth:1,padding:8,gap:4},
   defenderImage:{width:'100%',height:105,borderRadius:9},
