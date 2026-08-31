@@ -8,6 +8,8 @@ import { supabase } from '@/lib/supabase';
  * whose requests are already protected by RLS. Using the locally restored
  * session removes dozens of /auth/v1/user round trips while navigating.
  */
+export function getSessionUserId(required: true): Promise<string>;
+export function getSessionUserId(required?: false): Promise<string | null>;
 export async function getSessionUserId(required = false): Promise<string | null> {
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
