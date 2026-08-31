@@ -187,7 +187,10 @@ export default function TrainerStoreScreen(){
 
   function ownedAction(item:TrainerStoreItem){
     if(equipped(item))return {label:'EQUIPADO',icon:'checkmark-circle' as const,disabled:true,onPress:()=>{}};
-    if(['profile_frame','profile_background','booster_fx','title','shop_theme'].includes(item.category)){
+    if(['profile_frame','profile_background'].includes(item.category)){
+      return {label:'EQUIPAR NO PERFIL',icon:'person-circle' as const,disabled:false,onPress:()=>{void equip(item);}};
+    }
+    if(['booster_fx','title','shop_theme'].includes(item.category)){
       return {label:'EQUIPAR',icon:'flash' as const,disabled:false,onPress:()=>{void equip(item);}};
     }
     if(item.category==='card_style')return {label:'USAR EM CARTA',icon:'albums' as const,disabled:false,onPress:()=>router.push('/economy')};
@@ -528,6 +531,13 @@ function StoreCard({
       </View>
 
       <Text numberOfLines={3} style={[styles.description,{color:colors.muted}]}>{item.description||'Item permanente da sua coleção.'}</Text>
+      {item.metadata?.universalTheme===true ? (
+        <View style={styles.compatibilityRow}>
+          <View style={[styles.compatibilityBadge,{borderColor:accent}]}><Ionicons name="person" size={11} color={accent}/><Text style={[styles.compatibilityText,{color:accent}]}>PERFIL</Text></View>
+          <View style={[styles.compatibilityBadge,{borderColor:accent}]}><Ionicons name="albums" size={11} color={accent}/><Text style={[styles.compatibilityText,{color:accent}]}>CARTAS</Text></View>
+          <View style={[styles.compatibilityBadge,{borderColor:accent}]}><Ionicons name="layers" size={11} color={accent}/><Text style={[styles.compatibilityText,{color:accent}]}>DECKS</Text></View>
+        </View>
+      ) : null}
 
       {item.category==='card_style'||item.category==='deck_style' ? (
         <View style={[styles.applyHint,{backgroundColor:colors.surfaceAlt}]}>
@@ -604,6 +614,9 @@ const styles=StyleSheet.create({
   itemName:{fontSize:15,fontWeight:'900',marginTop:2},
   rarity:{fontSize:7,fontWeight:'900',letterSpacing:1,marginTop:2},
   description:{fontSize:9,lineHeight:14,minHeight:42},
+  compatibilityRow:{flexDirection:'row',flexWrap:'wrap',gap:5},
+  compatibilityBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},
+  compatibilityText:{fontSize:6,fontWeight:'900',letterSpacing:.45},
   applyHint:{minHeight:31,borderRadius:10,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:5},
   applyHintText:{fontSize:7,fontWeight:'800'},
   cardFooter:{marginTop:'auto',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
