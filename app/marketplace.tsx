@@ -7,6 +7,7 @@ import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { AuraBanner } from '@/components/AuraBanner';
+import { AuraFrame } from '@/components/AuraFrame';
 import { getMyBagPage } from '@/services/bag';
 import type { OwnedCardEntry } from '@/services/player';
 import { buyListing, cancelListing, createListing, createMarketOffer, getMarketplaceHub, saveMyShop, subscribeMarketplace, type MarketplaceHub, type MarketplaceListing, type ShopTheme } from '@/services/marketplace';
@@ -220,7 +221,7 @@ function ListingCard({item,myId,working,onBuy,onOffer}:{item:MarketplaceListing;
     colors.yellow;
   const listingBoosted=Boolean(item.boostedUntil&&new Date(item.boostedUntil).getTime()>Date.now());
   const shopBoosted=Boolean(item.shopHighlightUntil&&new Date(item.shopHighlightUntil).getTime()>Date.now());
-  return <View style={[styles.listing,{backgroundColor:colors.surface,borderColor:listingBoosted?colors.yellow:themeColor,borderWidth:listingBoosted||['royal','neon','master','celestial'].includes(item.shopTheme)?1.5:1}]}>
+  return <AuraFrame primaryColor={listingBoosted?colors.yellow:themeColor} secondaryColor={themeColor} intensity={listingBoosted?'premium':'soft'} radius={19}><View style={[styles.listing,{backgroundColor:colors.surface,borderColor:listingBoosted?colors.yellow:themeColor,borderWidth:listingBoosted||['royal','neon','master','celestial'].includes(item.shopTheme)?1.5:1}]}>
     <View pointerEvents="none" style={[styles.listingThemeGlow,{backgroundColor:themeColor,opacity:['royal','neon','master','celestial'].includes(item.shopTheme)?.13:.055}]}/>
     <View pointerEvents="none" style={[styles.listingThemeEdge,{backgroundColor:listingBoosted?colors.yellow:themeColor,opacity:listingBoosted?.9:.45}]}/>
     <View style={styles.sellerRow}>
@@ -233,7 +234,7 @@ function ListingCard({item,myId,working,onBuy,onOffer}:{item:MarketplaceListing;
     </View>
     <View style={styles.cardRow}>{item.card.image?<Image source={{uri:item.card.image}} resizeMode="contain" style={styles.cardImage}/>:<View style={[styles.cardImage,{backgroundColor:colors.surfaceAlt}]}/>}<View style={{flex:1}}><Text style={[styles.cardName,{color:colors.text}]}>{item.card.name}</Text><Text style={[styles.cardMeta,{color:colors.muted}]}>{item.card.rarity??'Sem raridade'} • {item.quantity} cópia(s)</Text><Text style={[styles.price,{color:colors.yellow}]}>🪙 {item.price.toLocaleString('pt-BR')}</Text><Text style={[styles.marketUsd,{color:colors.muted}]}>Mercado USD: {item.card.marketPriceUsd == null ? '—' : formatUsd(item.card.marketPriceUsd * item.quantity)}{item.quantity > 1 && item.card.marketPriceUsd != null ? ` • ${formatUsd(item.card.marketPriceUsd)} cada` : ''}</Text></View></View>
     <View style={styles.listingActions}><Pressable disabled={item.sellerId===myId||working} onPress={()=>onBuy(item)} style={[styles.buyButton,styles.flexButton,{backgroundColor:item.sellerId===myId?colors.surfaceAlt:colors.yellow}]}><Ionicons name={item.sellerId===myId?'storefront':'cart'} size={18} color={item.sellerId===myId?colors.muted:'#07111F'}/><Text style={[styles.buyText,item.sellerId===myId&&{color:colors.muted}]}>{item.sellerId===myId?'SUA OFERTA':'COMPRAR'}</Text></Pressable>{item.sellerId!==myId?<Pressable disabled={working} onPress={()=>onOffer(item)} style={[styles.buyButton,styles.flexButton,{backgroundColor:colors.accentSoft,borderWidth:1,borderColor:colors.accent}]}><Ionicons name="chatbubble-ellipses" size={18} color={colors.accent}/><Text style={[styles.buyText,{color:colors.text}]}>FAZER OFERTA</Text></Pressable>:null}</View>
-  </View>;
+  </View></AuraFrame>;
 }
 
 const styles=StyleSheet.create({
