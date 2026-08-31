@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   memberIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 9 },
   memberAvatar: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   memberAvatarText: { fontSize: 16, fontWeight: '900' },
-  memberName: { fontSize: 12, fontWeight: '900' },
+  memberName: { fontSize: 12, fontWeight: '900', textShadowColor:'#000000FF', textShadowOffset:{width:0,height:1}, textShadowRadius:4 },
   memberMeta: { fontSize: 8, marginTop: 2 },
   memberActions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   roleButton: { minHeight: 34, borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
