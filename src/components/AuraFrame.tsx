@@ -171,7 +171,7 @@ export function AuraFrame({
 
       <View style={[styles.content,{borderRadius:radius}]}>
         <View style={styles.inner}>{children}</View>
-        {variant==='galaxy'?<GalaxyFlowOverlay intensity={intensity} opacity={intensity==='master'?.78:intensity==='premium'?.62:.40}/>:null}
+        {variant==='galaxy'?<GalaxyFlowOverlay intensity={intensity} opacity={intensity==='master'?.92:intensity==='premium'?.78:.62}/>:null}
 
         {variant!=='galaxy'?(
           <>
