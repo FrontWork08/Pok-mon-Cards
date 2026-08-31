@@ -444,6 +444,11 @@ if (existsSync('app/card/[id].tsx')) {
   assert(cardThemeUi.includes('applyCardEconomyStyle'), 'Regressão: carta não aplica tema escolhido.');
   assert(cardThemeUi.includes('clearCardEconomyStyle'), 'Regressão: carta não consegue remover tema.');
   assert(cardThemeUi.includes('UNIVERSAL'), 'Regressão de UX: carta não identifica temas universais.');
+  assert(cardThemeUi.includes('imageColumn'), 'Regressão visual: área da carta perdeu o container de largura estável e pode colapsar em faixa vertical.');
+  assert(cardThemeUi.includes('cardAuraShell'), 'Regressão visual: AuraFrame da carta não ocupa mais toda a área de exibição.');
+  assert(cardThemeUi.includes('cardImageStage'), 'Regressão visual: tema deixou de cobrir a própria imagem da carta.');
+  assert(cardThemeUi.includes('GalaxyFlowOverlay') && cardThemeUi.includes('opacity={0.72}'), 'Regressão visual: Galaxy Flow não cobre mais a área da carta.');
+  assert(cardThemeUi.includes('panelThemeWash') && cardThemeUi.includes('cardThemeWash'), 'Regressão visual: cosmético deixou de personalizar toda a área da carta.');
 }
 
 if (existsSync('app/deck/[id].tsx')) {
