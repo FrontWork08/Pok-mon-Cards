@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { AuraBanner } from '@/components/AuraBanner';
 import { AuraFrame } from '@/components/AuraFrame';
+import { PremiumProfileFrame } from '@/components/PremiumProfileFrame';
 import {
   buyTrainerStoreItem,
   equipTrainerStoreItem,
@@ -498,9 +499,23 @@ function StoreCard({
   const card=(
     <View style={[styles.card,{backgroundColor:colors.surface,borderColor:equipped?accent:colors.border}]}>
       <View style={styles.cardTop}>
-        <View style={[styles.itemIcon,{backgroundColor:colors.accentSoft,borderColor:accent}]}>
-          <Ionicons name={(item.icon||category.icon) as keyof typeof Ionicons.glyphMap} size={24} color={accent}/>
-        </View>
+        {item.category==='profile_frame' ? (
+          <PremiumProfileFrame
+            frameId={item.id}
+            primaryColor={accent}
+            secondaryColor={galaxy?'#55E6FF':colors.yellow}
+            radius={15}
+            compact
+          >
+            <View style={[styles.itemIcon,styles.frameStoreIcon,{backgroundColor:galaxy?'#17102A':colors.accentSoft,borderColor:accent}]}>
+              <Ionicons name="person" size={24} color={galaxy?'#55E6FF':accent}/>
+            </View>
+          </PremiumProfileFrame>
+        ) : (
+          <View style={[styles.itemIcon,{backgroundColor:colors.accentSoft,borderColor:accent}]}>
+            <Ionicons name={(item.icon||category.icon) as keyof typeof Ionicons.glyphMap} size={24} color={accent}/>
+          </View>
+        )}
         <View style={{flex:1,minWidth:0}}>
           <View style={styles.badgeRow}>
             <Text style={[styles.category,{color:colors.muted}]}>{category.label.toUpperCase()}</Text>
@@ -581,6 +596,7 @@ const styles=StyleSheet.create({
   card:{minHeight:226,borderRadius:20,borderWidth:1,padding:13,gap:10,overflow:'hidden'},
   cardTop:{flexDirection:'row',gap:10,alignItems:'center'},
   itemIcon:{width:48,height:48,borderRadius:15,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  frameStoreIcon:{width:54,height:54},
   badgeRow:{flexDirection:'row',alignItems:'center',gap:5,flexWrap:'wrap'},
   category:{fontSize:7,fontWeight:'900',letterSpacing:.8},
   luxTag:{fontSize:6,fontWeight:'900',color:'#1A1205',backgroundColor:'#FFB84D',borderRadius:999,paddingHorizontal:6,paddingVertical:2},
