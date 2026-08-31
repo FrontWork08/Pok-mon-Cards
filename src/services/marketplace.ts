@@ -153,6 +153,7 @@ async function action(args: Record<string, unknown>) {
       CANNOT_BUY_OWN_LISTING:'Você não pode comprar sua própria oferta.',
       LISTING_LIMIT_REACHED:'Sua loja atingiu o limite de 100 ofertas ativas.',
       INVALID_SHOP_NAME:'O nome da loja deve ter entre 3 e 32 caracteres.',
+      PREMIUM_SHOP_THEME_LOCKED:'Esse tema premium precisa ser comprado na Economy 2.0 antes de ser usado.',
       LEGACY_CARD_LOCKED:'A última cópia desta carta está protegida pelo seu Legado Beta e não pode sair da coleção antes da migração 1.0.',
     };
     const key=Object.keys(map).find((item)=>error.message.includes(item));
