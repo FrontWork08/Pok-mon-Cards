@@ -98,10 +98,10 @@ function Section({ title, items, equipped, working, onEquip }: {
             </Pressable>
           );
           return flow ? (
-            <AuraFrame key={item.id} primaryColor={galaxy?'#8B5CFF':item.primaryColor} secondaryColor={galaxy?'#55E6FF':item.secondaryColor} intensity={galaxy?'master':'premium'} variant={galaxy?'galaxy':'energy'} radius={19}>
+            <AuraFrame key={item.id} style={styles.itemCell} primaryColor={galaxy?'#8B5CFF':item.primaryColor} secondaryColor={galaxy?'#55E6FF':item.secondaryColor} intensity={galaxy?'master':'premium'} variant={galaxy?'galaxy':'energy'} radius={19}>
               {card}
             </AuraFrame>
-          ) : <View key={item.id}>{card}</View>;
+          ) : <View key={item.id} style={styles.itemCell}>{card}</View>;
         })}
       </View>
     </View>
@@ -116,7 +116,8 @@ const styles = StyleSheet.create({
   section: { gap: 9 },
   sectionTitle: { fontSize: 20, fontWeight: '900' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  item: { flexGrow: 1, flexBasis: 180, maxWidth: 260, minHeight: 190, borderRadius: 19, borderWidth: 2, padding: 13 },
+  itemCell:{ flexGrow:1, flexBasis:180, maxWidth:260, minWidth:170 },
+  item: { width:'100%', minHeight: 205, borderRadius: 19, borderWidth: 2, padding: 13 },
   preview: { width: 58, height: 58, borderRadius: 19, borderWidth: 2, alignItems: 'center', justifyContent: 'center', position:'relative', overflow:'hidden' },
   galaxyDots:{...StyleSheet.absoluteFillObject},
   galaxyDotA:{position:'absolute',width:5,height:5,borderRadius:999,backgroundColor:'#fff',left:9,top:12},
