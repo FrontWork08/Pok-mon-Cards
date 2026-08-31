@@ -14,11 +14,7 @@ async function invokeTradeAction(body: Record<string, unknown>) {
 }
 
 export async function getMyTrades() {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!userData.user) throw new Error('Usuário não autenticado.');
-
-  const userId = userData.user.id;
+  const userId = await getSessionUserId(true);
   const { data, error } = await supabase
     .from('trades')
     .select(`
