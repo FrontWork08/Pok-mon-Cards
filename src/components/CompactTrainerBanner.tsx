@@ -167,7 +167,7 @@ export function CompactTrainerBanner({
       ]}
     >
       <View style={styles.content}>{children}</View>
-      {visual.galaxy?<GalaxyFlowOverlay intensity="premium" opacity={0.56}/>:null}
+      {visual.galaxy?<GalaxyFlowOverlay intensity="premium" opacity={0.82}/>:null}
 
       <Animated.View
         pointerEvents="none"
