@@ -59,6 +59,23 @@ function pct(value:number,target:number){
   return Math.max(0,Math.min(100,value/target*100));
 }
 
+function itemVisual(item:EconomyStoreItem){
+  const key=`${item.rarity} ${item.id}`.toLowerCase();
+  if(key.includes('legend')||key.includes('master')) return {primary:'#C493FF',secondary:'#8EE7FF',tier:4};
+  if(key.includes('luxury')||key.includes('auction')) return {primary:'#FFD447',secondary:'#FF9F43',tier:3};
+  if(key.includes('epic')) return {primary:'#B982FF',secondary:'#6A7CFF',tier:2};
+  if(key.includes('rare')) return {primary:'#55D9FF',secondary:'#6A7CFF',tier:1};
+  return {primary:'#65D894',secondary:'#8EE7FF',tier:0};
+}
+
+function museumRarityColor(rarity:string|null|undefined){
+  const value=(rarity??'').toLowerCase();
+  if(/hyper|secret|special illustration|shiny ultra|rainbow|gold/.test(value)) return '#FFD447';
+  if(/illustration|ultra|double rare|rare holo|promo/.test(value)) return '#C493FF';
+  if(/rare/.test(value)) return '#55D9FF';
+  return '#65D894';
+}
+
 function categoryLabel(category:EconomyStoreItem['category']){
   const labels:Record<EconomyStoreItem['category'],string>={
     profile_frame:'Moldura',
@@ -338,11 +355,17 @@ export default function EconomyScreen(){
           ><Ionicons name="expand" size={17} color="#07111F"/><Text style={styles.primaryText}>EXPANDIR {coins(hub.museum.progress.nextCost)}</Text></Pressable>:<Text style={[styles.maxed,{color:'#65D894'}]}>NÍVEL MÁXIMO</Text>}
         </View>
         <View style={styles.museumGrid}>
-          {museumSlots.map(({slot,card})=><Pressable key={slot} onPress={()=>{setBagSearch('');setPicker({mode:'museum',slot});}} style={[styles.museumSlot,{backgroundColor:colors.surface,borderColor:card?colors.yellow:colors.border}]}>
-            {card?.image?<Image source={{uri:card.image}} resizeMode="contain" style={styles.museumImage}/>:<Ionicons name="add-circle-outline" size={28} color={colors.muted}/>}
-            <Text numberOfLines={1} style={[styles.museumName,{color:colors.text}]}>{card?.name??`Espaço ${slot}`}</Text>
-            <Text style={[styles.museumMeta,{color:colors.muted}]}>{card?.rarity??'Toque para escolher'}</Text>
-          </Pressable>)}
+          {museumSlots.map(({slot,card})=>{
+            const rarityColor=museumRarityColor(card?.rarity);
+            return <Pressable key={slot} onPress={()=>{setBagSearch('');setPicker({mode:'museum',slot});}} style={[styles.museumSlot,{backgroundColor:colors.surface,borderColor:card?rarityColor:colors.border}]}>
+              <View style={[styles.museumSlotNumber,{backgroundColor:card?`${rarityColor}20`:colors.surfaceAlt,borderColor:card?rarityColor:colors.border}]}><Text style={[styles.museumSlotNumberText,{color:card?rarityColor:colors.muted}]}>#{slot}</Text></View>
+              {card?<View pointerEvents="none" style={[styles.museumCardHalo,{backgroundColor:rarityColor}]}/>:null}
+              {card?.image?<Image source={{uri:card.image}} resizeMode="contain" style={styles.museumImage}/>:<View style={[styles.museumEmptyIcon,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="add" size={24} color={colors.muted}/></View>}
+              <View style={[styles.museumPedestal,{backgroundColor:card?rarityColor:colors.border}]}/>
+              <Text numberOfLines={1} style={[styles.museumName,{color:colors.text}]}>{card?.name??`Espaço ${slot}`}</Text>
+              <Text numberOfLines={1} style={[styles.museumMeta,{color:card?rarityColor:colors.muted}]}>{card?.rarity??'Toque para escolher'}</Text>
+            </Pressable>;
+          })}
         </View>
       </Section>
 
@@ -512,12 +535,19 @@ function Metric({label,value,icon}:{label:string;value:string;icon:keyof typeof 
 
 function StoreCard({item,busy,canEquip,onBuy,onEquip}:{item:EconomyStoreItem;busy:boolean;canEquip:boolean;onBuy:()=>void;onEquip:()=>void}){
   const {colors}=useAppTheme();
-  return <View style={[styles.storeCard,{backgroundColor:colors.surface,borderColor:item.owned?colors.accent:colors.border}]}>
-    <View style={styles.storeTop}><View style={[styles.storeIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name={(item.icon||'sparkles') as keyof typeof Ionicons.glyphMap} size={23} color={colors.yellow}/></View><View style={[styles.rarityBadge,{backgroundColor:colors.surfaceAlt}]}><Text style={[styles.rarityText,{color:colors.muted}]}>{item.rarity.toUpperCase()}</Text></View></View>
+  const visual=itemVisual(item);
+  return <View style={[styles.storeCard,{backgroundColor:colors.surface,borderColor:item.owned?visual.primary:visual.tier>=2?`${visual.primary}99`:colors.border,borderWidth:visual.tier>=3?1.5:1}]}>
+    <View pointerEvents="none" style={[styles.storeGlow,{backgroundColor:visual.primary,opacity:visual.tier>=3?.18:visual.tier>=1?.10:.05}]}/>
+    <View pointerEvents="none" style={[styles.storeEdge,{backgroundColor:visual.secondary,opacity:visual.tier>=3?.75:.28}]}/>
+    <View style={styles.storeTop}>
+      <View style={[styles.storeIcon,{backgroundColor:`${visual.primary}18`,borderColor:`${visual.primary}70`}]}><Ionicons name={(item.icon||'sparkles') as keyof typeof Ionicons.glyphMap} size={23} color={visual.primary}/></View>
+      <View style={[styles.rarityBadge,{backgroundColor:`${visual.primary}15`,borderColor:`${visual.primary}55`}]}><View style={[styles.rarityDot,{backgroundColor:visual.primary}]}/><Text style={[styles.rarityText,{color:visual.primary}]}>{item.rarity.toUpperCase()}</Text></View>
+    </View>
     <Text style={[styles.storeName,{color:colors.text}]}>{item.name}</Text>
-    <Text style={[styles.storeCategory,{color:colors.accent}]}>{categoryLabel(item.category).toUpperCase()}</Text>
+    <Text style={[styles.storeCategory,{color:visual.primary}]}>{categoryLabel(item.category).toUpperCase()}</Text>
     <Text style={[styles.storeDesc,{color:colors.muted}]}>{item.description}</Text>
-    {item.owned?<View style={styles.storeActions}><View style={[styles.ownedBadge,{backgroundColor:'#153426'}]}><Ionicons name="checkmark" size={13} color="#65D894"/><Text style={styles.ownedText}>ADQUIRIDO</Text></View>{canEquip?<Pressable disabled={busy} onPress={onEquip} style={[styles.equipButton,{borderColor:colors.accent}]}>{busy?<ActivityIndicator size="small" color={colors.accent}/>:<Text style={[styles.equipText,{color:colors.accent}]}>EQUIPAR</Text>}</Pressable>:null}</View>:<Pressable disabled={busy} onPress={onBuy} style={[styles.buyButton,{backgroundColor:colors.yellow}]}>{busy?<ActivityIndicator color="#07111F"/>:<Text style={styles.buyText}>COMPRAR • {coins(item.priceCoins)}</Text>}</Pressable>}
+    {visual.tier>=3?<View style={styles.premiumSignature}><Ionicons name="sparkles" size={12} color={visual.secondary}/><Text style={[styles.premiumSignatureText,{color:visual.secondary}]}>PREMIUM VISUAL</Text></View>:null}
+    {item.owned?<View style={styles.storeActions}><View style={[styles.ownedBadge,{backgroundColor:'#153426',borderColor:'#2F9E68'}]}><Ionicons name="checkmark" size={13} color="#65D894"/><Text style={styles.ownedText}>ADQUIRIDO</Text></View>{canEquip?<Pressable disabled={busy} onPress={onEquip} style={[styles.equipButton,{borderColor:visual.primary,backgroundColor:`${visual.primary}12`}]}>{busy?<ActivityIndicator size="small" color={visual.primary}/>:<Text style={[styles.equipText,{color:visual.primary}]}>EQUIPAR</Text>}</Pressable>:null}</View>:<Pressable disabled={busy} onPress={onBuy} style={[styles.buyButton,{backgroundColor:visual.tier>=3?visual.primary:colors.yellow}]}>{busy?<ActivityIndicator color="#07111F"/>:<Text style={styles.buyText}>COMPRAR • {coins(item.priceCoins)}</Text>}</Pressable>}
   </View>;
 }
 
@@ -548,9 +578,9 @@ const styles=StyleSheet.create({
   section:{gap:10},sectionHead:{flexDirection:'row',alignItems:'center',gap:9},sectionIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},sectionTitle:{fontSize:19,fontWeight:'900'},sectionSubtitle:{fontSize:9,lineHeight:14,marginTop:2},
   heroCard:{borderRadius:20,borderWidth:1,padding:14,flexDirection:'row',alignItems:'center',gap:12,flexWrap:'wrap'},heroKicker:{fontSize:8,fontWeight:'900',letterSpacing:1},heroTitle:{fontSize:18,fontWeight:'900',marginTop:2},body:{fontSize:9,lineHeight:14},
   primary:{minHeight:44,borderRadius:13,paddingHorizontal:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},primaryText:{color:'#07111F',fontSize:8,fontWeight:'900'},disabled:{opacity:.45},maxed:{fontSize:9,fontWeight:'900'},
-  storeGrid:{flexDirection:'row',flexWrap:'wrap',gap:9},storeCard:{flexGrow:1,flexBasis:190,minWidth:180,maxWidth:310,minHeight:210,borderRadius:19,borderWidth:1,padding:12},storeTop:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},storeIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},rarityBadge:{borderRadius:999,paddingHorizontal:7,paddingVertical:4},rarityText:{fontSize:6.5,fontWeight:'900'},storeName:{fontSize:14,fontWeight:'900',marginTop:10},storeCategory:{fontSize:7,fontWeight:'900',letterSpacing:.7,marginTop:2},storeDesc:{fontSize:8,lineHeight:12,marginTop:5,flex:1},buyButton:{minHeight:40,borderRadius:11,alignItems:'center',justifyContent:'center',marginTop:10},buyText:{color:'#07111F',fontSize:8,fontWeight:'900'},storeActions:{flexDirection:'row',gap:6,alignItems:'center',marginTop:10},ownedBadge:{minHeight:36,borderRadius:10,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:4},ownedText:{color:'#9CEFC1',fontSize:7,fontWeight:'900'},equipButton:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:10,alignItems:'center',justifyContent:'center'},equipText:{fontSize:7,fontWeight:'900'},
+  storeGrid:{flexDirection:'row',flexWrap:'wrap',gap:9},storeCard:{flexGrow:1,flexBasis:190,minWidth:180,maxWidth:310,minHeight:220,borderRadius:19,borderWidth:1,padding:12,position:'relative',overflow:'hidden'},storeGlow:{position:'absolute',width:170,height:170,borderRadius:999,right:-72,top:-78},storeEdge:{position:'absolute',left:0,right:0,top:0,height:2},storeTop:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',zIndex:2},storeIcon:{width:43,height:43,borderRadius:14,borderWidth:1,alignItems:'center',justifyContent:'center'},rarityBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},rarityDot:{width:5,height:5,borderRadius:999},rarityText:{fontSize:6.5,fontWeight:'900'},storeName:{fontSize:14,fontWeight:'900',marginTop:10},storeCategory:{fontSize:7,fontWeight:'900',letterSpacing:.7,marginTop:2},storeDesc:{fontSize:8,lineHeight:12,marginTop:5,flex:1},premiumSignature:{flexDirection:'row',alignItems:'center',gap:4,marginTop:7},premiumSignatureText:{fontSize:6,fontWeight:'900',letterSpacing:.6},buyButton:{minHeight:40,borderRadius:11,alignItems:'center',justifyContent:'center',marginTop:10},buyText:{color:'#07111F',fontSize:8,fontWeight:'900'},storeActions:{flexDirection:'row',gap:6,alignItems:'center',marginTop:10},ownedBadge:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:4},ownedText:{color:'#9CEFC1',fontSize:7,fontWeight:'900'},equipButton:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:10,alignItems:'center',justifyContent:'center'},equipText:{fontSize:7,fontWeight:'900'},
   sectionHeaderRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap'},smallButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},smallText:{fontSize:7,fontWeight:'900'},
-  museumGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},museumSlot:{width:112,minHeight:155,borderRadius:15,borderWidth:1,padding:8,alignItems:'center',justifyContent:'center'},museumImage:{width:72,height:100},museumName:{fontSize:9,fontWeight:'900',marginTop:4,maxWidth:94},museumMeta:{fontSize:7,marginTop:2,textAlign:'center'},
+  museumGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},museumSlot:{width:122,minHeight:175,borderRadius:17,borderWidth:1,padding:8,alignItems:'center',justifyContent:'flex-end',position:'relative',overflow:'hidden'},museumSlotNumber:{position:'absolute',left:7,top:7,zIndex:3,borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:3},museumSlotNumberText:{fontSize:6,fontWeight:'900'},museumCardHalo:{position:'absolute',width:105,height:105,borderRadius:999,top:18,opacity:.13},museumEmptyIcon:{width:52,height:70,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center',marginBottom:14},museumImage:{width:78,height:108,zIndex:2},museumPedestal:{width:72,height:3,borderRadius:999,opacity:.75,marginTop:2},museumName:{fontSize:9,fontWeight:'900',marginTop:6,maxWidth:102},museumMeta:{fontSize:7,marginTop:2,textAlign:'center',maxWidth:102},
   simpleCard:{flexGrow:1,flexBasis:180,minWidth:170,maxWidth:280,borderRadius:17,borderWidth:1,padding:12,gap:6},simpleTitle:{fontSize:12,fontWeight:'900'},
   deckList:{gap:8},deckRow:{borderRadius:16,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'},deckStyleActions:{flexDirection:'row',flexWrap:'wrap',gap:5},tinyChip:{minHeight:31,borderRadius:9,borderWidth:1,paddingHorizontal:8,alignItems:'center',justifyContent:'center'},tinyText:{fontSize:6.5,fontWeight:'900'},
   progressBox:{borderRadius:18,borderWidth:1,padding:13,gap:9},progressTop:{flexDirection:'row',alignItems:'flex-start',gap:10},progressPct:{fontSize:14,fontWeight:'900'},track:{height:9,borderRadius:999,overflow:'hidden'},fill:{height:'100%',borderRadius:999},progressNumbers:{flexDirection:'row',justifyContent:'space-between',gap:8,flexWrap:'wrap'},quickRow:{flexDirection:'row',flexWrap:'wrap',gap:6},quickChip:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:9,alignItems:'center',justifyContent:'center'},quickText:{fontSize:7,fontWeight:'900'},
