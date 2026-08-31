@@ -62,6 +62,7 @@ export default function PlayerShowcaseScreen() {
   const winRate = winTotal ? Math.round(Number(player?.battleWins ?? 0) / winTotal * 100) : 0;
   const frameColor = player?.frame?.primaryColor ?? player?.guild?.color ?? colors.accent;
   const backgroundColor = player?.background?.secondaryColor ?? colors.accentSoft;
+  const galaxyProfile = [player?.frame?.id, player?.background?.id].some((value) => String(value ?? '').includes('galaxy'));
   const avatarUrl = getProfileAvatarUrl(player?.avatarPath ?? null);
 
   async function updateFriendship(action: 'send' | 'accept') {
@@ -104,7 +105,8 @@ export default function PlayerShowcaseScreen() {
           icon={player.prestige.level>=5?'diamond':'person'}
           primaryColor={frameColor}
           secondaryColor={player.background?.primaryColor??colors.yellow}
-          intensity={player.prestige.level>=5?'master':player.prestige.level>0?'premium':'soft'}
+          intensity={galaxyProfile?'master':player.prestige.level>=5?'master':player.prestige.level>0?'premium':'soft'}
+          variant={galaxyProfile?'galaxy':'energy'}
           badge={player.prestige.level>0?`PRESTÍGIO ${player.prestige.level}`:'TRAINER'}
           minHeight={220}
         >
