@@ -27,6 +27,8 @@ const requiredFiles = [
   'src/components/AuraFrame.tsx',
   'src/components/GuildHeadquartersShowcase.tsx',
   'src/components/GalaxyFlowOverlay.tsx',
+  'src/lib/session.ts',
+  'src/services/home.ts',
   'supabase/migrations/20260831030951_economy_v21_permanent_sinks_schema.sql',
   'supabase/migrations/20260831031041_economy_v21_luxury_and_museum_schema.sql',
   'supabase/migrations/20260831031133_economy_v21_core_sink_actions.sql',
@@ -43,6 +45,8 @@ const requiredFiles = [
   'supabase/migrations/20260831035416_economy_v21_performance_hardening.sql',
   'supabase/migrations/20260831104956_economy_v21_public_trophy_room.sql',
   'supabase/migrations/20260831121232_economy_v21_galaxy_flow_collection.sql',
+  'supabase/migrations/20260831130337_economy_v21_booster_price_relief.sql',
+  'supabase/migrations/20260831132415_home_dashboard_fast_path.sql',
 ];
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
@@ -51,6 +55,43 @@ if (existsSync('app/battle/[id].tsx')) {
   const battle = read('app/battle/[id].tsx');
   assert(battle.includes('forfeitBattle'), 'Regressão: tela de batalha perdeu a desistência.');
   assert(battle.includes('ratingNeutral'), 'Regressão: UI perdeu indicação de desistência neutra antes da seleção.');
+  assert(battle.includes('loadBattleState'), 'Regressão de performance: batalha perdeu o carregamento dinâmico separado.');
+  assert(battle.includes('loadStaticBattleResources'), 'Regressão de performance: recursos estáticos da batalha não estão separados.');
+  assert(battle.includes('realtimeRefreshTimer'), 'Regressão de performance: eventos realtime da batalha perderam o coalescing.');
+  assert(!battle.includes('setInterval(tick, 250)'), 'Regressão de performance: cronômetro da batalha voltou a renderizar 4x por segundo.');
+  const stateLoader = battle.split('const loadBattleState')[1]?.split('const loadStaticBattleResources')[0] ?? '';
+  assert(!stateLoader.includes('getMyBag()') && !stateLoader.includes('getMyDecks()'), 'Regressão de performance: realtime da batalha voltou a baixar Bag/Decks completos.');
+}
+
+if (existsSync('src/lib/session.ts')) {
+  const session = read('src/lib/session.ts');
+  assert(session.includes('supabase.auth.getSession()'), 'Regressão de performance: helper de sessão voltou a validar usuário pela rede.');
+  assert(!session.includes('supabase.auth.getUser()'), 'Regressão de performance: helper local não pode chamar auth.getUser().');
+}
+
+if (existsSync('app/_layout.tsx')) {
+  const rootLayout = read('app/_layout.tsx');
+  const appStackSection = rootLayout.split('function AppStack')[1] ?? rootLayout;
+  assert(!appStackSection.includes('supabase.auth.getUser()'), 'Regressão de performance: layout global voltou a duplicar verificações /auth/v1/user.');
+  assert(appStackSection.includes('60000'), 'Regressão de performance: fallback de manutenção voltou a fazer polling agressivo.');
+}
+
+if (existsSync('app/(tabs)/index.tsx')) {
+  const home = read('app/(tabs)/index.tsx');
+  assert(home.includes('getHomeDashboard'), 'Regressão de performance: Home deixou de usar o dashboard compacto.');
+  assert(!home.includes('getMyBag()') && !home.includes('getMyTrades()'), 'Regressão de performance: Home voltou a baixar Bag/Trocas completas.');
+}
+
+if (existsSync('app/(tabs)/packs.tsx')) {
+  const packsPerf = read('app/(tabs)/packs.tsx');
+  assert(!packsPerf.includes('getMyProfile'), 'Regressão de performance: Packs voltou a buscar perfil redundante.');
+  assert(packsPerf.includes('const coins = wallet.coins'), 'Regressão de performance: Packs deixou de reutilizar WalletProvider.');
+}
+
+if (existsSync('supabase/migrations/20260831132415_home_dashboard_fast_path.sql')) {
+  const homeDb = read('supabase/migrations/20260831132415_home_dashboard_fast_path.sql');
+  assert(homeDb.includes('get_home_dashboard'), 'Regressão de performance: RPC compacta da Home ausente.');
+  assert(homeDb.includes('grant execute on function public.get_home_dashboard() to authenticated'), 'Regressão de segurança: dashboard deve continuar restrito a autenticados.');
 }
 
 if (existsSync('src/services/ranks.ts')) {
@@ -370,4 +411,4 @@ if (failures.length) {
 }
 
 console.log('✅ Auditoria de regressão passou.');
-console.log('   Batalha, guilda, QR, Legado, Economy 2.1, reset, ginásios, Packs, Admin Abuse, atualização obrigatória e PWA permanecem protegidos.');
+console.log('   Batalha, performance, Home, guilda, QR, Legado, Economy 2.1, reset, ginásios, Packs, Admin Abuse, atualização obrigatória e PWA permanecem protegidos.');
