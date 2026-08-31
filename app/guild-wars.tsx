@@ -485,7 +485,7 @@ function GymBoard({
           <Text style={[styles.eventTitle,{color:colors.text}]}>Atividade ao vivo</Text>
           {board.events.slice(0, 6).map((event) => (
             <View key={event.id} style={styles.eventRow}>
-              <View style={[styles.eventDot,{backgroundColor:event.eventType==='capture'?colors.yellow:colors.accent}]}/>
+              <View style={[styles.eventDot,{backgroundColor:event.eventType==='capture'?colors.yellow:event.eventType==='cosmetic'?'#C493FF':colors.accent}]}/>
               <Text style={[styles.eventMessage,{color:colors.muted}]}>{event.message}</Text>
               <Text style={[styles.eventTime,{color:colors.muted}]}>
                 {event.createdAt ? new Date(event.createdAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : ''}
