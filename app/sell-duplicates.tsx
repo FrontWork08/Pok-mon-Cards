@@ -153,7 +153,7 @@ export default function SellDuplicatesScreen() {
               <View style={styles.ruleText}>
                 <Text style={[styles.ruleTitle, { color: colors.text }]}>Valor baseado no mercado</Text>
                 <Text style={[styles.ruleBody, { color: colors.muted }]}>
-                  O servidor combina valor de mercado + raridade + chance real de pull. Quanto mais difícil for conseguir outra cópia, maior pode ser o valor em Coins.
+                  O servidor combina mercado + raridade + chance de pull, com teto ligado ao preço do booster. Durante evento de boosters grátis, vendas de repetidas ficam pausadas para proteger a economia.
                 </Text>
               </View>
             </View>
@@ -233,6 +233,7 @@ export default function SellDuplicatesScreen() {
                   Tier {item.sale.rarityTier} • raridade ×{item.sale.rarityMultiplier.toFixed(2)}
                   {item.sale.dropChancePct != null ? ` • chance ~${item.sale.dropChancePct < 0.1 ? item.sale.dropChancePct.toFixed(3) : item.sale.dropChancePct.toFixed(2)}%` : ''}
                   {item.sale.dropMultiplier !== 1 ? ` • drop ×${item.sale.dropMultiplier.toFixed(2)}` : ''}
+                  {item.sale.coinPackCap != null ? ` • teto 🪙 ${item.sale.coinPackCap.toLocaleString('pt-BR')}` : ''}
                 </Text>
 
                 <View style={styles.actions}>
