@@ -1,0 +1,36 @@
+-- Security hardening: SECURITY DEFINER RPCs must never be callable by anon/PUBLIC.
+revoke execute on function public.purchase_economy_item(text) from public, anon;
+revoke execute on function public.equip_economy_item(text) from public, anon;
+revoke execute on function public.purchase_trainer_prestige() from public, anon;
+revoke execute on function public.reroll_luxury_shop() from public, anon;
+revoke execute on function public.apply_card_economy_style(text,text) from public, anon;
+revoke execute on function public.apply_deck_economy_style(uuid,text) from public, anon;
+revoke execute on function public.upgrade_collection_museum() from public, anon;
+revoke execute on function public.set_collection_museum_card(integer,text) from public, anon;
+revoke execute on function public.boost_market_listing(uuid,text) from public, anon;
+revoke execute on function public.boost_my_market_shop(text) from public, anon;
+revoke execute on function public.contribute_guild_project(bigint) from public, anon;
+revoke execute on function public.contribute_global_economy_project(uuid,bigint) from public, anon;
+revoke execute on function public.place_economy_auction_bid(uuid,bigint) from public, anon;
+revoke execute on function public.get_economy_sink_hub() from public, anon;
+revoke execute on function public.purchase_guild_war_gym_flare(uuid,text) from public, anon;
+revoke execute on function public.server_get_economy_health(uuid) from public, anon;
+revoke execute on function public.server_refresh_economy_advisor(uuid) from public, anon;
+
+grant execute on function public.purchase_economy_item(text) to authenticated;
+grant execute on function public.equip_economy_item(text) to authenticated;
+grant execute on function public.purchase_trainer_prestige() to authenticated;
+grant execute on function public.reroll_luxury_shop() to authenticated;
+grant execute on function public.apply_card_economy_style(text,text) to authenticated;
+grant execute on function public.apply_deck_economy_style(uuid,text) to authenticated;
+grant execute on function public.upgrade_collection_museum() to authenticated;
+grant execute on function public.set_collection_museum_card(integer,text) to authenticated;
+grant execute on function public.boost_market_listing(uuid,text) to authenticated;
+grant execute on function public.boost_my_market_shop(text) to authenticated;
+grant execute on function public.contribute_guild_project(bigint) to authenticated;
+grant execute on function public.contribute_global_economy_project(uuid,bigint) to authenticated;
+grant execute on function public.place_economy_auction_bid(uuid,bigint) to authenticated;
+grant execute on function public.get_economy_sink_hub() to authenticated;
+grant execute on function public.purchase_guild_war_gym_flare(uuid,text) to authenticated;
+grant execute on function public.server_get_economy_health(uuid) to authenticated;
+grant execute on function public.server_refresh_economy_advisor(uuid) to authenticated;
