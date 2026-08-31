@@ -85,6 +85,7 @@ export default function TrainerStoreScreen(){
   const [giftSearch,setGiftSearch]=useState('');
   const [giftMessage,setGiftMessage]=useState('');
   const [giftSending,setGiftSending]=useState(false);
+  const [giftError,setGiftError]=useState<string|null>(null);
   const loadedOnce=useRef(false);
 
   const load=useCallback(async()=>{
@@ -201,14 +202,20 @@ export default function TrainerStoreScreen(){
 
   async function openGift(item:TrainerStoreItem){
     if(working||giftSending)return;
-    if(!catalog?.live&&!catalog?.adminPreview){
-      setError('Os presentes da Trainer Shop serão liberados junto com a Economy 2.1 após a migração 1.0.');
-      return;
-    }
+
+    // Always open the gift sheet first. Even when Economy 2.1 is still gated,
+    // tapping the button must give immediate feedback instead of feeling broken.
     setGiftItem(item);
     setGiftFriendId(null);
     setGiftSearch('');
     setGiftMessage('');
+    setGiftError(null);
+
+    if(!catalog?.live&&!catalog?.adminPreview){
+      setGiftError('Os presentes ficam disponíveis para jogadores quando a migração 1.0 for concluída. O catálogo continua visível, mas os Coins do Beta não podem virar itens permanentes.');
+      return;
+    }
+
     if(giftFriends!==null)return;
     try{
       setGiftFriendsLoading(true);
@@ -216,7 +223,7 @@ export default function TrainerStoreScreen(){
       setGiftFriends(social.friends);
     }catch(e){
       setGiftFriends([]);
-      setError(e instanceof Error?e.message:'Não foi possível carregar seus amigos.');
+      setGiftError(e instanceof Error?e.message:'Não foi possível carregar seus amigos.');
     }finally{
       setGiftFriendsLoading(false);
     }
@@ -228,19 +235,24 @@ export default function TrainerStoreScreen(){
     setGiftFriendId(null);
     setGiftSearch('');
     setGiftMessage('');
+    setGiftError(null);
   }
 
   async function sendGift(){
     if(!giftItem||!giftFriendId||giftSending)return;
+    if(!catalog?.live&&!catalog?.adminPreview){
+      setGiftError('Os presentes ainda não estão liberados para jogadores nesta fase da migração.');
+      return;
+    }
     const friend=giftFriends?.find((entry)=>entry.id===giftFriendId);
     if(!friend)return;
     if(wallet.coins<giftItem.priceCoins){
-      setError(`Faltam 🪙 ${Math.max(0,giftItem.priceCoins-wallet.coins).toLocaleString('pt-BR')} para enviar este presente.`);
+      setGiftError(`Faltam 🪙 ${Math.max(0,giftItem.priceCoins-wallet.coins).toLocaleString('pt-BR')} para enviar este presente.`);
       return;
     }
     try{
       setGiftSending(true);
-      setError(null);
+      setGiftError(null);
       const result=await giftTrainerStoreItem(giftItem.id,friend.id,giftMessage);
       await Promise.all([wallet.refresh(),load()]);
       setGiftItem(null);
@@ -248,7 +260,7 @@ export default function TrainerStoreScreen(){
       setGiftMessage('');
       setNotice(`🎁 ${result.itemName} foi enviado para @${result.recipientName}.`);
     }catch(e){
-      setError(e instanceof Error?e.message:'Não foi possível enviar o presente.');
+      setGiftError(e instanceof Error?e.message:'Não foi possível enviar o presente.');
     }finally{
       setGiftSending(false);
     }
@@ -365,6 +377,13 @@ export default function TrainerStoreScreen(){
               </Pressable>
             </View>
 
+            {giftError ? (
+              <View style={[styles.giftInlineError,{backgroundColor:'#351A24',borderColor:'#683243'}]}>
+                <Ionicons name={!catalog?.live&&!catalog?.adminPreview?'lock-closed':'alert-circle'} size={17} color="#FF8998"/>
+                <Text style={styles.giftInlineErrorText}>{giftError}</Text>
+              </View>
+            ) : null}
+
             <Text style={[styles.giftStep,{color:colors.muted}]}>1. Escolha quem vai receber</Text>
             <View style={[styles.giftSearchBox,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
               <Ionicons name="search" size={17} color={colors.muted}/>
@@ -378,8 +397,14 @@ export default function TrainerStoreScreen(){
             </View>
 
             <ScrollView style={styles.friendList} contentContainerStyle={styles.friendListContent} keyboardShouldPersistTaps="handled">
-              {giftFriendsLoading?<ActivityIndicator color={colors.yellow}/>:null}
-              {!giftFriendsLoading&&filteredGiftFriends.map((friend)=>{
+              {!catalog?.live&&!catalog?.adminPreview ? (
+                <View style={styles.noFriends}>
+                  <Ionicons name="lock-closed" size={25} color={colors.yellow}/>
+                  <Text style={[styles.noFriendsText,{color:colors.muted}]}>O seletor de amigos será ativado junto com as compras da Economy 2.1.</Text>
+                </View>
+              ) : null}
+              {catalog?.live||catalog?.adminPreview ? (giftFriendsLoading?<ActivityIndicator color={colors.yellow}/>:null) : null}
+              {(catalog?.live||catalog?.adminPreview)&&!giftFriendsLoading&&filteredGiftFriends.map((friend)=>{
                 const selected=giftFriendId===friend.id;
                 return <Pressable
                   key={friend.id}
@@ -400,7 +425,7 @@ export default function TrainerStoreScreen(){
                   <Ionicons name={selected?'checkmark-circle':'ellipse-outline'} size={21} color={selected?colors.yellow:colors.muted}/>
                 </Pressable>;
               })}
-              {!giftFriendsLoading&&giftFriends!==null&&filteredGiftFriends.length===0?(
+              {(catalog?.live||catalog?.adminPreview)&&!giftFriendsLoading&&giftFriends!==null&&filteredGiftFriends.length===0?(
                 <View style={styles.noFriends}>
                   <Ionicons name="people-outline" size={25} color={colors.muted}/>
                   <Text style={[styles.noFriendsText,{color:colors.muted}]}>Nenhum amigo encontrado. Adicione um amigo antes de enviar presentes.</Text>
@@ -430,12 +455,18 @@ export default function TrainerStoreScreen(){
             </View>
 
             <Pressable
-              disabled={!giftFriendId||giftSending}
+              disabled={!giftFriendId||giftSending||(!catalog?.live&&!catalog?.adminPreview)}
               onPress={()=>{void sendGift();}}
-              style={[styles.sendGiftButton,{backgroundColor:colors.yellow},(!giftFriendId||giftSending)&&styles.disabled]}
+              style={[styles.sendGiftButton,{backgroundColor:colors.yellow},(!giftFriendId||giftSending||(!catalog?.live&&!catalog?.adminPreview))&&styles.disabled]}
             >
-              {giftSending?<ActivityIndicator color="#07111F"/>:<Ionicons name="gift" size={18} color="#07111F"/>}
-              <Text style={styles.sendGiftText}>{giftSending?'ENVIANDO…':`ENVIAR PRESENTE • 🪙 ${Number(giftItem?.priceCoins??0).toLocaleString('pt-BR')}`}</Text>
+              {giftSending?<ActivityIndicator color="#07111F"/>:<Ionicons name={!catalog?.live&&!catalog?.adminPreview?'lock-closed':'gift'} size={18} color="#07111F"/>}
+              <Text style={styles.sendGiftText}>
+                {giftSending
+                  ? 'ENVIANDO…'
+                  : !catalog?.live&&!catalog?.adminPreview
+                    ? 'DISPONÍVEL APÓS A MIGRAÇÃO 1.0'
+                    : `ENVIAR PRESENTE • 🪙 ${Number(giftItem?.priceCoins??0).toLocaleString('pt-BR')}`}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -591,6 +622,8 @@ const styles=StyleSheet.create({
   messageCount:{alignSelf:'flex-end',fontSize:7,fontWeight:'800'},
   giftPreview:{borderRadius:13,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:7},
   giftPreviewText:{flex:1,fontSize:8,lineHeight:12,fontWeight:'700'},
+  giftInlineError:{borderRadius:13,borderWidth:1,padding:9,flexDirection:'row',alignItems:'flex-start',gap:7},
+  giftInlineErrorText:{flex:1,color:'#FFD7DD',fontSize:8.5,lineHeight:13,fontWeight:'800'},
   sendGiftButton:{minHeight:48,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
   sendGiftText:{color:'#07111F',fontSize:9,fontWeight:'900'},
   disabled:{opacity:.48},
