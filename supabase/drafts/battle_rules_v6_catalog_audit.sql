@@ -95,6 +95,83 @@ begin
 end;
 $body$;
 
+create or replace function private.battle_v6_turn_ability_effects(p_card_id text)
+returns jsonb
+language plpgsql
+stable
+set search_path=''
+as $ability$
+declare
+  v_card public.cards%rowtype;
+  v_ability jsonb;
+  v_text text;
+  v_match text[];
+  v_extra_energy integer:=0;
+  v_heal numeric:=0;
+  v_cure boolean:=false;
+begin
+  select * into v_card from public.cards where id=p_card_id;
+  if v_card.id is null or jsonb_typeof(v_card.tcg_data->'abilities')<>'array' then
+    return jsonb_build_object('extraEnergy',0,'heal',0,'cureSpecial',false);
+  end if;
+  for v_ability in select value from jsonb_array_elements(v_card.tcg_data->'abilities') loop
+    v_text:=lower(coalesce(v_ability->>'text',''));
+    if v_text ~ 'once during your turn.*attach (?:a|1) basic [a-z]+ energy card from your hand to this pok[eé]mon' then
+      v_extra_energy:=greatest(v_extra_energy,1);
+    end if;
+    v_match:=regexp_match(v_text,'once during your turn.*heal ([0-9]+) damage from (?:your active pok[eé]mon|this pok[eé]mon)');
+    if v_match is not null then v_heal:=greatest(v_heal,v_match[1]::numeric); end if;
+    if v_text like '%whenever you attach an energy card from your hand to this pokémon%remove all special conditions from it%' then
+      v_cure:=true;
+    end if;
+  end loop;
+  return jsonb_build_object('extraEnergy',v_extra_energy,'heal',v_heal,'cureSpecial',v_cure);
+end;
+$ability$;
+
+create or replace function private.battle_v6_status_immune(p_card_id text,p_status text)
+returns boolean
+language sql
+stable
+set search_path=''
+as $immune$
+  select exists(
+    select 1
+    from public.cards c
+    cross join lateral jsonb_array_elements(coalesce(c.tcg_data->'abilities','[]'::jsonb)) a
+    where c.id=p_card_id
+      and (
+        lower(coalesce(a->>'text','')) like '%this pokémon can''t be '||lower(p_status)||'%'
+        or lower(coalesce(a->>'text','')) like '%this pokemon can''t be '||lower(p_status)||'%'
+        or lower(coalesce(a->>'text','')) like '%this pokémon cannot be '||lower(p_status)||'%'
+      )
+  );
+$immune$;
+
+create or replace function private.battle_v6_energy_attachment_punish(p_card_id text)
+returns numeric
+language plpgsql
+stable
+set search_path=''
+as $punish$
+declare
+  v_card public.cards%rowtype;
+  v_ability jsonb;
+  v_text text;
+  v_match text[];
+  v_damage numeric:=0;
+begin
+  select * into v_card from public.cards where id=p_card_id;
+  if v_card.id is null or jsonb_typeof(v_card.tcg_data->'abilities')<>'array' then return 0; end if;
+  for v_ability in select value from jsonb_array_elements(v_card.tcg_data->'abilities') loop
+    v_text:=lower(coalesce(v_ability->>'text',''));
+    v_match:=regexp_match(v_text,'whenever your opponent attaches an energy card from their hand to 1 of their pok[eé]mon, put ([0-9]+) damage counters? on that pok[eé]mon');
+    if v_match is not null then v_damage:=greatest(v_damage,v_match[1]::numeric*10); end if;
+  end loop;
+  return v_damage;
+end;
+$punish$;
+
 create or replace function private.battle_v6_defense_adjustment(
   p_attacker_card_id text,
   p_defender_card_id text,
@@ -213,7 +290,7 @@ begin
 
       -- Reactive damage/status even if the defender is Knocked Out.
       if v_damage>0 and v_text like '%damaged by an attack%' then
-        v_match:=regexp_match(v_text,'put ([0-9]+) damage counters? on the attacking pok[eé]mon');
+        v_match:=regexp_match(v_text,'(?:put|place) ([0-9]+) damage counters? on the attacking pok[eé]mon');
         if v_match is not null then
           v_reactive_damage:=greatest(v_reactive_damage,v_match[1]::numeric*10);
         end if;
@@ -1005,6 +1082,9 @@ declare
   v_reactive_status text;
   v_attack_failed boolean;
   v_direct numeric;
+  v_turn_ability jsonb;
+  v_attach_count integer;
+  v_attach_punish numeric;
   v_blocked text[];
   v_trace jsonb:='[]'::jsonb;
   v_winner_side text:=null;
@@ -1034,7 +1114,13 @@ begin
 
     if v_is_c then
       c_turns:=c_turns+1;
-      c_energy:=least(12,c_energy+1);
+      v_turn_ability:=private.battle_v6_turn_ability_effects(c.id);
+      v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
+      c_energy:=least(12,c_energy+v_attach_count);
+      if coalesce((v_turn_ability->>'heal')::numeric,0)>0 then c_damage:=greatest(0,c_damage-(v_turn_ability->>'heal')::numeric); end if;
+      if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then c_major:=null; c_poison:=false; c_burn:=false; end if;
+      v_attach_punish:=private.battle_v6_energy_attachment_punish(o.id);
+      if v_attach_punish>0 then c_damage:=least(c_hp,c_damage+v_attach_punish*v_attach_count); end if;
       v_energy_before:=c_energy;
       v_attack_failed:=false;
 
@@ -1154,7 +1240,7 @@ begin
               if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then c_no_weakness_next:=true; end if;
               if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then c_reactive_next:=greatest(c_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
               if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then c_prevent_damage_cap_next:=greatest(c_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
-              if coalesce(v_plan->>'inflictSelfMajor','')<>'' then c_major:=v_plan->>'inflictSelfMajor'; end if;
+              if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(c.id,v_plan->>'inflictSelfMajor') then c_major:=v_plan->>'inflictSelfMajor'; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
               then c_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
@@ -1177,14 +1263,15 @@ begin
                 v_status:=coalesce(v_plan->>'inflictMajor',v_plan->>'inflictStatus');
                 v_status_chance:=coalesce((v_plan->>'statusChance')::numeric,1);
                 if private.battle_v6_hash_roll(v_seed||':'||v_half||':status')<=v_status_chance then
-                  if coalesce((v_plan->>'inflictPoison')::boolean,false) then o_poison:=true; end if;
-                  if coalesce((v_plan->>'inflictBurn')::boolean,false) then o_burn:=true; end if;
-                  if v_status is not null and v_status not in ('poisoned','burned') then o_major:=v_status; end if;
+                  if coalesce((v_plan->>'inflictPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; end if;
+                  if coalesce((v_plan->>'inflictBurn')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
+                  if v_status is not null and v_status not in ('poisoned','burned') and not private.battle_v6_status_immune(o.id,v_status) then o_major:=v_status; end if;
                 end if;
               end if;
 
               if v_reactive>0 then c_damage:=least(c_hp,c_damage+v_reactive); end if;
-              if v_reactive_status='poisoned' then c_poison:=true; elsif v_reactive_status='burned' then c_burn:=true; end if;
+              if v_reactive_status='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true;
+              elsif v_reactive_status='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
 
               v_trace:=v_trace||jsonb_build_array(jsonb_build_object(
                 'halfTurn',v_half,'side','challenger','event','attack','attack',v_attack_name,
@@ -1201,7 +1288,13 @@ begin
 
     else
       o_turns:=o_turns+1;
-      o_energy:=least(12,o_energy+1);
+      v_turn_ability:=private.battle_v6_turn_ability_effects(o.id);
+      v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
+      o_energy:=least(12,o_energy+v_attach_count);
+      if coalesce((v_turn_ability->>'heal')::numeric,0)>0 then o_damage:=greatest(0,o_damage-(v_turn_ability->>'heal')::numeric); end if;
+      if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then o_major:=null; o_poison:=false; o_burn:=false; end if;
+      v_attach_punish:=private.battle_v6_energy_attachment_punish(c.id);
+      if v_attach_punish>0 then o_damage:=least(o_hp,o_damage+v_attach_punish*v_attach_count); end if;
       v_energy_before:=o_energy;
       v_attack_failed:=false;
 
@@ -1321,7 +1414,7 @@ begin
               if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then o_no_weakness_next:=true; end if;
               if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then o_reactive_next:=greatest(o_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
               if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then o_prevent_damage_cap_next:=greatest(o_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
-              if coalesce(v_plan->>'inflictSelfMajor','')<>'' then o_major:=v_plan->>'inflictSelfMajor'; end if;
+              if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(o.id,v_plan->>'inflictSelfMajor') then o_major:=v_plan->>'inflictSelfMajor'; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
               then o_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
@@ -1344,14 +1437,15 @@ begin
                 v_status:=coalesce(v_plan->>'inflictMajor',v_plan->>'inflictStatus');
                 v_status_chance:=coalesce((v_plan->>'statusChance')::numeric,1);
                 if private.battle_v6_hash_roll(v_seed||':'||v_half||':status')<=v_status_chance then
-                  if coalesce((v_plan->>'inflictPoison')::boolean,false) then c_poison:=true; end if;
-                  if coalesce((v_plan->>'inflictBurn')::boolean,false) then c_burn:=true; end if;
-                  if v_status is not null and v_status not in ('poisoned','burned') then c_major:=v_status; end if;
+                  if coalesce((v_plan->>'inflictPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; end if;
+                  if coalesce((v_plan->>'inflictBurn')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
+                  if v_status is not null and v_status not in ('poisoned','burned') and not private.battle_v6_status_immune(c.id,v_status) then c_major:=v_status; end if;
                 end if;
               end if;
 
               if v_reactive>0 then o_damage:=least(o_hp,o_damage+v_reactive); end if;
-              if v_reactive_status='poisoned' then o_poison:=true; elsif v_reactive_status='burned' then o_burn:=true; end if;
+              if v_reactive_status='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true;
+              elsif v_reactive_status='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
 
               v_trace:=v_trace||jsonb_build_array(jsonb_build_object(
                 'halfTurn',v_half,'side','opponent','event','attack','attack',v_attack_name,
@@ -1551,6 +1645,9 @@ $$;
 revoke all on function private.battle_v6_hash_roll(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_can_attack(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_matches_class(text,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_turn_ability_effects(text) from public,anon,authenticated;
+revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,boolean,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
