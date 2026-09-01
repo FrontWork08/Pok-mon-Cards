@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
   'supabase/migrations/20260901115912_lower_coin_packs_more_and_optimize_bulk_duplicate_sales.sql',
   'supabase/migrations/20260901115248_lower_coin_pack_prices.sql',
   'supabase/migrations/20260831202010_booster_quality_pull_boost.sql',
@@ -334,6 +335,14 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
+}
+
+if (existsSync('supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql')) {
+  const coinReliefFurther = read('supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql');
+  assert(coinReliefFurther.includes("'boosterCoinPriceMultiplier',0.50"), 'Regressão econômica: packs de coins perderam a redução para 50% do preço-base.');
+  assert(coinReliefFurther.includes("'boosterDiamondPriceMultiplier',0.90"), 'Regressão econômica: redução extra de coins não pode alterar packs de diamante.');
+  assert(coinReliefFurther.includes("'coinPackFloor',2500") && coinReliefFurther.includes('coin_pack_ceiling=50000'), 'Regressão econômica: faixa de packs de coins deve permanecer entre 2.500 e 50.000.');
+  assert(coinReliefFurther.includes("coalesce(p_price,0)>=30000") && coinReliefFurther.includes("coalesce(p_price,0)>=15000"), 'Regressão de balanceamento: redução de preço não pode reduzir o bônus de qualidade dos boosters.');
 }
 
 if (existsSync('supabase/migrations/20260901115912_lower_coin_packs_more_and_optimize_bulk_duplicate_sales.sql')) {
