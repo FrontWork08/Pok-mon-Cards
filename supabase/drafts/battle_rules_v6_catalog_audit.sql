@@ -552,6 +552,9 @@ declare
   v_defender_outgoing_reduction_next numeric:=0;
   v_self_no_weakness_next boolean:=false;
   v_self_reactive_damage_next numeric:=0;
+  v_self_reactive_multiplier_next numeric:=0;
+  v_self_reactive_chance_next numeric:=1;
+  v_self_reactive_status_next text:=null;
   v_self_prevent_damage_cap_next numeric:=0;
   v_inflict_self_major text:=null;
   v_inflict_poison boolean:=false;
@@ -777,6 +780,9 @@ begin
     v_defender_outgoing_reduction_next:=0;
     v_self_no_weakness_next:=false;
     v_self_reactive_damage_next:=0;
+    v_self_reactive_multiplier_next:=0;
+    v_self_reactive_chance_next:=1;
+    v_self_reactive_status_next:=null;
     v_self_prevent_damage_cap_next:=0;
     v_inflict_self_major:=null;
     v_inflict_poison:=false;
@@ -1593,10 +1599,45 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'sem Fraqueza no próximo turno');
     end if;
 
-    v_match:=regexp_match(v_text,'during your opponent''s next turn, if this pok[eé]mon is damaged by an attack.*(?:put|place) ([0-9]+) damage counters? on the attacking pok[eé]mon');
+    -- Next-turn counter effects. They resolve even if this Pokémon is Knocked Out by the triggering attack.
+    v_match:=regexp_match(v_text,'during your opponent''s next turn, if (?:this pok[eé]mon|[^,.]+) is damaged by (?:an opponent''s |an )?attack.*(?:put|place) ([0-9]+) damage counters? on the attacking pok[eé]mon');
     if v_match is not null then
-      v_self_reactive_damage_next:=v_match[1]::numeric*10;
-      v_effect_notes:=array_append(v_effect_notes,'contra-dano no próximo turno');
+      v_self_reactive_damage_next:=greatest(v_self_reactive_damage_next,v_match[1]::numeric*10);
+      v_effect_notes:=array_append(v_effect_notes,'contra-dano fixo no próximo turno');
+    end if;
+
+    if v_text ~ 'during your opponent''s next turn, if (?:this pok[eé]mon|[^,.]+) is damaged by (?:an opponent''s |an )?attack.*put damage counters on the attacking pok[eé]mon equal to the damage done to (?:this pok[eé]mon|[^.]+)' then
+      v_self_reactive_multiplier_next:=greatest(v_self_reactive_multiplier_next,1);
+      v_effect_notes:=array_append(v_effect_notes,'contra-dano igual ao dano recebido');
+    end if;
+
+    if v_text ~ 'if an attack (?:does damage to|damages) [^.]+ during your opponent''s next turn.*(?:attacks|does) (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) for an equal amount of damage'
+       or v_text ~ 'if an attack (?:does damage to|damages) [^.]+ during your opponent''s next turn.*(?:attacks|does) the defending pok[eé]mon for an equal amount of damage' then
+      v_self_reactive_multiplier_next:=greatest(v_self_reactive_multiplier_next,1);
+      if v_text like '%flip a coin%if heads%' then v_self_reactive_chance_next:=least(v_self_reactive_chance_next,0.5); end if;
+      v_effect_notes:=array_append(v_effect_notes,'contra-ataque igual ao dano recebido');
+    end if;
+
+    if v_text ~ 'if an attack does damage to [^.]+ during your opponent''s next turn.*flip a coin.*if heads.*(?:attacks|does) your opponent''s active pok[eé]mon for double that amount of damage' then
+      v_self_reactive_multiplier_next:=greatest(v_self_reactive_multiplier_next,2);
+      v_self_reactive_chance_next:=least(v_self_reactive_chance_next,0.5);
+      v_effect_notes:=array_append(v_effect_notes,'contra-ataque dobrado com moeda');
+    end if;
+
+    v_match:=regexp_match(v_text,'if an attack does damage to [^.]+ during your opponent''s next turn.*(?:attacks|does) your opponent''s active pok[eé]mon for ([0-9]+) damage');
+    if v_match is not null then
+      v_self_reactive_damage_next:=greatest(v_self_reactive_damage_next,v_match[1]::numeric);
+      if v_text like '%flip a coin%if heads%' then v_self_reactive_chance_next:=least(v_self_reactive_chance_next,0.5); end if;
+      v_effect_notes:=array_append(v_effect_notes,'contra-ataque fixo no próximo turno');
+    end if;
+
+    if v_text ~ 'during your opponent''s next turn, whenever your opponent''s attack damages [^.]+.*opponent''s active pok[eé]mon is now poisoned'
+       or v_text ~ 'during your opponent''s next turn, if (?:this pok[eé]mon|[^,.]+) is damaged by (?:an opponent''s |an )?attack.*attacking pok[eé]mon is now poisoned' then
+      v_self_reactive_status_next:='poisoned';
+      v_effect_notes:=array_append(v_effect_notes,'contra-status Poison no próximo turno');
+    elsif v_text ~ 'during your opponent''s next turn, if (?:this pok[eé]mon|[^,.]+) is damaged by (?:an opponent''s |an )?attack.*attacking pok[eé]mon is now burned' then
+      v_self_reactive_status_next:='burned';
+      v_effect_notes:=array_append(v_effect_notes,'contra-status Burn no próximo turno');
     end if;
 
     v_match:=regexp_match(v_text,'during your opponent''s next turn, if this pok[eé]mon would be damaged by an attack, prevent that attack''s damage done to this pok[eé]mon if that damage is ([0-9]+) or less');
@@ -1713,7 +1754,9 @@ begin
         +v_self_reduction_next*0.25
         +case when v_self_prevent_next then 45 else 0 end
         +case when v_self_no_weakness_next then 22 else 0 end
-        +v_self_reactive_damage_next*0.30
+        +v_self_reactive_damage_next*0.30*v_self_reactive_chance_next
+        +v_self_reactive_multiplier_next*45*v_self_reactive_chance_next
+        +case when v_self_reactive_status_next='poisoned' then 18 when v_self_reactive_status_next='burned' then 22 else 0 end
         +case when v_self_prevent_damage_cap_next>0 then 28 else 0 end
         +case when v_defender_energy_discard>0 or v_defender_energy_discard_coins>0 then 18 else 0 end
         +case when v_lock_defender_best then 28 else 0 end
@@ -1792,6 +1835,9 @@ begin
         'selfPreventClass',v_self_prevent_class,
         'selfNoWeaknessNext',v_self_no_weakness_next,
         'selfReactiveDamageNext',v_self_reactive_damage_next,
+        'selfReactiveMultiplierNext',v_self_reactive_multiplier_next,
+        'selfReactiveChanceNext',v_self_reactive_chance_next,
+        'selfReactiveStatusNext',v_self_reactive_status_next,
         'selfPreventDamageCapNext',v_self_prevent_damage_cap_next,
         'inflictSelfMajor',v_inflict_self_major,
         'inflictSelfPoison',v_inflict_self_poison,
@@ -1877,6 +1923,12 @@ declare
   o_no_weakness_next boolean:=false;
   c_reactive_next numeric:=0;
   o_reactive_next numeric:=0;
+  c_reactive_multiplier_next numeric:=0;
+  o_reactive_multiplier_next numeric:=0;
+  c_reactive_chance_next numeric:=1;
+  o_reactive_chance_next numeric:=1;
+  c_reactive_status_next text:=null;
+  o_reactive_status_next text:=null;
   c_prevent_damage_cap_next numeric:=0;
   o_prevent_damage_cap_next numeric:=0;
   c_delayed_ko_next boolean:=false;
@@ -1917,6 +1969,7 @@ declare
   v_effect_immune boolean;
   v_reactive numeric;
   v_reactive_status text;
+  v_reactive_counter numeric;
   v_attack_failed boolean;
   v_extra_turn boolean:=false;
   v_direct numeric;
@@ -2085,7 +2138,13 @@ begin
               if v_direct>0 then o_damage:=least(o_hp,o_damage+v_direct); end if;
               c_damage_dealt:=c_damage_dealt+v_effective+v_direct;
               if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and o_damage>=o_hp then v_extra_turn:=true; end if;
-              if o_reactive_next>0 and v_effective>0 then c_damage:=least(c_hp,c_damage+o_reactive_next); end if;
+              if v_effective>0 and (o_reactive_next>0 or o_reactive_multiplier_next>0 or o_reactive_status_next is not null)
+                 and private.battle_v6_hash_roll(v_seed||':'||v_half||':stored_reactive')<=o_reactive_chance_next then
+                v_reactive_counter:=greatest(0,o_reactive_next+o_reactive_multiplier_next*v_effective);
+                if v_reactive_counter>0 then c_damage:=least(c_hp,c_damage+v_reactive_counter); end if;
+                if o_reactive_status_next='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true;
+                elsif o_reactive_status_next='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
+              end if;
               c_last_attack:=v_attack_name; c_last_damage:=v_effective; c_last_advantage:=coalesce(v_plan->>'advantage','neutral');
 
               v_heal:=coalesce((v_plan->>'healDamage')::numeric,0);
@@ -2107,6 +2166,9 @@ begin
               if coalesce((v_plan->>'selfReductionNext')::numeric,0)>0 then c_reduce_next:=greatest(c_reduce_next,(v_plan->>'selfReductionNext')::numeric); end if;
               if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then c_no_weakness_next:=true; end if;
               if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then c_reactive_next:=greatest(c_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
+              if coalesce((v_plan->>'selfReactiveMultiplierNext')::numeric,0)>0 then c_reactive_multiplier_next:=greatest(c_reactive_multiplier_next,(v_plan->>'selfReactiveMultiplierNext')::numeric); end if;
+              if coalesce((v_plan->>'selfReactiveChanceNext')::numeric,1)<1 then c_reactive_chance_next:=least(c_reactive_chance_next,(v_plan->>'selfReactiveChanceNext')::numeric); end if;
+              if coalesce(v_plan->>'selfReactiveStatusNext','')<>'' then c_reactive_status_next:=v_plan->>'selfReactiveStatusNext'; end if;
               if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then c_prevent_damage_cap_next:=greatest(c_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
               if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; end if;
               if coalesce((v_plan->>'inflictSelfBurn')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
@@ -2322,7 +2384,13 @@ begin
               if v_direct>0 then c_damage:=least(c_hp,c_damage+v_direct); end if;
               o_damage_dealt:=o_damage_dealt+v_effective+v_direct;
               if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and c_damage>=c_hp then v_extra_turn:=true; end if;
-              if c_reactive_next>0 and v_effective>0 then o_damage:=least(o_hp,o_damage+c_reactive_next); end if;
+              if v_effective>0 and (c_reactive_next>0 or c_reactive_multiplier_next>0 or c_reactive_status_next is not null)
+                 and private.battle_v6_hash_roll(v_seed||':'||v_half||':stored_reactive')<=c_reactive_chance_next then
+                v_reactive_counter:=greatest(0,c_reactive_next+c_reactive_multiplier_next*v_effective);
+                if v_reactive_counter>0 then o_damage:=least(o_hp,o_damage+v_reactive_counter); end if;
+                if c_reactive_status_next='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true;
+                elsif c_reactive_status_next='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
+              end if;
               o_last_attack:=v_attack_name; o_last_damage:=v_effective; o_last_advantage:=coalesce(v_plan->>'advantage','neutral');
 
               v_heal:=coalesce((v_plan->>'healDamage')::numeric,0);
@@ -2344,6 +2412,9 @@ begin
               if coalesce((v_plan->>'selfReductionNext')::numeric,0)>0 then o_reduce_next:=greatest(o_reduce_next,(v_plan->>'selfReductionNext')::numeric); end if;
               if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then o_no_weakness_next:=true; end if;
               if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then o_reactive_next:=greatest(o_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
+              if coalesce((v_plan->>'selfReactiveMultiplierNext')::numeric,0)>0 then o_reactive_multiplier_next:=greatest(o_reactive_multiplier_next,(v_plan->>'selfReactiveMultiplierNext')::numeric); end if;
+              if coalesce((v_plan->>'selfReactiveChanceNext')::numeric,1)<1 then o_reactive_chance_next:=least(o_reactive_chance_next,(v_plan->>'selfReactiveChanceNext')::numeric); end if;
+              if coalesce(v_plan->>'selfReactiveStatusNext','')<>'' then o_reactive_status_next:=v_plan->>'selfReactiveStatusNext'; end if;
               if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then o_prevent_damage_cap_next:=greatest(o_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
               if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; end if;
               if coalesce((v_plan->>'inflictSelfBurn')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
@@ -2440,6 +2511,9 @@ begin
       o_prevent_next_class:=null;
       o_no_weakness_next:=false;
       o_reactive_next:=0;
+      o_reactive_multiplier_next:=0;
+      o_reactive_chance_next:=1;
+      o_reactive_status_next:=null;
       o_prevent_damage_cap_next:=0;
       c_outgoing_reduction_next:=0;
       c_attack_gate_next:=0;
@@ -2454,6 +2528,9 @@ begin
       c_prevent_next_class:=null;
       c_no_weakness_next:=false;
       c_reactive_next:=0;
+      c_reactive_multiplier_next:=0;
+      c_reactive_chance_next:=1;
+      c_reactive_status_next:=null;
       c_prevent_damage_cap_next:=0;
       o_outgoing_reduction_next:=0;
       o_attack_gate_next:=0;
