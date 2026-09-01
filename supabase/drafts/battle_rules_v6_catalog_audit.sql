@@ -239,6 +239,8 @@ create or replace function private.battle_v6_attack_plan(
   p_defender_energy integer,
   p_attacker_damage numeric,
   p_defender_damage numeric,
+  p_defender_special boolean,
+  p_ignore_defender_weakness boolean,
   p_blocked_attacks text[] default null
 )
 returns jsonb
@@ -301,6 +303,15 @@ declare
   v_self_prevent_chance numeric:=1;
   v_self_prevent_class text:='all';
   v_cooldown_attack_permanent boolean:=false;
+  v_ignore_defender_effects boolean:=false;
+  v_defender_cannot_attack_next boolean:=false;
+  v_defender_outgoing_reduction_next numeric:=0;
+  v_self_no_weakness_next boolean:=false;
+  v_self_reactive_damage_next numeric:=0;
+  v_self_prevent_damage_cap_next numeric:=0;
+  v_inflict_self_major text:=null;
+  v_direct_damage_counters numeric:=0;
+  v_defender_classes text;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
 begin
@@ -311,6 +322,7 @@ begin
   if not private.battle_v6_can_attack(v_attacker.id,v_defender.id) then return null; end if;
 
   v_attacker_type := coalesce(v_attacker.types[1],'Colorless');
+  v_defender_classes:=lower(coalesce(v_defender.tcg_data->'subtypes','[]'::jsonb)::text);
   v_defender_hp := greatest(10,least(1000,coalesce(
     nullif(regexp_replace(coalesce(v_defender.tcg_data->>'hp',''),'[^0-9]','','g'),'')::numeric,50
   )));
@@ -326,6 +338,11 @@ begin
         if v_match is not null then v_weakness_bonus:=greatest(0,v_match[1]::numeric); end if;
       end if;
     end loop;
+  end if;
+
+  if coalesce(p_ignore_defender_weakness,false) then
+    v_weakness_multiplier:=1;
+    v_weakness_bonus:=0;
   end if;
 
   if jsonb_typeof(v_defender.tcg_data->'resistances')='array' then
@@ -389,6 +406,14 @@ begin
     v_self_prevent_chance:=1;
     v_self_prevent_class:='all';
     v_cooldown_attack_permanent:=false;
+    v_ignore_defender_effects:=false;
+    v_defender_cannot_attack_next:=false;
+    v_defender_outgoing_reduction_next:=0;
+    v_self_no_weakness_next:=false;
+    v_self_reactive_damage_next:=0;
+    v_self_prevent_damage_cap_next:=0;
+    v_inflict_self_major:=null;
+    v_direct_damage_counters:=0;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
 
@@ -416,11 +441,45 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'bônus por contadores de dano do defensor');
     end if;
 
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) (?:already )?has any damage counters? on it, this attack does ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_defender_damage,0)>0 then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_expected_raw+v_match[1]::numeric;
+      v_effect_notes:=array_append(v_effect_notes,'bônus porque o defensor já está ferido');
+    end if;
+
+    v_match:=regexp_match(v_text,'this attack does ([0-9]+) damage for each damage counter on this pok[eé]mon');
+    if v_match is not null then
+      v_raw:=floor(coalesce(p_attacker_damage,0)/10)*v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'dano por contadores do atacante');
+    end if;
+
     v_match:=regexp_match(v_text,'(?:does )?([0-9]+) less damage for each damage counter on this pok[eé]mon');
     if v_match is not null then
       v_raw:=greatest(0,v_raw-floor(coalesce(p_attacker_damage,0)/10)*v_match[1]::numeric);
       v_expected_raw:=v_raw;
       v_effect_notes:=array_append(v_effect_notes,'penalidade por contadores de dano');
+    end if;
+
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is (?:a |an )?pok[eé]mon ex or pok[eé]mon v, this attack does ([0-9]+) more damage');
+    if v_match is not null and (
+      v_defender_classes ~ '"ex"' or v_defender_classes ~ '"v"' or v_defender_classes ~ '"vmax"' or v_defender_classes ~ '"vstar"' or v_defender_classes ~ '"v-union"'
+    ) then
+      v_raw:=v_raw+v_match[1]::numeric; v_expected_raw:=v_expected_raw+v_match[1]::numeric;
+      v_effect_notes:=array_append(v_effect_notes,'bônus contra Pokémon ex/V');
+    end if;
+
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is an evolution pok[eé]mon, this attack does ([0-9]+) more damage');
+    if v_match is not null and not (v_defender_classes ~ '"basic"') then
+      v_raw:=v_raw+v_match[1]::numeric; v_expected_raw:=v_expected_raw+v_match[1]::numeric;
+      v_effect_notes:=array_append(v_effect_notes,'bônus contra Pokémon de Evolução');
+    end if;
+
+    v_match:=regexp_match(v_text,'if your opponent''s active pok[eé]mon is affected by a special condition, this attack does ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_defender_special,false) then
+      v_raw:=v_raw+v_match[1]::numeric; v_expected_raw:=v_expected_raw+v_match[1]::numeric;
+      v_effect_notes:=array_append(v_effect_notes,'bônus contra Condição Especial');
     end if;
 
     v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each energy attached to this pok[eé]mon');
@@ -538,11 +597,11 @@ begin
       v_discard:=greatest(v_discard,coalesce(p_energy,0));
       v_effect_notes:=array_append(v_effect_notes,'descarta toda a Energia');
     else
-      v_match:=regexp_match(v_text,'discard ([0-9]+) energy from this pok[eé]mon');
+      v_match:=regexp_match(v_text,'discard ([0-9]+)(?: [a-z]+)? energy (?:attached to |from )this pok[eé]mon');
       if v_match is not null then
         v_discard:=greatest(v_discard,v_match[1]::integer);
         v_effect_notes:=array_append(v_effect_notes,'descarta Energia');
-      elsif v_text ~ 'discard (an|a) energy (?:attached to |from )this pok[eé]mon' then
+      elsif v_text ~ 'discard (an|a)(?: [a-z]+)? energy (?:attached to |from )this pok[eé]mon' then
         v_discard:=greatest(v_discard,1);
         v_effect_notes:=array_append(v_effect_notes,'descarta 1 Energia');
       end if;
@@ -563,6 +622,15 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'descarta Energia do defensor');
     end if;
 
+    v_match:=regexp_match(v_text,'put ([0-9]+) energy attached to this pok[eé]mon into your hand');
+    if v_match is not null then
+      v_discard:=greatest(v_discard,v_match[1]::integer);
+      v_effect_notes:=array_append(v_effect_notes,'Energia volta para a mão');
+    elsif v_text ~ 'put an energy attached to this pok[eé]mon into your hand' then
+      v_discard:=greatest(v_discard,1);
+      v_effect_notes:=array_append(v_effect_notes,'1 Energia volta para a mão');
+    end if;
+
     -- Cooldowns.
     if v_text like '%during your next turn, this pokémon can''t attack%'
        or v_text like '%during your next turn, this pokemon can''t attack%'
@@ -570,12 +638,37 @@ begin
       v_cooldown_all:=1;
       v_effect_notes:=array_append(v_effect_notes,'não pode atacar no próximo turno');
     elsif v_text like '%during your next turn, this pokémon can''t use%'
-       or v_text like '%during your next turn, this pokemon can''t use%' then
+       or v_text like '%during your next turn, this pokemon can''t use%'
+       or v_text ~ 'this pok[eé]mon can.t use .+ during your next turn'
+       or v_text like '%you can''t use this attack during your next turn%' then
       v_cooldown_attack:=1;
       v_effect_notes:=array_append(v_effect_notes,'ataque bloqueado no próximo turno');
     elsif v_text like '%can''t use this attack again as long as%' or v_text like '%cannot use this attack again as long as%' then
       v_cooldown_attack_permanent:=true;
       v_effect_notes:=array_append(v_effect_notes,'ataque não pode ser reutilizado enquanto permanecer em jogo');
+    end if;
+
+    if v_text like '%during your opponent''s next turn, the defending pokémon can''t use attacks%'
+       or v_text like '%during your opponent''s next turn, your opponent''s active pokémon can''t attack%' then
+      v_defender_cannot_attack_next:=true;
+      v_effect_notes:=array_append(v_effect_notes,'defensor não pode atacar no próximo turno');
+    end if;
+
+    if v_text like '%if the defending pokémon is a basic pokémon%can''t attack during your opponent''s next turn%'
+       and v_defender_classes ~ '"basic"' then
+      v_defender_cannot_attack_next:=true;
+      v_effect_notes:=array_append(v_effect_notes,'Pokémon Básico defensor não pode atacar');
+    end if;
+    if v_text like '%if the defending pokémon is an evolution pokémon%can''t attack during your opponent''s next turn%'
+       and not (v_defender_classes ~ '"basic"') then
+      v_defender_cannot_attack_next:=true;
+      v_effect_notes:=array_append(v_effect_notes,'Pokémon de Evolução defensor não pode atacar');
+    end if;
+
+    v_match:=regexp_match(v_text,'during your opponent''s next turn, the defending pok[eé]mon''s attacks do ([0-9]+) less damage');
+    if v_match is not null then
+      v_defender_outgoing_reduction_next:=v_match[1]::numeric;
+      v_effect_notes:=array_append(v_effect_notes,'reduz dano dos ataques do defensor no próximo turno');
     end if;
 
     -- Opponent next-turn attack interference.
@@ -584,9 +677,24 @@ begin
       v_defender_attack_gate_chance:=0.5;
       v_effect_notes:=array_append(v_effect_notes,'ataque do defensor pode falhar');
     end if;
-    if v_text like '%choose 1 of the defending pokémon''s attacks%can''t use that attack during your opponent''s next turn%' then
+    if v_text like '%choose 1 of the defending pokémon''s attacks%can''t use that attack during your opponent''s next turn%'
+       or v_text like '%choose 1 of your opponent''s active pokémon''s attacks%can''t use that attack during your opponent''s next turn%' then
       v_lock_defender_best:=true;
       v_effect_notes:=array_append(v_effect_notes,'bloqueia melhor ataque do defensor');
+    end if;
+
+    if v_text like '%both active pokémon are now asleep%' then
+      v_status:='asleep'; v_inflict_self_major:='asleep'; v_status_bonus:=35;
+      v_effect_notes:=array_append(v_effect_notes,'ambos ficam Adormecidos');
+    elsif v_text like '%both active pokémon are now confused%' then
+      v_status:='confused'; v_inflict_self_major:='confused'; v_status_bonus:=30;
+      v_effect_notes:=array_append(v_effect_notes,'ambos ficam Confusos');
+    end if;
+
+    v_match:=regexp_match(v_text,'put ([0-9]+) damage counters? on (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)');
+    if v_match is not null then
+      v_direct_damage_counters:=greatest(v_direct_damage_counters,v_match[1]::numeric*10);
+      v_effect_notes:=array_append(v_effect_notes,'coloca contadores de dano diretamente');
     end if;
 
     -- Special Conditions.
@@ -609,6 +717,29 @@ begin
        or v_text like '%heal from this pokemon the same amount of damage you did%' then
       v_heal_equal:=true;
       v_effect_notes:=array_append(v_effect_notes,'cura igual ao dano causado');
+    end if;
+
+    if v_text like '%during your opponent''s next turn, this pokémon has no weakness%' then
+      v_self_no_weakness_next:=true;
+      v_effect_notes:=array_append(v_effect_notes,'sem Fraqueza no próximo turno');
+    end if;
+
+    v_match:=regexp_match(v_text,'during your opponent''s next turn, if this pok[eé]mon is damaged by an attack.*put ([0-9]+) damage counters? on the attacking pok[eé]mon');
+    if v_match is not null then
+      v_self_reactive_damage_next:=v_match[1]::numeric*10;
+      v_effect_notes:=array_append(v_effect_notes,'contra-dano no próximo turno');
+    end if;
+
+    v_match:=regexp_match(v_text,'during your opponent''s next turn, if this pok[eé]mon would be damaged by an attack, prevent that attack''s damage done to this pok[eé]mon if that damage is ([0-9]+) or less');
+    if v_match is not null then
+      v_self_prevent_damage_cap_next:=v_match[1]::numeric;
+      v_effect_notes:=array_append(v_effect_notes,'previne dano baixo no próximo turno');
+    end if;
+
+    if v_text like '%during your opponent''s next turn%prevent all effects of attacks, including damage, done to this pokémon%' then
+      v_self_prevent_next:=true;
+      v_self_prevent_class:='all';
+      v_effect_notes:=array_append(v_effect_notes,'previne todos os efeitos e dano no próximo turno');
     end if;
 
     -- Next-turn protection on the attacker.
@@ -644,6 +775,7 @@ begin
       and (
         v_text like '%damage isn''t affected by resistance%'
         or v_text like '%damage is not affected by resistance%'
+        or v_text like '%don''t apply resistance%'
       );
 
     if v_ignore_weakness_resistance then
@@ -699,6 +831,9 @@ begin
         'cooldownAll',v_cooldown_all,
         'cooldownAttack',v_cooldown_attack,
         'cooldownAttackPermanent',v_cooldown_attack_permanent,
+        'ignoreDefenderEffects',v_ignore_defender_effects,
+        'defenderCannotAttackNext',v_defender_cannot_attack_next,
+        'defenderOutgoingReductionNext',v_defender_outgoing_reduction_next,
         'defenderAttackGateChance',v_defender_attack_gate_chance,
         'lockDefenderBest',v_lock_defender_best,
         'inflictStatus',v_status,
@@ -710,6 +845,11 @@ begin
         'selfPreventNext',v_self_prevent_next,
         'selfPreventChance',v_self_prevent_chance,
         'selfPreventClass',v_self_prevent_class,
+        'selfNoWeaknessNext',v_self_no_weakness_next,
+        'selfReactiveDamageNext',v_self_reactive_damage_next,
+        'selfPreventDamageCapNext',v_self_prevent_damage_cap_next,
+        'inflictSelfMajor',v_inflict_self_major,
+        'directDamageCounters',v_direct_damage_counters,
         'coinGateCount',v_coin_gate_count,
         'coinGateHeads',v_coin_gate_heads,
         'coinBonusCount',v_coin_bonus_count,
@@ -785,6 +925,14 @@ declare
   o_attack_gate_next numeric:=0;
   c_disable_best_next integer:=0;
   o_disable_best_next integer:=0;
+  c_outgoing_reduction_next numeric:=0;
+  o_outgoing_reduction_next numeric:=0;
+  c_no_weakness_next boolean:=false;
+  o_no_weakness_next boolean:=false;
+  c_reactive_next numeric:=0;
+  o_reactive_next numeric:=0;
+  c_prevent_damage_cap_next numeric:=0;
+  o_prevent_damage_cap_next numeric:=0;
   c_first boolean;
   v_seed text;
   v_is_c boolean;
@@ -809,6 +957,7 @@ declare
   v_reactive numeric;
   v_reactive_status text;
   v_attack_failed boolean;
+  v_direct numeric;
   v_blocked text[];
   v_trace jsonb:='[]'::jsonb;
   v_winner_side text:=null;
@@ -859,11 +1008,11 @@ begin
         v_blocked:=array[]::text[];
         if c_blocked_turns>0 and c_blocked_attack is not null then v_blocked:=array_append(v_blocked,c_blocked_attack); end if;
         if c_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_no_weakness_next,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           c_disable_best_next:=c_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_no_weakness_next,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -912,6 +1061,8 @@ begin
                 end if;
               end if;
 
+              if c_outgoing_reduction_next>0 then v_raw:=greatest(0,v_raw-c_outgoing_reduction_next); end if;
+
               if coalesce((v_plan->>'ignoreWeaknessResistance')::boolean,false) then
                 v_effective:=greatest(0,v_raw);
               elsif coalesce((v_plan->>'ignoreResistance')::boolean,false) then
@@ -921,16 +1072,24 @@ begin
               end if;
 
               if o_prevent_next_class is not null and private.battle_v6_matches_class(c.id,o_prevent_next_class) then v_effective:=0;
+              elsif o_prevent_damage_cap_next>0 and v_effective<=o_prevent_damage_cap_next then v_effective:=0;
               elsif o_reduce_next>0 then v_effective:=greatest(0,v_effective-o_reduce_next); end if;
 
-              v_def:=private.battle_v6_defense_adjustment(c.id,o.id,o_damage,v_effective,v_seed||':'||v_half||':def');
+              if coalesce((v_plan->>'ignoreDefenderEffects')::boolean,false) then
+                v_def:=jsonb_build_object('damage',v_effective,'effectImmune',false,'reactiveDamage',0);
+              else
+                v_def:=private.battle_v6_defense_adjustment(c.id,o.id,o_damage,v_effective,v_seed||':'||v_half||':def');
+              end if;
               v_effective:=coalesce((v_def->>'damage')::numeric,v_effective);
               v_effect_immune:=coalesce((v_def->>'effectImmune')::boolean,false);
               v_reactive:=coalesce((v_def->>'reactiveDamage')::numeric,0);
               v_reactive_status:=v_def->>'reactiveStatus';
 
               o_damage:=least(o_hp,o_damage+v_effective);
-              c_damage_dealt:=c_damage_dealt+v_effective;
+              v_direct:=case when not v_effect_immune then coalesce((v_plan->>'directDamageCounters')::numeric,0) else 0 end;
+              if v_direct>0 then o_damage:=least(o_hp,o_damage+v_direct); end if;
+              c_damage_dealt:=c_damage_dealt+v_effective+v_direct;
+              if o_reactive_next>0 and v_effective>0 then c_damage:=least(c_hp,c_damage+o_reactive_next); end if;
               c_last_attack:=v_attack_name; c_last_damage:=v_effective; c_last_advantage:=coalesce(v_plan->>'advantage','neutral');
 
               v_heal:=coalesce((v_plan->>'healDamage')::numeric,0);
@@ -944,6 +1103,10 @@ begin
               elsif coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then c_blocked_attack:=v_attack_name; c_blocked_turns:=1; end if;
 
               if coalesce((v_plan->>'selfReductionNext')::numeric,0)>0 then c_reduce_next:=greatest(c_reduce_next,(v_plan->>'selfReductionNext')::numeric); end if;
+              if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then c_no_weakness_next:=true; end if;
+              if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then c_reactive_next:=greatest(c_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
+              if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then c_prevent_damage_cap_next:=greatest(c_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
+              if coalesce(v_plan->>'inflictSelfMajor','')<>'' then c_major:=v_plan->>'inflictSelfMajor'; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
               then c_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
@@ -959,6 +1122,8 @@ begin
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then o_attack_gate_next:=greatest(o_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
+                if coalesce((v_plan->>'defenderCannotAttackNext')::boolean,false) then o_cooldown_all:=greatest(o_cooldown_all,1); end if;
+                if coalesce((v_plan->>'defenderOutgoingReductionNext')::numeric,0)>0 then o_outgoing_reduction_next:=greatest(o_outgoing_reduction_next,(v_plan->>'defenderOutgoingReductionNext')::numeric); end if;
                 if coalesce((v_plan->>'lockDefenderBest')::boolean,false) then o_disable_best_next:=greatest(o_disable_best_next,1); end if;
 
                 v_status:=coalesce(v_plan->>'inflictMajor',v_plan->>'inflictStatus');
@@ -1009,11 +1174,11 @@ begin
         v_blocked:=array[]::text[];
         if o_blocked_turns>0 and o_blocked_attack is not null then v_blocked:=array_append(v_blocked,o_blocked_attack); end if;
         if o_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_no_weakness_next,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           o_disable_best_next:=o_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_no_weakness_next,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1062,6 +1227,8 @@ begin
                 end if;
               end if;
 
+              if o_outgoing_reduction_next>0 then v_raw:=greatest(0,v_raw-o_outgoing_reduction_next); end if;
+
               if coalesce((v_plan->>'ignoreWeaknessResistance')::boolean,false) then
                 v_effective:=greatest(0,v_raw);
               elsif coalesce((v_plan->>'ignoreResistance')::boolean,false) then
@@ -1071,16 +1238,24 @@ begin
               end if;
 
               if c_prevent_next_class is not null and private.battle_v6_matches_class(o.id,c_prevent_next_class) then v_effective:=0;
+              elsif c_prevent_damage_cap_next>0 and v_effective<=c_prevent_damage_cap_next then v_effective:=0;
               elsif c_reduce_next>0 then v_effective:=greatest(0,v_effective-c_reduce_next); end if;
 
-              v_def:=private.battle_v6_defense_adjustment(o.id,c.id,c_damage,v_effective,v_seed||':'||v_half||':def');
+              if coalesce((v_plan->>'ignoreDefenderEffects')::boolean,false) then
+                v_def:=jsonb_build_object('damage',v_effective,'effectImmune',false,'reactiveDamage',0);
+              else
+                v_def:=private.battle_v6_defense_adjustment(o.id,c.id,c_damage,v_effective,v_seed||':'||v_half||':def');
+              end if;
               v_effective:=coalesce((v_def->>'damage')::numeric,v_effective);
               v_effect_immune:=coalesce((v_def->>'effectImmune')::boolean,false);
               v_reactive:=coalesce((v_def->>'reactiveDamage')::numeric,0);
               v_reactive_status:=v_def->>'reactiveStatus';
 
               c_damage:=least(c_hp,c_damage+v_effective);
-              o_damage_dealt:=o_damage_dealt+v_effective;
+              v_direct:=case when not v_effect_immune then coalesce((v_plan->>'directDamageCounters')::numeric,0) else 0 end;
+              if v_direct>0 then c_damage:=least(c_hp,c_damage+v_direct); end if;
+              o_damage_dealt:=o_damage_dealt+v_effective+v_direct;
+              if c_reactive_next>0 and v_effective>0 then o_damage:=least(o_hp,o_damage+c_reactive_next); end if;
               o_last_attack:=v_attack_name; o_last_damage:=v_effective; o_last_advantage:=coalesce(v_plan->>'advantage','neutral');
 
               v_heal:=coalesce((v_plan->>'healDamage')::numeric,0);
@@ -1094,6 +1269,10 @@ begin
               elsif coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then o_blocked_attack:=v_attack_name; o_blocked_turns:=1; end if;
 
               if coalesce((v_plan->>'selfReductionNext')::numeric,0)>0 then o_reduce_next:=greatest(o_reduce_next,(v_plan->>'selfReductionNext')::numeric); end if;
+              if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then o_no_weakness_next:=true; end if;
+              if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then o_reactive_next:=greatest(o_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
+              if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then o_prevent_damage_cap_next:=greatest(o_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
+              if coalesce(v_plan->>'inflictSelfMajor','')<>'' then o_major:=v_plan->>'inflictSelfMajor'; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
               then o_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
@@ -1109,6 +1288,8 @@ begin
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then c_attack_gate_next:=greatest(c_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
+                if coalesce((v_plan->>'defenderCannotAttackNext')::boolean,false) then c_cooldown_all:=greatest(c_cooldown_all,1); end if;
+                if coalesce((v_plan->>'defenderOutgoingReductionNext')::numeric,0)>0 then c_outgoing_reduction_next:=greatest(c_outgoing_reduction_next,(v_plan->>'defenderOutgoingReductionNext')::numeric); end if;
                 if coalesce((v_plan->>'lockDefenderBest')::boolean,false) then c_disable_best_next:=greatest(c_disable_best_next,1); end if;
 
                 v_status:=coalesce(v_plan->>'inflictMajor',v_plan->>'inflictStatus');
@@ -1141,6 +1322,10 @@ begin
     if v_is_c then
       o_reduce_next:=0;
       o_prevent_next_class:=null;
+      o_no_weakness_next:=false;
+      o_reactive_next:=0;
+      o_prevent_damage_cap_next:=0;
+      c_outgoing_reduction_next:=0;
       c_attack_gate_next:=0;
       c_disable_best_next:=0;
       if c_cooldown_all>0 then c_cooldown_all:=c_cooldown_all-1; end if;
@@ -1151,6 +1336,10 @@ begin
     else
       c_reduce_next:=0;
       c_prevent_next_class:=null;
+      c_no_weakness_next:=false;
+      c_reactive_next:=0;
+      c_prevent_damage_cap_next:=0;
+      o_outgoing_reduction_next:=0;
       o_attack_gate_next:=0;
       o_disable_best_next:=0;
       if o_cooldown_all>0 then o_cooldown_all:=o_cooldown_all-1; end if;
@@ -1314,7 +1503,7 @@ revoke all on function private.battle_v6_hash_roll(text) from public,anon,authen
 revoke all on function private.battle_v6_can_attack(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_matches_class(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,text[]) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,boolean,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
 grant execute on function public.server_resolve_battle_round(uuid) to service_role;
