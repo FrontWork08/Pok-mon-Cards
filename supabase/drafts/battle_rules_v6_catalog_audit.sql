@@ -931,7 +931,7 @@ begin
     -- Coin-driven damage.
     if v_text like '%flip a coin until you get tails%' then
       v_coin_until_tails:=true;
-      v_match:=regexp_match(v_text,'does ([0-9]+) (?:more )?damage (?:times|for) (?:the number of )?heads');
+      v_match:=regexp_match(v_text,'does ([0-9]+) (?:more )?damage (?:times the number of|for each|for the number of) heads');
       if v_match is null then v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each heads'); end if;
       if v_match is not null then
         v_coin_bonus_per_head:=v_match[1]::numeric;
@@ -944,7 +944,7 @@ begin
       v_match:=regexp_match(v_text,'flip ([0-9]+) coins?');
       if v_match is not null and v_text ~ '(?:for each heads|times the number of heads)' then
         v_coin_bonus_count:=greatest(1,least(v_match[1]::integer,20));
-        v_match:=regexp_match(v_text,'does ([0-9]+) (?:more )?damage (?:times|for) (?:the number of )?heads');
+        v_match:=regexp_match(v_text,'does ([0-9]+) (?:more )?damage (?:times the number of|for each|for the number of) heads');
         if v_match is null then v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each heads'); end if;
         if v_match is not null then
           v_coin_bonus_per_head:=v_match[1]::numeric;
@@ -1008,6 +1008,18 @@ begin
       v_coin_gate_count:=greatest(v_coin_gate_count,2);
       v_coin_gate_heads:=greatest(v_coin_gate_heads,2);
       v_effect_notes:=array_append(v_effect_notes,'ataque exige duas caras');
+    end if;
+
+    if v_text ~ 'flip 2 coins?.*if (?:both|both of them) (?:are )?heads, this attack does [0-9]+ more damage' then
+      v_match:=regexp_match(v_text,'if (?:both|both of them) (?:are )?heads, this attack does ([0-9]+) more damage');
+      if v_match is not null then
+        -- Encode as a special 2-coin bonus; the simulator applies it only at 2 heads.
+        v_coin_bonus_count:=greatest(v_coin_bonus_count,2);
+        v_coin_bonus_per_head:=greatest(v_coin_bonus_per_head,v_match[1]::numeric);
+        v_expected_raw:=v_expected_raw+v_match[1]::numeric*0.25;
+        v_dynamic_kind:='both_heads_bonus';
+        v_effect_notes:=array_append(v_effect_notes,'bônus somente com duas caras');
+      end if;
     end if;
 
     -- Attack gates.
@@ -1679,7 +1691,9 @@ begin
                   v_heads:=v_heads+1;
                 end loop;
                 v_bonus_heads:=v_heads;
-                if coalesce((v_plan->>'coinMultiplier')::boolean,false) then
+                if v_plan->>'dynamicKind'='both_heads_bonus' then
+                  if v_heads=v_coin_count then v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0); end if;
+                elsif coalesce((v_plan->>'coinMultiplier')::boolean,false) then
                   v_raw:=coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 else
                   v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
@@ -1690,7 +1704,9 @@ begin
                   if private.battle_v6_hash_roll(v_seed||':'||v_half||':bonus:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
                 end loop;
                 v_bonus_heads:=v_heads;
-                if coalesce((v_plan->>'coinMultiplier')::boolean,false) then
+                if v_plan->>'dynamicKind'='both_heads_bonus' then
+                  if v_heads=v_coin_count then v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0); end if;
+                elsif coalesce((v_plan->>'coinMultiplier')::boolean,false) then
                   v_raw:=coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 else
                   v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
@@ -1899,7 +1915,9 @@ begin
                   v_heads:=v_heads+1;
                 end loop;
                 v_bonus_heads:=v_heads;
-                if coalesce((v_plan->>'coinMultiplier')::boolean,false) then
+                if v_plan->>'dynamicKind'='both_heads_bonus' then
+                  if v_heads=v_coin_count then v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0); end if;
+                elsif coalesce((v_plan->>'coinMultiplier')::boolean,false) then
                   v_raw:=coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 else
                   v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
@@ -1910,7 +1928,9 @@ begin
                   if private.battle_v6_hash_roll(v_seed||':'||v_half||':bonus:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
                 end loop;
                 v_bonus_heads:=v_heads;
-                if coalesce((v_plan->>'coinMultiplier')::boolean,false) then
+                if v_plan->>'dynamicKind'='both_heads_bonus' then
+                  if v_heads=v_coin_count then v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0); end if;
+                elsif coalesce((v_plan->>'coinMultiplier')::boolean,false) then
                   v_raw:=coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 else
                   v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
