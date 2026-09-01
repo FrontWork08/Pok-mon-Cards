@@ -267,6 +267,14 @@ begin
         'weaknessBonus',v_weakness_bonus,
         'resistance',v_resistance,
         'advantage',case when v_weakness_multiplier>1 or v_weakness_bonus>0 then 'weakness' when v_resistance>0 then 'resisted' else 'neutral' end,
+        'ignoreWeaknessResistance',v_text like '%don''t apply weakness and resistance%' or v_text like '%do not apply weakness and resistance%',
+        'inflictPoison',v_text like '%is now poisoned%',
+        'inflictBurn',v_text like '%is now burned%',
+        'inflictMajor',case
+          when v_text like '%is now paralyzed%' then 'paralyzed'
+          when v_text like '%is now asleep%' then 'asleep'
+          when v_text like '%is now confused%' then 'confused'
+          else null end,
         'effectNotes',to_jsonb(v_effect_notes),
         'selectionScore',round(v_score,2)
       );
@@ -390,7 +398,11 @@ begin
               end loop;
               v_raw:=coalesce((v_plan->>'perUnitDamage')::numeric,0)*v_heads;
             end if;
-            v_effective:=greatest(0,v_raw*coalesce((v_plan->>'weaknessMultiplier')::numeric,1)+coalesce((v_plan->>'weaknessBonus')::numeric,0)-coalesce((v_plan->>'resistance')::numeric,0));
+            if coalesce((v_plan->>'ignoreWeaknessResistance')::boolean,false) then
+              v_effective:=greatest(0,v_raw);
+            else
+              v_effective:=greatest(0,v_raw*coalesce((v_plan->>'weaknessMultiplier')::numeric,1)+coalesce((v_plan->>'weaknessBonus')::numeric,0)-coalesce((v_plan->>'resistance')::numeric,0));
+            end if;
             v_ignore_defender_effects:=lower(coalesce(v_plan->>'attackText','')) like '%damage isn''t affected by any effects on your opponent%';
             if not v_ignore_defender_effects and jsonb_typeof(o.tcg_data->'abilities')='array' then
               for v_ability in select value from jsonb_array_elements(o.tcg_data->'abilities') loop
@@ -412,11 +424,11 @@ begin
             v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); c_energy:=greatest(0,c_energy-v_discard);
             c_cooldown_all:=greatest(c_cooldown_all,coalesce((v_plan->>'cooldownAll')::integer,0));
             if coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then c_blocked_attack:=v_attack_name; c_blocked_turns:=1; end if;
-            v_status:=v_plan->>'inflictStatus'; v_status_chance:=coalesce((v_plan->>'statusChance')::numeric,1);
-            if v_status is not null and private.battle_v5_hash_roll(p_battle_id::text||':'||p_round_no||':'||v_half||':status')<=v_status_chance then
-              if v_status='poisoned' then o_poison:=true;
-              elsif v_status='burned' then o_burn:=true;
-              else o_major:=v_status; end if;
+            v_status:=coalesce(v_plan->>'inflictMajor',v_plan->>'inflictStatus'); v_status_chance:=coalesce((v_plan->>'statusChance')::numeric,1);
+            if private.battle_v5_hash_roll(p_battle_id::text||':'||p_round_no||':'||v_half||':status')<=v_status_chance then
+              if coalesce((v_plan->>'inflictPoison')::boolean,false) then o_poison:=true; end if;
+              if coalesce((v_plan->>'inflictBurn')::boolean,false) then o_burn:=true; end if;
+              if v_status is not null and v_status not in ('poisoned','burned') then o_major:=v_status; end if;
             end if;
             v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','attack','attack',v_attack_name,'energyBefore',v_energy_before,'energyAfter',c_energy,'damage',round(v_effective,2),'defenderRemainingHp',greatest(0,o_hp-o_damage),'effects',coalesce(v_plan->'effectNotes','[]'::jsonb)));
           end if;
@@ -456,7 +468,11 @@ begin
               end loop;
               v_raw:=coalesce((v_plan->>'perUnitDamage')::numeric,0)*v_heads;
             end if;
-            v_effective:=greatest(0,v_raw*coalesce((v_plan->>'weaknessMultiplier')::numeric,1)+coalesce((v_plan->>'weaknessBonus')::numeric,0)-coalesce((v_plan->>'resistance')::numeric,0));
+            if coalesce((v_plan->>'ignoreWeaknessResistance')::boolean,false) then
+              v_effective:=greatest(0,v_raw);
+            else
+              v_effective:=greatest(0,v_raw*coalesce((v_plan->>'weaknessMultiplier')::numeric,1)+coalesce((v_plan->>'weaknessBonus')::numeric,0)-coalesce((v_plan->>'resistance')::numeric,0));
+            end if;
             v_ignore_defender_effects:=lower(coalesce(v_plan->>'attackText','')) like '%damage isn''t affected by any effects on your opponent%';
             if not v_ignore_defender_effects and jsonb_typeof(c.tcg_data->'abilities')='array' then
               for v_ability in select value from jsonb_array_elements(c.tcg_data->'abilities') loop
@@ -478,11 +494,11 @@ begin
             v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); o_energy:=greatest(0,o_energy-v_discard);
             o_cooldown_all:=greatest(o_cooldown_all,coalesce((v_plan->>'cooldownAll')::integer,0));
             if coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then o_blocked_attack:=v_attack_name; o_blocked_turns:=1; end if;
-            v_status:=v_plan->>'inflictStatus'; v_status_chance:=coalesce((v_plan->>'statusChance')::numeric,1);
-            if v_status is not null and private.battle_v5_hash_roll(p_battle_id::text||':'||p_round_no||':'||v_half||':status')<=v_status_chance then
-              if v_status='poisoned' then c_poison:=true;
-              elsif v_status='burned' then c_burn:=true;
-              else c_major:=v_status; end if;
+            v_status:=coalesce(v_plan->>'inflictMajor',v_plan->>'inflictStatus'); v_status_chance:=coalesce((v_plan->>'statusChance')::numeric,1);
+            if private.battle_v5_hash_roll(p_battle_id::text||':'||p_round_no||':'||v_half||':status')<=v_status_chance then
+              if coalesce((v_plan->>'inflictPoison')::boolean,false) then c_poison:=true; end if;
+              if coalesce((v_plan->>'inflictBurn')::boolean,false) then c_burn:=true; end if;
+              if v_status is not null and v_status not in ('poisoned','burned') then c_major:=v_status; end if;
             end if;
             v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','attack','attack',v_attack_name,'energyBefore',v_energy_before,'energyAfter',o_energy,'damage',round(v_effective,2),'defenderRemainingHp',greatest(0,c_hp-c_damage),'effects',coalesce(v_plan->'effectNotes','[]'::jsonb)));
           end if;
