@@ -140,7 +140,7 @@ export function CardPickerModal({
           </View>
           <View style={styles.sortRow}>
             {displayMode === 'battle'
-              ? <SortChip label="Atributos de combate" active={sort === 'battle'} onPress={() => setSort('battle')} />
+              ? <SortChip label="Visão geral TCG" active={sort === 'battle'} onPress={() => setSort('battle')} />
               : <SortChip label="Mais caras" active={sort === 'value'} onPress={() => setSort('value')} />}
             {enableCombatSort ? (
               <>
@@ -245,13 +245,13 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
     >
       <View style={[styles.imageWrap, { backgroundColor: colors.surfaceAlt }]}>
         {card.image_small ? <Image source={{ uri: card.image_small }} style={styles.image} resizeMode="contain" /> : <Ionicons name="image-outline" size={30} color={colors.muted} />}
-        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{displayMode === 'battle' ? `PWR ${combat.battleRating}` : card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
+        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{displayMode === 'battle' ? `HP ${combat.hp}` : card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
         {selected && mode === 'single' ? <View style={[styles.checkBadge, { backgroundColor: colors.yellow }]}><Ionicons name="checkmark" size={17} color="#07111F" /></View> : null}
       </View>
       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.pokemon_name}</Text>
-      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `HP ${combat.hp} • ATQ ${combat.maxDamage} • ⚡ ${combat.bestEnergy}` : `${card.rarity ?? 'Sem raridade'} • ${locationLabel}`}</Text>
+      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `ATQ BASE ${combat.maxDamage} • ⚡ custo ${combat.bestEnergy}` : `${card.rarity ?? 'Sem raridade'} • ${locationLabel}`}</Text>
       {showCombatStats && displayMode !== 'battle' ? <Text numberOfLines={1} style={[styles.legacyCombatMeta,{color:colors.yellow}]}>ATK {combat.maxDamage} • DEF {combat.hp}</Text> : null}
-      {displayMode === 'battle' ? <Text numberOfLines={1} style={[styles.battleMeta, { color: colors.muted }]}>EF {combat.efficiencyScore} • VEL {combat.speedScore} • TEC {combat.techniqueScore}</Text> : null}
+      {displayMode === 'battle' ? <Text numberOfLines={1} style={[styles.battleMeta, { color: colors.muted }]}>⚡ mín {combat.minEnergy} • {combat.attackCount} ataques • {combat.abilityCount} habilidades</Text> : null}
       {mode === 'quantity' ? (
         <View style={styles.qtyRow}>
           <Pressable style={[styles.qtyButton, { backgroundColor: colors.surfaceAlt }]} onPress={onMinus}><Text style={[styles.qtySign, { color: colors.text }]}>−</Text></Pressable>
