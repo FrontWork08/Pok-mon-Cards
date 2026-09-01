@@ -65,7 +65,8 @@ $$;
 
 create or replace function private.battle_v6_matches_class(
   p_card_id text,
-  p_class text
+  p_class text,
+  p_burned boolean
 )
 returns boolean
 language plpgsql
@@ -76,21 +77,32 @@ declare
   v_card public.cards%rowtype;
   v_classes text;
   v_has_ability boolean:=false;
+  v_primary_type text;
 begin
   if coalesce(p_class,'all')='all' then return true; end if;
   select * into v_card from public.cards where id=p_card_id;
   if v_card.id is null then return false; end if;
+
   v_classes:=lower(coalesce(v_card.tcg_data->'subtypes','[]'::jsonb)::text);
+  v_primary_type:=lower(coalesce(v_card.types[1],'Colorless'));
   v_has_ability:=jsonb_typeof(v_card.tcg_data->'abilities')='array'
     and jsonb_array_length(v_card.tcg_data->'abilities')>0;
+
   return case lower(p_class)
     when 'ex' then v_classes ~ '"ex"'
     when 'v' then v_classes ~ '"v"' or v_classes ~ '"vmax"' or v_classes ~ '"vstar"' or v_classes ~ '"v-union"'
     when 'vmax' then v_classes ~ '"vmax"'
     when 'gx' then v_classes ~ '"gx"'
+    when 'gx_or_ex' then v_classes ~ '"gx"' or v_classes ~ '"ex"'
     when 'basic' then v_classes ~ '"basic"'
+    when 'basic_non_colorless' then v_classes ~ '"basic"' and v_primary_type<>'colorless'
+    when 'evolution' then not (v_classes ~ '"basic"')
+    when 'tag_team' then v_classes ~ '"tag team"'
+    when 'ancient' then v_classes ~ '"ancient"'
+    when 'ultra_beast' then v_classes ~ '"ultra beast"'
     when 'ability' then v_has_ability
-    else true
+    when 'burned' then coalesce(p_burned,false)
+    else false
   end;
 end;
 $body$;
@@ -1177,14 +1189,25 @@ begin
       v_self_reduction_next:=greatest(v_self_reduction_next,v_match[1]::numeric);
       v_effect_notes:=array_append(v_effect_notes,'redução de dano no próximo turno');
     end if;
-    if v_text like '%during your opponent''s next turn%prevent all damage%done to this pokémon%' then
+    if v_text like '%during your opponent''s next turn%'
+       and v_text like '%prevent all damage%done to this pokémon%' then
       v_self_prevent_next:=true;
       if v_text like '%flip a coin%' and v_text like '%if heads%' then v_self_prevent_chance:=0.5; end if;
-      if v_text like '%from pokémon-ex%' or v_text like '%from pokémon ex%' then v_self_prevent_class:='ex';
+
+      if v_text like '%from basic non-colorless pokémon%' then v_self_prevent_class:='basic_non_colorless';
+      elsif v_text like '%from evolution pokémon%' then v_self_prevent_class:='evolution';
+      elsif v_text like '%from pokémon-gx and pokémon-ex%' or v_text like '%from pokémon gx and pokémon ex%' then v_self_prevent_class:='gx_or_ex';
+      elsif v_text like '%from tag team pokémon%' then v_self_prevent_class:='tag_team';
+      elsif v_text like '%from ancient pokémon%' then v_self_prevent_class:='ancient';
+      elsif v_text like '%from ultra beasts%' then v_self_prevent_class:='ultra_beast';
+      elsif v_text like '%from burned pokémon%' then v_self_prevent_class:='burned';
+      elsif v_text like '%from pokémon that have an ability%' then v_self_prevent_class:='ability';
+      elsif v_text like '%from pokémon-ex%' or v_text like '%from pokémon ex%' then v_self_prevent_class:='ex';
       elsif v_text like '%from pokémon vmax%' then v_self_prevent_class:='vmax';
       elsif v_text like '%from pokémon v%' then v_self_prevent_class:='v';
       elsif v_text like '%from basic pokémon%' then v_self_prevent_class:='basic';
       else v_self_prevent_class:='all'; end if;
+
       v_effect_notes:=array_append(v_effect_notes,'previne dano no próximo turno ('||v_self_prevent_class||')');
     end if;
 
@@ -1569,7 +1592,7 @@ begin
                 v_effective:=greatest(0,v_raw*coalesce((v_plan->>'weaknessMultiplier')::numeric,1)+coalesce((v_plan->>'weaknessBonus')::numeric,0)-coalesce((v_plan->>'resistance')::numeric,0));
               end if;
 
-              if o_prevent_next_class is not null and private.battle_v6_matches_class(c.id,o_prevent_next_class) then v_effective:=0;
+              if o_prevent_next_class is not null and private.battle_v6_matches_class(c.id,o_prevent_next_class,c_burn) then v_effective:=0;
               elsif o_prevent_damage_cap_next>0 and v_effective<=o_prevent_damage_cap_next then v_effective:=0;
               elsif o_reduce_next>0 then v_effective:=greatest(0,v_effective-o_reduce_next); end if;
 
@@ -1767,7 +1790,7 @@ begin
                 v_effective:=greatest(0,v_raw*coalesce((v_plan->>'weaknessMultiplier')::numeric,1)+coalesce((v_plan->>'weaknessBonus')::numeric,0)-coalesce((v_plan->>'resistance')::numeric,0));
               end if;
 
-              if c_prevent_next_class is not null and private.battle_v6_matches_class(o.id,c_prevent_next_class) then v_effective:=0;
+              if c_prevent_next_class is not null and private.battle_v6_matches_class(o.id,c_prevent_next_class,o_burn) then v_effective:=0;
               elsif c_prevent_damage_cap_next>0 and v_effective<=c_prevent_damage_cap_next then v_effective:=0;
               elsif c_reduce_next>0 then v_effective:=greatest(0,v_effective-c_reduce_next); end if;
 
@@ -2055,7 +2078,7 @@ $$;
 
 revoke all on function private.battle_v6_hash_roll(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_can_attack(text,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_matches_class(text,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_matches_class(text,text,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_copy_source_attack(text,integer,boolean,boolean,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_has_go_first_override(text,integer) from public,anon,authenticated;
 revoke all on function private.battle_v6_turn_ability_effects(text) from public,anon,authenticated;
