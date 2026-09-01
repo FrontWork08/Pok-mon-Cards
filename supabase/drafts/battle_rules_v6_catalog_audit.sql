@@ -886,6 +886,20 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'previne dano no próximo turno ('||v_self_prevent_class||')');
     end if;
 
+    v_ignore_defender_effects:=
+      exists(
+        select 1
+        from jsonb_array_elements(coalesce(v_attacker.tcg_data->'abilities','[]'::jsonb)) ab
+        where lower(coalesce(ab->>'text','')) like '%damage from attacks used by this pokémon isn''t affected by any effects on your opponent''s active pokémon%'
+           or lower(coalesce(ab->>'text','')) like '%damage from attacks used by this pokemon isn''t affected by any effects on your opponent''s active pokemon%'
+      )
+      or v_text like '%damage isn''t affected by any effects on your opponent''s active pokémon%'
+      or v_text like '%damage isn''t affected by any effects on the defending pokémon%'
+      or v_text like '%damage is not affected by any effects on your opponent''s active pokémon%'
+      or v_text like '%damage isn''t affected by weakness, resistance,%any other effects%'
+      or v_text like '%damage isn''t affected by weakness, resistance, poké-powers%'
+      or v_text like '%damage isn''t affected by weakness, resistance, pokémon powers%';
+
     -- Weakness / Resistance bypass.
     v_ignore_weakness_resistance:=
       v_text like '%don''t apply weakness and resistance%'
