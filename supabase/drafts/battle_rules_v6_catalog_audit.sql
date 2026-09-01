@@ -469,6 +469,9 @@ declare
   v_cooldown_attack integer := 0;
   v_status text := null;
   v_status_chance numeric := 1;
+  v_status_coin_count integer:=0;
+  v_status_heads_min integer:=0;
+  v_status_heads_max integer:=0;
   v_recoil numeric := 0;
   v_heal numeric := 0;
   v_heal_equal boolean:=false;
@@ -679,6 +682,9 @@ begin
     v_cooldown_attack:=0;
     v_status:=null;
     v_status_chance:=1;
+    v_status_coin_count:=0;
+    v_status_heads_min:=0;
+    v_status_heads_max:=0;
     v_recoil:=0;
     v_heal:=0;
     v_heal_equal:=false;
@@ -1208,9 +1214,32 @@ begin
     if v_text like '%is now confused%' then v_status:='confused'; v_status_bonus:=30; end if;
     if v_text like '%is now poisoned%' then v_status:='poisoned'; v_status_bonus:=20; end if;
     if v_text like '%is now burned%' then v_status:='burned'; v_status_bonus:=25; end if;
-    if v_status is not null then
-      if v_text like '%flip a coin%' and (v_text like '%if heads%' or v_text like '%if tails%') then v_status_chance:=0.5; end if;
-      v_effect_notes:=array_append(v_effect_notes,'condição especial: '||v_status);
+    if v_status is not null or v_text like '%is now poisoned%' or v_text like '%is now burned%' then
+      v_match:=regexp_match(v_text,'flip ([0-9]+) coins?');
+      if v_match is not null then
+        v_status_coin_count:=greatest(1,least(v_match[1]::integer,20));
+        if v_text ~ 'if (?:both|all)(?: of them)? (?:are )?heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+          v_status_heads_min:=v_status_coin_count; v_status_heads_max:=v_status_coin_count;
+        elsif v_text ~ 'if (?:either|1 or both|one or both)(?: of them| of the coins)? (?:is|are )?heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+          v_status_heads_min:=1; v_status_heads_max:=v_status_coin_count;
+        elsif v_text ~ 'if (?:you get |at least )?2 or more heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)'
+           or v_text ~ 'if (?:at least )?2 (?:of them )?are heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+          v_status_heads_min:=2; v_status_heads_max:=v_status_coin_count;
+        elsif v_text ~ 'if (?:you get )?at least 1 heads?.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+          v_status_heads_min:=1; v_status_heads_max:=v_status_coin_count;
+        elsif v_text ~ 'if (?:both|all)(?: of them)? (?:are )?tails.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+          v_status_heads_min:=0; v_status_heads_max:=0;
+        else
+          v_status_coin_count:=0;
+        end if;
+      elsif v_text like '%flip a coin%' then
+        if v_text ~ 'if heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+          v_status_coin_count:=1; v_status_heads_min:=1; v_status_heads_max:=1;
+        elsif v_text ~ 'if tails.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+          v_status_coin_count:=1; v_status_heads_min:=0; v_status_heads_max:=0;
+        end if;
+      end if;
+      if v_status is not null then v_effect_notes:=array_append(v_effect_notes,'condição especial: '||v_status); end if;
     end if;
 
     -- Recoil and healing.
@@ -1384,6 +1413,9 @@ begin
         'lockDefenderBest',v_lock_defender_best,
         'inflictStatus',v_status,
         'statusChance',v_status_chance,
+        'statusCoinCount',v_status_coin_count,
+        'statusHeadsMin',v_status_heads_min,
+        'statusHeadsMax',v_status_heads_max,
         'recoilDamage',v_recoil,
         'healDamage',v_heal,
         'healEqualDamage',v_heal_equal,
@@ -1518,6 +1550,13 @@ declare
   v_heal numeric;
   v_coin_count integer;
   v_heads integer;
+  v_gate_heads integer;
+  v_bonus_heads integer;
+  v_status_heads integer;
+  v_status_coin_count integer;
+  v_status_heads_min integer;
+  v_status_heads_max integer;
+  v_status_success boolean;
   v_required_heads integer;
   v_i integer;
   v_def jsonb;
@@ -1604,6 +1643,7 @@ begin
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
+          v_gate_heads:=-1; v_bonus_heads:=-1;
           if coalesce((v_plan->>'usesGxLimit')::boolean,false) then c_gx_used:=true; end if;
           if coalesce((v_plan->>'usesVstarLimit')::boolean,false) then c_vstar_used:=true; end if;
           v_extra_turn:=coalesce((v_plan->>'extraTurn')::boolean,false);
@@ -1621,6 +1661,7 @@ begin
               for v_i in 1..v_coin_count loop
                 if private.battle_v6_hash_roll(v_seed||':'||v_half||':gate:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
               end loop;
+              v_gate_heads:=v_heads;
               if v_heads<v_required_heads then
                 v_attack_failed:=true;
                 v_extra_turn:=false;
@@ -1637,6 +1678,7 @@ begin
                   exit when private.battle_v6_hash_roll(v_seed||':'||v_half||':until:'||v_i)<0.5;
                   v_heads:=v_heads+1;
                 end loop;
+                v_bonus_heads:=v_heads;
                 if coalesce((v_plan->>'coinMultiplier')::boolean,false) then
                   v_raw:=coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 else
@@ -1647,6 +1689,7 @@ begin
                 for v_i in 1..v_coin_count loop
                   if private.battle_v6_hash_roll(v_seed||':'||v_half||':bonus:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
                 end loop;
+                v_bonus_heads:=v_heads;
                 if coalesce((v_plan->>'coinMultiplier')::boolean,false) then
                   v_raw:=coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 else
@@ -1734,7 +1777,25 @@ begin
 
                 v_status:=coalesce(v_plan->>'inflictMajor',v_plan->>'inflictStatus');
                 v_status_chance:=coalesce((v_plan->>'statusChance')::numeric,1);
-                if private.battle_v6_hash_roll(v_seed||':'||v_half||':status')<=v_status_chance then
+                v_status_coin_count:=coalesce((v_plan->>'statusCoinCount')::integer,0);
+                v_status_heads_min:=coalesce((v_plan->>'statusHeadsMin')::integer,0);
+                v_status_heads_max:=coalesce((v_plan->>'statusHeadsMax')::integer,v_status_coin_count);
+                if v_status_coin_count>0 then
+                  if coalesce((v_plan->>'coinBonusCount')::integer,0)=v_status_coin_count and v_bonus_heads>=0 then
+                    v_status_heads:=v_bonus_heads;
+                  elsif coalesce((v_plan->>'coinGateCount')::integer,0)=v_status_coin_count and v_gate_heads>=0 then
+                    v_status_heads:=v_gate_heads;
+                  else
+                    v_status_heads:=0;
+                    for v_i in 1..v_status_coin_count loop
+                      if private.battle_v6_hash_roll(v_seed||':'||v_half||':statuscoin:'||v_i)>=0.5 then v_status_heads:=v_status_heads+1; end if;
+                    end loop;
+                  end if;
+                  v_status_success:=v_status_heads between v_status_heads_min and v_status_heads_max;
+                else
+                  v_status_success:=private.battle_v6_hash_roll(v_seed||':'||v_half||':status')<=v_status_chance;
+                end if;
+                if v_status_success then
                   if coalesce((v_plan->>'inflictPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; end if;
                   if coalesce((v_plan->>'inflictBurn')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
                   if v_status is not null and v_status not in ('poisoned','burned') and not private.battle_v6_status_immune(o.id,v_status) then o_major:=v_status; end if;
@@ -1802,6 +1863,7 @@ begin
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
+          v_gate_heads:=-1; v_bonus_heads:=-1;
           if coalesce((v_plan->>'usesGxLimit')::boolean,false) then o_gx_used:=true; end if;
           if coalesce((v_plan->>'usesVstarLimit')::boolean,false) then o_vstar_used:=true; end if;
           v_extra_turn:=coalesce((v_plan->>'extraTurn')::boolean,false);
@@ -1819,6 +1881,7 @@ begin
               for v_i in 1..v_coin_count loop
                 if private.battle_v6_hash_roll(v_seed||':'||v_half||':gate:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
               end loop;
+              v_gate_heads:=v_heads;
               if v_heads<v_required_heads then
                 v_attack_failed:=true;
                 v_extra_turn:=false;
@@ -1835,6 +1898,7 @@ begin
                   exit when private.battle_v6_hash_roll(v_seed||':'||v_half||':until:'||v_i)<0.5;
                   v_heads:=v_heads+1;
                 end loop;
+                v_bonus_heads:=v_heads;
                 if coalesce((v_plan->>'coinMultiplier')::boolean,false) then
                   v_raw:=coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 else
@@ -1845,6 +1909,7 @@ begin
                 for v_i in 1..v_coin_count loop
                   if private.battle_v6_hash_roll(v_seed||':'||v_half||':bonus:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
                 end loop;
+                v_bonus_heads:=v_heads;
                 if coalesce((v_plan->>'coinMultiplier')::boolean,false) then
                   v_raw:=coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 else
@@ -1932,7 +1997,25 @@ begin
 
                 v_status:=coalesce(v_plan->>'inflictMajor',v_plan->>'inflictStatus');
                 v_status_chance:=coalesce((v_plan->>'statusChance')::numeric,1);
-                if private.battle_v6_hash_roll(v_seed||':'||v_half||':status')<=v_status_chance then
+                v_status_coin_count:=coalesce((v_plan->>'statusCoinCount')::integer,0);
+                v_status_heads_min:=coalesce((v_plan->>'statusHeadsMin')::integer,0);
+                v_status_heads_max:=coalesce((v_plan->>'statusHeadsMax')::integer,v_status_coin_count);
+                if v_status_coin_count>0 then
+                  if coalesce((v_plan->>'coinBonusCount')::integer,0)=v_status_coin_count and v_bonus_heads>=0 then
+                    v_status_heads:=v_bonus_heads;
+                  elsif coalesce((v_plan->>'coinGateCount')::integer,0)=v_status_coin_count and v_gate_heads>=0 then
+                    v_status_heads:=v_gate_heads;
+                  else
+                    v_status_heads:=0;
+                    for v_i in 1..v_status_coin_count loop
+                      if private.battle_v6_hash_roll(v_seed||':'||v_half||':statuscoin:'||v_i)>=0.5 then v_status_heads:=v_status_heads+1; end if;
+                    end loop;
+                  end if;
+                  v_status_success:=v_status_heads between v_status_heads_min and v_status_heads_max;
+                else
+                  v_status_success:=private.battle_v6_hash_roll(v_seed||':'||v_half||':status')<=v_status_chance;
+                end if;
+                if v_status_success then
                   if coalesce((v_plan->>'inflictPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; end if;
                   if coalesce((v_plan->>'inflictBurn')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
                   if v_status is not null and v_status not in ('poisoned','burned') and not private.battle_v6_status_immune(c.id,v_status) then c_major:=v_status; end if;
