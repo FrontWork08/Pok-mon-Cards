@@ -1960,7 +1960,8 @@ begin
         'clearSelfSpecial',v_clear_self_special,
         'clearSelfPoison',v_clear_self_poison,
         'clearDefenderSpecial',v_clear_defender_special,
-        'directDamageCounters',v_direct_damage_counters,
+        'directDamageCounters',v_direct_damage_counters
+      ) || jsonb_build_object(
         'transferSelfDamage',v_transfer_self_damage,
         'transferSelfDamageChance',v_transfer_self_damage_chance,
         'swapDamageCounters',v_swap_damage_counters,
