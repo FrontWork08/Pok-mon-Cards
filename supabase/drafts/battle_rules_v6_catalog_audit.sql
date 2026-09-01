@@ -320,8 +320,10 @@ create or replace function private.battle_v6_attack_plan(
   p_energy integer,
   p_defender_energy integer,
   p_attacker_damage numeric,
+  p_attacker_last_damage_received numeric,
   p_defender_damage numeric,
   p_defender_special boolean,
+  p_defender_poison boolean,
   p_defender_major text,
   p_ignore_defender_weakness boolean,
   p_gx_used boolean,
@@ -542,6 +544,13 @@ begin
       end if;
     end if;
 
+    if v_text like '%if this pokémon was damaged by an attack during your opponent''s last turn%this attack does that much more damage%'
+       or v_text like '%if this pokemon was damaged by an attack during your opponent''s last turn%this attack does that much more damage%' then
+      v_raw:=v_raw+greatest(0,coalesce(p_attacker_last_damage_received,0));
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus igual ao dano recebido no turno anterior');
+    end if;
+
     v_match:=regexp_match(v_text,'(?:does )?([0-9]+) more damage for each damage counter on this pok[eé]mon');
     if v_match is not null then
       v_raw:=v_raw+(floor(coalesce(p_attacker_damage,0)/10)*v_match[1]::numeric);
@@ -595,6 +604,13 @@ begin
     if v_match is not null and coalesce(p_defender_special,false) then
       v_raw:=v_raw+v_match[1]::numeric; v_expected_raw:=v_expected_raw+v_match[1]::numeric;
       v_effect_notes:=array_append(v_effect_notes,'bônus contra Condição Especial');
+    end if;
+
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is poisoned, this attack does ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_defender_poison,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus contra Pokémon Envenenado');
     end if;
 
     v_match:=regexp_match(v_text,'(?:does )?([0-9]+) more damage (?:for each|times the amount of)(?: [a-z]+)? energy attached to this pok[eé]mon');
@@ -1244,6 +1260,8 @@ declare
   o_damage_dealt numeric:=0;
   c_last_advantage text:='neutral';
   o_last_advantage text:='neutral';
+  c_last_received_attack numeric:=0;
+  o_last_received_attack numeric:=0;
 begin
   select * into c from public.cards where id=p_challenger_card_id;
   select * into o from public.cards where id=p_opponent_card_id;
@@ -1260,6 +1278,7 @@ begin
     v_is_c:=case when c_first then mod(v_half,2)=1 else mod(v_half,2)=0 end;
 
     if v_is_c then
+      o_last_received_attack:=0;
       c_turns:=c_turns+1;
       v_turn_ability:=private.battle_v6_turn_ability_effects(c.id);
       v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
@@ -1291,11 +1310,11 @@ begin
         v_blocked:=array[]::text[];
         if c_blocked_turns>0 and c_blocked_attack is not null then v_blocked:=array_append(v_blocked,c_blocked_attack); end if;
         if c_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_major,o_no_weakness_next,c_gx_used,c_vstar_used,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           c_disable_best_next:=c_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_major,o_no_weakness_next,c_gx_used,c_vstar_used,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1371,6 +1390,7 @@ begin
               v_reactive_status:=v_def->>'reactiveStatus';
 
               o_damage:=least(o_hp,o_damage+v_effective);
+              o_last_received_attack:=v_effective;
               v_direct:=case when not v_effect_immune then coalesce((v_plan->>'directDamageCounters')::numeric,0) else 0 end;
               if v_direct>0 then o_damage:=least(o_hp,o_damage+v_direct); end if;
               c_damage_dealt:=c_damage_dealt+v_effective+v_direct;
@@ -1448,6 +1468,7 @@ begin
       end if;
 
     else
+      c_last_received_attack:=0;
       o_turns:=o_turns+1;
       v_turn_ability:=private.battle_v6_turn_ability_effects(o.id);
       v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
@@ -1479,11 +1500,11 @@ begin
         v_blocked:=array[]::text[];
         if o_blocked_turns>0 and o_blocked_attack is not null then v_blocked:=array_append(v_blocked,o_blocked_attack); end if;
         if o_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_major,c_no_weakness_next,o_gx_used,o_vstar_used,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           o_disable_best_next:=o_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_major,c_no_weakness_next,o_gx_used,o_vstar_used,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1559,6 +1580,7 @@ begin
               v_reactive_status:=v_def->>'reactiveStatus';
 
               c_damage:=least(c_hp,c_damage+v_effective);
+              c_last_received_attack:=v_effective;
               v_direct:=case when not v_effect_immune then coalesce((v_plan->>'directDamageCounters')::numeric,0) else 0 end;
               if v_direct>0 then c_damage:=least(c_hp,c_damage+v_direct); end if;
               o_damage_dealt:=o_damage_dealt+v_effective+v_direct;
@@ -1830,7 +1852,7 @@ revoke all on function private.battle_v6_turn_ability_effects(text) from public,
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,text,boolean,boolean,boolean,text[]) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,numeric,boolean,boolean,text,boolean,boolean,boolean,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
 grant execute on function public.server_resolve_battle_round(uuid) to service_role;
