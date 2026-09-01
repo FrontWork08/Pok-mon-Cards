@@ -526,6 +526,9 @@ declare
   v_status_heads_min integer:=0;
   v_status_heads_max integer:=0;
   v_recoil numeric := 0;
+  v_recoil_coin_count integer:=0;
+  v_recoil_heads_min integer:=0;
+  v_recoil_heads_max integer:=0;
   v_heal numeric := 0;
   v_heal_equal boolean:=false;
   v_interval integer := 1;
@@ -764,6 +767,9 @@ begin
     v_status_heads_min:=0;
     v_status_heads_max:=0;
     v_recoil:=0;
+    v_recoil_coin_count:=0;
+    v_recoil_heads_min:=0;
+    v_recoil_heads_max:=0;
     v_heal:=0;
     v_heal_equal:=false;
     v_effect_notes:=array[]::text[];
@@ -1791,7 +1797,30 @@ begin
 
     -- Recoil and healing.
     v_match:=regexp_match(v_text,'([0-9]+) damage to itself');
-    if v_match is not null then v_recoil:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'dano de recuo'); end if;
+    if v_match is not null then
+      v_recoil:=greatest(v_recoil,v_match[1]::numeric);
+      if v_text like '%flip a coin%' and v_text not like '%flip a coin%flip a coin%' then
+        if v_text ~ 'if tails,[^.]*[0-9]+ damage to itself' then
+          v_recoil_coin_count:=1; v_recoil_heads_min:=0; v_recoil_heads_max:=0;
+        elsif v_text ~ 'if heads,[^.]*[0-9]+ damage to itself' then
+          v_recoil_coin_count:=1; v_recoil_heads_min:=1; v_recoil_heads_max:=1;
+        end if;
+      end if;
+      v_effect_notes:=array_append(v_effect_notes,'dano de recuo');
+    end if;
+
+    v_match:=regexp_match(v_text,'put ([0-9]+) damage counters? on this pok[eé]mon');
+    if v_match is not null then
+      v_recoil:=greatest(v_recoil,v_match[1]::numeric*10);
+      if v_text like '%flip a coin%' and v_text not like '%flip a coin%flip a coin%' then
+        if v_text ~ 'if tails,[^.]*put [0-9]+ damage counters? on this pok[eé]mon' then
+          v_recoil_coin_count:=1; v_recoil_heads_min:=0; v_recoil_heads_max:=0;
+        elsif v_text ~ 'if heads,[^.]*put [0-9]+ damage counters? on this pok[eé]mon' then
+          v_recoil_coin_count:=1; v_recoil_heads_min:=1; v_recoil_heads_max:=1;
+        end if;
+      end if;
+      v_effect_notes:=array_append(v_effect_notes,'auto-dano por contadores');
+    end if;
     v_match:=regexp_match(v_text,'heal ([0-9]+) damage from (?:this pok[eé]mon|1 of your pok[eé]mon|each of your pok[eé]mon)');
     if v_match is not null then v_heal:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'cura'); end if;
     v_match:=regexp_match(v_text,'remove ([0-9]+) damage counters? from (?:this pok[eé]mon|1 of your pok[eé]mon)');
@@ -1808,6 +1837,13 @@ begin
       v_match:=regexp_match(v_text,'put ([0-9]+) damage counters? on ');
       if v_match is not null and v_text not like '%opponent%' and v_text not like '%defending%' then
         v_recoil:=greatest(v_recoil,v_match[1]::numeric*10);
+        if v_text like '%flip a coin%' and v_text not like '%flip a coin%flip a coin%' then
+          if v_text ~ 'if tails,[^.]*put [0-9]+ damage counters? on ' then
+            v_recoil_coin_count:=1; v_recoil_heads_min:=0; v_recoil_heads_max:=0;
+          elsif v_text ~ 'if heads,[^.]*put [0-9]+ damage counters? on ' then
+            v_recoil_coin_count:=1; v_recoil_heads_min:=1; v_recoil_heads_max:=1;
+          end if;
+        end if;
         v_effect_notes:=array_append(v_effect_notes,'auto-dano por contadores (texto legado)');
       end if;
     end if;
@@ -2014,7 +2050,7 @@ begin
         +case when v_defender_cannot_attack_next then 45 else 0 end
         +v_defender_outgoing_reduction_next*0.35
         +v_defender_attack_gate_chance*35
-        -v_recoil*0.5
+        -v_recoil*0.5*case when v_recoil_coin_count>0 then 0.5 else 1 end
         +v_heal*0.2
         +case when v_heal_equal then v_expected*0.15 else 0 end
         -v_cost*0.05;
@@ -2052,6 +2088,9 @@ begin
         'statusHeadsMin',v_status_heads_min,
         'statusHeadsMax',v_status_heads_max,
         'recoilDamage',v_recoil,
+        'recoilCoinCount',v_recoil_coin_count,
+        'recoilHeadsMin',v_recoil_heads_min,
+        'recoilHeadsMax',v_recoil_heads_max,
         'healDamage',v_heal,
         'healEqualDamage',v_heal_equal,
         'healAll',v_heal_all
@@ -2205,6 +2244,11 @@ declare
   v_status text;
   v_status_chance numeric;
   v_recoil numeric;
+  v_recoil_coin_count integer;
+  v_recoil_heads_min integer;
+  v_recoil_heads_max integer;
+  v_recoil_heads integer;
+  v_recoil_success boolean;
   v_heal numeric;
   v_coin_count integer;
   v_heads integer;
@@ -2326,6 +2370,13 @@ begin
               if v_heads<v_required_heads then
                 v_attack_failed:=true;
                 v_extra_turn:=false;
+                v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0);
+                v_recoil_coin_count:=coalesce((v_plan->>'recoilCoinCount')::integer,0);
+                if v_recoil>0 and v_recoil_coin_count=v_coin_count
+                   and v_heads between coalesce((v_plan->>'recoilHeadsMin')::integer,0)
+                                   and coalesce((v_plan->>'recoilHeadsMax')::integer,v_coin_count) then
+                  c_damage:=least(c_hp,c_damage+v_recoil);
+                end if;
                 v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','attack_coin_failed','attack',v_attack_name,'heads',v_heads,'coins',v_coin_count));
               end if;
             end if;
@@ -2407,7 +2458,28 @@ begin
                 if coalesce((v_plan->>'healAll')::boolean,false) then c_damage:=0;
                 elsif v_heal>0 then c_damage:=greatest(0,c_damage-v_heal); end if;
               end if;
-              v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0); if v_recoil>0 then c_damage:=least(c_hp,c_damage+v_recoil); end if;
+              v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0);
+              if v_recoil>0 then
+                v_recoil_coin_count:=coalesce((v_plan->>'recoilCoinCount')::integer,0);
+                if v_recoil_coin_count>0 then
+                  v_recoil_heads_min:=coalesce((v_plan->>'recoilHeadsMin')::integer,0);
+                  v_recoil_heads_max:=coalesce((v_plan->>'recoilHeadsMax')::integer,v_recoil_coin_count);
+                  if coalesce((v_plan->>'coinBonusCount')::integer,0)=v_recoil_coin_count and v_bonus_heads>=0 then
+                    v_recoil_heads:=v_bonus_heads;
+                  elsif coalesce((v_plan->>'coinGateCount')::integer,0)=v_recoil_coin_count and v_gate_heads>=0 then
+                    v_recoil_heads:=v_gate_heads;
+                  else
+                    v_recoil_heads:=0;
+                    for v_i in 1..v_recoil_coin_count loop
+                      if private.battle_v6_hash_roll(v_seed||':'||v_half||':recoil_coin:'||v_i)>=0.5 then v_recoil_heads:=v_recoil_heads+1; end if;
+                    end loop;
+                  end if;
+                  v_recoil_success:=v_recoil_heads between v_recoil_heads_min and v_recoil_heads_max;
+                else
+                  v_recoil_success:=true;
+                end if;
+                if v_recoil_success then c_damage:=least(c_hp,c_damage+v_recoil); end if;
+              end if;
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); c_energy:=greatest(0,c_energy-v_discard);
               if coalesce((v_plan->>'selfEnergyGain')::integer,0)>0
@@ -2598,6 +2670,13 @@ begin
               if v_heads<v_required_heads then
                 v_attack_failed:=true;
                 v_extra_turn:=false;
+                v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0);
+                v_recoil_coin_count:=coalesce((v_plan->>'recoilCoinCount')::integer,0);
+                if v_recoil>0 and v_recoil_coin_count=v_coin_count
+                   and v_heads between coalesce((v_plan->>'recoilHeadsMin')::integer,0)
+                                   and coalesce((v_plan->>'recoilHeadsMax')::integer,v_coin_count) then
+                  o_damage:=least(o_hp,o_damage+v_recoil);
+                end if;
                 v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','attack_coin_failed','attack',v_attack_name,'heads',v_heads,'coins',v_coin_count));
               end if;
             end if;
@@ -2679,7 +2758,28 @@ begin
                 if coalesce((v_plan->>'healAll')::boolean,false) then o_damage:=0;
                 elsif v_heal>0 then o_damage:=greatest(0,o_damage-v_heal); end if;
               end if;
-              v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0); if v_recoil>0 then o_damage:=least(o_hp,o_damage+v_recoil); end if;
+              v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0);
+              if v_recoil>0 then
+                v_recoil_coin_count:=coalesce((v_plan->>'recoilCoinCount')::integer,0);
+                if v_recoil_coin_count>0 then
+                  v_recoil_heads_min:=coalesce((v_plan->>'recoilHeadsMin')::integer,0);
+                  v_recoil_heads_max:=coalesce((v_plan->>'recoilHeadsMax')::integer,v_recoil_coin_count);
+                  if coalesce((v_plan->>'coinBonusCount')::integer,0)=v_recoil_coin_count and v_bonus_heads>=0 then
+                    v_recoil_heads:=v_bonus_heads;
+                  elsif coalesce((v_plan->>'coinGateCount')::integer,0)=v_recoil_coin_count and v_gate_heads>=0 then
+                    v_recoil_heads:=v_gate_heads;
+                  else
+                    v_recoil_heads:=0;
+                    for v_i in 1..v_recoil_coin_count loop
+                      if private.battle_v6_hash_roll(v_seed||':'||v_half||':recoil_coin:'||v_i)>=0.5 then v_recoil_heads:=v_recoil_heads+1; end if;
+                    end loop;
+                  end if;
+                  v_recoil_success:=v_recoil_heads between v_recoil_heads_min and v_recoil_heads_max;
+                else
+                  v_recoil_success:=true;
+                end if;
+                if v_recoil_success then o_damage:=least(o_hp,o_damage+v_recoil); end if;
+              end if;
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); o_energy:=greatest(0,o_energy-v_discard);
               if coalesce((v_plan->>'selfEnergyGain')::integer,0)>0
