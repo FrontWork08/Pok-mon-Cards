@@ -565,6 +565,15 @@ declare
   v_clear_self_poison boolean:=false;
   v_clear_defender_special boolean:=false;
   v_direct_damage_counters numeric:=0;
+  v_transfer_self_damage boolean:=false;
+  v_transfer_self_damage_chance numeric:=1;
+  v_swap_damage_counters boolean:=false;
+  v_swap_damage_chance numeric:=1;
+  v_set_defender_remaining_hp numeric:=0;
+  v_set_defender_hp_chance numeric:=1;
+  v_set_both_remaining_hp numeric:=0;
+  v_equalize_defender_to_attacker_hp boolean:=false;
+  v_hp_effect_value numeric:=0;
   v_defender_classes text;
   v_defender_retreat integer:=0;
   v_heal_all boolean:=false;
@@ -793,6 +802,15 @@ begin
     v_clear_self_poison:=false;
     v_clear_defender_special:=false;
     v_direct_damage_counters:=0;
+    v_transfer_self_damage:=false;
+    v_transfer_self_damage_chance:=1;
+    v_swap_damage_counters:=false;
+    v_swap_damage_chance:=1;
+    v_set_defender_remaining_hp:=0;
+    v_set_defender_hp_chance:=1;
+    v_set_both_remaining_hp:=0;
+    v_equalize_defender_to_attacker_hp:=false;
+    v_hp_effect_value:=0;
     v_heal_all:=false;
     v_self_energy_gain:=0;
     v_self_energy_gain_chance:=1;
@@ -1453,6 +1471,84 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'contadores distribuídos aplicados ao Ativo no 1x1');
     end if;
 
+    -- Direct damage-counter / HP manipulation.
+    if v_text not like '%benched pokémon%' then
+      if (
+        v_text like '%move all damage counters from this pokémon to the defending pokémon%'
+        or v_text like '%move all damage counters from this pokémon to your opponent''s active pokémon%'
+        or position('move all damage counters from '||lower(coalesce(v_attacker.pokemon_name,''))||' to the defending pokémon' in v_text)>0
+      ) then
+        if v_text like '%if the defending pokémon is asleep%' and lower(coalesce(p_defender_major,''))<>'asleep' then
+          null;
+        else
+          v_transfer_self_damage:=true;
+          if v_text like '%flip a coin%if heads%' then v_transfer_self_damage_chance:=0.5; end if;
+          v_effect_notes:=array_append(v_effect_notes,'transfere todo o dano do atacante ao defensor');
+        end if;
+      end if;
+
+      if (
+        v_text like '%switch all damage counters on this pokémon with those on your opponent''s active pokémon%'
+        or v_text like '%switch all damage counters on this pokémon with those on the defending pokémon%'
+        or position('switch all damage counters on '||lower(coalesce(v_attacker.pokemon_name,''))||' with those on the defending pokémon' in v_text)>0
+        or position('switch all damage counters on '||lower(coalesce(v_attacker.pokemon_name,''))||' with those on your opponent''s active pokémon' in v_text)>0
+      ) then
+        v_swap_damage_counters:=true;
+        if v_text like '%flip a coin%if heads%' then v_swap_damage_chance:=0.5; end if;
+        v_effect_notes:=array_append(v_effect_notes,'troca os contadores de dano dos dois Ativos');
+      end if;
+
+      v_match:=regexp_match(v_text,'put damage counters on (?:the defending pok[eé]mon|your opponent''s active pok[eé]mon|1 of your opponent''s pok[eé]mon) until (?:its|the defending pok[eé]mon''s) remaining hp is ([0-9]+)');
+      if v_match is null then
+        v_match:=regexp_match(v_text,'put damage counters on 1 of your opponent''s pok[eé]mon until its remaining hp is ([0-9]+)');
+      end if;
+      if v_match is not null then
+        v_set_defender_remaining_hp:=greatest(1,v_match[1]::numeric);
+        if v_text like '%flip a coin%if heads%' then v_set_defender_hp_chance:=0.5; end if;
+        v_effect_notes:=array_append(v_effect_notes,'ajusta HP restante do defensor para '||v_set_defender_remaining_hp);
+      end if;
+
+      v_match:=regexp_match(v_text,'put damage counters on both active pok[eé]mon until the remaining hp of each pok[eé]mon is ([0-9]+)');
+      if v_match is not null then
+        v_set_both_remaining_hp:=greatest(1,v_match[1]::numeric);
+        v_effect_notes:=array_append(v_effect_notes,'ajusta HP restante dos dois Ativos');
+      end if;
+
+      if v_text like '%put damage counters on the defending pokémon until the defending pokémon has the same remaining hp as%'
+         and position('same remaining hp as '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0 then
+        v_equalize_defender_to_attacker_hp:=true;
+        v_effect_notes:=array_append(v_effect_notes,'iguala HP restante do defensor ao atacante');
+      end if;
+    end if;
+
+    -- Estimate the direct value of these counter effects for attack selection.
+    if v_transfer_self_damage then
+      v_hp_effect_value:=v_hp_effect_value
+        +least(v_remaining_hp,greatest(0,coalesce(p_attacker_damage,0)))*v_transfer_self_damage_chance
+        +greatest(0,coalesce(p_attacker_damage,0))*0.35*v_transfer_self_damage_chance;
+    end if;
+    if v_swap_damage_counters then
+      v_hp_effect_value:=v_hp_effect_value
+        +(greatest(0,coalesce(p_attacker_damage,0)-coalesce(p_defender_damage,0))*1.35
+          -greatest(0,coalesce(p_defender_damage,0)-coalesce(p_attacker_damage,0))*0.5)*v_swap_damage_chance;
+    end if;
+    if v_set_defender_remaining_hp>0 and v_remaining_hp>v_set_defender_remaining_hp then
+      v_hp_effect_value:=v_hp_effect_value+(v_remaining_hp-v_set_defender_remaining_hp)*v_set_defender_hp_chance;
+    end if;
+    if v_set_both_remaining_hp>0 then
+      v_hp_effect_value:=v_hp_effect_value
+        +greatest(0,v_remaining_hp-v_set_both_remaining_hp)
+        -greatest(0,(greatest(10,least(1000,coalesce(nullif(regexp_replace(coalesce(v_attacker.tcg_data->>'hp',''),'[^0-9]','','g'),'')::numeric,50)))-coalesce(p_attacker_damage,0))-v_set_both_remaining_hp)*0.6;
+    end if;
+    if v_equalize_defender_to_attacker_hp then
+      v_hp_effect_value:=v_hp_effect_value+greatest(0,
+        v_remaining_hp-greatest(0,
+          greatest(10,least(1000,coalesce(nullif(regexp_replace(coalesce(v_attacker.tcg_data->>'hp',''),'[^0-9]','','g'),'')::numeric,50)))
+          -coalesce(p_attacker_damage,0)
+        )
+      );
+    end if;
+
     -- Special Conditions. Keep defender and self conditions strictly separate.
     -- Old cards often name the attacker instead of saying "this Pokémon".
     if v_text like '%both active pokémon are now paralyzed%'
@@ -1739,7 +1835,15 @@ begin
       case when v_cooldown_attack>0 then 2 else 1 end
     );
 
-    if v_instant_knockout and not v_self_knockout and not v_both_knockout then
+    if v_transfer_self_damage
+       and coalesce(p_attacker_damage,0)>=v_remaining_hp
+       and v_transfer_self_damage_chance=1 then
+      v_score:=1900000000-v_cost;
+    elsif v_swap_damage_counters
+       and coalesce(p_attacker_damage,0)>=v_defender_hp
+       and v_swap_damage_chance=1 then
+      v_score:=1900000000-v_cost;
+    elsif v_instant_knockout and not v_self_knockout and not v_both_knockout then
       v_score:=2000000000-v_cost;
     elsif v_both_knockout then
       v_score:=500000-v_cost;
@@ -1770,6 +1874,7 @@ begin
         +case when v_self_prevent_damage_cap_next>0 then 28 else 0 end
         +case when v_defender_energy_discard>0 or v_defender_energy_discard_coins>0 then 18 else 0 end
         +case when v_lock_defender_best then 28 else 0 end
+        +v_hp_effect_value
         +v_self_energy_gain*18
         +v_defender_energy_return*18
         +case when v_knockout_coin_count=1 and v_knockout_heads_required=1 then 220 else 0 end
@@ -1856,6 +1961,14 @@ begin
         'clearSelfPoison',v_clear_self_poison,
         'clearDefenderSpecial',v_clear_defender_special,
         'directDamageCounters',v_direct_damage_counters,
+        'transferSelfDamage',v_transfer_self_damage,
+        'transferSelfDamageChance',v_transfer_self_damage_chance,
+        'swapDamageCounters',v_swap_damage_counters,
+        'swapDamageChance',v_swap_damage_chance,
+        'setDefenderRemainingHp',v_set_defender_remaining_hp,
+        'setDefenderHpChance',v_set_defender_hp_chance,
+        'setBothRemainingHp',v_set_both_remaining_hp,
+        'equalizeDefenderToAttackerHp',v_equalize_defender_to_attacker_hp,
         'coinGateCount',v_coin_gate_count,
         'coinGateHeads',v_coin_gate_heads,
         'coinBonusCount',v_coin_bonus_count,
@@ -1983,6 +2096,8 @@ declare
   v_attack_failed boolean;
   v_extra_turn boolean:=false;
   v_direct numeric;
+  v_temp_damage numeric;
+  v_target_remaining numeric;
   v_turn_ability jsonb;
   v_attach_count integer;
   v_attach_punish numeric;
@@ -2201,6 +2316,32 @@ begin
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
+                if coalesce((v_plan->>'transferSelfDamage')::boolean,false)
+                   and private.battle_v6_hash_roll(v_seed||':'||v_half||':transfer_damage')<=coalesce((v_plan->>'transferSelfDamageChance')::numeric,1) then
+                  v_temp_damage:=c_damage;
+                  c_damage:=0;
+                  o_damage:=least(o_hp,o_damage+v_temp_damage);
+                end if;
+                if coalesce((v_plan->>'swapDamageCounters')::boolean,false)
+                   and private.battle_v6_hash_roll(v_seed||':'||v_half||':swap_damage')<=coalesce((v_plan->>'swapDamageChance')::numeric,1) then
+                  v_temp_damage:=c_damage;
+                  c_damage:=least(c_hp,o_damage);
+                  o_damage:=least(o_hp,v_temp_damage);
+                end if;
+                if coalesce((v_plan->>'setDefenderRemainingHp')::numeric,0)>0
+                   and private.battle_v6_hash_roll(v_seed||':'||v_half||':set_remaining_hp')<=coalesce((v_plan->>'setDefenderHpChance')::numeric,1) then
+                  v_target_remaining:=(v_plan->>'setDefenderRemainingHp')::numeric;
+                  if greatest(0,o_hp-o_damage)>v_target_remaining then o_damage:=least(o_hp,o_hp-v_target_remaining); end if;
+                end if;
+                if coalesce((v_plan->>'setBothRemainingHp')::numeric,0)>0 then
+                  v_target_remaining:=(v_plan->>'setBothRemainingHp')::numeric;
+                  if greatest(0,o_hp-o_damage)>v_target_remaining then o_damage:=least(o_hp,o_hp-v_target_remaining); end if;
+                  if greatest(0,c_hp-c_damage)>v_target_remaining then c_damage:=least(c_hp,c_hp-v_target_remaining); end if;
+                end if;
+                if coalesce((v_plan->>'equalizeDefenderToAttackerHp')::boolean,false) then
+                  v_target_remaining:=greatest(0,c_hp-c_damage);
+                  if greatest(0,o_hp-o_damage)>v_target_remaining then o_damage:=least(o_hp,o_hp-v_target_remaining); end if;
+                end if;
                 if coalesce((v_plan->>'bothKnockout')::boolean,false) then o_damage:=o_hp;
                 elsif coalesce((v_plan->>'knockoutCoinCount')::integer,0)>0 then
                   v_heads:=0; v_coin_count:=(v_plan->>'knockoutCoinCount')::integer;
@@ -2447,6 +2588,32 @@ begin
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
+                if coalesce((v_plan->>'transferSelfDamage')::boolean,false)
+                   and private.battle_v6_hash_roll(v_seed||':'||v_half||':transfer_damage')<=coalesce((v_plan->>'transferSelfDamageChance')::numeric,1) then
+                  v_temp_damage:=o_damage;
+                  o_damage:=0;
+                  c_damage:=least(c_hp,c_damage+v_temp_damage);
+                end if;
+                if coalesce((v_plan->>'swapDamageCounters')::boolean,false)
+                   and private.battle_v6_hash_roll(v_seed||':'||v_half||':swap_damage')<=coalesce((v_plan->>'swapDamageChance')::numeric,1) then
+                  v_temp_damage:=o_damage;
+                  o_damage:=least(o_hp,c_damage);
+                  c_damage:=least(c_hp,v_temp_damage);
+                end if;
+                if coalesce((v_plan->>'setDefenderRemainingHp')::numeric,0)>0
+                   and private.battle_v6_hash_roll(v_seed||':'||v_half||':set_remaining_hp')<=coalesce((v_plan->>'setDefenderHpChance')::numeric,1) then
+                  v_target_remaining:=(v_plan->>'setDefenderRemainingHp')::numeric;
+                  if greatest(0,c_hp-c_damage)>v_target_remaining then c_damage:=least(c_hp,c_hp-v_target_remaining); end if;
+                end if;
+                if coalesce((v_plan->>'setBothRemainingHp')::numeric,0)>0 then
+                  v_target_remaining:=(v_plan->>'setBothRemainingHp')::numeric;
+                  if greatest(0,c_hp-c_damage)>v_target_remaining then c_damage:=least(c_hp,c_hp-v_target_remaining); end if;
+                  if greatest(0,o_hp-o_damage)>v_target_remaining then o_damage:=least(o_hp,o_hp-v_target_remaining); end if;
+                end if;
+                if coalesce((v_plan->>'equalizeDefenderToAttackerHp')::boolean,false) then
+                  v_target_remaining:=greatest(0,o_hp-o_damage);
+                  if greatest(0,c_hp-c_damage)>v_target_remaining then c_damage:=least(c_hp,c_hp-v_target_remaining); end if;
+                end if;
                 if coalesce((v_plan->>'bothKnockout')::boolean,false) then c_damage:=c_hp;
                 elsif coalesce((v_plan->>'knockoutCoinCount')::integer,0)>0 then
                   v_heads:=0; v_coin_count:=(v_plan->>'knockoutCoinCount')::integer;
