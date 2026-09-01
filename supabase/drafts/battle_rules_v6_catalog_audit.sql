@@ -400,6 +400,8 @@ declare
   v_self_energy_gain integer:=0;
   v_self_energy_gain_chance numeric:=1;
   v_defender_energy_return integer:=0;
+  v_instant_knockout boolean:=false;
+  v_delayed_knockout_next boolean:=false;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
 begin
@@ -507,6 +509,8 @@ begin
     v_self_energy_gain:=0;
     v_self_energy_gain_chance:=1;
     v_defender_energy_return:=0;
+    v_instant_knockout:=false;
+    v_delayed_knockout_next:=false;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
 
@@ -827,6 +831,21 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'reduz dano dos ataques do defensor no próximo turno');
     end if;
 
+    if v_text like '%if your opponent''s active pokémon is affected by a special condition%it is knocked out%'
+       and coalesce(p_defender_special,false) then
+      v_instant_knockout:=true;
+      v_effect_notes:=array_append(v_effect_notes,'nocaute por Condição Especial');
+    end if;
+    if v_text like '%if your opponent''s active pokémon is a basic pokémon%it is knocked out%'
+       and v_defender_classes ~ '"basic"' then
+      v_instant_knockout:=true;
+      v_effect_notes:=array_append(v_effect_notes,'nocaute de Pokémon Básico');
+    end if;
+    if v_text like '%at the end of your opponent''s next turn%the defending pokémon will be knocked out%' then
+      v_delayed_knockout_next:=true;
+      v_effect_notes:=array_append(v_effect_notes,'nocaute atrasado no fim do próximo turno');
+    end if;
+
     -- Opponent next-turn attack interference.
     if (v_text like '%if the defending pokémon tries to attack during your opponent''s next turn%'
         or v_text like '%during your opponent''s next turn, if the defending pokémon tries to use an attack%')
@@ -968,7 +987,9 @@ begin
       case when v_cooldown_attack>0 then 2 else 1 end
     );
 
-    if v_remaining_hp>0 and (v_expected+v_direct_damage_counters)>=v_remaining_hp then
+    if v_instant_knockout then
+      v_score:=2000000000-v_cost;
+    elsif v_remaining_hp>0 and (v_expected+v_direct_damage_counters)>=v_remaining_hp then
       v_score:=1000000000+v_expected+v_direct_damage_counters-v_cost;
     else
       v_score:=(v_expected+v_direct_damage_counters)/v_interval
@@ -982,6 +1003,7 @@ begin
         +case when v_lock_defender_best then 28 else 0 end
         +v_self_energy_gain*18
         +v_defender_energy_return*18
+        +case when v_delayed_knockout_next then 160 else 0 end
         +case when v_defender_cannot_attack_next then 45 else 0 end
         +v_defender_outgoing_reduction_next*0.35
         +v_defender_attack_gate_chance*35
@@ -1028,6 +1050,8 @@ begin
         'selfEnergyGain',v_self_energy_gain,
         'selfEnergyGainChance',v_self_energy_gain_chance,
         'defenderEnergyReturn',v_defender_energy_return,
+        'instantKnockout',v_instant_knockout,
+        'delayedKnockoutNext',v_delayed_knockout_next,
         'selfPreventNext',v_self_prevent_next,
         'selfPreventChance',v_self_prevent_chance,
         'selfPreventClass',v_self_prevent_class,
@@ -1119,6 +1143,8 @@ declare
   o_reactive_next numeric:=0;
   c_prevent_damage_cap_next numeric:=0;
   o_prevent_damage_cap_next numeric:=0;
+  c_delayed_ko_next boolean:=false;
+  o_delayed_ko_next boolean:=false;
   c_first boolean;
   v_seed text;
   v_is_c boolean;
@@ -1324,6 +1350,8 @@ begin
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
+                if coalesce((v_plan->>'instantKnockout')::boolean,false) then o_damage:=o_hp; end if;
+                if coalesce((v_plan->>'delayedKnockoutNext')::boolean,false) then o_delayed_ko_next:=true; end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then o_attack_gate_next:=greatest(o_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
                 if coalesce((v_plan->>'defenderCannotAttackNext')::boolean,false) then o_cooldown_all:=greatest(o_cooldown_all,1); end if;
                 if coalesce((v_plan->>'defenderOutgoingReductionNext')::numeric,0)>0 then o_outgoing_reduction_next:=greatest(o_outgoing_reduction_next,(v_plan->>'defenderOutgoingReductionNext')::numeric); end if;
@@ -1505,6 +1533,8 @@ begin
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
+                if coalesce((v_plan->>'instantKnockout')::boolean,false) then c_damage:=c_hp; end if;
+                if coalesce((v_plan->>'delayedKnockoutNext')::boolean,false) then c_delayed_ko_next:=true; end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then c_attack_gate_next:=greatest(c_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
                 if coalesce((v_plan->>'defenderCannotAttackNext')::boolean,false) then c_cooldown_all:=greatest(c_cooldown_all,1); end if;
                 if coalesce((v_plan->>'defenderOutgoingReductionNext')::numeric,0)>0 then c_outgoing_reduction_next:=greatest(c_outgoing_reduction_next,(v_plan->>'defenderOutgoingReductionNext')::numeric); end if;
@@ -1535,6 +1565,12 @@ begin
           v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','charging_or_restricted','energy',o_energy));
         end if;
       end if;
+    end if;
+
+    if v_is_c then
+      if c_delayed_ko_next then c_damage:=c_hp; c_delayed_ko_next:=false; end if;
+    else
+      if o_delayed_ko_next then o_damage:=o_hp; o_delayed_ko_next:=false; end if;
     end if;
 
     -- Expire effects whose wording is limited to the just-finished turn.
