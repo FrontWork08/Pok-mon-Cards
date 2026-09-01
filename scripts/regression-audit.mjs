@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
   'supabase/migrations/20260901115912_lower_coin_packs_more_and_optimize_bulk_duplicate_sales.sql',
@@ -79,8 +80,33 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(battle.includes('loadStaticBattleResources'), 'Regressão de performance: recursos estáticos da batalha não estão separados.');
   assert(battle.includes('realtimeRefreshTimer'), 'Regressão de performance: eventos realtime da batalha perderam o coalescing.');
   assert(!battle.includes('setInterval(tick, 250)'), 'Regressão de performance: cronômetro da batalha voltou a renderizar 4x por segundo.');
+  assert(battle.includes('Regra v5 TCG'), 'Regressão de batalha: UI deixou de informar as regras TCG v5.');
+  assert(!battle.includes('Regra v4: vence quem consegue o nocaute mais rápido'), 'Regressão de batalha: UI voltou a anunciar a fórmula antiga v4 como regra ativa.');
+  assert(battle.includes('virtualEnergy'), 'Regressão de batalha: histórico deixou de renderizar o estado de Energia virtual da v5.');
   const stateLoader = battle.split('const loadBattleState')[1]?.split('const loadStaticBattleResources')[0] ?? '';
   assert(!stateLoader.includes('getMyBag()') && !stateLoader.includes('getMyDecks()'), 'Regressão de performance: realtime da batalha voltou a baixar Bag/Decks completos.');
+}
+
+if (existsSync('supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql')) {
+  const battleV5 = read('supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql');
+  assert(battleV5.includes('private.battle_v5_hash_roll'), 'Regressão v5: sorteios determinísticos do duelo TCG foram removidos.');
+  assert(battleV5.includes('private.battle_v5_attack_plan'), 'Regressão v5: planejador de ataques TCG foi removido.');
+  assert(battleV5.includes('private.battle_simulate_duel_v5'), 'Regressão v5: simulador por turnos foi removido.');
+  assert(battleV5.includes("'engine','official_tcg_virtual_energy'"), 'Regressão v5: motor deixou de registrar Energia virtual oficial.');
+  assert(battleV5.includes("'first_player_no_attack'"), 'Regressão v5: primeiro jogador voltou a poder atacar no primeiro turno.');
+  assert(battleV5.includes('c_energy:=least(12,c_energy+1)') && battleV5.includes('o_energy:=least(12,o_energy+1)'), 'Regressão v5: Energia virtual deixou de ser anexada uma vez por turno.');
+  assert(battleV5.includes("'energy_discard_bonus'") && battleV5.includes("'coin_multiplier'") && battleV5.includes("'virtual_hand_energy_multiplier'"), 'Regressão v5: dano +/× e descarte de Energia perderam suporte.');
+  assert(battleV5.includes("'cooldown_skip'") && battleV5.includes("'paralyzed_skip'") && battleV5.includes('c_poison') && battleV5.includes('c_burn'), 'Regressão v5: recarga ou Condições Especiais perderam suporte.');
+  assert(battleV5.includes('remaining hp becomes 10'), 'Regressão v5: habilidades defensivas de sobrevivência deixaram de ser aplicadas.');
+  assert(battleV5.includes('rules_version=5'), 'Regressão v5: rodadas novas deixaram de ser marcadas com regra 5.');
+  assert(battleV5.includes('v_sim:=private.battle_simulate_duel_v5'), 'Regressão v5: resolver de batalha deixou de usar a simulação TCG.');
+  assert(battleV5.includes('revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated'), 'Regressão de segurança v5: resolver interno de batalha não pode ficar exposto ao cliente.');
+}
+
+if (existsSync('src/components/CardPickerModal.tsx')) {
+  const picker = read('src/components/CardPickerModal.tsx');
+  assert(picker.includes('Visão geral TCG'), 'Regressão de UX: seletor de batalha deixou de apresentar visão TCG.');
+  assert(!picker.includes('PWR ${combat.battleRating}'), 'Regressão de UX: seletor voltou a sugerir que PWR decide a batalha.');
 }
 
 if (existsSync('src/lib/session.ts')) {
