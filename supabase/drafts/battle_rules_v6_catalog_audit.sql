@@ -423,6 +423,7 @@ create or replace function private.battle_v6_attack_plan(
   p_defender_damage numeric,
   p_defender_special boolean,
   p_defender_poison boolean,
+  p_defender_burn boolean,
   p_defender_major text,
   p_ignore_defender_weakness boolean,
   p_gx_used boolean,
@@ -582,6 +583,59 @@ begin
     if coalesce(p_vstar_used,false) and v_original_text like '%you can''t use more than 1 vstar power in a game%' then continue; end if;
     if coalesce(p_second_player_first_turn,false)
        and v_original_text like '%if you go second, you can''t use this attack during your first turn%' then continue; end if;
+
+    -- Conditions that can be evaluated exactly in the isolated 1v1 state.
+    if v_original_text like '%if this pokémon has no damage counters on it, this attack does nothing%'
+       and coalesce(p_attacker_damage,0)<=0 then continue; end if;
+    if v_original_text like '%if poliwrath was damaged by an attack during your opponent''s last turn, this attack does nothing%'
+       and coalesce(p_attacker_last_damage_received,0)>0 then continue; end if;
+
+    if (
+      v_original_text like '%if the defending pokémon is not asleep, this attack does nothing%'
+      or v_original_text like '%you can''t use this attack unless the defending pokémon is asleep%'
+      or v_original_text like '%this attack can be used if this pokémon is asleep. if it is not asleep, this attack does nothing%'
+    ) and lower(coalesce(p_defender_major,''))<>'asleep' then continue; end if;
+
+    if v_original_text like '%if your opponent''s active pokémon isn''t confused, this attack does nothing%'
+       and lower(coalesce(p_defender_major,''))<>'confused' then continue; end if;
+    if v_original_text like '%if your opponent''s active pokémon isn''t burned, this attack does nothing%'
+       and not coalesce(p_defender_burn,false) then continue; end if;
+    if v_original_text like '%if your opponent''s active pokémon isn''t a pokémon ex, this attack does nothing%'
+       and not (v_defender_classes ~ '"ex"') then continue; end if;
+
+    if v_original_text like '%this attack can''t be used unless sabrina''s abra and the defending pokémon have the same number of energy cards attached to them%'
+       and coalesce(p_energy,0)<>coalesce(p_defender_energy,0) then continue; end if;
+    if v_original_text like '%if light venomoth and the defending pokémon have a different number of energy cards attached to them, this attack does nothing%'
+       and coalesce(p_energy,0)<>coalesce(p_defender_energy,0) then continue; end if;
+
+    -- This round has no Bench, Stadium, Prize area, Lost Zone, Tools, or evolution/bench-transition event.
+    if v_original_text like '%if there is no stadium in play, this attack does nothing%'
+       or v_original_text like '%if there is no stadium card in play, this attack does nothing%'
+       or v_original_text like '%discard a stadium in play. if you can''t, this attack does nothing%'
+       or v_original_text like '%if you have 4 or fewer benched pokémon, this attack does nothing%'
+       or v_original_text like '%if you don''t have lunatone on your bench, this attack does nothing%'
+       or v_original_text like '%if you don''t have uxie and azelf on your bench, this attack does nothing%'
+       or v_original_text like '%if don''t have uxie lv.x and azelf lv.x in play, this attack does nothing%'
+       or v_original_text like '%if your opponent has no benched pokémon, this attack does nothing%'
+       or v_original_text like '%this attack can''t be used if your opponent has no benched pokémon%'
+       or v_original_text like '%you can use this attack only if you have 10 or more cards in the lost zone%'
+       or v_original_text like '%if the defending pokémon has no pokémon tool card attached to it, this attack does nothing%'
+       or v_original_text like '%if this pokémon didn''t move from the bench to the active spot this turn, this attack does nothing%'
+       or v_original_text like '%if this pokémon didn't move from the bench to the active spot this turn, this attack does nothing%'
+       or v_original_text like '%if this pokémon didn't evolve from loudred during this turn, this attack does nothing%'
+    then continue; end if;
+
+    if v_original_text like '%prize card%' and (
+      v_original_text like '%you can use this attack only if%'
+      or v_original_text like '%if your opponent doesn''t have exactly%'
+      or v_original_text like '%if you have more prize cards remaining%'
+    ) then continue; end if;
+
+    -- No hand is simulated. Explicit nonzero hand-count requirements therefore fail.
+    if v_original_text ~ 'if you don.t have exactly [1-9][0-9]* cards in your hand, this attack does nothing'
+       or v_original_text like '%if your opponent has 5 or fewer cards in their hand, this attack does nothing%'
+       or v_original_text like '%if you have less cards in your hand than your opponent%if you have more or the same number of cards in your hand as your opponent, this attack does nothing%'
+    then continue; end if;
 
     v_copy_source:=null;
     v_copy_source_name:=null;
@@ -930,6 +984,24 @@ begin
       v_raw:=0;
       v_expected_raw:=0;
       v_effect_notes:=array_append(v_effect_notes,'ataque exige defensor Adormecido');
+    end if;
+
+    if v_text like '%flip a coin%' and v_text like '%if tails%' and v_text like '%this attack does nothing%' then
+      v_coin_gate_count:=greatest(v_coin_gate_count,1);
+      v_coin_gate_heads:=greatest(v_coin_gate_heads,1);
+      v_effect_notes:=array_append(v_effect_notes,'ataque exige cara');
+    end if;
+
+    if v_text ~ 'flip 2 coins?.*if (?:both of them|both) (?:are )?tails, this attack does nothing' then
+      v_coin_gate_count:=greatest(v_coin_gate_count,2);
+      v_coin_gate_heads:=greatest(v_coin_gate_heads,1);
+      v_effect_notes:=array_append(v_effect_notes,'ataque falha apenas com duas coroas');
+    end if;
+
+    if v_text ~ 'flip 2 coins?.*if (?:1 or both of them|either of them|any of them) (?:is|are)? ?tails, this attack does nothing' then
+      v_coin_gate_count:=greatest(v_coin_gate_count,2);
+      v_coin_gate_heads:=greatest(v_coin_gate_heads,2);
+      v_effect_notes:=array_append(v_effect_notes,'ataque exige duas caras');
     end if;
 
     -- Attack gates.
@@ -1524,11 +1596,11 @@ begin
         end if;
         if c_blocked_turns>0 and c_blocked_attack is not null then v_blocked:=array_append(v_blocked,c_blocked_attack); end if;
         if c_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
+          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           c_disable_best_next:=c_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
+        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1722,11 +1794,11 @@ begin
         end if;
         if o_blocked_turns>0 and o_blocked_attack is not null then v_blocked:=array_append(v_blocked,o_blocked_attack); end if;
         if o_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
+          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           o_disable_best_next:=o_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
+        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -2085,7 +2157,7 @@ revoke all on function private.battle_v6_turn_ability_effects(text) from public,
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,numeric,boolean,boolean,text,boolean,boolean,boolean,boolean,text[]) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,numeric,boolean,boolean,boolean,text,boolean,boolean,boolean,boolean,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
 grant execute on function public.server_resolve_battle_round(uuid) to service_role;
