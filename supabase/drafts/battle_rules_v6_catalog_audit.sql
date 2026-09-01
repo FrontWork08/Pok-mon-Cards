@@ -1635,9 +1635,18 @@ begin
     if v_text ~ 'during your opponent''s next turn, whenever your opponent''s attack damages [^.]+.*opponent''s active pok[eé]mon is now poisoned'
        or v_text ~ 'during your opponent''s next turn, if (?:this pok[eé]mon|[^,.]+) is damaged by (?:an opponent''s |an )?attack.*attacking pok[eé]mon is now poisoned' then
       v_self_reactive_status_next:='poisoned';
+      -- This condition belongs to the future reactive trigger, not to the attack that sets it up.
+      if v_text ~ 'during your opponent''s next turn.*(?:opponent''s active pok[eé]mon|attacking pok[eé]mon) is now poisoned' then
+        v_inflict_poison:=false;
+        if v_status='poisoned' then v_status:=null; end if;
+      end if;
       v_effect_notes:=array_append(v_effect_notes,'contra-status Poison no próximo turno');
     elsif v_text ~ 'during your opponent''s next turn, if (?:this pok[eé]mon|[^,.]+) is damaged by (?:an opponent''s |an )?attack.*attacking pok[eé]mon is now burned' then
       v_self_reactive_status_next:='burned';
+      if v_text ~ 'during your opponent''s next turn.*attacking pok[eé]mon is now burned' then
+        v_inflict_burn:=false;
+        if v_status='burned' then v_status:=null; end if;
+      end if;
       v_effect_notes:=array_append(v_effect_notes,'contra-status Burn no próximo turno');
     end if;
 
