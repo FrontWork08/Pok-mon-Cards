@@ -428,6 +428,7 @@ declare
   v_instant_knockout boolean:=false;
   v_delayed_knockout_next boolean:=false;
   v_defender_heal_block_next boolean:=false;
+  v_extra_turn boolean:=false;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
 begin
@@ -542,6 +543,7 @@ begin
     v_instant_knockout:=false;
     v_delayed_knockout_next:=false;
     v_defender_heal_block_next:=false;
+    v_extra_turn:=false;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
 
@@ -928,6 +930,11 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'bloqueia cura no próximo turno');
     end if;
 
+    if v_text like '%take another turn after this one%' then
+      v_extra_turn:=true;
+      v_effect_notes:=array_append(v_effect_notes,'concede um turno extra');
+    end if;
+
     -- Opponent next-turn attack interference.
     if (v_text like '%if the defending pokémon tries to attack during your opponent''s next turn%'
         or v_text like '%during your opponent''s next turn, if the defending pokémon tries to use an attack%')
@@ -1093,6 +1100,7 @@ begin
         +v_defender_energy_return*18
         +case when v_delayed_knockout_next then 160 else 0 end
         +case when v_defender_heal_block_next then 24 else 0 end
+        +case when v_extra_turn then 70 else 0 end
         +case when v_defender_cannot_attack_next then 45 else 0 end
         +v_defender_outgoing_reduction_next*0.35
         +v_defender_attack_gate_chance*35
@@ -1142,6 +1150,7 @@ begin
         'instantKnockout',v_instant_knockout,
         'delayedKnockoutNext',v_delayed_knockout_next,
         'defenderHealBlockNext',v_defender_heal_block_next,
+        'extraTurn',v_extra_turn,
         'usesGxLimit',v_text like '%you can''t use more than 1 gx attack in a game%',
         'usesVstarLimit',v_text like '%you can''t use more than 1 vstar power in a game%',
         'selfPreventNext',v_self_prevent_next,
@@ -1267,6 +1276,7 @@ declare
   v_reactive numeric;
   v_reactive_status text;
   v_attack_failed boolean;
+  v_extra_turn boolean:=false;
   v_direct numeric;
   v_turn_ability jsonb;
   v_attach_count integer;
@@ -1296,9 +1306,10 @@ begin
   o_hp:=(o_profile->>'hp')::numeric;
   v_seed:=coalesce(p_seed,p_battle_id::text||':'||p_round_no);
   c_first:=coalesce(p_first_challenger,private.battle_v6_hash_roll(v_seed||':first')>=0.5);
+  v_is_c:=c_first;
 
   for v_half in 1..80 loop
-    v_is_c:=case when c_first then mod(v_half,2)=1 else mod(v_half,2)=0 end;
+    v_extra_turn:=false;
 
     if v_is_c then
       o_last_received_attack:=0;
@@ -1346,10 +1357,12 @@ begin
           v_attack_name:=v_plan->>'attackName';
           if coalesce((v_plan->>'usesGxLimit')::boolean,false) then c_gx_used:=true; end if;
           if coalesce((v_plan->>'usesVstarLimit')::boolean,false) then c_vstar_used:=true; end if;
+          v_extra_turn:=coalesce((v_plan->>'extraTurn')::boolean,false);
 
           if c_major='confused' and private.battle_v6_hash_roll(v_seed||':'||v_half||':confused')<0.5 then
             c_damage:=least(c_hp,c_damage+30);
             v_attack_failed:=true;
+            v_extra_turn:=false;
             v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','confusion_tails','selfDamage',30,'attack',v_attack_name));
           else
             v_coin_count:=coalesce((v_plan->>'coinGateCount')::integer,0);
@@ -1361,6 +1374,7 @@ begin
               end loop;
               if v_heads<v_required_heads then
                 v_attack_failed:=true;
+                v_extra_turn:=false;
                 v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','attack_coin_failed','attack',v_attack_name,'heads',v_heads,'coins',v_coin_count));
               end if;
             end if;
@@ -1539,10 +1553,12 @@ begin
           v_attack_name:=v_plan->>'attackName';
           if coalesce((v_plan->>'usesGxLimit')::boolean,false) then o_gx_used:=true; end if;
           if coalesce((v_plan->>'usesVstarLimit')::boolean,false) then o_vstar_used:=true; end if;
+          v_extra_turn:=coalesce((v_plan->>'extraTurn')::boolean,false);
 
           if o_major='confused' and private.battle_v6_hash_roll(v_seed||':'||v_half||':confused')<0.5 then
             o_damage:=least(o_hp,o_damage+30);
             v_attack_failed:=true;
+            v_extra_turn:=false;
             v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','confusion_tails','selfDamage',30,'attack',v_attack_name));
           else
             v_coin_count:=coalesce((v_plan->>'coinGateCount')::integer,0);
@@ -1554,6 +1570,7 @@ begin
               end loop;
               if v_heads<v_required_heads then
                 v_attack_failed:=true;
+                v_extra_turn:=false;
                 v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','attack_coin_failed','attack',v_attack_name,'heads',v_heads,'coins',v_coin_count));
               end if;
             end if;
@@ -1733,7 +1750,8 @@ begin
       exit;
     end if;
 
-    -- Pokemon Checkup after every turn.
+    if not v_extra_turn then
+      -- Pokemon Checkup after every turn.
     if c_poison then c_damage:=least(c_hp,c_damage+10); end if;
     if o_poison then o_damage:=least(o_hp,o_damage+10); end if;
     if c_burn then
@@ -1754,6 +1772,9 @@ begin
       elsif o_damage>=o_hp then v_winner_side:='challenger'; v_resolution:='pokemon_checkup_ko';
       else v_winner_side:='opponent'; v_resolution:='pokemon_checkup_ko'; end if;
       exit;
+    end if;
+
+      v_is_c:=not v_is_c;
     end if;
   end loop;
 
