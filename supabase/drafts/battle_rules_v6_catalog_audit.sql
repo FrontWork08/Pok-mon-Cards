@@ -63,6 +63,38 @@ begin
 end;
 $$;
 
+create or replace function private.battle_v6_matches_class(
+  p_card_id text,
+  p_class text
+)
+returns boolean
+language plpgsql
+stable
+set search_path=''
+as $
+declare
+  v_card public.cards%rowtype;
+  v_classes text;
+  v_has_ability boolean:=false;
+begin
+  if coalesce(p_class,'all')='all' then return true; end if;
+  select * into v_card from public.cards where id=p_card_id;
+  if v_card.id is null then return false; end if;
+  v_classes:=lower(coalesce(v_card.tcg_data->'subtypes','[]'::jsonb)::text);
+  v_has_ability:=jsonb_typeof(v_card.tcg_data->'abilities')='array'
+    and jsonb_array_length(v_card.tcg_data->'abilities')>0;
+  return case lower(p_class)
+    when 'ex' then v_classes ~ '"ex"'
+    when 'v' then v_classes ~ '"v"' or v_classes ~ '"vmax"' or v_classes ~ '"vstar"' or v_classes ~ '"v-union"'
+    when 'vmax' then v_classes ~ '"vmax"'
+    when 'gx' then v_classes ~ '"gx"'
+    when 'basic' then v_classes ~ '"basic"'
+    when 'ability' then v_has_ability
+    else true
+  end;
+end;
+$;
+
 create or replace function private.battle_v6_defense_adjustment(
   p_attacker_card_id text,
   p_defender_card_id text,
@@ -263,9 +295,12 @@ declare
   v_ignore_resistance boolean:=false;
   v_defender_energy_discard integer:=0;
   v_defender_energy_discard_chance numeric:=1;
+  v_defender_energy_discard_coins integer:=0;
   v_self_reduction_next numeric:=0;
   v_self_prevent_next boolean:=false;
   v_self_prevent_chance numeric:=1;
+  v_self_prevent_class text:='all';
+  v_cooldown_attack_permanent boolean:=false;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
 begin
@@ -348,9 +383,12 @@ begin
     v_ignore_resistance:=false;
     v_defender_energy_discard:=0;
     v_defender_energy_discard_chance:=1;
+    v_defender_energy_discard_coins:=0;
     v_self_reduction_next:=0;
     v_self_prevent_next:=false;
     v_self_prevent_chance:=1;
+    v_self_prevent_class:='all';
+    v_cooldown_attack_permanent:=false;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
 
@@ -511,7 +549,12 @@ begin
     end if;
 
     -- Energy discard from the opposing Active Pokemon.
-    if (
+    v_match:=regexp_match(v_text,'flip ([0-9]+) coins?.*for each heads, discard (?:an|a) energy (?:card )?(?:attached to |from )?(?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)');
+    if v_match is not null then
+      v_defender_energy_discard_coins:=greatest(1,least(v_match[1]::integer,20));
+      v_defender_energy_discard:=0;
+      v_effect_notes:=array_append(v_effect_notes,'descarta Energia do defensor por cara');
+    elsif (
       v_text ~ 'discard (an|a) energy (?:card )?(?:attached to |from )(?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)'
       or v_text ~ 'discard an energy card attached to the defending pok[eé]mon'
     ) then
@@ -530,6 +573,9 @@ begin
        or v_text like '%during your next turn, this pokemon can''t use%' then
       v_cooldown_attack:=1;
       v_effect_notes:=array_append(v_effect_notes,'ataque bloqueado no próximo turno');
+    elsif v_text like '%can''t use this attack again as long as%' or v_text like '%cannot use this attack again as long as%' then
+      v_cooldown_attack_permanent:=true;
+      v_effect_notes:=array_append(v_effect_notes,'ataque não pode ser reutilizado enquanto permanecer em jogo');
     end if;
 
     -- Opponent next-turn attack interference.
@@ -559,8 +605,8 @@ begin
     if v_match is not null then v_recoil:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'dano de recuo'); end if;
     v_match:=regexp_match(v_text,'heal ([0-9]+) damage from this pok[eé]mon');
     if v_match is not null then v_heal:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'cura'); end if;
-    if v_text like '%heal from this pokémon the same amount of damage you did to your opponent''s active pokémon%'
-       or v_text like '%heal from this pokemon the same amount of damage you did to your opponent''s active pokemon%' then
+    if v_text like '%heal from this pokémon the same amount of damage you did%'
+       or v_text like '%heal from this pokemon the same amount of damage you did%' then
       v_heal_equal:=true;
       v_effect_notes:=array_append(v_effect_notes,'cura igual ao dano causado');
     end if;
@@ -579,7 +625,12 @@ begin
     if v_text like '%during your opponent''s next turn%prevent all damage%done to this pokémon%' then
       v_self_prevent_next:=true;
       if v_text like '%flip a coin%' and v_text like '%if heads%' then v_self_prevent_chance:=0.5; end if;
-      v_effect_notes:=array_append(v_effect_notes,'previne dano no próximo turno');
+      if v_text like '%from pokémon-ex%' or v_text like '%from pokémon ex%' then v_self_prevent_class:='ex';
+      elsif v_text like '%from pokémon vmax%' then v_self_prevent_class:='vmax';
+      elsif v_text like '%from pokémon v%' then v_self_prevent_class:='v';
+      elsif v_text like '%from basic pokémon%' then v_self_prevent_class:='basic';
+      else v_self_prevent_class:='all'; end if;
+      v_effect_notes:=array_append(v_effect_notes,'previne dano no próximo turno ('||v_self_prevent_class||')');
     end if;
 
     -- Weakness / Resistance bypass.
@@ -644,8 +695,10 @@ begin
         'discardEnergy',least(greatest(v_discard,0),coalesce(p_energy,0)),
         'defenderEnergyDiscard',v_defender_energy_discard,
         'defenderEnergyDiscardChance',v_defender_energy_discard_chance,
+        'defenderEnergyDiscardCoins',v_defender_energy_discard_coins,
         'cooldownAll',v_cooldown_all,
         'cooldownAttack',v_cooldown_attack,
+        'cooldownAttackPermanent',v_cooldown_attack_permanent,
         'defenderAttackGateChance',v_defender_attack_gate_chance,
         'lockDefenderBest',v_lock_defender_best,
         'inflictStatus',v_status,
@@ -656,6 +709,7 @@ begin
         'selfReductionNext',v_self_reduction_next,
         'selfPreventNext',v_self_prevent_next,
         'selfPreventChance',v_self_prevent_chance,
+        'selfPreventClass',v_self_prevent_class,
         'coinGateCount',v_coin_gate_count,
         'coinGateHeads',v_coin_gate_heads,
         'coinBonusCount',v_coin_bonus_count,
@@ -725,8 +779,8 @@ declare
   o_blocked_turns integer:=0;
   c_reduce_next numeric:=0;
   o_reduce_next numeric:=0;
-  c_prevent_next boolean:=false;
-  o_prevent_next boolean:=false;
+  c_prevent_next_class text:=null;
+  o_prevent_next_class text:=null;
   c_attack_gate_next numeric:=0;
   o_attack_gate_next numeric:=0;
   c_disable_best_next integer:=0;
@@ -796,7 +850,6 @@ begin
       elsif c_major='asleep' then
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','asleep_skip','energy',c_energy));
       elsif c_cooldown_all>0 then
-        c_cooldown_all:=c_cooldown_all-1;
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','cooldown_skip','energy',c_energy));
       elsif c_attack_gate_next>0 and private.battle_v6_hash_roll(v_seed||':'||v_half||':attack_gate')<c_attack_gate_next then
         c_attack_gate_next:=0;
@@ -811,7 +864,6 @@ begin
           c_disable_best_next:=c_disable_best_next-1;
         end if;
         v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,v_blocked);
-        if c_blocked_turns>0 then c_blocked_turns:=c_blocked_turns-1; if c_blocked_turns=0 then c_blocked_attack:=null; end if; end if;
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -868,8 +920,8 @@ begin
                 v_effective:=greatest(0,v_raw*coalesce((v_plan->>'weaknessMultiplier')::numeric,1)+coalesce((v_plan->>'weaknessBonus')::numeric,0)-coalesce((v_plan->>'resistance')::numeric,0));
               end if;
 
-              if o_prevent_next then v_effective:=0; o_prevent_next:=false;
-              elsif o_reduce_next>0 then v_effective:=greatest(0,v_effective-o_reduce_next); o_reduce_next:=0; end if;
+              if o_prevent_next_class is not null and private.battle_v6_matches_class(c.id,o_prevent_next_class) then v_effective:=0;
+              elsif o_reduce_next>0 then v_effective:=greatest(0,v_effective-o_reduce_next); end if;
 
               v_def:=private.battle_v6_defense_adjustment(c.id,o.id,o_damage,v_effective,v_seed||':'||v_half||':def');
               v_effective:=coalesce((v_def->>'damage')::numeric,v_effective);
@@ -888,15 +940,22 @@ begin
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); c_energy:=greatest(0,c_energy-v_discard);
               c_cooldown_all:=greatest(c_cooldown_all,coalesce((v_plan->>'cooldownAll')::integer,0));
-              if coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then c_blocked_attack:=v_attack_name; c_blocked_turns:=1; end if;
+              if coalesce((v_plan->>'cooldownAttackPermanent')::boolean,false) then c_blocked_attack:=v_attack_name; c_blocked_turns:=99;
+              elsif coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then c_blocked_attack:=v_attack_name; c_blocked_turns:=1; end if;
 
               if coalesce((v_plan->>'selfReductionNext')::numeric,0)>0 then c_reduce_next:=greatest(c_reduce_next,(v_plan->>'selfReductionNext')::numeric); end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
-              then c_prevent_next:=true; end if;
+              then c_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
 
               if not v_effect_immune then
-                if coalesce((v_plan->>'defenderEnergyDiscard')::integer,0)>0
+                if coalesce((v_plan->>'defenderEnergyDiscardCoins')::integer,0)>0 then
+                  v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardCoins')::integer;
+                  for v_i in 1..v_coin_count loop
+                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
+                  end loop;
+                  o_energy:=greatest(0,o_energy-v_heads);
+                elsif coalesce((v_plan->>'defenderEnergyDiscard')::integer,0)>0
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then o_attack_gate_next:=greatest(o_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
@@ -941,7 +1000,6 @@ begin
       elsif o_major='asleep' then
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','asleep_skip','energy',o_energy));
       elsif o_cooldown_all>0 then
-        o_cooldown_all:=o_cooldown_all-1;
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','cooldown_skip','energy',o_energy));
       elsif o_attack_gate_next>0 and private.battle_v6_hash_roll(v_seed||':'||v_half||':attack_gate')<o_attack_gate_next then
         o_attack_gate_next:=0;
@@ -956,7 +1014,6 @@ begin
           o_disable_best_next:=o_disable_best_next-1;
         end if;
         v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,v_blocked);
-        if o_blocked_turns>0 then o_blocked_turns:=o_blocked_turns-1; if o_blocked_turns=0 then o_blocked_attack:=null; end if; end if;
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1013,8 +1070,8 @@ begin
                 v_effective:=greatest(0,v_raw*coalesce((v_plan->>'weaknessMultiplier')::numeric,1)+coalesce((v_plan->>'weaknessBonus')::numeric,0)-coalesce((v_plan->>'resistance')::numeric,0));
               end if;
 
-              if c_prevent_next then v_effective:=0; c_prevent_next:=false;
-              elsif c_reduce_next>0 then v_effective:=greatest(0,v_effective-c_reduce_next); c_reduce_next:=0; end if;
+              if c_prevent_next_class is not null and private.battle_v6_matches_class(o.id,c_prevent_next_class) then v_effective:=0;
+              elsif c_reduce_next>0 then v_effective:=greatest(0,v_effective-c_reduce_next); end if;
 
               v_def:=private.battle_v6_defense_adjustment(o.id,c.id,c_damage,v_effective,v_seed||':'||v_half||':def');
               v_effective:=coalesce((v_def->>'damage')::numeric,v_effective);
@@ -1033,15 +1090,22 @@ begin
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); o_energy:=greatest(0,o_energy-v_discard);
               o_cooldown_all:=greatest(o_cooldown_all,coalesce((v_plan->>'cooldownAll')::integer,0));
-              if coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then o_blocked_attack:=v_attack_name; o_blocked_turns:=1; end if;
+              if coalesce((v_plan->>'cooldownAttackPermanent')::boolean,false) then o_blocked_attack:=v_attack_name; o_blocked_turns:=99;
+              elsif coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then o_blocked_attack:=v_attack_name; o_blocked_turns:=1; end if;
 
               if coalesce((v_plan->>'selfReductionNext')::numeric,0)>0 then o_reduce_next:=greatest(o_reduce_next,(v_plan->>'selfReductionNext')::numeric); end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
-              then o_prevent_next:=true; end if;
+              then o_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
 
               if not v_effect_immune then
-                if coalesce((v_plan->>'defenderEnergyDiscard')::integer,0)>0
+                if coalesce((v_plan->>'defenderEnergyDiscardCoins')::integer,0)>0 then
+                  v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardCoins')::integer;
+                  for v_i in 1..v_coin_count loop
+                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
+                  end loop;
+                  c_energy:=greatest(0,c_energy-v_heads);
+                elsif coalesce((v_plan->>'defenderEnergyDiscard')::integer,0)>0
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then c_attack_gate_next:=greatest(c_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
@@ -1070,6 +1134,29 @@ begin
         else
           v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','charging_or_restricted','energy',o_energy));
         end if;
+      end if;
+    end if;
+
+    -- Expire effects whose wording is limited to the just-finished turn.
+    if v_is_c then
+      o_reduce_next:=0;
+      o_prevent_next_class:=null;
+      c_attack_gate_next:=0;
+      c_disable_best_next:=0;
+      if c_cooldown_all>0 then c_cooldown_all:=c_cooldown_all-1; end if;
+      if c_blocked_turns>0 and c_blocked_turns<99 then
+        c_blocked_turns:=c_blocked_turns-1;
+        if c_blocked_turns=0 then c_blocked_attack:=null; end if;
+      end if;
+    else
+      c_reduce_next:=0;
+      c_prevent_next_class:=null;
+      o_attack_gate_next:=0;
+      o_disable_best_next:=0;
+      if o_cooldown_all>0 then o_cooldown_all:=o_cooldown_all-1; end if;
+      if o_blocked_turns>0 and o_blocked_turns<99 then
+        o_blocked_turns:=o_blocked_turns-1;
+        if o_blocked_turns=0 then o_blocked_attack:=null; end if;
       end if;
     end if;
 
@@ -1225,6 +1312,7 @@ $$;
 
 revoke all on function private.battle_v6_hash_roll(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_can_attack(text,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_matches_class(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
