@@ -515,8 +515,8 @@ if (existsSync('src/components/AuraFrame.tsx')) {
   assert(auraFrame.indexOf('<View style={styles.inner}>{children}</View>') < auraFrame.indexOf('styles.flowTop'), 'Regressão visual: efeitos do AuraFrame precisam ser renderizados acima de cards opacos.');
   assert(auraFrame.includes('styles.glowA') && auraFrame.includes('styles.glowB'), 'Regressão visual: AuraFrame perdeu o brilho interno.');
   assert(auraFrame.includes('styles.shine'), 'Regressão visual: AuraFrame perdeu o reflexo interno.');
-  assert(auraFrame.includes('GalaxyFlowOverlay') && auraFrame.includes("variant==='galaxy'"), 'Regressão visual: AuraFrame Galaxy perdeu a atmosfera naturalista compartilhada.');
-  assert(auraFrame.includes("intensity==='master'?.92:intensity==='premium'?.78:.62"), 'Regressão visual: superfícies Galaxy ficaram fracas demais.');
+  assert(auraFrame.includes("variant==='galaxy'?(") && auraFrame.includes('styles.nebula') && auraFrame.includes('styles.galaxyOrb'), 'Regressão visual: AuraFrame Galaxy perdeu o visual cósmico clássico.');
+  assert(auraFrame.includes('styles.flowTop') && auraFrame.includes('styles.flowBottom'), 'Regressão visual: AuraFrame Galaxy perdeu os trilhos clássicos de energia.');
   assert(auraFrame.includes('AccessibilityInfo.isReduceMotionEnabled'), 'Regressão de acessibilidade: AuraFrame não respeita redução de movimento.');
 }
 
@@ -547,8 +547,8 @@ if (existsSync('src/components/MarketplaceListingSurface.tsx')) {
   assert(marketSurface.includes('styles.topRail') && marketSurface.includes('translateX:topRail'), 'Regressão visual: Marketplace perdeu fluxo interno superior.');
   assert(marketSurface.includes('styles.bottomRail') && marketSurface.includes('translateX:bottomRail'), 'Regressão visual: Marketplace perdeu fluxo interno inferior.');
   assert(marketSurface.includes('styles.shine'), 'Regressão visual: Marketplace perdeu reflexo interno premium.');
-  assert(marketSurface.includes('GalaxyFlowOverlay') && marketSurface.includes('visual.galaxy'), 'Regressão visual: Galaxy Market perdeu a atmosfera naturalista interna.');
-  assert(marketSurface.includes('opacity={0.76}'), 'Regressão visual: Galaxy Market ficou fraco demais.');
+  assert(marketSurface.includes('visual.galaxy?(') && marketSurface.includes('styles.nebula') && marketSurface.includes('styles.nebulaSmall'), 'Regressão visual: Galaxy Market perdeu o efeito cósmico clássico.');
+  assert(marketSurface.includes('styles.cornerGem') && marketSurface.includes('styles.spark'), 'Regressão visual: Galaxy Market perdeu brilhos e gemas do visual anterior.');
   assert(marketSurface.includes('<View style={styles.content}>{children}</View>'), 'Regressão visual: conteúdo do anúncio deixou de ser preservado abaixo dos efeitos.');
 }
 
@@ -642,10 +642,10 @@ if (existsSync('src/components/PremiumProfileFrame.tsx')) {
   assert(premiumFrame.includes('energyRail'), 'Regressão visual: molduras premium perderam o fluxo de energia.');
   assert(premiumFrame.includes('shine'), 'Regressão visual: molduras premium perderam o reflexo de luxo.');
   assert(premiumFrame.includes('cornerGem'), 'Regressão visual: molduras premium perderam os cristais de canto.');
-  assert(premiumFrame.includes('GalaxyFlowOverlay'), 'Regressão visual: Galaxy Flow perdeu a nebulosa integrada à moldura.');
-  assert(premiumFrame.includes("const naturalGalaxy=preset.theme==='galaxy'"), 'Regressão visual: moldura Galaxy perdeu o modo naturalista.');
-  assert(premiumFrame.includes('compact ? .74 : .88'), 'Regressão visual: Galaxy Flow ficou fraco demais nas molduras de perfil.');
-  assert(premiumFrame.includes('preset.tier >= 4 && !naturalGalaxy'), 'Regressão visual: moldura Galaxy voltou a usar órbitas sintéticas.');
+  assert(premiumFrame.includes('GalaxyFlowOverlay'), 'Regressão visual: Galaxy Flow perdeu o overlay integrado à moldura.');
+  assert(!premiumFrame.includes('naturalGalaxy'), 'Regressão visual: moldura Galaxy voltou ao modo naturalista que foi revertido.');
+  assert(premiumFrame.includes('compact ? .72 : .92'), 'Regressão visual: intensidade clássica do Galaxy Flow foi alterada nas molduras.');
+  assert(premiumFrame.includes('styles.orbitWide') && premiumFrame.includes('styles.energyRail'), 'Regressão visual: moldura Galaxy perdeu órbitas ou trilhos clássicos.');
   assert(premiumFrame.includes('AccessibilityInfo.isReduceMotionEnabled'), 'Regressão de acessibilidade: molduras premium não respeitam redução de movimento.');
 }
 
@@ -671,13 +671,11 @@ if (existsSync('src/components/GalaxyFlowOverlay.tsx')) {
   assert(galaxy.includes('GalaxyFlowOverlay'), 'Regressão visual: overlay Galaxy Flow foi removido.');
   assert(galaxy.includes('#8B5CFF') && galaxy.includes('#55E6FF'), 'Regressão visual: paleta cósmica Galaxy Flow foi alterada.');
   assert(galaxy.includes('AccessibilityInfo.isReduceMotionEnabled'), 'Regressão de acessibilidade: Galaxy Flow não respeita redução de movimento.');
-  assert(galaxy.includes('cloudViolet') && galaxy.includes('cloudBlue') && galaxy.includes('dustA'), 'Regressão visual: Galaxy Flow perdeu nuvens irregulares ou faixas de poeira.');
-  assert(galaxy.includes('BRIGHT_STARS') && galaxy.includes('bloomHorizontal'), 'Regressão visual: Galaxy Flow perdeu estrelas pontuais e blooms discretos.');
-  assert(galaxy.includes('opacity:.20*strength') && galaxy.includes('opacity:.16*strength'), 'Regressão visual: Galaxy Flow ficou invisível por opacidade baixa demais.');
-  assert(galaxy.includes('milkyCore') && galaxy.includes('milkyCoreBack'), 'Regressão visual: Galaxy Flow perdeu a faixa luminosa principal da nebulosa.');
+  assert(galaxy.includes('nebulaA') && galaxy.includes('nebulaB') && galaxy.includes('nebulaC'), 'Regressão visual: Galaxy Flow clássico perdeu as nebulosas coloridas.');
+  assert(galaxy.includes('flowRibbon') && galaxy.includes('orbitOuter') && galaxy.includes('orbitInner'), 'Regressão visual: Galaxy Flow clássico perdeu faixas ou órbitas neon.');
   assert(galaxy.includes("root:{overflow:'hidden',zIndex:18}"), 'Regressão visual: Galaxy Flow pode voltar a ficar atrás do conteúdo.');
-  assert(galaxy.includes('const sharedDrift=new Animated.Value(.42)') && galaxy.includes('galaxyUsers'), 'Regressão de performance: Galaxy Flow deve compartilhar animação entre todas as instâncias.');
-  assert(!galaxy.includes('flowRibbon') && !galaxy.includes('orbitOuter'), 'Regressão visual: Galaxy Flow voltou aos anéis/faixas neon artificiais.');
+  assert(galaxy.includes('const sharedDrift=new Animated.Value(.36)') && galaxy.includes('galaxyUsers'), 'Regressão de performance: Galaxy Flow deve continuar compartilhando animação entre instâncias.');
+  assert(!galaxy.includes('cloudViolet') && !galaxy.includes('milkyCore'), 'Regressão visual: Galaxy Flow voltou à reformulação naturalista que foi revertida.');
 }
 
 if (existsSync('supabase/migrations/20260831121232_economy_v21_galaxy_flow_collection.sql')) {
