@@ -724,7 +724,7 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'sem Fraqueza no próximo turno');
     end if;
 
-    v_match:=regexp_match(v_text,'during your opponent''s next turn, if this pok[eé]mon is damaged by an attack.*put ([0-9]+) damage counters? on the attacking pok[eé]mon');
+    v_match:=regexp_match(v_text,'during your opponent''s next turn, if this pok[eé]mon is damaged by an attack.*(?:put|place) ([0-9]+) damage counters? on the attacking pok[eé]mon');
     if v_match is not null then
       v_self_reactive_damage_next:=v_match[1]::numeric*10;
       v_effect_notes:=array_append(v_effect_notes,'contra-dano no próximo turno');
@@ -794,15 +794,20 @@ begin
       case when v_cooldown_attack>0 then 2 else 1 end
     );
 
-    if v_remaining_hp>0 and v_expected>=v_remaining_hp then
-      v_score:=1000000000+v_expected-v_cost;
+    if v_remaining_hp>0 and (v_expected+v_direct_damage_counters)>=v_remaining_hp then
+      v_score:=1000000000+v_expected+v_direct_damage_counters-v_cost;
     else
-      v_score:=v_expected/v_interval
+      v_score:=(v_expected+v_direct_damage_counters)/v_interval
         +v_status_bonus
         +v_self_reduction_next*0.25
         +case when v_self_prevent_next then 45 else 0 end
-        +case when v_defender_energy_discard>0 then 18 else 0 end
+        +case when v_self_no_weakness_next then 22 else 0 end
+        +v_self_reactive_damage_next*0.30
+        +case when v_self_prevent_damage_cap_next>0 then 28 else 0 end
+        +case when v_defender_energy_discard>0 or v_defender_energy_discard_coins>0 then 18 else 0 end
         +case when v_lock_defender_best then 28 else 0 end
+        +case when v_defender_cannot_attack_next then 45 else 0 end
+        +v_defender_outgoing_reduction_next*0.35
         +v_defender_attack_gate_chance*35
         -v_recoil*0.5
         +v_heal*0.2
