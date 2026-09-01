@@ -202,10 +202,9 @@ export function PremiumProfileFrame({
   const shineX = flow.interpolate({ inputRange: [0, .68, 1], outputRange: [-180, compact ? 260 : 620, compact ? 260 : 620] });
   const cornerPulse = pulse.interpolate({ inputRange: [0, 1], outputRange: [.7, 1.18] });
 
-  const naturalGalaxy=preset.theme==='galaxy';
-  const border = compact ? 2 : naturalGalaxy ? 2 : preset.tier >= 4 ? 3 : 2;
+  const border = compact ? 2 : preset.tier >= 4 ? 3 : 2;
   const railHeight = compact ? 2 : preset.tier >= 4 ? 4 : 3;
-  const particleCount = naturalGalaxy ? 0 : compact ? Math.min(5, preset.particles) : preset.particles;
+  const particleCount = compact ? Math.min(5, preset.particles) : preset.particles;
 
   if (!enabled) return <View style={style}>{children}</View>;
 
@@ -218,7 +217,7 @@ export function PremiumProfileFrame({
           {
             borderRadius: radius + 8,
             borderColor: preset.primary,
-            opacity:naturalGalaxy?pulse.interpolate({inputRange:[0,1],outputRange:[compact?.20:.28,compact?.42:.56]}):outerOpacity,
+            opacity: outerOpacity,
             transform: [{ scale: outerScale }],
           },
         ]}
@@ -238,7 +237,7 @@ export function PremiumProfileFrame({
         ]}
       />
 
-      {preset.tier >= 4 && !naturalGalaxy ? (
+      {preset.tier >= 4 ? (
         <>
           <Animated.View
             pointerEvents="none"
@@ -278,7 +277,7 @@ export function PremiumProfileFrame({
         ]}
       >
         {preset.theme === 'galaxy' ? (
-          <GalaxyFlowOverlay intensity="master" opacity={compact ? .74 : .88} />
+          <GalaxyFlowOverlay intensity="master" opacity={compact ? .72 : .92} />
         ) : null}
 
         <Animated.View
@@ -296,42 +295,36 @@ export function PremiumProfileFrame({
           ]}
         />
 
-        {!naturalGalaxy?(
-          <>
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.energyRail,
-              styles.energyTop,
-              {
-                height: railHeight,
-                width: compact ? 82 : preset.tier >= 4 ? 150 : 116,
-                backgroundColor: preset.secondary,
-                opacity: outerOpacity,
-                transform: [{ translateX: topFlow }],
-              },
-            ]}
-          />
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.energyRail,
-              styles.energyBottom,
-              {
-                height: railHeight,
-                width: compact ? 82 : preset.tier >= 4 ? 150 : 116,
-                backgroundColor: preset.tertiary,
-                opacity: outerOpacity,
-                transform: [{ translateX: bottomFlow }],
-              },
-            ]}
-          />
-  
-  
-          </>
-        ):null}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.energyRail,
+            styles.energyTop,
+            {
+              height: railHeight,
+              width: compact ? 82 : preset.tier >= 4 ? 150 : 116,
+              backgroundColor: preset.secondary,
+              opacity: outerOpacity,
+              transform: [{ translateX: topFlow }],
+            },
+          ]}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.energyRail,
+            styles.energyBottom,
+            {
+              height: railHeight,
+              width: compact ? 82 : preset.tier >= 4 ? 150 : 116,
+              backgroundColor: preset.tertiary,
+              opacity: outerOpacity,
+              transform: [{ translateX: bottomFlow }],
+            },
+          ]}
+        />
 
-        {preset.tier >= 3 && !naturalGalaxy ? (
+        {preset.tier >= 3 ? (
           <Animated.View
             pointerEvents="none"
             style={[
@@ -379,7 +372,7 @@ export function PremiumProfileFrame({
           );
         })}
 
-        {preset.tier >= 4 && !naturalGalaxy ? (
+        {preset.tier >= 4 ? (
           <>
             <Animated.View pointerEvents="none" style={[styles.cornerGem, styles.cornerTL, { backgroundColor: preset.secondary, transform: [{ scale: cornerPulse }] }]} />
             <Animated.View pointerEvents="none" style={[styles.cornerGem, styles.cornerTR, { backgroundColor: preset.tertiary, transform: [{ scale: cornerPulse }] }]} />
