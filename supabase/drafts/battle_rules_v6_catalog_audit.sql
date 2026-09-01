@@ -508,6 +508,7 @@ declare
   v_self_energy_gain integer:=0;
   v_self_energy_gain_chance numeric:=1;
   v_defender_energy_return integer:=0;
+  v_required_self_discard integer:=0;
   v_instant_knockout boolean:=false;
   v_delayed_knockout_next boolean:=false;
   v_defender_heal_block_next boolean:=false;
@@ -718,6 +719,7 @@ begin
     v_self_energy_gain:=0;
     v_self_energy_gain_chance:=1;
     v_defender_energy_return:=0;
+    v_required_self_discard:=0;
     v_instant_knockout:=false;
     v_delayed_knockout_next:=false;
     v_defender_heal_block_next:=false;
@@ -1034,6 +1036,45 @@ begin
       v_coin_gate_heads:=v_coin_gate_count;
       v_expected_raw:=v_expected_raw*power(0.5,v_coin_gate_count);
       v_effect_notes:=array_append(v_effect_notes,'ataque exige todas as moedas em cara');
+    end if;
+
+    -- Mandatory additional Energy payment on legacy attacks.
+    -- Color is abstracted by virtual Energy, but named Special Energy has no equivalent and is unavailable.
+    if v_text like '%plasma energy%' and v_text like '%attack does nothing%' then continue; end if;
+    if v_text like '%voltaic lightning energy%' and v_text like '%attack does nothing%' then continue; end if;
+
+    v_match:=regexp_match(v_text,'discard ([0-9]+)(?: basic)?(?: [a-z]+)? energy cards? attached to [^.,]+(?: or this attack does nothing|.*if you can.t discard(?: cards)?[^.]*this attack does nothing)');
+    if v_match is not null then
+      v_required_self_discard:=greatest(v_required_self_discard,v_match[1]::integer);
+    end if;
+
+    if v_text ~ 'discard (?:a|an)(?: basic)?(?: [a-z]+)? energy card attached to [^.,]+ or this attack does nothing'
+       or v_text ~ 'discard (?:a|an) basic energy card attached to [^.,]+ or this attack does nothing' then
+      v_required_self_discard:=greatest(v_required_self_discard,1);
+    end if;
+
+    if v_text ~ 'discard 1 [a-z]+ energy card and 1 [a-z]+ energy card attached to [^.,]+ or this attack does nothing' then
+      v_required_self_discard:=greatest(v_required_self_discard,2);
+    end if;
+
+    if v_text ~ 'discard all(?: [a-z]+)? energy cards? attached to [^.,]+ or this attack does nothing' then
+      if coalesce(p_energy,0)<=0 then continue; end if;
+      v_required_self_discard:=greatest(v_required_self_discard,coalesce(p_energy,0));
+    end if;
+
+    if v_required_self_discard>coalesce(p_energy,0) then continue; end if;
+    if v_required_self_discard>0 then
+      v_discard:=greatest(v_discard,v_required_self_discard);
+      v_effect_notes:=array_append(v_effect_notes,'custo adicional obrigatório de Energia');
+    end if;
+
+    -- Explicit mandatory hand/discard-pile resources are unavailable in the isolated duel.
+    if (
+      v_text like '%from your hand%' or v_text like '%in your discard pile%'
+    ) and v_text like '%attack does nothing%' and (
+      v_text like '%if you can''t%' or v_text like '%if you don''t%' or v_text like '%if you have fewer than%'
+    ) then
+      continue;
     end if;
 
     -- Energy discard from self.
