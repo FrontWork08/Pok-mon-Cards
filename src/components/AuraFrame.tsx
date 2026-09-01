@@ -8,7 +8,6 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 
 type AuraIntensity='soft'|'premium'|'master';
 
@@ -152,7 +151,7 @@ export function AuraFrame({
           {
             borderRadius:radius+4,
             borderColor:primaryColor,
-            opacity:Animated.multiply(pulse,variant==='galaxy'?config.border*.58:config.border),
+            opacity:Animated.multiply(pulse,config.border),
             transform:[{scale:pulseScale}],
           },
         ]}
@@ -164,74 +163,65 @@ export function AuraFrame({
           {
             borderRadius:radius+8,
             borderColor:second,
-            opacity:Animated.multiply(pulse,variant==='galaxy'?(intensity==='master'?.22:.14):(intensity==='master'?.42:.24)),
+            opacity:Animated.multiply(pulse,intensity==='master'?.42:.24),
           },
         ]}
       />
 
       <View style={[styles.content,{borderRadius:radius}]}>
         <View style={styles.inner}>{children}</View>
-        {variant==='galaxy'?<GalaxyFlowOverlay intensity={intensity} opacity={intensity==='master'?.92:intensity==='premium'?.78:.62}/>:null}
 
-        {variant!=='galaxy'?(
-          <>
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.glow,
-                styles.glowA,
-                {
-                  backgroundColor:primaryColor,
-                  opacity:Animated.multiply(pulse,config.glow),
-                  transform:[{translateX:driftA},{scale:pulseScale}],
-                },
-              ]}
-            />
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.glow,
-                styles.glowB,
-                {
-                  backgroundColor:second,
-                  opacity:Animated.multiply(pulse,config.glow*.75),
-                  transform:[{translateX:driftB}],
-                },
-              ]}
-            />
-          </>
-        ):null}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.glow,
+            styles.glowA,
+            {
+              backgroundColor:primaryColor,
+              opacity:Animated.multiply(pulse,config.glow),
+              transform:[{translateX:driftA},{scale:pulseScale}],
+            },
+          ]}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.glow,
+            styles.glowB,
+            {
+              backgroundColor:second,
+              opacity:Animated.multiply(pulse,config.glow*.75),
+              transform:[{translateX:driftB}],
+            },
+          ]}
+        />
 
-        {variant!=='galaxy'?(
-          <>
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.flowTop,
-                {
-                  height:config.rail,
-                  backgroundColor:primaryColor,
-                  opacity:Animated.multiply(pulse,config.border),
-                  transform:[{translateX:topX}],
-                },
-              ]}
-            />
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.flowBottom,
-                {
-                  height:config.rail,
-                  backgroundColor:second,
-                  opacity:Animated.multiply(pulse,config.border),
-                  transform:[{translateX:bottomX}],
-                },
-              ]}
-            />
-          </>
-        ):null}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flowTop,
+            {
+              height:config.rail,
+              backgroundColor:primaryColor,
+              opacity:Animated.multiply(pulse,config.border),
+              transform:[{translateX:topX}],
+            },
+          ]}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flowBottom,
+            {
+              height:config.rail,
+              backgroundColor:second,
+              opacity:Animated.multiply(pulse,config.border),
+              transform:[{translateX:bottomX}],
+            },
+          ]}
+        />
 
-        {variant!=='galaxy'&&intensity!=='soft'?(
+        {intensity!=='soft'?(
           <Animated.View
             pointerEvents="none"
             style={[
@@ -256,14 +246,10 @@ export function AuraFrame({
           ]}
         />
 
-        {variant!=='galaxy'?(
-          <>
-            <Animated.View pointerEvents="none" style={[styles.gem,styles.gemTL,{backgroundColor:second,opacity:twinkle}]}/>
-            <Animated.View pointerEvents="none" style={[styles.gem,styles.gemBR,{backgroundColor:primaryColor,opacity:pulse}]}/>
-          </>
-        ):null}
+        <Animated.View pointerEvents="none" style={[styles.gem,styles.gemTL,{backgroundColor:second,opacity:twinkle}]}/>
+        <Animated.View pointerEvents="none" style={[styles.gem,styles.gemBR,{backgroundColor:primaryColor,opacity:pulse}]}/>
 
-        {variant!=='galaxy'&&intensity!=='soft'?STARS.map(([left,top,size],index)=>(
+        {intensity!=='soft'?STARS.map(([left,top,size],index)=>(
           <Animated.View
             key={index}
             pointerEvents="none"
@@ -282,7 +268,43 @@ export function AuraFrame({
           />
         )):null}
 
-
+        {variant==='galaxy'?(
+          <>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.nebula,
+                {
+                  backgroundColor:'#8B5CFF',
+                  opacity:Animated.multiply(pulse,intensity==='master'?.13:.09),
+                  transform:[{translateX:bottomX},{rotate:'-9deg'}],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.nebulaSmall,
+                {
+                  backgroundColor:'#55E6FF',
+                  opacity:Animated.multiply(twinkle,intensity==='master'?.10:.07),
+                  transform:[{translateX:topX},{rotate:'10deg'}],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.galaxyOrb,
+                {
+                  backgroundColor:'#E056FD',
+                  opacity:Animated.multiply(pulse,.10),
+                  transform:[{translateX:driftA},{scale:pulseScale}],
+                },
+              ]}
+            />
+          </>
+        ):null}
       </View>
     </View>
   );
@@ -305,4 +327,7 @@ const styles=StyleSheet.create({
   gemTL:{left:8,top:8},
   gemBR:{right:8,bottom:8},
   star:{position:'absolute',zIndex:10},
+  nebula:{position:'absolute',left:-220,top:'24%',width:270,height:30,borderRadius:999,zIndex:6},
+  nebulaSmall:{position:'absolute',left:-185,bottom:'18%',width:220,height:21,borderRadius:999,zIndex:6},
+  galaxyOrb:{position:'absolute',right:-44,top:'18%',width:120,height:120,borderRadius:999,zIndex:5},
 });
