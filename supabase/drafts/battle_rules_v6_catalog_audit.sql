@@ -1662,8 +1662,8 @@ begin
         -case v_inflict_self_major when 'paralyzed' then 45 when 'asleep' then 28 when 'confused' then 18 else 0 end
         -case when v_inflict_self_poison then 14 else 0 end
         -case when v_inflict_self_burn then 18 else 0 end
-        +case when v_inflict_self_poison then private.battle_v6_self_status_payoff(v_attacker.id,'poisoned')*greatest(1,v_weakness_multiplier)*0.5 else 0 end
-        +case when v_inflict_self_burn then private.battle_v6_self_status_payoff(v_attacker.id,'burned')*greatest(1,v_weakness_multiplier)*0.5 else 0 end
+        +case when v_inflict_self_poison then private.battle_v6_self_status_payoff(v_attacker.id,'poisoned')*greatest(1,v_weakness_multiplier)*0.65 else 0 end
+        +case when v_inflict_self_burn then private.battle_v6_self_status_payoff(v_attacker.id,'burned')*greatest(1,v_weakness_multiplier)*0.65 else 0 end
         +case when v_inflict_self_major is not null then private.battle_v6_self_status_payoff(v_attacker.id,'special')*greatest(1,v_weakness_multiplier)*0.4 else 0 end
         +case when v_clear_self_special and (coalesce(p_attacker_poison,false) or coalesce(p_attacker_burn,false) or p_attacker_major is not null) then 28 else 0 end
         +case when v_clear_self_poison and coalesce(p_attacker_poison,false) then 16 else 0 end
