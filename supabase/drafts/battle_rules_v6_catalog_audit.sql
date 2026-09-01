@@ -768,6 +768,9 @@ create or replace function private.battle_v6_attack_plan(
   p_gx_used boolean,
   p_vstar_used boolean,
   p_second_player_first_turn boolean,
+  p_healed_this_turn boolean,
+  p_next_attack_bonus_name text,
+  p_next_attack_bonus numeric,
   p_blocked_attacks text[] default null
 )
 returns jsonb
@@ -887,6 +890,8 @@ declare
   v_defender_heal_block_next boolean:=false;
   v_extra_turn boolean:=false;
   v_extra_turn_on_knockout boolean:=false;
+  v_self_next_attack_bonus_name text:=null;
+  v_self_next_attack_bonus numeric:=0;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
   v_original_text text;
@@ -952,7 +957,7 @@ begin
       case when jsonb_typeof(v_attack->'cost')='array' then jsonb_array_length(v_attack->'cost') else 0 end,
       0
     );
-    v_cost:=greatest(0,least(12,v_cost));
+    v_cost:=greatest(0,least(12,v_cost+private.battle_v6_ability_cost_delta(v_attacker.id,v_defender.id)));
     if coalesce(p_energy,0)<v_cost then continue; end if;
 
     v_original_text:=lower(coalesce(v_attack->>'text',''));
@@ -1073,6 +1078,13 @@ begin
     v_heal_equal:=false;
     v_effect_notes:=array[]::text[];
     v_status_bonus:=0;
+    if coalesce(p_next_attack_bonus,0)>0
+       and p_next_attack_bonus_name is not null
+       and lower(v_name)=lower(p_next_attack_bonus_name) then
+      v_raw:=v_raw+p_next_attack_bonus;
+      v_expected_raw:=v_expected_raw+p_next_attack_bonus;
+      v_effect_notes:=array_append(v_effect_notes,'bônus armazenado do turno anterior: +'||p_next_attack_bonus);
+    end if;
     v_coin_gate_count:=0;
     v_coin_gate_heads:=0;
     v_coin_bonus_count:=0;
@@ -1134,6 +1146,8 @@ begin
     v_defender_heal_block_next:=false;
     v_extra_turn:=false;
     v_extra_turn_on_knockout:=false;
+    v_self_next_attack_bonus_name:=null;
+    v_self_next_attack_bonus:=0;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
     if v_copy_source is not null then
@@ -1187,6 +1201,13 @@ begin
         v_expected_raw:=v_raw;
         v_effect_notes:=array_append(v_effect_notes,'dano multi-alvo aplicado uma vez ao único Ativo');
       end if;
+    end if;
+
+    v_match:=regexp_match(v_text,'if this pok[eé]mon was healed during this turn, this attack does ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_healed_this_turn,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_expected_raw+v_match[1]::numeric;
+      v_effect_notes:=array_append(v_effect_notes,'bônus por ter sido curado neste turno');
     end if;
 
     -- Non-random conditional damage.
@@ -1816,6 +1837,13 @@ begin
        or v_text ~ 'if one of your pok[eé]mon used .+ during your last turn, this attack can.t be used' then
       v_cooldown_attack:=greatest(v_cooldown_attack,1);
       v_effect_notes:=array_append(v_effect_notes,'não pode repetir no turno seguinte');
+    end if;
+
+    v_match:=regexp_match(v_text,'during your next turn, this pok[eé]mon''s ([a-z0-9 ''-]+) attack does ([0-9]+) more damage');
+    if v_match is not null then
+      v_self_next_attack_bonus_name:=trim(v_match[1]);
+      v_self_next_attack_bonus:=v_match[2]::numeric;
+      v_effect_notes:=array_append(v_effect_notes,'prepara bônus para ataque no próximo turno');
     end if;
 
     -- Cooldowns.
@@ -2488,6 +2516,7 @@ begin
         +case when v_defender_heal_block_next then 24 else 0 end
         +case when v_extra_turn then 70 else 0 end
         +case when v_extra_turn_on_knockout then 35 else 0 end
+        +v_self_next_attack_bonus*0.45
         +case when v_defender_cannot_attack_next then 45 else 0 end
         +v_defender_outgoing_reduction_next*0.35
         +v_defender_attack_gate_chance*35
@@ -2555,6 +2584,8 @@ begin
         'defenderHealBlockNext',v_defender_heal_block_next,
         'extraTurn',v_extra_turn,
         'extraTurnOnKnockout',v_extra_turn_on_knockout,
+        'selfNextAttackBonusName',v_self_next_attack_bonus_name,
+        'selfNextAttackBonus',v_self_next_attack_bonus,
         'usesGxLimit',v_uses_gx_limit,
         'usesVstarLimit',v_uses_vstar_limit,
         'copiedAttack',v_copy_source is not null,
@@ -2681,6 +2712,12 @@ declare
   o_gx_used boolean:=false;
   c_vstar_used boolean:=false;
   o_vstar_used boolean:=false;
+  c_healed_this_turn boolean:=false;
+  o_healed_this_turn boolean:=false;
+  c_next_attack_bonus_name text:=null;
+  o_next_attack_bonus_name text:=null;
+  c_next_attack_bonus numeric:=0;
+  o_next_attack_bonus numeric:=0;
   c_first boolean;
   v_seed text;
   v_is_c boolean;
@@ -2758,13 +2795,14 @@ begin
 
     if v_is_c then
       o_last_received_attack:=0;
+      c_healed_this_turn:=false;
       c_turns:=c_turns+1;
       v_turn_ability:=private.battle_v6_turn_ability_effects(c.id);
       v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
       c_energy:=least(12,c_energy+v_attach_count);
-      if not c_heal_block_next and coalesce((v_turn_ability->>'heal')::numeric,0)>0
+      if not c_heal_block_next and c_damage>0 and coalesce((v_turn_ability->>'heal')::numeric,0)>0
          and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
-      then c_damage:=greatest(0,c_damage-(v_turn_ability->>'heal')::numeric); end if;
+      then c_damage:=greatest(0,c_damage-(v_turn_ability->>'heal')::numeric); c_healed_this_turn:=true; end if;
       if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then c_major:=null; c_poison:=false; c_poison_checkup_damage:=10; c_burn:=false; end if;
       if coalesce((v_turn_ability->>'damageOpponent')::numeric,0)>0 then o_damage:=least(o_hp,o_damage+(v_turn_ability->>'damageOpponent')::numeric); end if;
       if coalesce((v_turn_ability->>'burnOpponent')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
@@ -2799,14 +2837,15 @@ begin
         end if;
         if c_blocked_turns>0 and c_blocked_attack is not null then v_blocked:=array_append(v_blocked,c_blocked_attack); end if;
         if c_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,c_poison,c_burn,c_major,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
+          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,c_poison,c_burn,c_major,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),c_healed_this_turn,c_next_attack_bonus_name,c_next_attack_bonus,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           c_disable_best_next:=c_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,c_poison,c_burn,c_major,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
+        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,c_poison,c_burn,c_major,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),c_healed_this_turn,c_next_attack_bonus_name,c_next_attack_bonus,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
+          if c_next_attack_bonus_name is not null and lower(v_attack_name)=lower(c_next_attack_bonus_name) then c_next_attack_bonus_name:=null; c_next_attack_bonus:=0; end if;
           v_gate_heads:=-1; v_bonus_heads:=-1;
           if coalesce((v_plan->>'usesGxLimit')::boolean,false) then c_gx_used:=true; end if;
           if coalesce((v_plan->>'usesVstarLimit')::boolean,false) then c_vstar_used:=true; end if;
@@ -2964,6 +3003,10 @@ begin
               elsif coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then c_blocked_attack:=v_attack_name; c_blocked_turns:=1; end if;
 
               if coalesce((v_plan->>'selfReductionNext')::numeric,0)>0 then c_reduce_next:=greatest(c_reduce_next,(v_plan->>'selfReductionNext')::numeric); end if;
+              if coalesce((v_plan->>'selfNextAttackBonus')::numeric,0)>0 and coalesce(v_plan->>'selfNextAttackBonusName','')<>'' then
+                c_next_attack_bonus_name:=v_plan->>'selfNextAttackBonusName';
+                c_next_attack_bonus:=(v_plan->>'selfNextAttackBonus')::numeric;
+              end if;
               if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then c_no_weakness_next:=true; end if;
               if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then c_reactive_next:=greatest(c_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
               if coalesce((v_plan->>'selfReactiveMultiplierNext')::numeric,0)>0 then c_reactive_multiplier_next:=greatest(c_reactive_multiplier_next,(v_plan->>'selfReactiveMultiplierNext')::numeric); end if;
@@ -3087,13 +3130,14 @@ begin
 
     else
       c_last_received_attack:=0;
+      o_healed_this_turn:=false;
       o_turns:=o_turns+1;
       v_turn_ability:=private.battle_v6_turn_ability_effects(o.id);
       v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
       o_energy:=least(12,o_energy+v_attach_count);
-      if not o_heal_block_next and coalesce((v_turn_ability->>'heal')::numeric,0)>0
+      if not o_heal_block_next and o_damage>0 and coalesce((v_turn_ability->>'heal')::numeric,0)>0
          and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
-      then o_damage:=greatest(0,o_damage-(v_turn_ability->>'heal')::numeric); end if;
+      then o_damage:=greatest(0,o_damage-(v_turn_ability->>'heal')::numeric); o_healed_this_turn:=true; end if;
       if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then o_major:=null; o_poison:=false; o_poison_checkup_damage:=10; o_burn:=false; end if;
       if coalesce((v_turn_ability->>'damageOpponent')::numeric,0)>0 then c_damage:=least(c_hp,c_damage+(v_turn_ability->>'damageOpponent')::numeric); end if;
       if coalesce((v_turn_ability->>'burnOpponent')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
@@ -3128,14 +3172,15 @@ begin
         end if;
         if o_blocked_turns>0 and o_blocked_attack is not null then v_blocked:=array_append(v_blocked,o_blocked_attack); end if;
         if o_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,o_poison,o_burn,o_major,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
+          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,o_poison,o_burn,o_major,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),o_healed_this_turn,o_next_attack_bonus_name,o_next_attack_bonus,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           o_disable_best_next:=o_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,o_poison,o_burn,o_major,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
+        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,o_poison,o_burn,o_major,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),o_healed_this_turn,o_next_attack_bonus_name,o_next_attack_bonus,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
+          if o_next_attack_bonus_name is not null and lower(v_attack_name)=lower(o_next_attack_bonus_name) then o_next_attack_bonus_name:=null; o_next_attack_bonus:=0; end if;
           v_gate_heads:=-1; v_bonus_heads:=-1;
           if coalesce((v_plan->>'usesGxLimit')::boolean,false) then o_gx_used:=true; end if;
           if coalesce((v_plan->>'usesVstarLimit')::boolean,false) then o_vstar_used:=true; end if;
@@ -3293,6 +3338,10 @@ begin
               elsif coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then o_blocked_attack:=v_attack_name; o_blocked_turns:=1; end if;
 
               if coalesce((v_plan->>'selfReductionNext')::numeric,0)>0 then o_reduce_next:=greatest(o_reduce_next,(v_plan->>'selfReductionNext')::numeric); end if;
+              if coalesce((v_plan->>'selfNextAttackBonus')::numeric,0)>0 and coalesce(v_plan->>'selfNextAttackBonusName','')<>'' then
+                o_next_attack_bonus_name:=v_plan->>'selfNextAttackBonusName';
+                o_next_attack_bonus:=(v_plan->>'selfNextAttackBonus')::numeric;
+              end if;
               if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then o_no_weakness_next:=true; end if;
               if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then o_reactive_next:=greatest(o_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
               if coalesce((v_plan->>'selfReactiveMultiplierNext')::numeric,0)>0 then o_reactive_multiplier_next:=greatest(o_reactive_multiplier_next,(v_plan->>'selfReactiveMultiplierNext')::numeric); end if;
@@ -3635,7 +3684,7 @@ revoke all on function private.battle_v6_turn_ability_effects(text) from public,
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,boolean,text,numeric,boolean,boolean,boolean,text,boolean,boolean,boolean,boolean,text[]) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,boolean,text,numeric,boolean,boolean,boolean,text,boolean,boolean,boolean,boolean,boolean,text,numeric,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
 grant execute on function public.server_resolve_battle_round(uuid) to service_role;
