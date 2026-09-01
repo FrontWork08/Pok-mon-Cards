@@ -195,6 +195,7 @@ begin
       case when jsonb_typeof(v_attack->'cost')='array' then jsonb_array_length(v_attack->'cost') else 0 end,
       0
     );
+    v_cost:=greatest(0,v_cost+private.battle_v6_ability_cost_delta(v_attacker.id,v_defender.id));
     if coalesce(p_require_source_energy,false) and coalesce(p_energy,0)<v_cost then continue; end if;
 
     v_damage:=coalesce(v_attack->>'damage','');
@@ -244,6 +245,191 @@ as $firstturn$
   );
 $firstturn$;
 
+create or replace function private.battle_v6_ability_hp_bonus(p_card_id text,p_energy integer)
+returns numeric
+language plpgsql
+stable
+set search_path=''
+as $hpbonus$
+declare
+  v_card public.cards%rowtype;
+  v_ability jsonb;
+  v_text text;
+  v_match text[];
+  v_bonus numeric:=0;
+begin
+  select * into v_card from public.cards where id=p_card_id;
+  if v_card.id is null or jsonb_typeof(v_card.tcg_data->'abilities')<>'array' then return 0; end if;
+  for v_ability in select value from jsonb_array_elements(v_card.tcg_data->'abilities') loop
+    v_text:=lower(coalesce(v_ability->>'text',''));
+    v_match:=regexp_match(v_text,'if this pok[eé]mon has any [a-z]+ energy attached(?: to it)?, it gets \+([0-9]+) hp');
+    if v_match is not null and coalesce(p_energy,0)>0 then v_bonus:=greatest(v_bonus,v_match[1]::numeric); end if;
+    -- Special Energy is not represented by the virtual-energy model, so that condition is intentionally false.
+  end loop;
+  return v_bonus;
+end;
+$hpbonus$;
+
+create or replace function private.battle_v6_ability_attack_bonus(
+  p_card_id text,p_energy integer,p_damage numeric,p_defender_card_id text
+)
+returns numeric
+language plpgsql
+stable
+set search_path=''
+as $atkbonus$
+declare
+  v_card public.cards%rowtype;
+  v_def public.cards%rowtype;
+  v_ability jsonb;
+  v_text text;
+  v_match text[];
+  v_bonus numeric:=0;
+  v_subtypes text;
+  v_type text;
+begin
+  select * into v_card from public.cards where id=p_card_id;
+  select * into v_def from public.cards where id=p_defender_card_id;
+  if v_card.id is null or jsonb_typeof(v_card.tcg_data->'abilities')<>'array' then return 0; end if;
+  v_subtypes:=lower(coalesce(v_card.tcg_data->'subtypes','[]'::jsonb)::text);
+  v_type:=lower(coalesce(v_card.types[1],''));
+
+  for v_ability in select value from jsonb_array_elements(v_card.tcg_data->'abilities') loop
+    v_text:=lower(coalesce(v_ability->>'text',''));
+
+    v_match:=regexp_match(v_text,'if this pok[eé]mon''s remaining hp is ([0-9]+) or less, its attacks do ([0-9]+) more damage');
+    if v_match is not null then
+      if greatest(0,coalesce(nullif(regexp_replace(coalesce(v_card.tcg_data->>'hp',''),'[^0-9]','','g'),'')::numeric,50)+private.battle_v6_ability_hp_bonus(v_card.id,p_energy)-coalesce(p_damage,0))<=v_match[1]::numeric
+      then v_bonus:=v_bonus+v_match[2]::numeric; end if;
+    end if;
+
+    v_match:=regexp_match(v_text,'if this pok[eé]mon has any [a-z]+ energy attached(?: to it)?, it gets \+[0-9]+ hp, and the attacks it uses do ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_energy,0)>0 then v_bonus:=v_bonus+v_match[1]::numeric; end if;
+
+    v_match:=regexp_match(v_text,'attacks used by your pok[eé]mon do ([0-9]+) more damage');
+    if v_match is not null then v_bonus:=v_bonus+v_match[1]::numeric; end if;
+
+    v_match:=regexp_match(v_text,'your basic pok[eé]mon''s attacks do ([0-9]+) more damage');
+    if v_match is not null and v_subtypes ~ '"basic"' then v_bonus:=v_bonus+v_match[1]::numeric; end if;
+
+    v_match:=regexp_match(v_text,'(?:each of )?your ([a-z]+) pok[eé]mon''s attacks do ([0-9]+) more damage');
+    if v_match is not null and lower(v_match[1])=v_type then v_bonus:=v_bonus+v_match[2]::numeric; end if;
+
+    v_match:=regexp_match(v_text,'your ([a-z]+) pok[eé]mon''s attacks do ([0-9]+) more damage');
+    if v_match is not null and lower(v_match[1])=v_type then v_bonus:=v_bonus+v_match[2]::numeric; end if;
+
+    v_match:=regexp_match(v_text,'attacks used by your future pok[eé]mon, except any iron crown ex, do ([0-9]+) more damage');
+    if v_match is not null and v_subtypes ~ '"future"' and lower(coalesce(v_card.pokemon_name,''))<>'iron crown ex'
+    then v_bonus:=v_bonus+v_match[1]::numeric; end if;
+  end loop;
+  return greatest(0,v_bonus);
+end;
+$atkbonus$;
+
+create or replace function private.battle_v6_ability_cost_delta(
+  p_attacker_card_id text,p_defender_card_id text
+)
+returns integer
+language plpgsql
+stable
+set search_path=''
+as $costdelta$
+declare
+  a public.cards%rowtype;
+  d public.cards%rowtype;
+  ab jsonb;
+  t text;
+  a_sub text;
+  d_sub text;
+  delta integer:=0;
+begin
+  select * into a from public.cards where id=p_attacker_card_id;
+  select * into d from public.cards where id=p_defender_card_id;
+  if a.id is null or d.id is null then return 0; end if;
+  a_sub:=lower(coalesce(a.tcg_data->'subtypes','[]'::jsonb)::text);
+  d_sub:=lower(coalesce(d.tcg_data->'subtypes','[]'::jsonb)::text);
+
+  if jsonb_typeof(d.tcg_data->'abilities')='array' then
+    for ab in select value from jsonb_array_elements(d.tcg_data->'abilities') loop
+      t:=lower(coalesce(ab->>'text',''));
+      if t like '%attacks used by your opponent''s active pokémon cost colorless more%' then delta:=delta+1; end if;
+      if t like '%your opponent''s basic pokémon''s attacks cost colorless more%' and a_sub ~ '"basic"' then delta:=delta+1; end if;
+    end loop;
+  end if;
+
+  if jsonb_typeof(a.tcg_data->'abilities')='array' then
+    for ab in select value from jsonb_array_elements(a.tcg_data->'abilities') loop
+      t:=lower(coalesce(ab->>'text',''));
+      if t like '%attacks cost colorless less for each of your opponent''s pokémon v in play%'
+         and (d_sub ~ '"v"' or d_sub ~ '"vmax"' or d_sub ~ '"vstar"' or d_sub ~ '"v-union"') then delta:=delta-1; end if;
+      if t like '%attacks cost colorless less for each of your opponent''s single strike, rapid strike, and fusion strike pokémon in play%'
+         and (d_sub ~ 'single strike' or d_sub ~ 'rapid strike' or d_sub ~ 'fusion strike') then delta:=delta-1; end if;
+    end loop;
+  end if;
+  return delta;
+end;
+$costdelta$;
+
+create or replace function private.battle_v6_ability_can_attack(p_card_id text)
+returns boolean
+language plpgsql
+stable
+set search_path=''
+as $canattack$
+declare
+  c public.cards%rowtype;
+  ab jsonb;
+  t text;
+begin
+  select * into c from public.cards where id=p_card_id;
+  if c.id is null then return false; end if;
+  if jsonb_typeof(c.tcg_data->'abilities')<>'array' then return true; end if;
+  for ab in select value from jsonb_array_elements(c.tcg_data->'abilities') loop
+    t:=lower(coalesce(ab->>'text',''));
+    if t like '%this pokémon can''t attack unless you have 4 or more team rocket''s pokémon in play%'
+       or t like '%if you have 4 or fewer pokémon in play, this pokémon can''t attack%'
+       or t like '%if you have 4 or fewer pokemon in play, this pokemon can''t attack%' then return false; end if;
+  end loop;
+  return true;
+end;
+$canattack$;
+
+create or replace function private.battle_v6_checkup_ability_effects(
+  p_source_card_id text,p_target_card_id text,p_target_poisoned boolean
+)
+returns jsonb
+language plpgsql
+stable
+set search_path=''
+as $checkability$
+declare
+  s public.cards%rowtype;
+  t public.cards%rowtype;
+  ab jsonb;
+  txt text;
+  v_damage numeric:=0;
+  v_poison_bonus numeric:=0;
+  v_target_has_ability boolean:=false;
+begin
+  select * into s from public.cards where id=p_source_card_id;
+  select * into t from public.cards where id=p_target_card_id;
+  if s.id is null or t.id is null then return jsonb_build_object('damage',0,'poisonBonus',0); end if;
+  v_target_has_ability:=jsonb_typeof(t.tcg_data->'abilities')='array' and jsonb_array_length(t.tcg_data->'abilities')>0;
+  if jsonb_typeof(s.tcg_data->'abilities')='array' then
+    for ab in select value from jsonb_array_elements(s.tcg_data->'abilities') loop
+      txt:=lower(coalesce(ab->>'text',''));
+      if txt like '%during pokémon checkup, put 1 damage counter on each pokémon that has an ability%'
+         and v_target_has_ability and lower(coalesce(t.pokemon_name,''))<>'froslass' then v_damage:=v_damage+10; end if;
+      if coalesce(p_target_poisoned,false)
+         and txt like '%put 1 more damage counter on your opponent''s poisoned pokémon between turns%' then
+        v_poison_bonus:=v_poison_bonus+10;
+      end if;
+    end loop;
+  end if;
+  return jsonb_build_object('damage',v_damage,'poisonBonus',v_poison_bonus);
+end;
+$checkability$;
+
 create or replace function private.battle_v6_turn_ability_effects(p_card_id text)
 returns jsonb
 language plpgsql
@@ -259,10 +445,13 @@ declare
   v_heal numeric:=0;
   v_heal_chance numeric:=1;
   v_cure boolean:=false;
+  v_damage_opponent numeric:=0;
+  v_burn_opponent boolean:=false;
+  v_self_ko_damage_opponent numeric:=0;
 begin
   select * into v_card from public.cards where id=p_card_id;
   if v_card.id is null or jsonb_typeof(v_card.tcg_data->'abilities')<>'array' then
-    return jsonb_build_object('extraEnergy',0,'heal',0,'healChance',1,'cureSpecial',false);
+    return jsonb_build_object('extraEnergy',0,'heal',0,'healChance',1,'cureSpecial',false,'damageOpponent',0,'burnOpponent',false,'selfKoDamageOpponent',0);
   end if;
   for v_ability in select value from jsonb_array_elements(v_card.tcg_data->'abilities') loop
     v_text:=lower(coalesce(v_ability->>'text',''));
@@ -270,7 +459,7 @@ begin
        or v_text ~ 'once during your turn.*attach (?:a|1)(?: basic)? [a-z]+ energy card from your discard pile to this pok[eé]mon' then
       v_extra_energy:=greatest(v_extra_energy,1);
     end if;
-    v_match:=regexp_match(v_text,'once during your turn.*heal ([0-9]+) damage from (?:your active pok[eé]mon|this pok[eé]mon)');
+    v_match:=regexp_match(v_text,'once during your turn.*heal ([0-9]+) damage from (?:your active pok[eé]mon|this pok[eé]mon|1 of your pok[eé]mon|each of your pok[eé]mon)');
     if v_match is not null then
       v_heal:=greatest(v_heal,v_match[1]::numeric);
       if v_text like '%flip a coin%' and v_text like '%if heads%' then v_heal_chance:=least(v_heal_chance,0.5); end if;
@@ -278,8 +467,21 @@ begin
     if v_text like '%whenever you attach an energy card from your hand to this pokémon%remove all special conditions from it%' then
       v_cure:=true;
     end if;
+
+    v_match:=regexp_match(v_text,'once during your turn.*(?:put|place) ([0-9]+) damage counters? on 1 of your opponent''s pok[eé]mon');
+    if v_match is not null and v_text not like '%if you use this ability, this pokémon is knocked out%' then
+      v_damage_opponent:=greatest(v_damage_opponent,v_match[1]::numeric*10);
+    end if;
+    v_match:=regexp_match(v_text,'during your turn, you may (?:put|place) ([0-9]+) damage counters? on 1 of your opponent''s pok[eé]mon');
+    if v_match is not null and v_text not like '%if you use this ability, this pokémon is knocked out%' then
+      v_damage_opponent:=greatest(v_damage_opponent,v_match[1]::numeric*10);
+    end if;
+    if v_text like '%once during your turn%make your opponent''s active pokémon burned%' then v_burn_opponent:=true; end if;
+
+    v_match:=regexp_match(v_text,'once during your turn.*(?:put|place) ([0-9]+) damage counters? on 1 of your opponent''s pok[eé]mon.*if you use this ability, this pok[eé]mon is knocked out');
+    if v_match is not null then v_self_ko_damage_opponent:=greatest(v_self_ko_damage_opponent,v_match[1]::numeric*10); end if;
   end loop;
-  return jsonb_build_object('extraEnergy',v_extra_energy,'heal',v_heal,'healChance',v_heal_chance,'cureSpecial',v_cure);
+  return jsonb_build_object('extraEnergy',v_extra_energy,'heal',v_heal,'healChance',v_heal_chance,'cureSpecial',v_cure,'damageOpponent',v_damage_opponent,'burnOpponent',v_burn_opponent,'selfKoDamageOpponent',v_self_ko_damage_opponent);
 end;
 $ability$;
 
@@ -298,6 +500,15 @@ as $immune$
         lower(coalesce(a->>'text','')) like '%this pokémon can''t be '||lower(p_status)||'%'
         or lower(coalesce(a->>'text','')) like '%this pokemon can''t be '||lower(p_status)||'%'
         or lower(coalesce(a->>'text','')) like '%this pokémon cannot be '||lower(p_status)||'%'
+        or (
+          lower(p_status) in ('asleep','confused','paralyzed','poisoned','burned')
+          and lower(coalesce(a->>'text','')) like '%'||lower(p_status)||'%'
+          and (
+            lower(coalesce(a->>'text','')) like '%can''t become%'
+            or lower(coalesce(a->>'text','')) like '%cannot become%'
+            or lower(coalesce(a->>'text','')) like '%can''t be affected by any special conditions%'
+          )
+        )
       )
   );
 $immune$;
@@ -373,9 +584,9 @@ begin
   v_has_ability:=jsonb_typeof(v_attacker.tcg_data->'abilities')='array'
     and jsonb_array_length(v_attacker.tcg_data->'abilities')>0;
 
-  v_def_hp:=greatest(10,least(1000,coalesce(
+  v_def_hp:=greatest(10,least(1100,coalesce(
     nullif(regexp_replace(coalesce(v_defender.tcg_data->>'hp',''),'[^0-9]','','g'),'')::numeric,50
-  )));
+  ) + private.battle_v6_ability_hp_bonus(v_defender.id,1)));
 
   if jsonb_typeof(v_defender.tcg_data->'abilities')='array' then
     for v_ability in select value from jsonb_array_elements(v_defender.tcg_data->'abilities') loop
@@ -424,6 +635,19 @@ begin
       if v_text like '%prevent all damage done to this pokémon by attacks from basic pokémon%'
          and v_is_basic then v_damage:=0; end if;
 
+      if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s pokémon ex%'
+         and v_is_ex then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by attacks from colorless pokémon%'
+         and lower(coalesce(v_attacker.types[1],''))='colorless' then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s fire pokémon%'
+         and lower(coalesce(v_attacker.types[1],''))='fire' then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by your opponent''s attacks if that damage is exactly 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, or 260%'
+         and v_damage between 20 and 260 and mod(v_damage,20)=0 then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s pokémon that have 2 or fewer energy attached to them%'
+         then null; end if; -- attacker energy is resolved in the simulator; no false immunity here.
+      if v_text like '%if this pokémon has full hp, it takes 80 less damage from attacks%'
+         and coalesce(p_defender_damage,0)=0 then v_damage:=greatest(0,v_damage-80); end if;
+
       -- Effects immunity (damage remains unless the ability says "including damage").
       if (
         v_text like '%prevent all effects of attacks from your opponent''s pokémon done to this pokémon%'
@@ -447,6 +671,12 @@ begin
         v_match:=regexp_match(v_text,'(?:put|place) ([0-9]+) damage counters? on the attacking pok[eé]mon');
         if v_match is not null then
           v_reactive_damage:=greatest(v_reactive_damage,v_match[1]::numeric*10);
+        end if;
+        if v_text like '%put damage counters on the attacking pokémon equal to the damage done to this pokémon%' then
+          if (v_text like '%pokémon-gx or pokémon-ex%' and (v_is_gx or v_is_ex))
+             or (v_text not like '%pokémon-gx%' and v_text not like '%pokémon-ex%') then
+            v_reactive_damage:=greatest(v_reactive_damage,v_damage);
+          end if;
         end if;
         if v_text like '%attacking pokémon is now burned%' then v_reactive_status:='burned'; end if;
         if v_text like '%attacking pokémon is now poisoned%' then v_reactive_status:='poisoned'; end if;
@@ -610,13 +840,14 @@ begin
   if v_attacker.id is null or v_defender.id is null then raise exception 'CARD_NOT_FOUND'; end if;
 
   if not private.battle_v6_can_attack(v_attacker.id,v_defender.id) then return null; end if;
+  if not private.battle_v6_ability_can_attack(v_attacker.id) then return null; end if;
 
   v_attacker_type := coalesce(v_attacker.types[1],'Colorless');
   v_defender_classes:=lower(coalesce(v_defender.tcg_data->'subtypes','[]'::jsonb)::text);
   v_defender_retreat:=greatest(0,least(10,coalesce(nullif(regexp_replace(coalesce(v_defender.tcg_data->>'convertedRetreatCost',''),'[^0-9]','','g'),'')::integer,0)));
-  v_defender_hp := greatest(10,least(1000,coalesce(
+  v_defender_hp := greatest(10,least(1100,coalesce(
     nullif(regexp_replace(coalesce(v_defender.tcg_data->>'hp',''),'[^0-9]','','g'),'')::numeric,50
-  )));
+  ) + private.battle_v6_ability_hp_bonus(v_defender.id,p_defender_energy)));
   v_remaining_hp := greatest(0,v_defender_hp-coalesce(p_defender_damage,0));
 
   if jsonb_typeof(v_defender.tcg_data->'weaknesses')='array' then
@@ -2000,6 +2231,9 @@ begin
       or v_text like '%damage isn''t affected by weakness, resistance, poké-powers%'
       or v_text like '%damage isn''t affected by weakness, resistance, pokémon powers%';
 
+    v_raw:=v_raw+private.battle_v6_ability_attack_bonus(v_attacker.id,p_energy,p_attacker_damage,v_defender.id);
+    v_expected_raw:=v_expected_raw+private.battle_v6_ability_attack_bonus(v_attacker.id,p_energy,p_attacker_damage,v_defender.id);
+
     -- Weakness / Resistance bypass.
     v_ignore_weakness_resistance:=
       v_text like '%don''t apply weakness and resistance%'
@@ -2309,6 +2543,7 @@ declare
   v_turn_ability jsonb;
   v_attach_count integer;
   v_attach_punish numeric;
+  v_check_ability jsonb;
   v_blocked text[];
   v_trace jsonb:='[]'::jsonb;
   v_winner_side text:=null;
@@ -2330,8 +2565,8 @@ begin
 
   c_profile:=public.battle_card_profile(c.id);
   o_profile:=public.battle_card_profile(o.id);
-  c_hp:=(c_profile->>'hp')::numeric;
-  o_hp:=(o_profile->>'hp')::numeric;
+  c_hp:=(c_profile->>'hp')::numeric+private.battle_v6_ability_hp_bonus(c.id,1);
+  o_hp:=(o_profile->>'hp')::numeric+private.battle_v6_ability_hp_bonus(o.id,1);
   v_seed:=coalesce(p_seed,p_battle_id::text||':'||p_round_no);
   c_first:=coalesce(p_first_challenger,private.battle_v6_hash_roll(v_seed||':first')>=0.5);
   v_is_c:=c_first;
@@ -2349,6 +2584,13 @@ begin
          and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
       then c_damage:=greatest(0,c_damage-(v_turn_ability->>'heal')::numeric); end if;
       if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then c_major:=null; c_poison:=false; c_poison_checkup_damage:=10; c_burn:=false; end if;
+      if coalesce((v_turn_ability->>'damageOpponent')::numeric,0)>0 then o_damage:=least(o_hp,o_damage+(v_turn_ability->>'damageOpponent')::numeric); end if;
+      if coalesce((v_turn_ability->>'burnOpponent')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
+      if coalesce((v_turn_ability->>'selfKoDamageOpponent')::numeric,0)>0
+         and greatest(0,o_hp-o_damage)<=coalesce((v_turn_ability->>'selfKoDamageOpponent')::numeric,0) then
+        o_damage:=least(o_hp,o_damage+(v_turn_ability->>'selfKoDamageOpponent')::numeric);
+        c_damage:=c_hp;
+      end if;
       v_attach_punish:=private.battle_v6_energy_attachment_punish(o.id);
       if v_attach_punish>0 then c_damage:=least(c_hp,c_damage+v_attach_punish*v_attach_count); end if;
       v_energy_before:=c_energy;
@@ -2649,6 +2891,13 @@ begin
          and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
       then o_damage:=greatest(0,o_damage-(v_turn_ability->>'heal')::numeric); end if;
       if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then o_major:=null; o_poison:=false; o_poison_checkup_damage:=10; o_burn:=false; end if;
+      if coalesce((v_turn_ability->>'damageOpponent')::numeric,0)>0 then c_damage:=least(c_hp,c_damage+(v_turn_ability->>'damageOpponent')::numeric); end if;
+      if coalesce((v_turn_ability->>'burnOpponent')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
+      if coalesce((v_turn_ability->>'selfKoDamageOpponent')::numeric,0)>0
+         and greatest(0,c_hp-c_damage)<=coalesce((v_turn_ability->>'selfKoDamageOpponent')::numeric,0) then
+        c_damage:=least(c_hp,c_damage+(v_turn_ability->>'selfKoDamageOpponent')::numeric);
+        o_damage:=o_hp;
+      end if;
       v_attach_punish:=private.battle_v6_energy_attachment_punish(c.id);
       if v_attach_punish>0 then o_damage:=least(o_hp,o_damage+v_attach_punish*v_attach_count); end if;
       v_energy_before:=o_energy;
@@ -2994,8 +3243,15 @@ begin
 
     if not v_extra_turn then
       -- Pokemon Checkup after every turn.
-    if c_poison then c_damage:=least(c_hp,c_damage+c_poison_checkup_damage); end if;
-    if o_poison then o_damage:=least(o_hp,o_damage+o_poison_checkup_damage); end if;
+    v_check_ability:=private.battle_v6_checkup_ability_effects(c.id,o.id,o_poison);
+    if coalesce((v_check_ability->>'damage')::numeric,0)>0 then o_damage:=least(o_hp,o_damage+(v_check_ability->>'damage')::numeric); end if;
+    v_reactive:=case when o_poison then coalesce((v_check_ability->>'poisonBonus')::numeric,0) else 0 end;
+    v_check_ability:=private.battle_v6_checkup_ability_effects(o.id,c.id,c_poison);
+    if coalesce((v_check_ability->>'damage')::numeric,0)>0 then c_damage:=least(c_hp,c_damage+(v_check_ability->>'damage')::numeric); end if;
+    v_direct:=case when c_poison then coalesce((v_check_ability->>'poisonBonus')::numeric,0) else 0 end;
+
+    if c_poison then c_damage:=least(c_hp,c_damage+c_poison_checkup_damage+v_direct); end if;
+    if o_poison then o_damage:=least(o_hp,o_damage+o_poison_checkup_damage+v_reactive); end if;
     if c_burn then
       c_damage:=least(c_hp,c_damage+20);
       if private.battle_v6_hash_roll(v_seed||':'||v_half||':c_burn')>=0.5 then c_burn:=false; end if;
@@ -3143,6 +3399,11 @@ revoke all on function private.battle_v6_matches_class(text,text,boolean) from p
 revoke all on function private.battle_v6_self_status_payoff(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_copy_source_attack(text,integer,boolean,boolean,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_has_go_first_override(text,integer) from public,anon,authenticated;
+revoke all on function private.battle_v6_ability_hp_bonus(text,integer) from public,anon,authenticated;
+revoke all on function private.battle_v6_ability_attack_bonus(text,integer,numeric,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_ability_cost_delta(text,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_ability_can_attack(text) from public,anon,authenticated;
+revoke all on function private.battle_v6_checkup_ability_effects(text,text,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_turn_ability_effects(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
