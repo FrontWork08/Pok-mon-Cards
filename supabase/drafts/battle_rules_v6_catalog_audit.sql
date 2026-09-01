@@ -1612,7 +1612,8 @@ begin
     end if;
 
     if v_text ~ 'if an attack (?:does damage to|damages) [^.]+ during your opponent''s next turn.*(?:attacks|does) (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) for an equal amount of damage'
-       or v_text ~ 'if an attack (?:does damage to|damages) [^.]+ during your opponent''s next turn.*(?:attacks|does) the defending pok[eé]mon for an equal amount of damage' then
+       or v_text ~ 'if an attack (?:does damage to|damages) [^.]+ during your opponent''s next turn.*(?:attacks|does) the defending pok[eé]mon for an equal amount of damage'
+       or v_text ~ 'if an attack (?:does damage to|damages) [^.]+ during your opponent''s next turn.*does an equal amount of damage to (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)' then
       v_self_reactive_multiplier_next:=greatest(v_self_reactive_multiplier_next,1);
       if v_text like '%flip a coin%if heads%' then v_self_reactive_chance_next:=least(v_self_reactive_chance_next,0.5); end if;
       v_effect_notes:=array_append(v_effect_notes,'contra-ataque igual ao dano recebido');
