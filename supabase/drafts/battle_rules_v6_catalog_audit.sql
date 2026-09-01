@@ -661,6 +661,30 @@ begin
       end if;
     end if;
 
+    -- The isolated round has no Bench, Prize Cards, Tools, or discard-pile Pokémon.
+    -- Multipliers driven entirely by those zones therefore use a zero count.
+    if v_damage_text ~ '[×x*]' and (
+      v_text ~ 'damage (?:times the number of|for each).*benched pok[eé]mon'
+      or v_text ~ 'damage (?:times the number of|for each).*prize cards?'
+      or v_text ~ 'damage (?:times the number of|for each).*pok[eé]mon in your discard pile'
+      or v_text ~ 'damage (?:times the number of|for each).*pok[eé]mon tool'
+    ) then
+      v_raw:=0;
+      v_expected_raw:=0;
+      v_effect_notes:=array_append(v_effect_notes,'contador de zona externa = 0 no duelo 1x1');
+    end if;
+
+    if v_text like '%if this pokémon didn''t move from the bench to the active spot this turn, this attack does nothing%'
+       or v_text like '%if this pokemon didn''t move from the bench to the active spot this turn, this attack does nothing%' then
+      v_raw:=0;
+      v_expected_raw:=0;
+      v_effect_notes:=array_append(v_effect_notes,'condição de entrada pelo Banco não existe no duelo 1x1');
+    end if;
+
+    if v_text ~ 'you can use this attack only if your opponent has exactly [0-9]+ prize cards remaining' then
+      continue;
+    end if;
+
     -- Text-only attacks that can target any opposing Pokemon target the Active in this 1v1 format.
     if v_base=0 and v_text not like '%benched pokémon%' then
       v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) damage to (?:1|each) of your opponent''s pok[eé]mon');
