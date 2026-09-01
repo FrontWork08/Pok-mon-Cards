@@ -402,6 +402,7 @@ declare
   v_defender_energy_return integer:=0;
   v_instant_knockout boolean:=false;
   v_delayed_knockout_next boolean:=false;
+  v_defender_heal_block_next boolean:=false;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
 begin
@@ -511,6 +512,7 @@ begin
     v_defender_energy_return:=0;
     v_instant_knockout:=false;
     v_delayed_knockout_next:=false;
+    v_defender_heal_block_next:=false;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
 
@@ -846,6 +848,11 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'nocaute atrasado no fim do próximo turno');
     end if;
 
+    if v_text like '%the defending pokémon can''t be healed during your opponent''s next turn%' then
+      v_defender_heal_block_next:=true;
+      v_effect_notes:=array_append(v_effect_notes,'bloqueia cura no próximo turno');
+    end if;
+
     -- Opponent next-turn attack interference.
     if (v_text like '%if the defending pokémon tries to attack during your opponent''s next turn%'
         or v_text like '%during your opponent''s next turn, if the defending pokémon tries to use an attack%')
@@ -1004,6 +1011,7 @@ begin
         +v_self_energy_gain*18
         +v_defender_energy_return*18
         +case when v_delayed_knockout_next then 160 else 0 end
+        +case when v_defender_heal_block_next then 24 else 0 end
         +case when v_defender_cannot_attack_next then 45 else 0 end
         +v_defender_outgoing_reduction_next*0.35
         +v_defender_attack_gate_chance*35
@@ -1052,6 +1060,7 @@ begin
         'defenderEnergyReturn',v_defender_energy_return,
         'instantKnockout',v_instant_knockout,
         'delayedKnockoutNext',v_delayed_knockout_next,
+        'defenderHealBlockNext',v_defender_heal_block_next,
         'selfPreventNext',v_self_prevent_next,
         'selfPreventChance',v_self_prevent_chance,
         'selfPreventClass',v_self_prevent_class,
@@ -1145,6 +1154,8 @@ declare
   o_prevent_damage_cap_next numeric:=0;
   c_delayed_ko_next boolean:=false;
   o_delayed_ko_next boolean:=false;
+  c_heal_block_next boolean:=false;
+  o_heal_block_next boolean:=false;
   c_first boolean;
   v_seed text;
   v_is_c boolean;
@@ -1205,7 +1216,7 @@ begin
       v_turn_ability:=private.battle_v6_turn_ability_effects(c.id);
       v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
       c_energy:=least(12,c_energy+v_attach_count);
-      if coalesce((v_turn_ability->>'heal')::numeric,0)>0
+      if not c_heal_block_next and coalesce((v_turn_ability->>'heal')::numeric,0)>0
          and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
       then c_damage:=greatest(0,c_damage-(v_turn_ability->>'heal')::numeric); end if;
       if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then c_major:=null; c_poison:=false; c_burn:=false; end if;
@@ -1226,6 +1237,7 @@ begin
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','cooldown_skip','energy',c_energy));
       elsif c_attack_gate_next>0 and private.battle_v6_hash_roll(v_seed||':'||v_half||':attack_gate')<c_attack_gate_next then
         c_attack_gate_next:=0;
+      c_heal_block_next:=false;
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','attack_gate_failed','energy',c_energy));
       else
         c_attack_gate_next:=0;
@@ -1318,8 +1330,10 @@ begin
 
               v_heal:=coalesce((v_plan->>'healDamage')::numeric,0);
               if coalesce((v_plan->>'healEqualDamage')::boolean,false) then v_heal:=greatest(v_heal,v_effective); end if;
-              if coalesce((v_plan->>'healAll')::boolean,false) then c_damage:=0;
-              elsif v_heal>0 then c_damage:=greatest(0,c_damage-v_heal); end if;
+              if not c_heal_block_next then
+                if coalesce((v_plan->>'healAll')::boolean,false) then c_damage:=0;
+                elsif v_heal>0 then c_damage:=greatest(0,c_damage-v_heal); end if;
+              end if;
               v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0); if v_recoil>0 then c_damage:=least(c_hp,c_damage+v_recoil); end if;
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); c_energy:=greatest(0,c_energy-v_discard);
@@ -1352,6 +1366,7 @@ begin
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
                 if coalesce((v_plan->>'instantKnockout')::boolean,false) then o_damage:=o_hp; end if;
                 if coalesce((v_plan->>'delayedKnockoutNext')::boolean,false) then o_delayed_ko_next:=true; end if;
+                if coalesce((v_plan->>'defenderHealBlockNext')::boolean,false) then o_heal_block_next:=true; end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then o_attack_gate_next:=greatest(o_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
                 if coalesce((v_plan->>'defenderCannotAttackNext')::boolean,false) then o_cooldown_all:=greatest(o_cooldown_all,1); end if;
                 if coalesce((v_plan->>'defenderOutgoingReductionNext')::numeric,0)>0 then o_outgoing_reduction_next:=greatest(o_outgoing_reduction_next,(v_plan->>'defenderOutgoingReductionNext')::numeric); end if;
@@ -1388,7 +1403,7 @@ begin
       v_turn_ability:=private.battle_v6_turn_ability_effects(o.id);
       v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
       o_energy:=least(12,o_energy+v_attach_count);
-      if coalesce((v_turn_ability->>'heal')::numeric,0)>0
+      if not o_heal_block_next and coalesce((v_turn_ability->>'heal')::numeric,0)>0
          and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
       then o_damage:=greatest(0,o_damage-(v_turn_ability->>'heal')::numeric); end if;
       if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then o_major:=null; o_poison:=false; o_burn:=false; end if;
@@ -1409,6 +1424,7 @@ begin
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','cooldown_skip','energy',o_energy));
       elsif o_attack_gate_next>0 and private.battle_v6_hash_roll(v_seed||':'||v_half||':attack_gate')<o_attack_gate_next then
         o_attack_gate_next:=0;
+      o_heal_block_next:=false;
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','attack_gate_failed','energy',o_energy));
       else
         o_attack_gate_next:=0;
@@ -1501,8 +1517,10 @@ begin
 
               v_heal:=coalesce((v_plan->>'healDamage')::numeric,0);
               if coalesce((v_plan->>'healEqualDamage')::boolean,false) then v_heal:=greatest(v_heal,v_effective); end if;
-              if coalesce((v_plan->>'healAll')::boolean,false) then o_damage:=0;
-              elsif v_heal>0 then o_damage:=greatest(0,o_damage-v_heal); end if;
+              if not o_heal_block_next then
+                if coalesce((v_plan->>'healAll')::boolean,false) then o_damage:=0;
+                elsif v_heal>0 then o_damage:=greatest(0,o_damage-v_heal); end if;
+              end if;
               v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0); if v_recoil>0 then o_damage:=least(o_hp,o_damage+v_recoil); end if;
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); o_energy:=greatest(0,o_energy-v_discard);
@@ -1535,6 +1553,7 @@ begin
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
                 if coalesce((v_plan->>'instantKnockout')::boolean,false) then c_damage:=c_hp; end if;
                 if coalesce((v_plan->>'delayedKnockoutNext')::boolean,false) then c_delayed_ko_next:=true; end if;
+                if coalesce((v_plan->>'defenderHealBlockNext')::boolean,false) then c_heal_block_next:=true; end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then c_attack_gate_next:=greatest(c_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
                 if coalesce((v_plan->>'defenderCannotAttackNext')::boolean,false) then c_cooldown_all:=greatest(c_cooldown_all,1); end if;
                 if coalesce((v_plan->>'defenderOutgoingReductionNext')::numeric,0)>0 then c_outgoing_reduction_next:=greatest(c_outgoing_reduction_next,(v_plan->>'defenderOutgoingReductionNext')::numeric); end if;
