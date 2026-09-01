@@ -1180,7 +1180,7 @@ begin
       end if;
     end if;
 
-    if v_base=0 and v_text not like '%benched pokémon%' then
+    if v_base=0 then
       v_match:=regexp_match(v_text,'this attack does ([0-9]+) damage to [23] of your opponent''s pok[eé]mon');
       if v_match is not null then
         v_raw:=v_match[1]::numeric;
