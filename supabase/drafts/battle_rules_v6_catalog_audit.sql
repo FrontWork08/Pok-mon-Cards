@@ -621,6 +621,26 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'bônus pelo custo de Recuo do defensor');
     end if;
 
+    v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) damage for each(?: [a-z]+)? energy attached to this pok[eé]mon');
+    if v_match is not null then
+      v_raw:=v_match[1]::numeric*greatest(0,coalesce(p_energy,0));
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'dano por Energia do atacante');
+    end if;
+
+    v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) damage for each(?: [a-z]+)? energy attached to (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon|all of your opponent''s pok[eé]mon)');
+    if v_match is not null then
+      v_raw:=v_match[1]::numeric*greatest(0,coalesce(p_defender_energy,0));
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'dano por Energia do defensor');
+    end if;
+
+    if v_text like '%damage to the defending pokémon equal to half the defending pokémon''s remaining hp%rounded up to the nearest 10%' then
+      v_raw:=ceil(v_remaining_hp/20.0)*10;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'metade do HP restante arredondada');
+    end if;
+
     -- Energy-discard damage bonuses (Rayquaza VMAX style).
     v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each .*energy.*discard');
     if v_match is null and v_text like '%discard any amount%energy%' then
@@ -753,12 +773,18 @@ begin
       v_defender_energy_discard:=0;
       v_effect_notes:=array_append(v_effect_notes,'descarta Energia do defensor por cara');
     elsif (
-      v_text ~ 'discard (an|a) energy (?:card )?(?:attached to |from )(?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)'
-      or v_text ~ 'discard an energy card attached to the defending pok[eé]mon'
+      v_text ~ 'discard (an|a)(?: special)? energy (?:card )?(?:attached to |from )(?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)'
+      or v_text ~ 'discard (?:an|a)(?: special)? energy (?:card )?attached to the defending pok[eé]mon'
+      or v_text like '%if the defending pokémon has any energy cards attached to it%choose 1 of them and discard it%'
     ) then
       v_defender_energy_discard:=1;
       if v_text like '%flip a coin%' then v_defender_energy_discard_chance:=0.5; end if;
       v_effect_notes:=array_append(v_effect_notes,'descarta Energia do defensor');
+    end if;
+
+    if v_text ~ 'put all energy attached to this pok[eé]mon into your hand' then
+      v_discard:=greatest(v_discard,coalesce(p_energy,0));
+      v_effect_notes:=array_append(v_effect_notes,'toda Energia volta para a mão');
     end if;
 
     v_match:=regexp_match(v_text,'put ([0-9]+) energy attached to this pok[eé]mon into your hand');
@@ -783,7 +809,7 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'anexa 1 Energia virtual ao atacante');
     end if;
 
-    v_match:=regexp_match(v_text,'(?:put|return) ([0-9]+) energy attached to your opponent''s active pok[eé]mon (?:into|to) their hand');
+    v_match:=regexp_match(v_text,'(?:you may )?(?:put|return) ([0-9]+) energy attached to your opponent''s active pok[eé]mon (?:into|to) their hand');
     if v_match is not null then
       v_defender_energy_return:=greatest(v_defender_energy_return,v_match[1]::integer);
       v_effect_notes:=array_append(v_effect_notes,'Energia do defensor volta para a mão');
@@ -791,6 +817,12 @@ begin
        or v_text ~ 'you may put an energy attached to your opponent''s active pok[eé]mon into their hand' then
       v_defender_energy_return:=greatest(v_defender_energy_return,1);
       v_effect_notes:=array_append(v_effect_notes,'1 Energia do defensor volta para a mão');
+    end if;
+
+    if v_text like '%shuffle all energy from each of your opponent''s pokémon into their deck%'
+       or v_text like '%shuffle all energy from all of their pokémon into their deck%' then
+      v_defender_energy_return:=greatest(v_defender_energy_return,coalesce(p_defender_energy,0));
+      v_effect_notes:=array_append(v_effect_notes,'remove toda Energia do defensor');
     end if;
 
     -- Cooldowns.
@@ -878,6 +910,12 @@ begin
     if v_match is not null then
       v_direct_damage_counters:=greatest(v_direct_damage_counters,v_match[1]::numeric*10);
       v_effect_notes:=array_append(v_effect_notes,'coloca contadores de dano diretamente');
+    end if;
+
+    v_match:=regexp_match(v_text,'(?:put|place) ([0-9]+) damage counters? on your opponent''s pok[eé]mon in any way you like');
+    if v_match is not null then
+      v_direct_damage_counters:=greatest(v_direct_damage_counters,v_match[1]::numeric*10);
+      v_effect_notes:=array_append(v_effect_notes,'contadores distribuídos aplicados ao Ativo no 1x1');
     end if;
 
     -- Special Conditions.
