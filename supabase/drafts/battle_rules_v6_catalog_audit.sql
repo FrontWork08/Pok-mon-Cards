@@ -840,7 +840,8 @@ begin
         'statusChance',v_status_chance,
         'recoilDamage',v_recoil,
         'healDamage',v_heal,
-        'healEqualDamage',v_heal_equal,
+        'healEqualDamage',v_heal_equal
+      ) || jsonb_build_object(
         'selfReductionNext',v_self_reduction_next,
         'selfPreventNext',v_self_prevent_next,
         'selfPreventChance',v_self_prevent_chance,
