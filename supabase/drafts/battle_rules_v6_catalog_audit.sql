@@ -107,6 +107,56 @@ begin
 end;
 $body$;
 
+create or replace function private.battle_v6_self_status_payoff(p_card_id text,p_status text)
+returns numeric
+language plpgsql
+stable
+set search_path=''
+as $payoff$
+declare
+  v_card public.cards%rowtype;
+  v_attack jsonb;
+  v_text text;
+  v_match text[];
+  v_best numeric:=0;
+  v_name text;
+begin
+  select * into v_card from public.cards where id=p_card_id;
+  if v_card.id is null or jsonb_typeof(v_card.tcg_data->'attacks')<>'array' then return 0; end if;
+  v_name:=lower(coalesce(v_card.pokemon_name,''));
+
+  for v_attack in select value from jsonb_array_elements(v_card.tcg_data->'attacks') loop
+    v_text:=lower(coalesce(v_attack->>'text',''));
+
+    if lower(coalesce(p_status,''))='poisoned' and (
+      v_text like '%if this pokémon is poisoned, this attack does%'
+      or v_text like '%if this pokemon is poisoned, this attack does%'
+      or position('if '||v_name||' is poisoned, this attack does' in v_text)>0
+    ) then
+      v_match:=regexp_match(v_text,'this attack does [0-9]+ damage plus ([0-9]+) more damage');
+      if v_match is null then v_match:=regexp_match(v_text,'this attack does ([0-9]+) more damage'); end if;
+      if v_match is not null then v_best:=greatest(v_best,v_match[1]::numeric); end if;
+    elsif lower(coalesce(p_status,''))='burned' and (
+      v_text like '%if this pokémon is burned, this attack does%'
+      or v_text like '%if this pokemon is burned, this attack does%'
+      or position('if '||v_name||' is burned, this attack does' in v_text)>0
+    ) then
+      v_match:=regexp_match(v_text,'this attack does [0-9]+ damage plus ([0-9]+) more damage');
+      if v_match is null then v_match:=regexp_match(v_text,'this attack does ([0-9]+) more damage'); end if;
+      if v_match is not null then v_best:=greatest(v_best,v_match[1]::numeric); end if;
+    elsif lower(coalesce(p_status,''))='special' and (
+      v_text like '%if this pokémon is affected by a special condition, this attack does%'
+      or v_text like '%if this pokemon is affected by a special condition, this attack does%'
+    ) then
+      v_match:=regexp_match(v_text,'this attack does [0-9]+ damage plus ([0-9]+) more damage');
+      if v_match is null then v_match:=regexp_match(v_text,'this attack does ([0-9]+) more damage'); end if;
+      if v_match is not null then v_best:=greatest(v_best,v_match[1]::numeric); end if;
+    end if;
+  end loop;
+  return v_best;
+end;
+$payoff$;
+
 create or replace function private.battle_v6_copy_source_attack(
   p_defender_card_id text,
   p_energy integer,
@@ -868,6 +918,27 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'bônus contra Pokémon Envenenado');
     end if;
 
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is poisoned, this attack does [0-9]+ damage plus ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_defender_poison,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus legado contra Pokémon Envenenado');
+    end if;
+
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is burned, this attack does [0-9]+ damage plus ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_defender_burn,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus legado contra Pokémon Queimado');
+    end if;
+
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is affected by (?:a|any) special conditions?, this attack does [0-9]+ damage plus ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_defender_special,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus legado contra Condição Especial');
+    end if;
+
     v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is burned, this attack does ([0-9]+) more damage');
     if v_match is not null and coalesce(p_defender_burn,false) then
       v_raw:=v_raw+v_match[1]::numeric;
@@ -1193,6 +1264,15 @@ begin
     end if;
 
     -- Virtual-Energy translation for attacks that attach Energy to this Active Pokémon.
+    v_match:=regexp_match(v_text,'search your deck for up to ([0-9]+)(?: basic)? [a-z]+ energy cards? and attach them to this pok[eé]mon');
+    if v_match is not null then
+      v_self_energy_gain:=greatest(v_self_energy_gain,least(6,v_match[1]::integer));
+      v_effect_notes:=array_append(v_effect_notes,'acelera Energia virtual a partir do deck');
+    elsif v_text ~ 'search your deck for (?:a|1)(?: basic)? [a-z]+ energy card and attach it to this pok[eé]mon' then
+      v_self_energy_gain:=greatest(v_self_energy_gain,1);
+      v_effect_notes:=array_append(v_effect_notes,'acelera 1 Energia virtual a partir do deck');
+    end if;
+
     v_match:=regexp_match(v_text,'attach (?:up to )?([0-9]+)(?: basic)? [a-z]+ energy cards? from your discard pile to this pok[eé]mon');
     if v_match is not null then
       v_self_energy_gain:=greatest(v_self_energy_gain,least(6,v_match[1]::integer));
@@ -1582,6 +1662,9 @@ begin
         -case v_inflict_self_major when 'paralyzed' then 45 when 'asleep' then 28 when 'confused' then 18 else 0 end
         -case when v_inflict_self_poison then 14 else 0 end
         -case when v_inflict_self_burn then 18 else 0 end
+        +case when v_inflict_self_poison then private.battle_v6_self_status_payoff(v_attacker.id,'poisoned')*greatest(1,v_weakness_multiplier)*0.5 else 0 end
+        +case when v_inflict_self_burn then private.battle_v6_self_status_payoff(v_attacker.id,'burned')*greatest(1,v_weakness_multiplier)*0.5 else 0 end
+        +case when v_inflict_self_major is not null then private.battle_v6_self_status_payoff(v_attacker.id,'special')*greatest(1,v_weakness_multiplier)*0.4 else 0 end
         +case when v_clear_self_special and (coalesce(p_attacker_poison,false) or coalesce(p_attacker_burn,false) or p_attacker_major is not null) then 28 else 0 end
         +case when v_clear_self_poison and coalesce(p_attacker_poison,false) then 16 else 0 end
         -case when v_clear_defender_special and coalesce(p_defender_special,false) then 8 else 0 end
@@ -2475,6 +2558,7 @@ $$;
 revoke all on function private.battle_v6_hash_roll(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_can_attack(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_matches_class(text,text,boolean) from public,anon,authenticated;
+revoke all on function private.battle_v6_self_status_payoff(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_copy_source_attack(text,integer,boolean,boolean,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_has_go_first_override(text,integer) from public,anon,authenticated;
 revoke all on function private.battle_v6_turn_ability_effects(text) from public,anon,authenticated;
