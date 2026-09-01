@@ -158,6 +158,7 @@ end;
 $payoff$;
 
 create or replace function private.battle_v6_copy_source_attack(
+  p_attacker_card_id text,
   p_defender_card_id text,
   p_energy integer,
   p_require_source_energy boolean,
@@ -195,7 +196,7 @@ begin
       case when jsonb_typeof(v_attack->'cost')='array' then jsonb_array_length(v_attack->'cost') else 0 end,
       0
     );
-    v_cost:=greatest(0,v_cost+private.battle_v6_ability_cost_delta(v_attacker.id,v_defender.id));
+    v_cost:=greatest(0,v_cost+private.battle_v6_ability_cost_delta(p_attacker_card_id,p_defender_card_id));
     if coalesce(p_require_source_energy,false) and coalesce(p_energy,0)<v_cost then continue; end if;
 
     v_damage:=coalesce(v_attack->>'damage','');
@@ -1163,7 +1164,7 @@ begin
       if v_original_text like '%flip a coin%' and v_original_text like '%if heads%' then v_copy_chance:=0.5; end if;
 
       v_copy_source:=private.battle_v6_copy_source_attack(
-        v_defender.id,p_energy,v_copy_requires_energy,p_gx_used,p_vstar_used
+        v_attacker.id,v_defender.id,p_energy,v_copy_requires_energy,p_gx_used,p_vstar_used
       );
       if v_copy_source is null then continue; end if;
 
@@ -3768,7 +3769,7 @@ revoke all on function private.battle_v6_hash_roll(text) from public,anon,authen
 revoke all on function private.battle_v6_can_attack(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_matches_class(text,text,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_self_status_payoff(text,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_copy_source_attack(text,integer,boolean,boolean,boolean) from public,anon,authenticated;
+revoke all on function private.battle_v6_copy_source_attack(text,text,integer,boolean,boolean,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_has_go_first_override(text,integer) from public,anon,authenticated;
 revoke all on function private.battle_v6_has_victory_star(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_attack_coin_heads(text,text,integer,boolean) from public,anon,authenticated;
