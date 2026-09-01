@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260901180938_battle_rules_v6_exhaustive_catalog_resolution.sql',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -80,9 +81,10 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(battle.includes('loadStaticBattleResources'), 'Regressão de performance: recursos estáticos da batalha não estão separados.');
   assert(battle.includes('realtimeRefreshTimer'), 'Regressão de performance: eventos realtime da batalha perderam o coalescing.');
   assert(!battle.includes('setInterval(tick, 250)'), 'Regressão de performance: cronômetro da batalha voltou a renderizar 4x por segundo.');
-  assert(battle.includes('Regra v5 TCG'), 'Regressão de batalha: UI deixou de informar as regras TCG v5.');
+  assert(battle.includes('Regra v6 TCG'), 'Regressão de batalha: UI deixou de informar as regras TCG v6.');
+  assert(!battle.includes('Regra v5 TCG'), 'Regressão de batalha: UI voltou a anunciar a v5 como regra ativa.');
   assert(!battle.includes('Regra v4: vence quem consegue o nocaute mais rápido'), 'Regressão de batalha: UI voltou a anunciar a fórmula antiga v4 como regra ativa.');
-  assert(battle.includes('virtualEnergy'), 'Regressão de batalha: histórico deixou de renderizar o estado de Energia virtual da v5.');
+  assert(battle.includes('virtualEnergy'), 'Regressão de batalha: histórico deixou de renderizar o estado de Energia virtual da v6.');
   const stateLoader = battle.split('const loadBattleState')[1]?.split('const loadStaticBattleResources')[0] ?? '';
   assert(!stateLoader.includes('getMyBag()') && !stateLoader.includes('getMyDecks()'), 'Regressão de performance: realtime da batalha voltou a baixar Bag/Decks completos.');
 }
@@ -101,6 +103,24 @@ if (existsSync('supabase/migrations/20260901135056_battle_rules_v5_official_tcg_
   assert(battleV5.includes('rules_version=5'), 'Regressão v5: rodadas novas deixaram de ser marcadas com regra 5.');
   assert(battleV5.includes('v_sim:=private.battle_simulate_duel_v5'), 'Regressão v5: resolver de batalha deixou de usar a simulação TCG.');
   assert(battleV5.includes('revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated'), 'Regressão de segurança v5: resolver interno de batalha não pode ficar exposto ao cliente.');
+}
+
+
+if (existsSync('supabase/migrations/20260901180938_battle_rules_v6_exhaustive_catalog_resolution.sql')) {
+  const battleV6 = read('supabase/migrations/20260901180938_battle_rules_v6_exhaustive_catalog_resolution.sql');
+  assert(battleV6.includes('private.battle_v6_hash_roll'), 'Regressão v6: sorteios determinísticos foram removidos.');
+  assert(battleV6.includes('private.battle_v6_attack_plan'), 'Regressão v6: planejador de ataques foi removido.');
+  assert(battleV6.includes('private.battle_simulate_duel_v6'), 'Regressão v6: simulador por turnos foi removido.');
+  assert(battleV6.includes('private.battle_v6_defense_adjustment'), 'Regressão v6: Abilities defensivas deixaram de ser resolvidas.');
+  assert(battleV6.includes('private.battle_v6_has_victory_star') && battleV6.includes('private.battle_v6_attack_coin_heads'), 'Regressão v6: Victory Star/rerrolagem de moedas perdeu suporte.');
+  assert(battleV6.includes('poisonCheckupDamage') && battleV6.includes('selfPoisonCheckupDamage'), 'Regressão v6: Poison reforçado deixou de persistir no Checkup.');
+  assert(battleV6.includes('selfNextAttackBonus') && battleV6.includes('bônus por ter sido curado neste turno'), 'Regressão v6: efeitos entre turnos de ataque/cura perderam suporte.');
+  assert(battleV6.includes('healDefenderDamage') && battleV6.includes('defenderEnergyDiscardAllCoinCount'), 'Regressão v6: cura bilateral ou descarte condicional de Energia perdeu suporte.');
+  assert(battleV6.includes('v_sim:=private.battle_simulate_duel_v6'), 'Regressão v6: resolver deixou de usar a simulação v6.');
+  assert(battleV6.includes('rules_version=6'), 'Regressão v6: rodadas novas deixaram de ser marcadas com regra 6.');
+  assert(battleV6.includes("'tcg_v6_resolved'"), 'Regressão v6: evento de resolução v6 deixou de ser registrado.');
+  assert(battleV6.includes('revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated'), 'Regressão de segurança v6: resolver interno ficou exposto ao cliente.');
+  assert(battleV6.includes('grant execute on function public.server_resolve_battle_round(uuid) to service_role'), 'Regressão de segurança v6: service_role perdeu acesso ao resolver interno.');
 }
 
 if (existsSync('src/components/CardPickerModal.tsx')) {
