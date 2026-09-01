@@ -397,6 +397,9 @@ declare
   v_defender_classes text;
   v_defender_retreat integer:=0;
   v_heal_all boolean:=false;
+  v_self_energy_gain integer:=0;
+  v_self_energy_gain_chance numeric:=1;
+  v_defender_energy_return integer:=0;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
 begin
@@ -501,6 +504,9 @@ begin
     v_inflict_self_major:=null;
     v_direct_damage_counters:=0;
     v_heal_all:=false;
+    v_self_energy_gain:=0;
+    v_self_energy_gain_chance:=1;
+    v_defender_energy_return:=0;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
 
@@ -758,6 +764,29 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'1 Energia volta para a mão');
     end if;
 
+    -- Virtual-Energy translation for attacks that attach Energy to this Active Pokémon.
+    v_match:=regexp_match(v_text,'attach (?:up to )?([0-9]+)(?: basic)? [a-z]+ energy cards? from your discard pile to this pok[eé]mon');
+    if v_match is not null then
+      v_self_energy_gain:=greatest(v_self_energy_gain,least(6,v_match[1]::integer));
+      if v_text like '%flip a coin%' and v_text like '%if heads%' then v_self_energy_gain_chance:=0.5; end if;
+      v_effect_notes:=array_append(v_effect_notes,'anexa Energia virtual ao atacante');
+    elsif v_text ~ 'attach (?:an|a)(?: basic)? [a-z]+ energy card from your discard pile to this pok[eé]mon'
+       or v_text ~ 'attach (?:an|a) energy card from your discard pile to this pok[eé]mon' then
+      v_self_energy_gain:=greatest(v_self_energy_gain,1);
+      if v_text like '%flip a coin%' and v_text like '%if heads%' then v_self_energy_gain_chance:=0.5; end if;
+      v_effect_notes:=array_append(v_effect_notes,'anexa 1 Energia virtual ao atacante');
+    end if;
+
+    v_match:=regexp_match(v_text,'(?:put|return) ([0-9]+) energy attached to your opponent''s active pok[eé]mon (?:into|to) their hand');
+    if v_match is not null then
+      v_defender_energy_return:=greatest(v_defender_energy_return,v_match[1]::integer);
+      v_effect_notes:=array_append(v_effect_notes,'Energia do defensor volta para a mão');
+    elsif v_text ~ '(?:put|return) an energy attached to your opponent''s active pok[eé]mon (?:into|to) their hand'
+       or v_text ~ 'you may put an energy attached to your opponent''s active pok[eé]mon into their hand' then
+      v_defender_energy_return:=greatest(v_defender_energy_return,1);
+      v_effect_notes:=array_append(v_effect_notes,'1 Energia do defensor volta para a mão');
+    end if;
+
     -- Cooldowns.
     if v_text like '%during your next turn, this pokémon can''t attack%'
        or v_text like '%during your next turn, this pokemon can''t attack%'
@@ -950,6 +979,8 @@ begin
         +case when v_self_prevent_damage_cap_next>0 then 28 else 0 end
         +case when v_defender_energy_discard>0 or v_defender_energy_discard_coins>0 then 18 else 0 end
         +case when v_lock_defender_best then 28 else 0 end
+        +v_self_energy_gain*18
+        +v_defender_energy_return*18
         +case when v_defender_cannot_attack_next then 45 else 0 end
         +v_defender_outgoing_reduction_next*0.35
         +v_defender_attack_gate_chance*35
@@ -993,6 +1024,9 @@ begin
         'healAll',v_heal_all
       ) || jsonb_build_object(
         'selfReductionNext',v_self_reduction_next,
+        'selfEnergyGain',v_self_energy_gain,
+        'selfEnergyGainChance',v_self_energy_gain_chance,
+        'defenderEnergyReturn',v_defender_energy_return,
         'selfPreventNext',v_self_prevent_next,
         'selfPreventChance',v_self_prevent_chance,
         'selfPreventClass',v_self_prevent_class,
@@ -1262,6 +1296,9 @@ begin
               v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0); if v_recoil>0 then c_damage:=least(c_hp,c_damage+v_recoil); end if;
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); c_energy:=greatest(0,c_energy-v_discard);
+              if coalesce((v_plan->>'selfEnergyGain')::integer,0)>0
+                 and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_energy_gain')<=coalesce((v_plan->>'selfEnergyGainChance')::numeric,1)
+              then c_energy:=least(12,c_energy+(v_plan->>'selfEnergyGain')::integer); end if;
               c_cooldown_all:=greatest(c_cooldown_all,coalesce((v_plan->>'cooldownAll')::integer,0));
               if coalesce((v_plan->>'cooldownAttackPermanent')::boolean,false) then c_blocked_attack:=v_attack_name; c_blocked_turns:=99;
               elsif coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then c_blocked_attack:=v_attack_name; c_blocked_turns:=1; end if;
@@ -1285,6 +1322,7 @@ begin
                 elsif coalesce((v_plan->>'defenderEnergyDiscard')::integer,0)>0
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
+                if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then o_attack_gate_next:=greatest(o_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
                 if coalesce((v_plan->>'defenderCannotAttackNext')::boolean,false) then o_cooldown_all:=greatest(o_cooldown_all,1); end if;
                 if coalesce((v_plan->>'defenderOutgoingReductionNext')::numeric,0)>0 then o_outgoing_reduction_next:=greatest(o_outgoing_reduction_next,(v_plan->>'defenderOutgoingReductionNext')::numeric); end if;
@@ -1439,6 +1477,9 @@ begin
               v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0); if v_recoil>0 then o_damage:=least(o_hp,o_damage+v_recoil); end if;
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); o_energy:=greatest(0,o_energy-v_discard);
+              if coalesce((v_plan->>'selfEnergyGain')::integer,0)>0
+                 and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_energy_gain')<=coalesce((v_plan->>'selfEnergyGainChance')::numeric,1)
+              then o_energy:=least(12,o_energy+(v_plan->>'selfEnergyGain')::integer); end if;
               o_cooldown_all:=greatest(o_cooldown_all,coalesce((v_plan->>'cooldownAll')::integer,0));
               if coalesce((v_plan->>'cooldownAttackPermanent')::boolean,false) then o_blocked_attack:=v_attack_name; o_blocked_turns:=99;
               elsif coalesce((v_plan->>'cooldownAttack')::integer,0)>0 then o_blocked_attack:=v_attack_name; o_blocked_turns:=1; end if;
@@ -1462,6 +1503,7 @@ begin
                 elsif coalesce((v_plan->>'defenderEnergyDiscard')::integer,0)>0
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
+                if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then c_attack_gate_next:=greatest(c_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
                 if coalesce((v_plan->>'defenderCannotAttackNext')::boolean,false) then c_cooldown_all:=greatest(c_cooldown_all,1); end if;
                 if coalesce((v_plan->>'defenderOutgoingReductionNext')::numeric,0)>0 then c_outgoing_reduction_next:=greatest(c_outgoing_reduction_next,(v_plan->>'defenderOutgoingReductionNext')::numeric); end if;
