@@ -804,6 +804,9 @@ declare
   v_dynamic_count integer := 0;
   v_per_unit numeric := 0;
   v_discard integer := 0;
+  v_discard_coin_count integer:=0;
+  v_discard_heads_min integer:=0;
+  v_discard_heads_max integer:=0;
   v_cooldown_all integer := 0;
   v_cooldown_attack integer := 0;
   v_status text := null;
@@ -816,6 +819,7 @@ declare
   v_recoil_heads_min integer:=0;
   v_recoil_heads_max integer:=0;
   v_heal numeric := 0;
+  v_heal_defender numeric:=0;
   v_heal_equal boolean:=false;
   v_interval integer := 1;
   v_effect_notes text[];
@@ -831,6 +835,8 @@ declare
   v_defender_energy_discard integer:=0;
   v_defender_energy_discard_chance numeric:=1;
   v_defender_energy_discard_coins integer:=0;
+  v_defender_energy_discard_all_coin_count integer:=0;
+  v_defender_energy_discard_all_heads integer:=0;
   v_self_reduction_next numeric:=0;
   v_self_prevent_next boolean:=false;
   v_self_prevent_chance numeric:=1;
@@ -1048,6 +1054,9 @@ begin
     v_dynamic_count:=0;
     v_per_unit:=0;
     v_discard:=0;
+    v_discard_coin_count:=0;
+    v_discard_heads_min:=0;
+    v_discard_heads_max:=0;
     v_cooldown_all:=0;
     v_cooldown_attack:=0;
     v_status:=null;
@@ -1060,6 +1069,7 @@ begin
     v_recoil_heads_min:=0;
     v_recoil_heads_max:=0;
     v_heal:=0;
+    v_heal_defender:=0;
     v_heal_equal:=false;
     v_effect_notes:=array[]::text[];
     v_status_bonus:=0;
@@ -1074,6 +1084,8 @@ begin
     v_defender_energy_discard:=0;
     v_defender_energy_discard_chance:=1;
     v_defender_energy_discard_coins:=0;
+    v_defender_energy_discard_all_coin_count:=0;
+    v_defender_energy_discard_all_heads:=0;
     v_self_reduction_next:=0;
     v_self_prevent_next:=false;
     v_self_prevent_chance:=1;
@@ -1165,6 +1177,15 @@ begin
         v_raw:=v_match[1]::numeric;
         v_expected_raw:=v_raw;
         v_effect_notes:=array_append(v_effect_notes,'dano direcionado ao Pokémon Ativo');
+      end if;
+    end if;
+
+    if v_base=0 and v_text not like '%benched pokémon%' then
+      v_match:=regexp_match(v_text,'this attack does ([0-9]+) damage to [23] of your opponent''s pok[eé]mon');
+      if v_match is not null then
+        v_raw:=v_match[1]::numeric;
+        v_expected_raw:=v_raw;
+        v_effect_notes:=array_append(v_effect_notes,'dano multi-alvo aplicado uma vez ao único Ativo');
       end if;
     end if;
 
@@ -1454,6 +1475,49 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'metade do HP restante arredondada');
     end if;
 
+    v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) damage (?:times the amount of|for each) energy attached to both active pok[eé]mon');
+    if v_match is not null then
+      v_raw:=v_match[1]::numeric*(greatest(0,coalesce(p_energy,0))+greatest(0,coalesce(p_defender_energy,0)));
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'dano pela Energia dos dois Ativos');
+    end if;
+
+    v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) more damage (?:times the amount of|for each) energy attached to both active pok[eé]mon');
+    if v_match is not null then
+      v_raw:=v_raw+v_match[1]::numeric*(greatest(0,coalesce(p_energy,0))+greatest(0,coalesce(p_defender_energy,0)));
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus pela Energia dos dois Ativos');
+    end if;
+
+    v_match:=regexp_match(v_text,'does ([0-9]+) damage times the amount of energy attached to this pok[eé]mon and the defending pok[eé]mon');
+    if v_match is not null then
+      v_raw:=v_match[1]::numeric*(greatest(0,coalesce(p_energy,0))+greatest(0,coalesce(p_defender_energy,0)));
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'dano pela soma de Energia dos Ativos');
+    end if;
+
+    v_match:=regexp_match(v_text,'this attack does ([0-9]+) more damage for each energy attached to both active pok[eé]mon');
+    if v_match is not null then
+      v_raw:=v_raw+v_match[1]::numeric*(greatest(0,coalesce(p_energy,0))+greatest(0,coalesce(p_defender_energy,0)));
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus pela soma de Energia dos Ativos');
+    end if;
+
+    v_match:=regexp_match(v_text,'this attack does ([0-9]+) (?:more )?damage for each [a-z]+ energy attached to all of your pok[eé]mon');
+    if v_match is not null then
+      if v_text like '%more damage%' then v_raw:=v_raw+v_match[1]::numeric*greatest(0,coalesce(p_energy,0));
+      else v_raw:=v_match[1]::numeric*greatest(0,coalesce(p_energy,0)); end if;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'Energia de todo o lado = atacante no 1x1');
+    end if;
+
+    v_match:=regexp_match(v_text,'this attack does ([0-9]+) damage for each of your pok[eé]mon that has any damage counters on it');
+    if v_match is not null then
+      v_raw:=case when coalesce(p_attacker_damage,0)>0 then v_match[1]::numeric else 0 end;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'contagem do lado reduzida ao atacante no 1x1');
+    end if;
+
     -- Energy-discard damage bonuses (Rayquaza VMAX style).
     v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each .*energy.*discard');
     if v_match is null and v_text like '%discard any amount%energy%' then
@@ -1639,7 +1703,8 @@ begin
     end if;
 
     -- Energy discard from self.
-    if v_text like '%discard all energy from this pokémon%' or v_text like '%discard all energy from this pokemon%' then
+    if v_text like '%discard all energy from this pokémon%' or v_text like '%discard all energy from this pokemon%'
+       or v_text ~ 'discard all(?: basic)? [a-z]+ energy from this pok[eé]mon' then
       v_discard:=greatest(v_discard,coalesce(p_energy,0));
       v_effect_notes:=array_append(v_effect_notes,'descarta toda a Energia');
     else
@@ -1652,8 +1717,34 @@ begin
         v_effect_notes:=array_append(v_effect_notes,'descarta 1 Energia');
       end if;
     end if;
+    if v_discard>0 and v_text like '%flip a coin%' then
+      if v_text ~ 'if tails,[^.]*discard (?:an|a|[0-9]+|all)(?: [a-z]+)? energy' then
+        v_discard_coin_count:=1; v_discard_heads_min:=0; v_discard_heads_max:=0;
+        v_effect_notes:=array_append(v_effect_notes,'descarte próprio condicionado a coroa');
+      elsif v_text ~ 'if heads,[^.]*discard (?:an|a|[0-9]+|all)(?: [a-z]+)? energy' then
+        v_discard_coin_count:=1; v_discard_heads_min:=1; v_discard_heads_max:=1;
+        v_effect_notes:=array_append(v_effect_notes,'descarte próprio condicionado a cara');
+      end if;
+    end if;
 
     -- Energy discard from the opposing Active Pokemon.
+    if v_text ~ 'flip 2 coins?.*if both(?: of them)? (?:are )?heads, discard all energy attached to the defending pok[eé]mon' then
+      v_defender_energy_discard_all_coin_count:=2;
+      v_defender_energy_discard_all_heads:=2;
+      v_effect_notes:=array_append(v_effect_notes,'remove toda Energia do defensor com duas caras');
+    elsif v_text like '%discard all energy from your opponent''s active pokémon%'
+       or v_text like '%discard all energy attached to the defending pokémon%' then
+      v_defender_energy_discard:=greatest(v_defender_energy_discard,coalesce(p_defender_energy,0));
+      v_effect_notes:=array_append(v_effect_notes,'remove toda Energia do defensor');
+    end if;
+
+    v_match:=regexp_match(v_text,'discard ([0-9]+)(?: [a-z]+)? energy (?:cards? )?(?:attached to |from )?(?:your opponent''s active pok[eé]mon|the defending pok[eé]mon|your opponent''s pok[eé]mon)');
+    if v_match is not null then
+      v_defender_energy_discard:=greatest(v_defender_energy_discard,v_match[1]::integer);
+      if v_text like '%flip a coin%' then v_defender_energy_discard_chance:=0.5; end if;
+      v_effect_notes:=array_append(v_effect_notes,'descarta múltiplas Energias do defensor');
+    end if;
+
     v_match:=regexp_match(v_text,'flip ([0-9]+) coins?.*for each heads, discard (?:an|a) energy (?:card )?(?:attached to |from )?(?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)');
     if v_match is not null then
       v_defender_energy_discard_coins:=greatest(1,least(v_match[1]::integer,20));
@@ -1761,6 +1852,12 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'Pokémon de Evolução defensor não pode atacar');
     end if;
 
+    v_match:=regexp_match(v_text,'during your opponent''s next turn, any damage done by attacks from the defending pok[eé]mon is reduced by ([0-9]+)');
+    if v_match is not null then
+      v_defender_outgoing_reduction_next:=greatest(v_defender_outgoing_reduction_next,v_match[1]::numeric);
+      v_effect_notes:=array_append(v_effect_notes,'reduz dano do defensor no próximo turno');
+    end if;
+
     v_match:=regexp_match(v_text,'during your opponent''s next turn, (?:the defending pok[eé]mon''s attacks|attacks used by the defending pok[eé]mon) do ([0-9]+) less damage');
     if v_match is not null then
       v_defender_outgoing_reduction_next:=v_match[1]::numeric;
@@ -1768,6 +1865,16 @@ begin
     end if;
 
     -- Direct Knock Out effects.
+    if v_text like '%knock out your opponent''s active pokémon.%' then
+      v_instant_knockout:=true;
+      v_effect_notes:=array_append(v_effect_notes,'nocaute direto do defensor');
+      v_match:=regexp_match(v_text,'if your opponent''s active pok[eé]mon is knocked out in this way, this pok[eé]mon does ([0-9]+) damage to itself');
+      if v_match is not null then
+        v_recoil:=greatest(v_recoil,v_match[1]::numeric);
+        v_effect_notes:=array_append(v_effect_notes,'auto-dano após nocaute direto');
+      end if;
+    end if;
+
     if v_text like '%both active pokémon are knocked out%'
        or v_text like '%both active pokemon are knocked out%'
        or (
@@ -2015,6 +2122,9 @@ begin
 
     if v_inflict_poison then
       v_match:=regexp_match(v_text,'(?:during pok[eé]mon checkup|between turns).*?(?:put|place) ([2-9]) damage counters?.*instead of 1');
+      if v_match is null then
+        v_match:=regexp_match(v_text,'(?:put|place) ([2-9]) damage counters? instead of 1.*between turns');
+      end if;
       if v_match is not null then
         v_inflict_poison_checkup_damage:=v_match[1]::numeric*10;
         v_status_bonus:=greatest(v_status_bonus,v_inflict_poison_checkup_damage*0.7);
@@ -2053,6 +2163,9 @@ begin
 
     if v_inflict_self_poison then
       v_match:=regexp_match(v_text,'(?:during pok[eé]mon checkup|between turns).*?(?:put|place) ([2-9]) damage counters?.*instead of 1');
+      if v_match is null then
+        v_match:=regexp_match(v_text,'(?:put|place) ([2-9]) damage counters? instead of 1.*between turns');
+      end if;
       if v_match is not null then
         v_inflict_self_poison_checkup_damage:=v_match[1]::numeric*10;
         v_effect_notes:=array_append(v_effect_notes,'Poison reforçado no atacante: '||v_inflict_self_poison_checkup_damage||' por Checkup');
@@ -2141,6 +2254,13 @@ begin
     end if;
     v_match:=regexp_match(v_text,'heal ([0-9]+) damage from (?:this pok[eé]mon|1 of your pok[eé]mon|each of your pok[eé]mon)');
     if v_match is not null then v_heal:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'cura'); end if;
+    v_match:=regexp_match(v_text,'heal ([0-9]+) damage from each pok[eé]mon \(both yours and your opponent''s\)');
+    if v_match is not null then
+      v_heal:=greatest(v_heal,v_match[1]::numeric);
+      v_heal_defender:=greatest(v_heal_defender,v_match[1]::numeric);
+      v_effect_notes:=array_append(v_effect_notes,'cura os dois Ativos');
+    end if;
+    if v_text like '%heal all damage from all of your pokémon%' then v_heal_all:=true; end if;
     v_match:=regexp_match(v_text,'remove ([0-9]+) damage counters? from (?:this pok[eé]mon|1 of your pok[eé]mon)');
     if v_match is not null then v_heal:=greatest(v_heal,v_match[1]::numeric*10); v_effect_notes:=array_append(v_effect_notes,'remove contadores de dano'); end if;
     if position('from '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0 then
@@ -2392,9 +2512,14 @@ begin
         'dynamicCount',v_dynamic_count,
         'perUnitDamage',v_per_unit,
         'discardEnergy',least(greatest(v_discard,0),coalesce(p_energy,0)),
+        'discardCoinCount',v_discard_coin_count,
+        'discardHeadsMin',v_discard_heads_min,
+        'discardHeadsMax',v_discard_heads_max,
         'defenderEnergyDiscard',v_defender_energy_discard,
         'defenderEnergyDiscardChance',v_defender_energy_discard_chance,
         'defenderEnergyDiscardCoins',v_defender_energy_discard_coins,
+        'defenderEnergyDiscardAllCoinCount',v_defender_energy_discard_all_coin_count,
+        'defenderEnergyDiscardAllHeads',v_defender_energy_discard_all_heads,
         'cooldownAll',v_cooldown_all,
         'cooldownAttack',v_cooldown_attack,
         'cooldownAttackPermanent',v_cooldown_attack_permanent,
@@ -2413,6 +2538,7 @@ begin
         'recoilHeadsMin',v_recoil_heads_min,
         'recoilHeadsMax',v_recoil_heads_max,
         'healDamage',v_heal,
+        'healDefenderDamage',v_heal_defender,
         'healEqualDamage',v_heal_equal,
         'healAll',v_heal_all
       ) || jsonb_build_object(
@@ -2792,6 +2918,9 @@ begin
                 if coalesce((v_plan->>'healAll')::boolean,false) then c_damage:=0;
                 elsif v_heal>0 then c_damage:=greatest(0,c_damage-v_heal); end if;
               end if;
+              if coalesce((v_plan->>'healDefenderDamage')::numeric,0)>0 and not o_heal_block_next then
+                o_damage:=greatest(0,o_damage-(v_plan->>'healDefenderDamage')::numeric);
+              end if;
               v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0);
               if v_recoil>0 then
                 v_recoil_coin_count:=coalesce((v_plan->>'recoilCoinCount')::integer,0);
@@ -2815,7 +2944,18 @@ begin
                 if v_recoil_success then c_damage:=least(c_hp,c_damage+v_recoil); end if;
               end if;
 
-              v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); c_energy:=greatest(0,c_energy-v_discard);
+              v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0);
+              if v_discard>0 and coalesce((v_plan->>'discardCoinCount')::integer,0)>0 then
+                v_coin_count:=(v_plan->>'discardCoinCount')::integer;
+                if v_gate_heads>=0 and coalesce((v_plan->>'coinGateCount')::integer,0)=v_coin_count then v_heads:=v_gate_heads;
+                elsif v_bonus_heads>=0 and coalesce((v_plan->>'coinBonusCount')::integer,0)=v_coin_count then v_heads:=v_bonus_heads;
+                else
+                  v_heads:=0;
+                  for v_i in 1..v_coin_count loop if private.battle_v6_hash_roll(v_seed||':'||v_half||':discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if; end loop;
+                end if;
+                if v_heads between coalesce((v_plan->>'discardHeadsMin')::integer,0) and coalesce((v_plan->>'discardHeadsMax')::integer,v_coin_count)
+                then c_energy:=greatest(0,c_energy-v_discard); end if;
+              else c_energy:=greatest(0,c_energy-v_discard); end if;
               if coalesce((v_plan->>'selfEnergyGain')::integer,0)>0
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_energy_gain')<=coalesce((v_plan->>'selfEnergyGainChance')::numeric,1)
               then c_energy:=least(12,c_energy+(v_plan->>'selfEnergyGain')::integer); end if;
@@ -2841,7 +2981,13 @@ begin
               then c_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
 
               if not v_effect_immune then
-                if coalesce((v_plan->>'defenderEnergyDiscardCoins')::integer,0)>0 then
+                if coalesce((v_plan->>'defenderEnergyDiscardAllCoinCount')::integer,0)>0 then
+                  v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardAllCoinCount')::integer;
+                  for v_i in 1..v_coin_count loop
+                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_all_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
+                  end loop;
+                  if v_heads>=coalesce((v_plan->>'defenderEnergyDiscardAllHeads')::integer,v_coin_count) then o_energy:=0; end if;
+                elsif coalesce((v_plan->>'defenderEnergyDiscardCoins')::integer,0)>0 then
                   v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardCoins')::integer;
                   for v_i in 1..v_coin_count loop
                     if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
@@ -3101,6 +3247,9 @@ begin
                 if coalesce((v_plan->>'healAll')::boolean,false) then o_damage:=0;
                 elsif v_heal>0 then o_damage:=greatest(0,o_damage-v_heal); end if;
               end if;
+              if coalesce((v_plan->>'healDefenderDamage')::numeric,0)>0 and not c_heal_block_next then
+                c_damage:=greatest(0,c_damage-(v_plan->>'healDefenderDamage')::numeric);
+              end if;
               v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0);
               if v_recoil>0 then
                 v_recoil_coin_count:=coalesce((v_plan->>'recoilCoinCount')::integer,0);
@@ -3124,7 +3273,18 @@ begin
                 if v_recoil_success then o_damage:=least(o_hp,o_damage+v_recoil); end if;
               end if;
 
-              v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); o_energy:=greatest(0,o_energy-v_discard);
+              v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0);
+              if v_discard>0 and coalesce((v_plan->>'discardCoinCount')::integer,0)>0 then
+                v_coin_count:=(v_plan->>'discardCoinCount')::integer;
+                if v_gate_heads>=0 and coalesce((v_plan->>'coinGateCount')::integer,0)=v_coin_count then v_heads:=v_gate_heads;
+                elsif v_bonus_heads>=0 and coalesce((v_plan->>'coinBonusCount')::integer,0)=v_coin_count then v_heads:=v_bonus_heads;
+                else
+                  v_heads:=0;
+                  for v_i in 1..v_coin_count loop if private.battle_v6_hash_roll(v_seed||':'||v_half||':discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if; end loop;
+                end if;
+                if v_heads between coalesce((v_plan->>'discardHeadsMin')::integer,0) and coalesce((v_plan->>'discardHeadsMax')::integer,v_coin_count)
+                then o_energy:=greatest(0,o_energy-v_discard); end if;
+              else o_energy:=greatest(0,o_energy-v_discard); end if;
               if coalesce((v_plan->>'selfEnergyGain')::integer,0)>0
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_energy_gain')<=coalesce((v_plan->>'selfEnergyGainChance')::numeric,1)
               then o_energy:=least(12,o_energy+(v_plan->>'selfEnergyGain')::integer); end if;
@@ -3150,7 +3310,13 @@ begin
               then o_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
 
               if not v_effect_immune then
-                if coalesce((v_plan->>'defenderEnergyDiscardCoins')::integer,0)>0 then
+                if coalesce((v_plan->>'defenderEnergyDiscardAllCoinCount')::integer,0)>0 then
+                  v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardAllCoinCount')::integer;
+                  for v_i in 1..v_coin_count loop
+                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_all_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
+                  end loop;
+                  if v_heads>=coalesce((v_plan->>'defenderEnergyDiscardAllHeads')::integer,v_coin_count) then c_energy:=0; end if;
+                elsif coalesce((v_plan->>'defenderEnergyDiscardCoins')::integer,0)>0 then
                   v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardCoins')::integer;
                   for v_i in 1..v_coin_count loop
                     if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
