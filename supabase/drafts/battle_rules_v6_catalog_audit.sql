@@ -324,6 +324,8 @@ create or replace function private.battle_v6_attack_plan(
   p_defender_special boolean,
   p_defender_major text,
   p_ignore_defender_weakness boolean,
+  p_gx_used boolean,
+  p_vstar_used boolean,
   p_blocked_attacks text[] default null
 )
 returns jsonb
@@ -464,6 +466,8 @@ begin
     if coalesce(p_energy,0)<v_cost then continue; end if;
 
     v_text:=lower(coalesce(v_attack->>'text',''));
+    if coalesce(p_gx_used,false) and v_text like '%you can''t use more than 1 gx attack in a game%' then continue; end if;
+    if coalesce(p_vstar_used,false) and v_text like '%you can''t use more than 1 vstar power in a game%' then continue; end if;
     v_damage_text:=coalesce(v_attack->>'damage','');
     v_match:=regexp_match(v_damage_text,'([0-9]+)');
     v_base:=case when v_match is null then 0 else v_match[1]::numeric end;
@@ -1099,6 +1103,8 @@ begin
         'instantKnockout',v_instant_knockout,
         'delayedKnockoutNext',v_delayed_knockout_next,
         'defenderHealBlockNext',v_defender_heal_block_next,
+        'usesGxLimit',v_text like '%you can''t use more than 1 gx attack in a game%',
+        'usesVstarLimit',v_text like '%you can''t use more than 1 vstar power in a game%',
         'selfPreventNext',v_self_prevent_next,
         'selfPreventChance',v_self_prevent_chance,
         'selfPreventClass',v_self_prevent_class,
@@ -1194,6 +1200,10 @@ declare
   o_delayed_ko_next boolean:=false;
   c_heal_block_next boolean:=false;
   o_heal_block_next boolean:=false;
+  c_gx_used boolean:=false;
+  o_gx_used boolean:=false;
+  c_vstar_used boolean:=false;
+  o_vstar_used boolean:=false;
   c_first boolean;
   v_seed text;
   v_is_c boolean;
@@ -1281,14 +1291,16 @@ begin
         v_blocked:=array[]::text[];
         if c_blocked_turns>0 and c_blocked_attack is not null then v_blocked:=array_append(v_blocked,c_blocked_attack); end if;
         if c_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_major,o_no_weakness_next,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_major,o_no_weakness_next,c_gx_used,c_vstar_used,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           c_disable_best_next:=c_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_major,o_no_weakness_next,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_major,o_no_weakness_next,c_gx_used,c_vstar_used,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
+          if coalesce((v_plan->>'usesGxLimit')::boolean,false) then c_gx_used:=true; end if;
+          if coalesce((v_plan->>'usesVstarLimit')::boolean,false) then c_vstar_used:=true; end if;
 
           if c_major='confused' and private.battle_v6_hash_roll(v_seed||':'||v_half||':confused')<0.5 then
             c_damage:=least(c_hp,c_damage+30);
@@ -1467,14 +1479,16 @@ begin
         v_blocked:=array[]::text[];
         if o_blocked_turns>0 and o_blocked_attack is not null then v_blocked:=array_append(v_blocked,o_blocked_attack); end if;
         if o_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_major,c_no_weakness_next,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_major,c_no_weakness_next,o_gx_used,o_vstar_used,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           o_disable_best_next:=o_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_major,c_no_weakness_next,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_major,c_no_weakness_next,o_gx_used,o_vstar_used,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
+          if coalesce((v_plan->>'usesGxLimit')::boolean,false) then o_gx_used:=true; end if;
+          if coalesce((v_plan->>'usesVstarLimit')::boolean,false) then o_vstar_used:=true; end if;
 
           if o_major='confused' and private.battle_v6_hash_roll(v_seed||':'||v_half||':confused')<0.5 then
             o_damage:=least(o_hp,o_damage+30);
@@ -1816,7 +1830,7 @@ revoke all on function private.battle_v6_turn_ability_effects(text) from public,
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,text,boolean,text[]) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,text,boolean,boolean,boolean,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
 grant execute on function public.server_resolve_battle_round(uuid) to service_role;
