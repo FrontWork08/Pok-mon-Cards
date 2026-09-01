@@ -561,8 +561,10 @@ declare
   v_self_prevent_damage_cap_next numeric:=0;
   v_inflict_self_major text:=null;
   v_inflict_poison boolean:=false;
+  v_inflict_poison_checkup_damage numeric:=10;
   v_inflict_burn boolean:=false;
   v_inflict_self_poison boolean:=false;
+  v_inflict_self_poison_checkup_damage numeric:=10;
   v_inflict_self_burn boolean:=false;
   v_clear_self_special boolean:=false;
   v_clear_self_poison boolean:=false;
@@ -801,8 +803,10 @@ begin
     v_self_prevent_damage_cap_next:=0;
     v_inflict_self_major:=null;
     v_inflict_poison:=false;
+    v_inflict_poison_checkup_damage:=10;
     v_inflict_burn:=false;
     v_inflict_self_poison:=false;
+    v_inflict_self_poison_checkup_damage:=10;
     v_inflict_self_burn:=false;
     v_clear_self_special:=false;
     v_clear_self_poison:=false;
@@ -1692,6 +1696,11 @@ begin
     if v_text like '%both active pokémon are now poisoned%'
        or v_text like '%both this pokémon and the defending pokémon are now poisoned%' then
       v_inflict_poison:=true; v_inflict_self_poison:=true; v_status_bonus:=greatest(v_status_bonus,20);
+      v_match:=regexp_match(v_text,'(?:during pok[eé]mon checkup|between turns).*?(?:put|place) ([2-9]) damage counters?.*instead of 1');
+      if v_match is not null then
+        v_inflict_poison_checkup_damage:=v_match[1]::numeric*10;
+        v_inflict_self_poison_checkup_damage:=v_inflict_poison_checkup_damage;
+      end if;
       v_effect_notes:=array_append(v_effect_notes,'ambos ficam Envenenados');
     end if;
     if v_text like '%both active pokémon are now burned%'
@@ -1715,6 +1724,15 @@ begin
     if v_text like '%defending pokémon is now poisoned%'
        or v_text like '%opponent''s active pokémon is now poisoned%' then
       v_inflict_poison:=true; v_status_bonus:=greatest(v_status_bonus,20);
+    end if;
+
+    if v_inflict_poison then
+      v_match:=regexp_match(v_text,'(?:during pok[eé]mon checkup|between turns).*?(?:put|place) ([2-9]) damage counters?.*instead of 1');
+      if v_match is not null then
+        v_inflict_poison_checkup_damage:=v_match[1]::numeric*10;
+        v_status_bonus:=greatest(v_status_bonus,v_inflict_poison_checkup_damage*0.7);
+        v_effect_notes:=array_append(v_effect_notes,'Poison reforçado: '||v_inflict_poison_checkup_damage||' por Checkup');
+      end if;
     end if;
     if v_text like '%defending pokémon is now burned%'
        or v_text like '%opponent''s active pokémon is now burned%' then
@@ -1744,6 +1762,14 @@ begin
        or (v_copy_source is not null and position(lower(coalesce(v_defender.pokemon_name,''))||' is now poisoned' in v_text)>0) then
       v_inflict_self_poison:=true;
       v_effect_notes:=array_append(v_effect_notes,'atacante fica Envenenado');
+    end if;
+
+    if v_inflict_self_poison then
+      v_match:=regexp_match(v_text,'(?:during pok[eé]mon checkup|between turns).*?(?:put|place) ([2-9]) damage counters?.*instead of 1');
+      if v_match is not null then
+        v_inflict_self_poison_checkup_damage:=v_match[1]::numeric*10;
+        v_effect_notes:=array_append(v_effect_notes,'Poison reforçado no atacante: '||v_inflict_self_poison_checkup_damage||' por Checkup');
+      end if;
     end if;
     if v_text like '%this pokémon is now burned%'
        or position(lower(coalesce(v_attacker.pokemon_name,''))||' is now burned' in v_text)>0
@@ -2128,6 +2154,7 @@ begin
         'selfPreventDamageCapNext',v_self_prevent_damage_cap_next,
         'inflictSelfMajor',v_inflict_self_major,
         'inflictSelfPoison',v_inflict_self_poison,
+        'selfPoisonCheckupDamage',v_inflict_self_poison_checkup_damage,
         'inflictSelfBurn',v_inflict_self_burn,
         'clearSelfSpecial',v_clear_self_special,
         'clearSelfPoison',v_clear_self_poison,
@@ -2155,6 +2182,7 @@ begin
         'ignoreWeaknessResistance',v_ignore_weakness_resistance,
         'ignoreResistance',v_ignore_resistance,
         'inflictPoison',v_inflict_poison,
+        'poisonCheckupDamage',v_inflict_poison_checkup_damage,
         'inflictBurn',v_inflict_burn,
         'inflictMajor',v_status,
         'effectNotes',to_jsonb(v_effect_notes),
@@ -2197,6 +2225,8 @@ declare
   o_major text:=null;
   c_poison boolean:=false;
   o_poison boolean:=false;
+  c_poison_checkup_damage numeric:=10;
+  o_poison_checkup_damage numeric:=10;
   c_burn boolean:=false;
   o_burn boolean:=false;
   c_cooldown_all integer:=0;
@@ -2318,7 +2348,7 @@ begin
       if not c_heal_block_next and coalesce((v_turn_ability->>'heal')::numeric,0)>0
          and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
       then c_damage:=greatest(0,c_damage-(v_turn_ability->>'heal')::numeric); end if;
-      if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then c_major:=null; c_poison:=false; c_burn:=false; end if;
+      if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then c_major:=null; c_poison:=false; c_poison_checkup_damage:=10; c_burn:=false; end if;
       v_attach_punish:=private.battle_v6_energy_attachment_punish(o.id);
       if v_attach_punish>0 then c_damage:=least(c_hp,c_damage+v_attach_punish*v_attach_count); end if;
       v_energy_before:=c_energy;
@@ -2452,7 +2482,7 @@ begin
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':stored_reactive')<=o_reactive_chance_next then
                 v_reactive_counter:=greatest(0,o_reactive_next+o_reactive_multiplier_next*v_effective);
                 if v_reactive_counter>0 then c_damage:=least(c_hp,c_damage+v_reactive_counter); end if;
-                if o_reactive_status_next='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true;
+                if o_reactive_status_next='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; c_poison_checkup_damage:=10;
                 elsif o_reactive_status_next='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
               end if;
               c_last_attack:=v_attack_name; c_last_damage:=v_effective; c_last_advantage:=coalesce(v_plan->>'advantage','neutral');
@@ -2501,11 +2531,11 @@ begin
               if coalesce((v_plan->>'selfReactiveChanceNext')::numeric,1)<1 then c_reactive_chance_next:=least(c_reactive_chance_next,(v_plan->>'selfReactiveChanceNext')::numeric); end if;
               if coalesce(v_plan->>'selfReactiveStatusNext','')<>'' then c_reactive_status_next:=v_plan->>'selfReactiveStatusNext'; end if;
               if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then c_prevent_damage_cap_next:=greatest(c_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
-              if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; end if;
+              if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; c_poison_checkup_damage:=10; c_poison_checkup_damage:=greatest(10,coalesce((v_plan->>'selfPoisonCheckupDamage')::numeric,10)); end if;
               if coalesce((v_plan->>'inflictSelfBurn')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
               if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(c.id,v_plan->>'inflictSelfMajor') then c_major:=v_plan->>'inflictSelfMajor'; end if;
-              if coalesce((v_plan->>'clearSelfSpecial')::boolean,false) then c_poison:=false; c_burn:=false; c_major:=null; end if;
-              if coalesce((v_plan->>'clearSelfPoison')::boolean,false) then c_poison:=false; end if;
+              if coalesce((v_plan->>'clearSelfSpecial')::boolean,false) then c_poison:=false; c_poison_checkup_damage:=10; c_burn:=false; c_major:=null; end if;
+              if coalesce((v_plan->>'clearSelfPoison')::boolean,false) then c_poison:=false; c_poison_checkup_damage:=10; end if;
               if coalesce((v_plan->>'selfKnockout')::boolean,false) or coalesce((v_plan->>'bothKnockout')::boolean,false) then c_damage:=c_hp; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
@@ -2585,15 +2615,15 @@ begin
                   v_status_success:=private.battle_v6_hash_roll(v_seed||':'||v_half||':status')<=v_status_chance;
                 end if;
                 if v_status_success then
-                  if coalesce((v_plan->>'inflictPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; end if;
+                  if coalesce((v_plan->>'inflictPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; o_poison_checkup_damage:=10; o_poison_checkup_damage:=greatest(10,coalesce((v_plan->>'poisonCheckupDamage')::numeric,10)); end if;
                   if coalesce((v_plan->>'inflictBurn')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
                   if v_status is not null and v_status not in ('poisoned','burned') and not private.battle_v6_status_immune(o.id,v_status) then o_major:=v_status; end if;
                 end if;
-                if coalesce((v_plan->>'clearDefenderSpecial')::boolean,false) then o_poison:=false; o_burn:=false; o_major:=null; end if;
+                if coalesce((v_plan->>'clearDefenderSpecial')::boolean,false) then o_poison:=false; o_poison_checkup_damage:=10; o_burn:=false; o_major:=null; end if;
               end if;
 
               if v_reactive>0 then c_damage:=least(c_hp,c_damage+v_reactive); end if;
-              if v_reactive_status='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true;
+              if v_reactive_status='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; c_poison_checkup_damage:=10;
               elsif v_reactive_status='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
 
               v_trace:=v_trace||jsonb_build_array(jsonb_build_object(
@@ -2618,7 +2648,7 @@ begin
       if not o_heal_block_next and coalesce((v_turn_ability->>'heal')::numeric,0)>0
          and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
       then o_damage:=greatest(0,o_damage-(v_turn_ability->>'heal')::numeric); end if;
-      if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then o_major:=null; o_poison:=false; o_burn:=false; end if;
+      if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then o_major:=null; o_poison:=false; o_poison_checkup_damage:=10; o_burn:=false; end if;
       v_attach_punish:=private.battle_v6_energy_attachment_punish(c.id);
       if v_attach_punish>0 then o_damage:=least(o_hp,o_damage+v_attach_punish*v_attach_count); end if;
       v_energy_before:=o_energy;
@@ -2752,7 +2782,7 @@ begin
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':stored_reactive')<=c_reactive_chance_next then
                 v_reactive_counter:=greatest(0,c_reactive_next+c_reactive_multiplier_next*v_effective);
                 if v_reactive_counter>0 then o_damage:=least(o_hp,o_damage+v_reactive_counter); end if;
-                if c_reactive_status_next='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true;
+                if c_reactive_status_next='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; o_poison_checkup_damage:=10;
                 elsif c_reactive_status_next='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
               end if;
               o_last_attack:=v_attack_name; o_last_damage:=v_effective; o_last_advantage:=coalesce(v_plan->>'advantage','neutral');
@@ -2801,11 +2831,11 @@ begin
               if coalesce((v_plan->>'selfReactiveChanceNext')::numeric,1)<1 then o_reactive_chance_next:=least(o_reactive_chance_next,(v_plan->>'selfReactiveChanceNext')::numeric); end if;
               if coalesce(v_plan->>'selfReactiveStatusNext','')<>'' then o_reactive_status_next:=v_plan->>'selfReactiveStatusNext'; end if;
               if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then o_prevent_damage_cap_next:=greatest(o_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
-              if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; end if;
+              if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; o_poison_checkup_damage:=10; o_poison_checkup_damage:=greatest(10,coalesce((v_plan->>'selfPoisonCheckupDamage')::numeric,10)); end if;
               if coalesce((v_plan->>'inflictSelfBurn')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
               if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(o.id,v_plan->>'inflictSelfMajor') then o_major:=v_plan->>'inflictSelfMajor'; end if;
-              if coalesce((v_plan->>'clearSelfSpecial')::boolean,false) then o_poison:=false; o_burn:=false; o_major:=null; end if;
-              if coalesce((v_plan->>'clearSelfPoison')::boolean,false) then o_poison:=false; end if;
+              if coalesce((v_plan->>'clearSelfSpecial')::boolean,false) then o_poison:=false; o_poison_checkup_damage:=10; o_burn:=false; o_major:=null; end if;
+              if coalesce((v_plan->>'clearSelfPoison')::boolean,false) then o_poison:=false; o_poison_checkup_damage:=10; end if;
               if coalesce((v_plan->>'selfKnockout')::boolean,false) or coalesce((v_plan->>'bothKnockout')::boolean,false) then o_damage:=o_hp; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
@@ -2885,15 +2915,15 @@ begin
                   v_status_success:=private.battle_v6_hash_roll(v_seed||':'||v_half||':status')<=v_status_chance;
                 end if;
                 if v_status_success then
-                  if coalesce((v_plan->>'inflictPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; end if;
+                  if coalesce((v_plan->>'inflictPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; c_poison_checkup_damage:=10; c_poison_checkup_damage:=greatest(10,coalesce((v_plan->>'poisonCheckupDamage')::numeric,10)); end if;
                   if coalesce((v_plan->>'inflictBurn')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
                   if v_status is not null and v_status not in ('poisoned','burned') and not private.battle_v6_status_immune(c.id,v_status) then c_major:=v_status; end if;
                 end if;
-                if coalesce((v_plan->>'clearDefenderSpecial')::boolean,false) then c_poison:=false; c_burn:=false; c_major:=null; end if;
+                if coalesce((v_plan->>'clearDefenderSpecial')::boolean,false) then c_poison:=false; c_poison_checkup_damage:=10; c_burn:=false; c_major:=null; end if;
               end if;
 
               if v_reactive>0 then o_damage:=least(o_hp,o_damage+v_reactive); end if;
-              if v_reactive_status='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true;
+              if v_reactive_status='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; o_poison_checkup_damage:=10;
               elsif v_reactive_status='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
 
               v_trace:=v_trace||jsonb_build_array(jsonb_build_object(
@@ -2964,8 +2994,8 @@ begin
 
     if not v_extra_turn then
       -- Pokemon Checkup after every turn.
-    if c_poison then c_damage:=least(c_hp,c_damage+10); end if;
-    if o_poison then o_damage:=least(o_hp,o_damage+10); end if;
+    if c_poison then c_damage:=least(c_hp,c_damage+c_poison_checkup_damage); end if;
+    if o_poison then o_damage:=least(o_hp,o_damage+o_poison_checkup_damage); end if;
     if c_burn then
       c_damage:=least(c_hp,c_damage+20);
       if private.battle_v6_hash_roll(v_seed||':'||v_half||':c_burn')>=0.5 then c_burn:=false; end if;
