@@ -76,7 +76,9 @@ export async function getDuplicateCardsForSale(): Promise<DuplicateSaleCard[]> {
   })).filter((row) => row.cards && row.quantity > 1);
 }
 
-function duplicateSaleError(message: string) {
+function duplicateSaleError(error: unknown) {
+  const message = String((error as any)?.message ?? error ?? 'Não foi possível concluir a venda.');
+  const code = String((error as any)?.code ?? '');
   const known: Array<[string, string]> = [
     ['APP_MAINTENANCE', 'As vendas estão pausadas enquanto o jogo está em manutenção.'],
     ['DUPLICATE_SALES_PAUSED_DURING_FREE_EVENT', 'A venda de repetidas fica pausada durante boosters grátis para impedir geração infinita de Coins e proteger a economia.'],
@@ -87,21 +89,27 @@ function duplicateSaleError(message: string) {
     ['PLAYER_NOT_AVAILABLE', 'Sua conta não está disponível para esta operação.'],
     ['INVALID_SALE', 'Quantidade inválida para venda.'],
     ['LEGACY_CARD_LOCKED', 'A última cópia desta carta está protegida pelo seu Legado Beta até a migração 1.0.'],
+    ['57014', 'A venda em lote demorou além do limite. Atualize a tela antes de tentar novamente.'],
+    ['statement timeout', 'A venda em lote demorou além do limite. Atualize a tela antes de tentar novamente.'],
+    ['Network request failed', 'A conexão caiu durante a venda. Atualize a tela antes de tentar novamente para confirmar o resultado.'],
+    ['Failed to fetch', 'A conexão caiu durante a venda. Atualize a tela antes de tentar novamente para confirmar o resultado.'],
   ];
-  return new Error(known.find(([key]) => message.includes(key))?.[1] ?? message);
+  const mapped = known.find(([key]) => code.includes(key) || message.includes(key));
+  return new Error(mapped?.[1] ?? message);
 }
 
 export async function sellAllDuplicateCards(): Promise<BulkDuplicateSaleResult> {
   const { data, error } = await supabase.rpc('sell_all_duplicate_cards');
-  if (error) throw duplicateSaleError(error.message);
+  if (error) throw duplicateSaleError(error);
+  if (!data || data.ok !== true) throw new Error('O servidor não confirmou a venda em lote. Atualize a tela antes de tentar novamente.');
   return {
-    ok: Boolean(data?.ok),
-    uniqueCardsSold: Number(data?.uniqueCardsSold ?? 0),
-    quantitySold: Number(data?.quantitySold ?? 0),
-    coinsEarned: Number(data?.coinsEarned ?? 0),
-    skippedUniqueCards: Number(data?.skippedUniqueCards ?? 0),
-    skippedCopies: Number(data?.skippedCopies ?? 0),
-    coins: Number(data?.coins ?? 0),
+    ok: true,
+    uniqueCardsSold: Number(data.uniqueCardsSold ?? 0),
+    quantitySold: Number(data.quantitySold ?? 0),
+    coinsEarned: Number(data.coinsEarned ?? 0),
+    skippedUniqueCards: Number(data.skippedUniqueCards ?? 0),
+    skippedCopies: Number(data.skippedCopies ?? 0),
+    coins: Number(data.coins ?? 0),
   };
 }
 
@@ -110,6 +118,6 @@ export async function sellDuplicateCards(cardId: string, quantity: number): Prom
     p_card_id: cardId,
     p_quantity: quantity,
   });
-  if (error) throw duplicateSaleError(error.message);
+  if (error) throw duplicateSaleError(error);
   return data as DuplicateSaleResult;
 }
