@@ -108,24 +108,29 @@ declare
   v_match text[];
   v_extra_energy integer:=0;
   v_heal numeric:=0;
+  v_heal_chance numeric:=1;
   v_cure boolean:=false;
 begin
   select * into v_card from public.cards where id=p_card_id;
   if v_card.id is null or jsonb_typeof(v_card.tcg_data->'abilities')<>'array' then
-    return jsonb_build_object('extraEnergy',0,'heal',0,'cureSpecial',false);
+    return jsonb_build_object('extraEnergy',0,'heal',0,'healChance',1,'cureSpecial',false);
   end if;
   for v_ability in select value from jsonb_array_elements(v_card.tcg_data->'abilities') loop
     v_text:=lower(coalesce(v_ability->>'text',''));
-    if v_text ~ 'once during your turn.*attach (?:a|1) basic [a-z]+ energy card from your hand to this pok[eé]mon' then
+    if v_text ~ 'once during your turn.*attach (?:a|1) basic [a-z]+ energy card from your hand to this pok[eé]mon'
+       or v_text ~ 'once during your turn.*attach (?:a|1)(?: basic)? [a-z]+ energy card from your discard pile to this pok[eé]mon' then
       v_extra_energy:=greatest(v_extra_energy,1);
     end if;
     v_match:=regexp_match(v_text,'once during your turn.*heal ([0-9]+) damage from (?:your active pok[eé]mon|this pok[eé]mon)');
-    if v_match is not null then v_heal:=greatest(v_heal,v_match[1]::numeric); end if;
+    if v_match is not null then
+      v_heal:=greatest(v_heal,v_match[1]::numeric);
+      if v_text like '%flip a coin%' and v_text like '%if heads%' then v_heal_chance:=least(v_heal_chance,0.5); end if;
+    end if;
     if v_text like '%whenever you attach an energy card from your hand to this pokémon%remove all special conditions from it%' then
       v_cure:=true;
     end if;
   end loop;
-  return jsonb_build_object('extraEnergy',v_extra_energy,'heal',v_heal,'cureSpecial',v_cure);
+  return jsonb_build_object('extraEnergy',v_extra_energy,'heal',v_heal,'healChance',v_heal_chance,'cureSpecial',v_cure);
 end;
 $ability$;
 
@@ -1117,7 +1122,9 @@ begin
       v_turn_ability:=private.battle_v6_turn_ability_effects(c.id);
       v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
       c_energy:=least(12,c_energy+v_attach_count);
-      if coalesce((v_turn_ability->>'heal')::numeric,0)>0 then c_damage:=greatest(0,c_damage-(v_turn_ability->>'heal')::numeric); end if;
+      if coalesce((v_turn_ability->>'heal')::numeric,0)>0
+         and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
+      then c_damage:=greatest(0,c_damage-(v_turn_ability->>'heal')::numeric); end if;
       if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then c_major:=null; c_poison:=false; c_burn:=false; end if;
       v_attach_punish:=private.battle_v6_energy_attachment_punish(o.id);
       if v_attach_punish>0 then c_damage:=least(c_hp,c_damage+v_attach_punish*v_attach_count); end if;
@@ -1292,7 +1299,9 @@ begin
       v_turn_ability:=private.battle_v6_turn_ability_effects(o.id);
       v_attach_count:=1+coalesce((v_turn_ability->>'extraEnergy')::integer,0);
       o_energy:=least(12,o_energy+v_attach_count);
-      if coalesce((v_turn_ability->>'heal')::numeric,0)>0 then o_damage:=greatest(0,o_damage-(v_turn_ability->>'heal')::numeric); end if;
+      if coalesce((v_turn_ability->>'heal')::numeric,0)>0
+         and private.battle_v6_hash_roll(v_seed||':'||v_half||':turn_heal')<=coalesce((v_turn_ability->>'healChance')::numeric,1)
+      then o_damage:=greatest(0,o_damage-(v_turn_ability->>'heal')::numeric); end if;
       if coalesce((v_turn_ability->>'cureSpecial')::boolean,false) then o_major:=null; o_poison:=false; o_burn:=false; end if;
       v_attach_punish:=private.battle_v6_energy_attachment_punish(c.id);
       if v_attach_punish>0 then o_damage:=least(o_hp,o_damage+v_attach_punish*v_attach_count); end if;
