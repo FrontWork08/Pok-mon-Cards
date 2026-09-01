@@ -98,11 +98,27 @@ export default function SellDuplicatesScreen() {
               try {
                 setSellingAll(true);
                 const result = await sellAllDuplicateCards();
-                await Promise.all([refreshWallet(), load()]);
-                Alert.alert(
-                  'Venda em lote concluída',
-                  `Você vendeu ${result.quantitySold.toLocaleString('pt-BR')} repetida(s) de ${result.uniqueCardsSold.toLocaleString('pt-BR')} carta(s) e recebeu 🪙 ${result.coinsEarned.toLocaleString('pt-BR')}.${result.skippedCopies ? `\n\n${result.skippedCopies.toLocaleString('pt-BR')} cópia(s) sem cotação foram preservadas.` : ''}`,
-                );
+
+                // A venda já foi confirmada pelo servidor. Atualizações visuais posteriores
+                // não podem transformar uma venda bem-sucedida em uma mensagem de erro.
+                setCards((current) => current.filter((entry) => (
+                  Number(entry.quantity ?? 0) > 1
+                  && Number(entry.sale?.unitCoins ?? 0) <= 0
+                )));
+
+                if (result.quantitySold > 0) {
+                  Alert.alert(
+                    'Venda em lote concluída',
+                    `Você vendeu ${result.quantitySold.toLocaleString('pt-BR')} repetida(s) de ${result.uniqueCardsSold.toLocaleString('pt-BR')} carta(s) e recebeu 🪙 ${result.coinsEarned.toLocaleString('pt-BR')}.${result.skippedCopies ? `\n\n${result.skippedCopies.toLocaleString('pt-BR')} cópia(s) sem cotação foram preservadas.` : ''}`,
+                  );
+                } else {
+                  Alert.alert('Tudo atualizado', 'Não havia mais repetidas vendáveis quando o servidor confirmou a operação.');
+                }
+
+                void Promise.allSettled([
+                  refreshWallet(),
+                  getDuplicateCardsForSale().then(setCards),
+                ]);
               } catch (error) {
                 Alert.alert('Não foi possível vender tudo', error instanceof Error ? error.message : 'Tente novamente.');
               } finally {
@@ -113,7 +129,7 @@ export default function SellDuplicatesScreen() {
         },
       ],
     );
-  }, [load, refreshWallet, sellingAll, sellingCardId, summary]);
+  }, [refreshWallet, sellingAll, sellingCardId, summary]);
 
   const confirmSale = useCallback((entry: DuplicateSaleCard, quantity: number) => {
     const card = entry.cards;
