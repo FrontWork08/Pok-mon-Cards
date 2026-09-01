@@ -916,6 +916,92 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'dano por contadores do atacante');
     end if;
 
+    -- Legacy cards name the attacker instead of saying "this Pokémon".
+    if position('damage counter on '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0
+       or position('damage counters on '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0 then
+
+      -- "10 damage plus 10 more damage for each damage counter on Bagon."
+      v_match:=regexp_match(v_text,'does ([0-9]+) damage plus ([0-9]+) more damage for each damage counter on ');
+      if v_match is not null then
+        if v_text ~ 'if heads, this attack does [0-9]+ damage plus [0-9]+ more damage for each damage counter'
+           and v_text ~ 'if tails, this attack does [0-9]+ damage' then
+          v_coin_bonus_count:=greatest(v_coin_bonus_count,1);
+          v_coin_bonus_per_head:=greatest(v_coin_bonus_per_head,
+            floor(coalesce(p_attacker_damage,0)/10)*v_match[2]::numeric);
+          v_expected_raw:=v_base+floor(coalesce(p_attacker_damage,0)/10)*v_match[2]::numeric*0.5;
+          v_raw:=v_base;
+          v_effect_notes:=array_append(v_effect_notes,'bônus legado por contadores condicionado à moeda');
+        else
+          v_raw:=v_base+floor(coalesce(p_attacker_damage,0)/10)*v_match[2]::numeric;
+          v_expected_raw:=v_raw;
+          v_effect_notes:=array_append(v_effect_notes,'bônus legado por contadores do atacante');
+        end if;
+      else
+        -- "30 damage plus 10 damage times the number of damage counters on ..."
+        v_match:=regexp_match(v_text,'does ([0-9]+) damage plus ([0-9]+) damage times the number of damage counters on ');
+        if v_match is not null then
+          v_raw:=v_base+floor(coalesce(p_attacker_damage,0)/10)*v_match[2]::numeric;
+          v_expected_raw:=v_raw;
+          v_effect_notes:=array_append(v_effect_notes,'bônus legado por contadores do atacante');
+        end if;
+      end if;
+
+      -- Pure Flail / Retaliate forms.
+      if v_text ~ '(?:this attack )?does [0-9]+ damage (?:times the number of|for each) damage counters? on ' then
+        v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) damage (?:times the number of|for each) damage counters? on ');
+        if v_match is not null then
+          v_raw:=floor(coalesce(p_attacker_damage,0)/10)*v_match[1]::numeric;
+          v_expected_raw:=v_raw;
+          if v_text like '%flip a coin%if heads%' and v_text not like '%if tails%this attack does%' then
+            v_coin_gate_count:=greatest(v_coin_gate_count,1);
+            v_coin_gate_heads:=greatest(v_coin_gate_heads,1);
+          elsif v_text ~ 'flip 2 coins?.*if either (?:is|of them is) heads' then
+            v_coin_gate_count:=greatest(v_coin_gate_count,2);
+            v_coin_gate_heads:=greatest(v_coin_gate_heads,1);
+          end if;
+          v_effect_notes:=array_append(v_effect_notes,'dano legado por contadores do atacante');
+        end if;
+      end if;
+
+      -- Dwindling Wave / Karate Chop forms.
+      v_match:=regexp_match(v_text,'(?:does|damage from this attack is reduced by) ([0-9]+) damage minus ([0-9]+) damage for each damage counter on ');
+      if v_match is not null then
+        v_raw:=greatest(0,v_match[1]::numeric-floor(coalesce(p_attacker_damage,0)/10)*v_match[2]::numeric);
+        v_expected_raw:=v_raw;
+        v_effect_notes:=array_append(v_effect_notes,'penalidade legada por contadores do atacante');
+      else
+        v_match:=regexp_match(v_text,'damage from this attack is reduced by ([0-9]+) for each damage counter on ');
+        if v_match is not null then
+          v_raw:=greatest(0,v_base-floor(coalesce(p_attacker_damage,0)/10)*v_match[1]::numeric);
+          v_expected_raw:=v_raw;
+          v_effect_notes:=array_append(v_effect_notes,'penalidade legada por contadores do atacante');
+        else
+          v_match:=regexp_match(v_text,'does ([0-9]+) damage minus ([0-9]+) damage for each damage counter on ');
+          if v_match is not null then
+            v_raw:=greatest(0,v_match[1]::numeric-floor(coalesce(p_attacker_damage,0)/10)*v_match[2]::numeric);
+            v_expected_raw:=v_raw;
+            v_effect_notes:=array_append(v_effect_notes,'penalidade legada por contadores do atacante');
+          end if;
+        end if;
+      end if;
+    end if;
+
+    -- Modern pure counter damage also appears as "times the number of".
+    v_match:=regexp_match(v_text,'this attack does ([0-9]+) damage times the number of damage counters? on this pok[eé]mon');
+    if v_match is not null then
+      v_raw:=floor(coalesce(p_attacker_damage,0)/10)*v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'dano por contadores do atacante');
+    end if;
+
+    -- Pure damage based on counters already on the defender.
+    v_match:=regexp_match(v_text,'this attack does ([0-9]+) damage (?:for each|times the number of) damage counters? on (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)');
+    if v_match is not null then
+      v_raw:=floor(coalesce(p_defender_damage,0)/10)*v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'dano por contadores do defensor');
+    end if;
+
     v_match:=regexp_match(v_text,'(?:does )?([0-9]+) less damage for each damage counter on this pok[eé]mon');
     if v_match is not null then
       v_raw:=greatest(0,v_raw-floor(coalesce(p_attacker_damage,0)/10)*v_match[1]::numeric);
@@ -1471,6 +1557,33 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'contadores distribuídos aplicados ao Ativo no 1x1');
     end if;
 
+    if (
+      position('count the number of damage counters on '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0
+      and v_text ~ 'put that many damage counters on (?:1 of your opponent''s pok[eé]mon|the defending pok[eé]mon)'
+    ) then
+      v_direct_damage_counters:=greatest(v_direct_damage_counters,greatest(0,coalesce(p_attacker_damage,0)));
+      v_effect_notes:=array_append(v_effect_notes,'copia contadores do atacante para o defensor');
+    end if;
+
+    if position('for each damage counter on '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0
+       and v_text ~ 'put 1 damage counter on the defending pok[eé]mon for each damage counter on ' then
+      v_direct_damage_counters:=greatest(v_direct_damage_counters,greatest(0,coalesce(p_attacker_damage,0)));
+      v_effect_notes:=array_append(v_effect_notes,'replica contadores do atacante no defensor');
+    end if;
+
+    if position('for each damage counter on '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0
+       and v_text ~ 'put 1 damage counter, plus 1 more damage counter for each damage counter on ' then
+      v_direct_damage_counters:=greatest(v_direct_damage_counters,10+greatest(0,coalesce(p_attacker_damage,0)));
+      v_effect_notes:=array_append(v_effect_notes,'replica contadores + 1 no defensor');
+    end if;
+
+    v_match:=regexp_match(v_text,'put up to ([0-9]+) damage counters on [^.]+\. then, put that many damage counters on the defending pok[eé]mon');
+    if v_match is not null and position(lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0 then
+      v_direct_damage_counters:=greatest(v_direct_damage_counters,v_match[1]::numeric*10);
+      v_recoil:=greatest(v_recoil,v_match[1]::numeric*10);
+      v_effect_notes:=array_append(v_effect_notes,'contadores espelhados entre atacante e defensor');
+    end if;
+
     -- Direct damage-counter / HP manipulation.
     if v_text not like '%benched pokémon%' then
       if (
@@ -1683,6 +1796,21 @@ begin
     if v_match is not null then v_heal:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'cura'); end if;
     v_match:=regexp_match(v_text,'remove ([0-9]+) damage counters? from (?:this pok[eé]mon|1 of your pok[eé]mon)');
     if v_match is not null then v_heal:=greatest(v_heal,v_match[1]::numeric*10); v_effect_notes:=array_append(v_effect_notes,'remove contadores de dano'); end if;
+    if position('from '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0 then
+      v_match:=regexp_match(v_text,'remove ([0-9]+) damage counters? from ');
+      if v_match is not null then
+        v_heal:=greatest(v_heal,v_match[1]::numeric*10);
+        v_effect_notes:=array_append(v_effect_notes,'remove contadores de dano do atacante (texto legado)');
+      end if;
+    end if;
+
+    if position('on '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0 then
+      v_match:=regexp_match(v_text,'put ([0-9]+) damage counters? on ');
+      if v_match is not null and v_text not like '%opponent%' and v_text not like '%defending%' then
+        v_recoil:=greatest(v_recoil,v_match[1]::numeric*10);
+        v_effect_notes:=array_append(v_effect_notes,'auto-dano por contadores (texto legado)');
+      end if;
+    end if;
     if v_text like '%heal all damage from this pokémon%' then v_heal_all:=true; v_effect_notes:=array_append(v_effect_notes,'cura todo o dano'); end if;
     if v_text like '%heal from this pokémon the same amount of damage you did%'
        or v_text like '%heal from this pokemon the same amount of damage you did%' then
