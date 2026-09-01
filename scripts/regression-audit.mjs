@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260901115912_lower_coin_packs_more_and_optimize_bulk_duplicate_sales.sql',
   'supabase/migrations/20260901115248_lower_coin_pack_prices.sql',
   'supabase/migrations/20260831202010_booster_quality_pull_boost.sql',
   'supabase/migrations/20260831201910_booster_luck_small_raise.sql',
@@ -114,6 +115,16 @@ if (existsSync('app/(tabs)/bag.tsx')) {
   assert(bagUi.includes('imageThemeTint') && bagUi.includes('imageThemeStroke'), 'Regressão visual: tema deixou de cobrir a imagem da carta na Bag.');
   assert(bagUi.includes("variant={galaxy?'galaxy':'energy'}"), 'Regressão visual: Galaxy Flow da Bag perdeu o efeito cósmico.');
   assert(bagUi.includes('cardThemed:{marginBottom:0}'), 'Regressão visual: cards temáticos voltaram a quebrar o espaçamento da grade.');
+}
+
+if (existsSync('app/sell-duplicates.tsx') && existsSync('src/services/cardSales.ts')) {
+  const bulkUi = read('app/sell-duplicates.tsx');
+  const bulkService = read('src/services/cardSales.ts');
+  assert(bulkUi.includes('Promise.allSettled(['), 'Regressão de UX: refresh pós-venda em lote pode voltar a transformar sucesso em erro falso.');
+  assert(!bulkUi.includes('await Promise.all([refreshWallet(), load()])'), 'Regressão de UX: venda concluída não pode falhar por causa do refresh visual posterior.');
+  assert(bulkUi.includes("getDuplicateCardsForSale().then(setCards)"), 'Regressão de UX: lista de repetidas não sincroniza silenciosamente após venda em lote.');
+  assert(bulkService.includes("data.ok !== true"), 'Regressão: cliente deixou de validar a confirmação da venda em lote.');
+  assert(bulkService.includes('statement timeout') && bulkService.includes('Network request failed'), 'Regressão de UX: erros transitórios da venda em lote perderam mensagens seguras.');
 }
 
 if (existsSync('app/sell-duplicates.tsx') && existsSync('src/services/cardSales.ts')) {
@@ -323,6 +334,16 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
+}
+
+if (existsSync('supabase/migrations/20260901115912_lower_coin_packs_more_and_optimize_bulk_duplicate_sales.sql')) {
+  const coinReliefMore = read('supabase/migrations/20260901115912_lower_coin_packs_more_and_optimize_bulk_duplicate_sales.sql');
+  assert(coinReliefMore.includes("'boosterCoinPriceMultiplier',0.60"), 'Regressão econômica: packs de coins perderam a redução para 60% do preço-base.');
+  assert(coinReliefMore.includes("'boosterDiamondPriceMultiplier',0.90"), 'Regressão econômica: redução extra de coins não pode alterar packs de diamante.');
+  assert(coinReliefMore.includes("'coinPackFloor',3000") && coinReliefMore.includes('coin_pack_ceiling=60000'), 'Regressão econômica: faixa de packs de coins deve permanecer entre 3.000 e 60.000.');
+  assert(coinReliefMore.includes("coalesce(p_price,0)>=40000") && coinReliefMore.includes("coalesce(p_price,0)>=20000"), 'Regressão de balanceamento: redução de preço não pode rebaixar a sorte dos boosters caros.');
+  assert(coinReliefMore.includes('with owned as materialized') && coinReliefMore.includes('update public.player_cards pc') && coinReliefMore.includes('insert into private.card_duplicate_sales'), 'Regressão de performance: venda em lote voltou ao loop carta por carta.');
+  assert(!coinReliefMore.includes('for v_row in'), 'Regressão de performance: venda de todas as repetidas não deve percorrer inventário em loop PL/pgSQL.');
 }
 
 if (existsSync('supabase/migrations/20260901115248_lower_coin_pack_prices.sql')) {
