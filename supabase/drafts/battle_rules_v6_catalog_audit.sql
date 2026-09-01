@@ -1237,7 +1237,6 @@ begin
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','cooldown_skip','energy',c_energy));
       elsif c_attack_gate_next>0 and private.battle_v6_hash_roll(v_seed||':'||v_half||':attack_gate')<c_attack_gate_next then
         c_attack_gate_next:=0;
-      c_heal_block_next:=false;
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','attack_gate_failed','energy',c_energy));
       else
         c_attack_gate_next:=0;
@@ -1424,7 +1423,6 @@ begin
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','cooldown_skip','energy',o_energy));
       elsif o_attack_gate_next>0 and private.battle_v6_hash_roll(v_seed||':'||v_half||':attack_gate')<o_attack_gate_next then
         o_attack_gate_next:=0;
-      o_heal_block_next:=false;
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','attack_gate_failed','energy',o_energy));
       else
         o_attack_gate_next:=0;
@@ -1601,6 +1599,7 @@ begin
       o_prevent_damage_cap_next:=0;
       c_outgoing_reduction_next:=0;
       c_attack_gate_next:=0;
+      c_heal_block_next:=false;
       c_disable_best_next:=0;
       if c_blocked_turns>0 and c_blocked_turns<99 then
         c_blocked_turns:=c_blocked_turns-1;
@@ -1614,6 +1613,7 @@ begin
       c_prevent_damage_cap_next:=0;
       o_outgoing_reduction_next:=0;
       o_attack_gate_next:=0;
+      o_heal_block_next:=false;
       o_disable_best_next:=0;
       if o_blocked_turns>0 and o_blocked_turns<99 then
         o_blocked_turns:=o_blocked_turns-1;
