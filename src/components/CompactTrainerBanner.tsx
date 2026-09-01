@@ -8,7 +8,6 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 
 type BannerVisual = {
   premium:boolean;
@@ -167,7 +166,6 @@ export function CompactTrainerBanner({
       ]}
     >
       <View style={styles.content}>{children}</View>
-      {visual.galaxy?<GalaxyFlowOverlay intensity="premium" opacity={0.72}/>:null}
 
       <Animated.View
         pointerEvents="none"
@@ -181,66 +179,54 @@ export function CompactTrainerBanner({
         ]}
       />
 
-      {!visual.galaxy?(
-        <>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.glowRight,
-            {
-              backgroundColor:visual.primary,
-              opacity:visual.tier>=4?Animated.multiply(pulse,.24):Animated.multiply(pulse,.15),
-              transform:[{scale:pulseScale}],
-            },
-          ]}
-        />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.glowLeft,
-            {
-              backgroundColor:visual.secondary,
-              opacity:visual.tier>=4?Animated.multiply(pulse,.18):Animated.multiply(pulse,.12),
-            },
-          ]}
-        />
-  
-  
-        </>
-      ):null}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.glowRight,
+          {
+            backgroundColor:visual.primary,
+            opacity:visual.tier>=4?Animated.multiply(pulse,.24):Animated.multiply(pulse,.15),
+            transform:[{scale:pulseScale}],
+          },
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.glowLeft,
+          {
+            backgroundColor:visual.secondary,
+            opacity:visual.tier>=4?Animated.multiply(pulse,.18):Animated.multiply(pulse,.12),
+          },
+        ]}
+      />
 
-      {!visual.galaxy?(
-        <>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.rail,
-            styles.railTop,
-            {
-              backgroundColor:visual.secondary,
-              opacity:visual.tier>=4?.98:.82,
-              transform:[{translateX:railForward}],
-            },
-          ]}
-        />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.rail,
-            styles.railBottom,
-            {
-              backgroundColor:visual.tertiary,
-              opacity:visual.tier>=4?.90:.72,
-              transform:[{translateX:railBackward}],
-            },
-          ]}
-        />
-  
-  
-        </>
-      ):null}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.rail,
+          styles.railTop,
+          {
+            backgroundColor:visual.secondary,
+            opacity:visual.tier>=4?.98:.82,
+            transform:[{translateX:railForward}],
+          },
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.rail,
+          styles.railBottom,
+          {
+            backgroundColor:visual.tertiary,
+            opacity:visual.tier>=4?.90:.72,
+            transform:[{translateX:railBackward}],
+          },
+        ]}
+      />
 
-      {!visual.galaxy&&visual.tier>=3 ? (
+      {visual.tier>=3 ? (
         <Animated.View
           pointerEvents="none"
           style={[
@@ -255,10 +241,16 @@ export function CompactTrainerBanner({
       ):null}
 
       <View pointerEvents="none" style={[styles.innerLine,{borderColor:`${visual.secondary}B8`}]}/>
-      {!visual.galaxy?(
+      <Animated.View pointerEvents="none" style={[styles.gem,styles.gemTL,{backgroundColor:visual.secondary,opacity:twinkle,transform:[{scale:pulseScale}]}]}/>
+      <Animated.View pointerEvents="none" style={[styles.gem,styles.gemBR,{backgroundColor:visual.tertiary,opacity:twinkle,transform:[{scale:pulseScale}]}]}/>
+
+      {visual.galaxy ? (
         <>
-          <Animated.View pointerEvents="none" style={[styles.gem,styles.gemTL,{backgroundColor:visual.secondary,opacity:twinkle,transform:[{scale:pulseScale}]}]}/>
-          <Animated.View pointerEvents="none" style={[styles.gem,styles.gemBR,{backgroundColor:visual.tertiary,opacity:twinkle,transform:[{scale:pulseScale}]}]}/>
+          <Animated.View pointerEvents="none" style={[styles.star,{left:'22%',top:7,backgroundColor:'#FFFFFF',opacity:twinkle,transform:[{scale:pulseScale}]}]}/>
+          <Animated.View pointerEvents="none" style={[styles.starSmall,{left:'67%',bottom:8,backgroundColor:'#55E6FF',opacity:pulse}]}/>
+          <Animated.View pointerEvents="none" style={[styles.starSmall,{right:24,top:13,backgroundColor:'#E9D4FF',opacity:twinkle}]}/>
+          <Animated.View pointerEvents="none" style={[styles.nebulaRibbon,{backgroundColor:'#8B5CFF',opacity:Animated.multiply(pulse,.10),transform:[{translateX:railBackward},{rotate:'-9deg'}]}]}/>
+          <Animated.View pointerEvents="none" style={[styles.nebulaRibbonSmall,{backgroundColor:'#E056FD',opacity:Animated.multiply(twinkle,.08),transform:[{translateX:railForward},{rotate:'8deg'}]}]}/>
         </>
       ):null}
     </View>
@@ -326,4 +318,24 @@ const styles=StyleSheet.create({
   gem:{position:'absolute',width:7,height:7,borderRadius:2,zIndex:12},
   gemTL:{left:7,top:7},
   gemBR:{right:7,bottom:7},
+  star:{position:'absolute',width:4,height:4,borderRadius:999,zIndex:10},
+  starSmall:{position:'absolute',width:3,height:3,borderRadius:999,zIndex:10},
+  nebulaRibbon:{
+    position:'absolute',
+    top:'28%',
+    left:-190,
+    width:240,
+    height:24,
+    borderRadius:999,
+    zIndex:6,
+  },
+  nebulaRibbonSmall:{
+    position:'absolute',
+    bottom:'20%',
+    left:-170,
+    width:190,
+    height:16,
+    borderRadius:999,
+    zIndex:6,
+  },
 });
