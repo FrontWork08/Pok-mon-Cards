@@ -9,28 +9,17 @@ import {
 
 type GalaxyIntensity='soft'|'premium'|'master';
 
-const GALAXY_ACCENT_VIOLET='#8B5CFF';
-const GALAXY_ACCENT_CYAN='#55E6FF';
-
-const sharedDrift=new Animated.Value(.42);
-const sharedTwinkle=new Animated.Value(.35);
+const sharedDrift=new Animated.Value(.36);
+const sharedTwinkle=new Animated.Value(.28);
 let driftLoop:Animated.CompositeAnimation|null=null;
 let twinkleLoop:Animated.CompositeAnimation|null=null;
 let galaxyUsers=0;
 let reduceMotionCache:boolean|null=null;
 
 const STARS=[
-  ['6%','13%',1,.10],['12%','47%',1,.38],['17%','76%',2,.72],['23%','26%',1,.54],
-  ['29%','61%',1,.18],['34%','9%',2,.86],['39%','83%',1,.31],['45%','39%',1,.64],
-  ['51%','69%',2,.45],['57%','18%',1,.22],['63%','55%',1,.79],['69%','88%',1,.52],
-  ['75%','31%',2,.12],['80%','73%',1,.67],['86%','14%',1,.41],['91%','46%',2,.91],
-  ['95%','81%',1,.28],['9%','91%',1,.59],['48%','94%',1,.84],['72%','6%',1,.34],
-] as const;
-
-const BRIGHT_STARS=[
-  ['18%','21%',.12],
-  ['61%','34%',.62],
-  ['83%','67%',.88],
+  ['8%','18%',3,.10],['17%','65%',2,.28],['26%','34%',4,.46],['35%','78%',2,.64],
+  ['46%','13%',3,.82],['55%','56%',2,.20],['63%','28%',4,.38],['72%','76%',3,.56],
+  ['81%','42%',2,.74],['90%','20%',4,.92],['94%','69%',2,.34],['12%','87%',3,.70],
 ] as const;
 
 function startSharedGalaxy(){
@@ -48,25 +37,24 @@ function startSharedGalaxy(){
 
     if(reduce){
       sharedDrift.setValue(.42);
-      sharedTwinkle.setValue(.48);
+      sharedTwinkle.setValue(.55);
       return;
     }
 
     const native=Platform.OS!=='web';
-    sharedDrift.setValue(.36);
-    sharedTwinkle.setValue(.28);
+    sharedDrift.setValue(0);
+    sharedTwinkle.setValue(0);
 
-    driftLoop=Animated.loop(Animated.sequence([
-      Animated.timing(sharedDrift,{toValue:1,duration:12500,useNativeDriver:native}),
-      Animated.timing(sharedDrift,{toValue:0,duration:14200,useNativeDriver:native}),
-      Animated.timing(sharedDrift,{toValue:.36,duration:9800,useNativeDriver:native}),
-    ]));
-
+    driftLoop=Animated.loop(
+      Animated.timing(sharedDrift,{
+        toValue:1,
+        duration:7200,
+        useNativeDriver:native,
+      }),
+    );
     twinkleLoop=Animated.loop(Animated.sequence([
-      Animated.timing(sharedTwinkle,{toValue:1,duration:2600,useNativeDriver:native}),
-      Animated.timing(sharedTwinkle,{toValue:.18,duration:3400,useNativeDriver:native}),
-      Animated.timing(sharedTwinkle,{toValue:.62,duration:2100,useNativeDriver:native}),
-      Animated.timing(sharedTwinkle,{toValue:.28,duration:3700,useNativeDriver:native}),
+      Animated.timing(sharedTwinkle,{toValue:1,duration:2300,useNativeDriver:native}),
+      Animated.timing(sharedTwinkle,{toValue:0,duration:2300,useNativeDriver:native}),
     ]));
 
     driftLoop.start();
@@ -94,12 +82,8 @@ function stopSharedGalaxy(){
 }
 
 /**
- * Naturalistic galaxy/nebula layer inspired by real telescope imagery:
- * mostly dark space, irregular translucent gas clouds, dusty cavities,
- * sparse star fields and only a few bright stellar blooms.
- *
- * All instances share two animation loops, so the effect stays usable in
- * dense Bag/ranking grids without spawning one animation per card.
+ * Galaxy Flow clássico: neon cósmico, órbitas, estrelas, nebulosas e
+ * faixas de energia. Mantém loops compartilhados para não pesar em grids.
  */
 export function GalaxyFlowOverlay({
   intensity='premium',
@@ -113,127 +97,75 @@ export function GalaxyFlowOverlay({
     return stopSharedGalaxy;
   },[]);
 
-  const strength=intensity==='master'?1:intensity==='premium'?.84:.62;
-
-  const driftX=sharedDrift.interpolate({
-    inputRange:[0,.5,1],
-    outputRange:[-22,18,-22],
-  });
-  const driftXBack=sharedDrift.interpolate({
-    inputRange:[0,.5,1],
-    outputRange:[20,-17,20],
-  });
-  const driftY=sharedDrift.interpolate({
-    inputRange:[0,.5,1],
-    outputRange:[10,-13,10],
-  });
-  const cloudScale=sharedDrift.interpolate({
-    inputRange:[0,.5,1],
-    outputRange:[.96,1.05,.96],
-  });
-  const dustScale=sharedDrift.interpolate({
-    inputRange:[0,.5,1],
-    outputRange:[1.02,.97,1.02],
-  });
-  const shimmer=sharedTwinkle.interpolate({
-    inputRange:[0,.45,1],
-    outputRange:[.28,.78,.38],
-  });
+  const strength=intensity==='master'?1:intensity==='premium'?.72:.44;
+  const driftA=sharedDrift.interpolate({inputRange:[0,1],outputRange:[-52,62]});
+  const driftB=sharedDrift.interpolate({inputRange:[0,1],outputRange:[48,-66]});
+  const driftY=sharedTwinkle.interpolate({inputRange:[0,1],outputRange:[-12,14]});
+  const scale=sharedTwinkle.interpolate({inputRange:[0,1],outputRange:[.92,1.12]});
+  const ringRotate=sharedDrift.interpolate({inputRange:[0,1],outputRange:['0deg','360deg']});
+  const ringRotateBack=sharedDrift.interpolate({inputRange:[0,1],outputRange:['360deg','0deg']});
 
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill,styles.root,{opacity}]}>
-      <View style={styles.deepSpace}/>
-
-      <Animated.View style={[styles.cloud,styles.cloudViolet,{
-        opacity:.20*strength,
-        transform:[{translateX:driftX},{translateY:driftY},{scale:cloudScale},{rotate:'-11deg'}],
-      }]}/>
-      <Animated.View style={[styles.cloud,styles.cloudBlue,{
-        opacity:.13*strength,
-        transform:[{translateX:driftXBack},{translateY:driftY},{scale:cloudScale},{rotate:'14deg'}],
-      }]}/>
-      <Animated.View style={[styles.cloud,styles.cloudMagenta,{
-        opacity:.11*strength,
-        transform:[{translateX:driftX},{scale:cloudScale},{rotate:'7deg'}],
-      }]}/>
-      <Animated.View style={[styles.cloud,styles.cloudIndigo,{
-        opacity:.14*strength,
-        transform:[{translateX:driftXBack},{translateY:driftY},{scale:cloudScale},{rotate:'-18deg'}],
-      }]}/>
-
-      <Animated.View style={[styles.milkyCore,{
-        opacity:.15*strength,
-        transform:[{translateX:driftX},{translateY:driftY},{scaleX:cloudScale},{rotate:'-17deg'}],
-      }]}/>
-      <Animated.View style={[styles.milkyCore,styles.milkyCoreBack,{
-        opacity:.10*strength,
-        transform:[{translateX:driftXBack},{scaleX:cloudScale},{rotate:'11deg'}],
-      }]}/>
-
-      <Animated.View style={[styles.filament,styles.filamentA,{
-        opacity:.12*strength,
-        transform:[{translateX:driftX},{scaleX:cloudScale},{rotate:'-8deg'}],
-      }]}/>
-      <Animated.View style={[styles.filament,styles.filamentB,{
-        opacity:.095*strength,
-        transform:[{translateX:driftXBack},{scaleX:cloudScale},{rotate:'12deg'}],
-      }]}/>
-
-      <Animated.View style={[styles.dust,styles.dustA,{
+      <Animated.View style={[styles.nebula,styles.nebulaA,{
+        backgroundColor:'#7A49FF',
         opacity:.18*strength,
-        transform:[{translateX:driftXBack},{scale:dustScale},{rotate:'9deg'}],
+        transform:[{translateX:driftA},{translateY:driftY},{scale}],
       }]}/>
-      <Animated.View style={[styles.dust,styles.dustB,{
+      <Animated.View style={[styles.nebula,styles.nebulaB,{
+        backgroundColor:'#21D4FD',
         opacity:.16*strength,
-        transform:[{translateX:driftX},{scale:dustScale},{rotate:'-15deg'}],
+        transform:[{translateX:driftB},{translateY:driftY},{scale}],
+      }]}/>
+      <Animated.View style={[styles.nebula,styles.nebulaC,{
+        backgroundColor:'#E056FD',
+        opacity:.14*strength,
+        transform:[{translateX:driftA},{scale}],
+      }]}/>
+
+      <Animated.View style={[styles.orbit,styles.orbitOuter,{
+        borderColor:'#8B5CFF',
+        opacity:.24*strength,
+        transform:[{rotate:ringRotate}],
+      }]}/>
+      <Animated.View style={[styles.orbit,styles.orbitInner,{
+        borderColor:'#55E6FF',
+        opacity:.28*strength,
+        transform:[{rotate:ringRotateBack}],
       }]}/>
 
       {STARS.map(([left,top,size,phase],index)=>{
         const starOpacity=sharedTwinkle.interpolate({
-          inputRange:[0,Math.max(.08,phase),1],
-          outputRange:[.34,index%5===0?1:.82,.38],
+          inputRange:[0,Math.max(.05,phase),1],
+          outputRange:[.18,.95,.25],
         });
-        const tinyDrift=sharedDrift.interpolate({
+        const rise=sharedDrift.interpolate({
           inputRange:[0,1],
-          outputRange:[index%2?-1.5:1,index%2?1.5:-1],
+          outputRange:[index%2?7:-5,index%2?-8:9],
         });
         return (
-          <Animated.View
-            key={`s-${index}`}
-            style={[
-              styles.star,
-              {
-                left:left as any,
-                top:top as any,
-                width:size,
-                height:size,
-                borderRadius:999,
-                backgroundColor:index%7===0?'#CFEFFF':index%6===0?'#E7DFFF':'#FFFFFF',
-                opacity:Animated.multiply(starOpacity,strength),
-                transform:[{translateY:tinyDrift}],
-              },
-            ]}
-          />
+          <Animated.View key={index} style={[styles.star,{
+            left:left as any,
+            top:top as any,
+            width:size,
+            height:size,
+            borderRadius:size,
+            backgroundColor:index%3===0?'#FFFFFF':index%3===1?'#8EE7FF':'#D8B8FF',
+            opacity:Animated.multiply(starOpacity,strength),
+            transform:[{translateY:rise}],
+          }]}/>
         );
       })}
 
-      {BRIGHT_STARS.map(([left,top,phase],index)=>{
-        const bloom=sharedTwinkle.interpolate({
-          inputRange:[0,Math.max(.10,phase),1],
-          outputRange:[.28,.96,.34],
-        });
-        return (
-          <View key={`b-${index}`} style={[styles.brightStar,{left:left as any,top:top as any}]}>
-            <Animated.View style={[styles.bloomCore,{opacity:Animated.multiply(bloom,strength)}]}/>
-            <Animated.View style={[styles.bloomHorizontal,{opacity:Animated.multiply(bloom,.42*strength)}]}/>
-            <Animated.View style={[styles.bloomVertical,{opacity:Animated.multiply(bloom,.34*strength)}]}/>
-          </View>
-        );
-      })}
-
-      <Animated.View style={[styles.haze,{
-        opacity:Animated.multiply(shimmer,.085*strength),
-        transform:[{translateX:driftXBack},{scale:cloudScale}],
+      <Animated.View style={[styles.flowRibbon,styles.ribbonA,{
+        borderColor:'#8B5CFF',
+        opacity:.22*strength,
+        transform:[{translateX:driftA},{rotate:'-14deg'}],
+      }]}/>
+      <Animated.View style={[styles.flowRibbon,styles.ribbonB,{
+        borderColor:'#55E6FF',
+        opacity:.20*strength,
+        transform:[{translateX:driftB},{rotate:'18deg'}],
       }]}/>
     </View>
   );
@@ -241,37 +173,15 @@ export function GalaxyFlowOverlay({
 
 const styles=StyleSheet.create({
   root:{overflow:'hidden',zIndex:18},
-  deepSpace:{...StyleSheet.absoluteFillObject,backgroundColor:'#070812',opacity:.16},
-
-  cloud:{position:'absolute',borderRadius:999},
-  cloudViolet:{width:360,height:185,right:-128,top:-62,backgroundColor:'#7350A8'},
-  cloudBlue:{width:330,height:170,left:-126,bottom:-58,backgroundColor:'#3678A8'},
-  cloudMagenta:{width:240,height:118,left:'28%',top:'31%',backgroundColor:'#9A4F87'},
-  cloudIndigo:{width:285,height:130,right:'9%',bottom:'12%',backgroundColor:'#3A3F86'},
-  milkyCore:{position:'absolute',width:430,height:52,left:-95,top:'39%',borderRadius:999,backgroundColor:'#D7C8FF'},
-  milkyCoreBack:{width:360,height:34,left:'12%',top:'18%',backgroundColor:'#B9F0FF'},
-
-  filament:{position:'absolute',borderRadius:999},
-  filamentA:{width:390,height:36,left:-105,top:'24%',backgroundColor:GALAXY_ACCENT_VIOLET},
-  filamentB:{width:350,height:28,right:-110,bottom:'25%',backgroundColor:GALAXY_ACCENT_CYAN},
-
-  dust:{position:'absolute',borderRadius:999,backgroundColor:'#02030A'},
-  dustA:{width:320,height:72,left:'12%',top:'42%'},
-  dustB:{width:250,height:54,right:'5%',top:'13%'},
-
+  nebula:{position:'absolute',borderRadius:999},
+  nebulaA:{width:260,height:180,right:-80,top:-70},
+  nebulaB:{width:230,height:165,left:-80,bottom:-60},
+  nebulaC:{width:160,height:130,left:'38%',top:'23%'},
+  orbit:{position:'absolute',borderRadius:999,borderWidth:1.5},
+  orbitOuter:{width:330,height:150,left:'50%',top:'42%',marginLeft:-165,marginTop:-75},
+  orbitInner:{width:230,height:105,left:'50%',top:'42%',marginLeft:-115,marginTop:-52},
   star:{position:'absolute',zIndex:7},
-  brightStar:{position:'absolute',width:14,height:14,marginLeft:-7,marginTop:-7,zIndex:8},
-  bloomCore:{position:'absolute',left:5,top:5,width:4,height:4,borderRadius:999,backgroundColor:'#FFFFFF'},
-  bloomHorizontal:{position:'absolute',left:0,top:6.5,width:14,height:1,backgroundColor:'#DDF5FF'},
-  bloomVertical:{position:'absolute',left:6.5,top:0,width:1,height:14,backgroundColor:'#EBDFFF'},
-
-  haze:{
-    position:'absolute',
-    width:280,
-    height:120,
-    left:'18%',
-    top:'18%',
-    borderRadius:999,
-    backgroundColor:'#BFDFFF',
-  },
+  flowRibbon:{position:'absolute',borderWidth:2,borderRadius:999},
+  ribbonA:{width:360,height:76,right:-110,top:20},
+  ribbonB:{width:310,height:68,left:-120,bottom:20},
 });
