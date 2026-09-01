@@ -312,6 +312,8 @@ declare
   v_inflict_self_major text:=null;
   v_direct_damage_counters numeric:=0;
   v_defender_classes text;
+  v_defender_retreat integer:=0;
+  v_heal_all boolean:=false;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
 begin
@@ -323,6 +325,7 @@ begin
 
   v_attacker_type := coalesce(v_attacker.types[1],'Colorless');
   v_defender_classes:=lower(coalesce(v_defender.tcg_data->'subtypes','[]'::jsonb)::text);
+  v_defender_retreat:=greatest(0,least(10,coalesce(nullif(regexp_replace(coalesce(v_defender.tcg_data->>'convertedRetreatCost',''),'[^0-9]','','g'),'')::integer,0)));
   v_defender_hp := greatest(10,least(1000,coalesce(
     nullif(regexp_replace(coalesce(v_defender.tcg_data->>'hp',''),'[^0-9]','','g'),'')::numeric,50
   )));
@@ -414,8 +417,21 @@ begin
     v_self_prevent_damage_cap_next:=0;
     v_inflict_self_major:=null;
     v_direct_damage_counters:=0;
+    v_heal_all:=false;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
+
+    -- Text-only attacks that can target any opposing Pokemon target the Active in this 1v1 format.
+    if v_base=0 and v_text not like '%benched pokémon%' then
+      v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) damage to (?:1|each) of your opponent''s pok[eé]mon');
+      if v_match is null then v_match:=regexp_match(v_text,'choose 1 of your opponent''s pok[eé]mon.*this attack does ([0-9]+) damage to that pok[eé]mon'); end if;
+      if v_match is null then v_match:=regexp_match(v_text,'does ([0-9]+) damage to each defending pok[eé]mon'); end if;
+      if v_match is not null then
+        v_raw:=v_match[1]::numeric;
+        v_expected_raw:=v_raw;
+        v_effect_notes:=array_append(v_effect_notes,'dano direcionado ao Pokémon Ativo');
+      end if;
+    end if;
 
     -- Non-random conditional damage.
     if v_text ~ 'if this pok[eé]mon has any damage counter' then
@@ -482,18 +498,32 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'bônus contra Condição Especial');
     end if;
 
-    v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each energy attached to this pok[eé]mon');
+    v_match:=regexp_match(v_text,'(?:does )?([0-9]+) more damage (?:for each|times the amount of)(?: [a-z]+)? energy attached to this pok[eé]mon');
     if v_match is not null then
       v_raw:=v_raw+v_match[1]::numeric*greatest(0,coalesce(p_energy,0));
       v_expected_raw:=v_raw;
       v_effect_notes:=array_append(v_effect_notes,'bônus por Energia anexada');
     end if;
 
-    v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each energy attached to (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)');
+    v_match:=regexp_match(v_text,'(?:does )?([0-9]+) more damage (?:for each|times the amount of)(?: [a-z]+)? energy attached to (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)');
     if v_match is not null then
       v_raw:=v_raw+v_match[1]::numeric*greatest(0,coalesce(p_defender_energy,0));
       v_expected_raw:=v_raw;
       v_effect_notes:=array_append(v_effect_notes,'bônus pela Energia do defensor');
+    end if;
+
+    v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) damage times the amount of(?: [a-z]+)? energy attached to (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)');
+    if v_match is not null then
+      v_raw:=v_match[1]::numeric*greatest(0,coalesce(p_defender_energy,0));
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'dano multiplicado pela Energia do defensor');
+    end if;
+
+    v_match:=regexp_match(v_text,'(?:this attack )?does ([0-9]+) more damage for each colorless in your opponent''s active pok[eé]mon''s retreat cost');
+    if v_match is not null then
+      v_raw:=v_raw+v_match[1]::numeric*v_defender_retreat;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus pelo custo de Recuo do defensor');
     end if;
 
     -- Energy-discard damage bonuses (Rayquaza VMAX style).
@@ -576,6 +606,13 @@ begin
           end if;
         end if;
       end if;
+    end if;
+
+    if v_text like '%if your opponent''s active pokémon has no damage counters on it before this attack does damage, this attack does nothing%'
+       and coalesce(p_defender_damage,0)<=0 then
+      v_raw:=0;
+      v_expected_raw:=0;
+      v_effect_notes:=array_append(v_effect_notes,'ataque exige defensor já ferido');
     end if;
 
     -- Attack gates.
@@ -691,7 +728,7 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'ambos ficam Confusos');
     end if;
 
-    v_match:=regexp_match(v_text,'put ([0-9]+) damage counters? on (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon)');
+    v_match:=regexp_match(v_text,'(?:put|place) ([0-9]+) damage counters? on (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon|1 of your opponent''s pok[eé]mon)');
     if v_match is not null then
       v_direct_damage_counters:=greatest(v_direct_damage_counters,v_match[1]::numeric*10);
       v_effect_notes:=array_append(v_effect_notes,'coloca contadores de dano diretamente');
@@ -711,8 +748,11 @@ begin
     -- Recoil and healing.
     v_match:=regexp_match(v_text,'([0-9]+) damage to itself');
     if v_match is not null then v_recoil:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'dano de recuo'); end if;
-    v_match:=regexp_match(v_text,'heal ([0-9]+) damage from this pok[eé]mon');
+    v_match:=regexp_match(v_text,'heal ([0-9]+) damage from (?:this pok[eé]mon|1 of your pok[eé]mon|each of your pok[eé]mon)');
     if v_match is not null then v_heal:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'cura'); end if;
+    v_match:=regexp_match(v_text,'remove ([0-9]+) damage counters? from (?:this pok[eé]mon|1 of your pok[eé]mon)');
+    if v_match is not null then v_heal:=greatest(v_heal,v_match[1]::numeric*10); v_effect_notes:=array_append(v_effect_notes,'remove contadores de dano'); end if;
+    if v_text like '%heal all damage from this pokémon%' then v_heal_all:=true; v_effect_notes:=array_append(v_effect_notes,'cura todo o dano'); end if;
     if v_text like '%heal from this pokémon the same amount of damage you did%'
        or v_text like '%heal from this pokemon the same amount of damage you did%' then
       v_heal_equal:=true;
@@ -845,7 +885,8 @@ begin
         'statusChance',v_status_chance,
         'recoilDamage',v_recoil,
         'healDamage',v_heal,
-        'healEqualDamage',v_heal_equal
+        'healEqualDamage',v_heal_equal,
+        'healAll',v_heal_all
       ) || jsonb_build_object(
         'selfReductionNext',v_self_reduction_next,
         'selfPreventNext',v_self_prevent_next,
@@ -1100,7 +1141,8 @@ begin
 
               v_heal:=coalesce((v_plan->>'healDamage')::numeric,0);
               if coalesce((v_plan->>'healEqualDamage')::boolean,false) then v_heal:=greatest(v_heal,v_effective); end if;
-              if v_heal>0 then c_damage:=greatest(0,c_damage-v_heal); end if;
+              if coalesce((v_plan->>'healAll')::boolean,false) then c_damage:=0;
+              elsif v_heal>0 then c_damage:=greatest(0,c_damage-v_heal); end if;
               v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0); if v_recoil>0 then c_damage:=least(c_hp,c_damage+v_recoil); end if;
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); c_energy:=greatest(0,c_energy-v_discard);
@@ -1266,7 +1308,8 @@ begin
 
               v_heal:=coalesce((v_plan->>'healDamage')::numeric,0);
               if coalesce((v_plan->>'healEqualDamage')::boolean,false) then v_heal:=greatest(v_heal,v_effective); end if;
-              if v_heal>0 then o_damage:=greatest(0,o_damage-v_heal); end if;
+              if coalesce((v_plan->>'healAll')::boolean,false) then o_damage:=0;
+              elsif v_heal>0 then o_damage:=greatest(0,o_damage-v_heal); end if;
               v_recoil:=coalesce((v_plan->>'recoilDamage')::numeric,0); if v_recoil>0 then o_damage:=least(o_hp,o_damage+v_recoil); end if;
 
               v_discard:=coalesce((v_plan->>'discardEnergy')::integer,0); o_energy:=greatest(0,o_energy-v_discard);
