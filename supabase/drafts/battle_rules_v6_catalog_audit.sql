@@ -821,15 +821,16 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'Pokémon de Evolução defensor não pode atacar');
     end if;
 
-    v_match:=regexp_match(v_text,'during your opponent''s next turn, the defending pok[eé]mon''s attacks do ([0-9]+) less damage');
+    v_match:=regexp_match(v_text,'during your opponent''s next turn, (?:the defending pok[eé]mon''s attacks|attacks used by the defending pok[eé]mon) do ([0-9]+) less damage');
     if v_match is not null then
       v_defender_outgoing_reduction_next:=v_match[1]::numeric;
       v_effect_notes:=array_append(v_effect_notes,'reduz dano dos ataques do defensor no próximo turno');
     end if;
 
     -- Opponent next-turn attack interference.
-    if v_text like '%if the defending pokémon tries to attack during your opponent''s next turn%'
-       and v_text like '%if tails, that attack does nothing%' then
+    if (v_text like '%if the defending pokémon tries to attack during your opponent''s next turn%'
+        or v_text like '%during your opponent''s next turn, if the defending pokémon tries to use an attack%')
+       and (v_text like '%if tails, that attack does nothing%' or v_text like '%if tails, that attack doesn''t happen%') then
       v_defender_attack_gate_chance:=0.5;
       v_effect_notes:=array_append(v_effect_notes,'ataque do defensor pode falhar');
     end if;
@@ -839,10 +840,10 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'bloqueia melhor ataque do defensor');
     end if;
 
-    if v_text like '%both active pokémon are now asleep%' then
+    if v_text like '%both active pokémon are now asleep%' or v_text like '%both this pokémon and the defending pokémon are now asleep%' then
       v_status:='asleep'; v_inflict_self_major:='asleep'; v_status_bonus:=35;
       v_effect_notes:=array_append(v_effect_notes,'ambos ficam Adormecidos');
-    elsif v_text like '%both active pokémon are now confused%' then
+    elsif v_text like '%both active pokémon are now confused%' or v_text like '%both this pokémon and the defending pokémon are now confused%' then
       v_status:='confused'; v_inflict_self_major:='confused'; v_status_bonus:=30;
       v_effect_notes:=array_append(v_effect_notes,'ambos ficam Confusos');
     end if;
