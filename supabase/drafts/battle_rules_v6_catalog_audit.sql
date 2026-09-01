@@ -720,7 +720,7 @@ begin
         if v_match is not null then v_reactive_damage:=greatest(v_reactive_damage,v_match[1]::numeric*10); end if;
       end if;
 
-      if v_damage>0 and v_text like '%damaged by an attack%' then
+      if v_damage>0 and (v_text like '%damaged by an attack%' or v_text like '%damaged by an opponent''s attack%' or v_text like '%damaged by an attack from your opponent''s pokémon%') then
         v_match:=regexp_match(v_text,'(?:put|place) ([0-9]+) damage counters? on the attacking pok[eé]mon');
         if v_match is not null then
           v_reactive_damage:=greatest(v_reactive_damage,v_match[1]::numeric*10);
