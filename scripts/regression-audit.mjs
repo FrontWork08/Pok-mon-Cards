@@ -582,9 +582,9 @@ if (existsSync('src/components/CompactTrainerBanner.tsx')) {
   assert(compactIdentity.includes('const sharedFlow=new Animated.Value(0)'), 'Regressão de performance: banners densos devem compartilhar um único valor animado.');
   assert(compactIdentity.includes('let sharedLoop:Animated.CompositeAnimation|null=null'), 'Regressão de performance: animação compacta perdeu o loop compartilhado.');
   assert(compactIdentity.includes('sharedUsers'), 'Regressão de performance: animação compacta perdeu o controle global de assinantes.');
-  assert(compactIdentity.includes('GalaxyFlowOverlay') && compactIdentity.includes('visual.galaxy'), 'Regressão visual: banner compacto Galaxy perdeu a atmosfera naturalista.');
-  assert(compactIdentity.includes('GalaxyFlowOverlay') && compactIdentity.includes('opacity={0.72}'), 'Regressão visual: Galaxy Flow deve continuar cobrindo o banner compacto inteiro.');
-  assert(compactIdentity.includes('!visual.galaxy'), 'Regressão visual: banner Galaxy compacto voltou a misturar efeitos neon genéricos.');
+  assert(compactIdentity.includes('visual.galaxy ? (') && compactIdentity.includes('styles.nebulaRibbon'), 'Regressão visual: banner compacto Galaxy perdeu o visual cósmico anterior.');
+  assert(compactIdentity.includes('styles.star') && compactIdentity.includes('styles.starSmall'), 'Regressão visual: banner compacto Galaxy perdeu as estrelas do visual anterior.');
+  assert(!compactIdentity.includes('GalaxyFlowOverlay'), 'Regressão visual: banner compacto Galaxy voltou ao overlay de nebulosa naturalista que foi revertido.');
   assert(compactIdentity.includes('styles.railTop') && compactIdentity.includes('translateX:railForward'), 'Regressão visual: fluxo animado superior do banner compacto foi removido.');
   assert(compactIdentity.includes('styles.railBottom') && compactIdentity.includes('translateX:railBackward'), 'Regressão visual: fluxo animado inferior do banner compacto foi removido.');
   assert(compactIdentity.includes("content:{position:'relative',zIndex:2}"), 'Regressão visual: efeitos compactos não-Galaxy precisam continuar acima do conteúdo padrão.');
