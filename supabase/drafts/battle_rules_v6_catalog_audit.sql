@@ -2817,6 +2817,9 @@ declare
   v_effect_immune boolean;
   v_reactive numeric;
   v_reactive_status text;
+  v_reactive_energy_discard integer;
+  v_reactive_knockout_chance numeric;
+  v_reactive_chance numeric;
   v_reactive_counter numeric;
   v_attack_failed boolean;
   v_extra_turn boolean:=false;
@@ -2992,12 +2995,15 @@ begin
               if coalesce((v_plan->>'ignoreDefenderEffects')::boolean,false) then
                 v_def:=jsonb_build_object('damage',v_effective,'effectImmune',false,'reactiveDamage',0);
               else
-                v_def:=private.battle_v6_defense_adjustment(c.id,o.id,o_damage,v_effective,v_seed||':'||v_half||':def');
+                v_def:=private.battle_v6_defense_adjustment(c.id,o.id,c_energy,o_energy,o_major,o_damage,v_effective,v_seed||':'||v_half||':def');
               end if;
               v_effective:=coalesce((v_def->>'damage')::numeric,v_effective);
               v_effect_immune:=coalesce((v_def->>'effectImmune')::boolean,false);
               v_reactive:=coalesce((v_def->>'reactiveDamage')::numeric,0);
               v_reactive_status:=v_def->>'reactiveStatus';
+              v_reactive_energy_discard:=coalesce((v_def->>'reactiveEnergyDiscard')::integer,0);
+              v_reactive_knockout_chance:=coalesce((v_def->>'reactiveKnockoutChance')::numeric,0);
+              v_reactive_chance:=coalesce((v_def->>'reactiveChance')::numeric,1);
 
               o_damage:=least(o_hp,o_damage+v_effective);
               o_last_received_attack:=v_effective;
@@ -3174,7 +3180,10 @@ begin
                 if coalesce((v_plan->>'clearDefenderSpecial')::boolean,false) then o_poison:=false; o_poison_checkup_damage:=10; o_burn:=false; o_major:=null; end if;
               end if;
 
-              if v_reactive>0 then c_damage:=least(c_hp,c_damage+v_reactive); end if;
+              if v_reactive>0 and private.battle_v6_hash_roll(v_seed||':'||v_half||':ability_reactive')<=v_reactive_chance then c_damage:=least(c_hp,c_damage+v_reactive); end if;
+              if v_reactive_energy_discard>0 and v_effective>0 then c_energy:=greatest(0,c_energy-v_reactive_energy_discard); end if;
+              if v_reactive_knockout_chance>0 and o_damage>=o_hp
+                 and private.battle_v6_hash_roll(v_seed||':'||v_half||':ability_reactive_ko')<=v_reactive_knockout_chance then c_damage:=c_hp; end if;
               if v_reactive_status='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; c_poison_checkup_damage:=10;
               elsif v_reactive_status='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true;
               elsif v_reactive_status is not null and not private.battle_v6_status_immune(c.id,v_reactive_status) then c_major:=v_reactive_status; end if;
@@ -3327,12 +3336,15 @@ begin
               if coalesce((v_plan->>'ignoreDefenderEffects')::boolean,false) then
                 v_def:=jsonb_build_object('damage',v_effective,'effectImmune',false,'reactiveDamage',0);
               else
-                v_def:=private.battle_v6_defense_adjustment(o.id,c.id,c_damage,v_effective,v_seed||':'||v_half||':def');
+                v_def:=private.battle_v6_defense_adjustment(o.id,c.id,o_energy,c_energy,c_major,c_damage,v_effective,v_seed||':'||v_half||':def');
               end if;
               v_effective:=coalesce((v_def->>'damage')::numeric,v_effective);
               v_effect_immune:=coalesce((v_def->>'effectImmune')::boolean,false);
               v_reactive:=coalesce((v_def->>'reactiveDamage')::numeric,0);
               v_reactive_status:=v_def->>'reactiveStatus';
+              v_reactive_energy_discard:=coalesce((v_def->>'reactiveEnergyDiscard')::integer,0);
+              v_reactive_knockout_chance:=coalesce((v_def->>'reactiveKnockoutChance')::numeric,0);
+              v_reactive_chance:=coalesce((v_def->>'reactiveChance')::numeric,1);
 
               c_damage:=least(c_hp,c_damage+v_effective);
               c_last_received_attack:=v_effective;
@@ -3509,7 +3521,10 @@ begin
                 if coalesce((v_plan->>'clearDefenderSpecial')::boolean,false) then c_poison:=false; c_poison_checkup_damage:=10; c_burn:=false; c_major:=null; end if;
               end if;
 
-              if v_reactive>0 then o_damage:=least(o_hp,o_damage+v_reactive); end if;
+              if v_reactive>0 and private.battle_v6_hash_roll(v_seed||':'||v_half||':ability_reactive')<=v_reactive_chance then o_damage:=least(o_hp,o_damage+v_reactive); end if;
+              if v_reactive_energy_discard>0 and v_effective>0 then o_energy:=greatest(0,o_energy-v_reactive_energy_discard); end if;
+              if v_reactive_knockout_chance>0 and c_damage>=c_hp
+                 and private.battle_v6_hash_roll(v_seed||':'||v_half||':ability_reactive_ko')<=v_reactive_knockout_chance then o_damage:=o_hp; end if;
               if v_reactive_status='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; o_poison_checkup_damage:=10;
               elsif v_reactive_status='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true;
               elsif v_reactive_status is not null and not private.battle_v6_status_immune(o.id,v_reactive_status) then o_major:=v_reactive_status; end if;
