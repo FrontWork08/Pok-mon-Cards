@@ -570,6 +570,10 @@ declare
   v_defender_energy_return integer:=0;
   v_required_self_discard integer:=0;
   v_instant_knockout boolean:=false;
+  v_knockout_coin_count integer:=0;
+  v_knockout_heads_required integer:=0;
+  v_self_knockout boolean:=false;
+  v_both_knockout boolean:=false;
   v_delayed_knockout_next boolean:=false;
   v_defender_heal_block_next boolean:=false;
   v_extra_turn boolean:=false;
@@ -789,6 +793,10 @@ begin
     v_defender_energy_return:=0;
     v_required_self_discard:=0;
     v_instant_knockout:=false;
+    v_knockout_coin_count:=0;
+    v_knockout_heads_required:=0;
+    v_self_knockout:=false;
+    v_both_knockout:=false;
     v_delayed_knockout_next:=false;
     v_defender_heal_block_next:=false;
     v_extra_turn:=false;
@@ -1347,6 +1355,34 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'reduz dano dos ataques do defensor no próximo turno');
     end if;
 
+    -- Direct Knock Out effects.
+    if v_text like '%both active pokémon are knocked out%'
+       or v_text like '%both active pokemon are knocked out%'
+       or (
+         position('both '||lower(coalesce(v_attacker.pokemon_name,''))||' and the defending pokémon are now knocked out' in v_text)>0
+         or position('both '||lower(coalesce(v_attacker.pokemon_name,''))||' and the defending pokemon are now knocked out' in v_text)>0
+       ) then
+      v_both_knockout:=true;
+      v_effect_notes:=array_append(v_effect_notes,'nocaute simultâneo dos dois Ativos');
+    end if;
+
+    if trim(v_text) in ('this pokémon is knocked out.','this pokemon is knocked out.')
+       or v_text like '%then, this pokémon is knocked out.%'
+       or v_text like '%then, this pokemon is knocked out.%' then
+      v_self_knockout:=true;
+      v_effect_notes:=array_append(v_effect_notes,'atacante é nocauteado pelo próprio ataque');
+    end if;
+
+    if v_text ~ 'flip 2 coins?.*if (?:both|both of them) (?:are )?heads, (?:the defending pok[eé]mon|your opponent''s active pok[eé]mon) is knocked out' then
+      v_knockout_coin_count:=2;
+      v_knockout_heads_required:=2;
+      v_effect_notes:=array_append(v_effect_notes,'nocaute do defensor exige duas caras');
+    elsif v_text ~ 'flip a coin.*if heads, (?:the defending pok[eé]mon|your opponent''s active pok[eé]mon) is knocked out' then
+      v_knockout_coin_count:=1;
+      v_knockout_heads_required:=1;
+      v_effect_notes:=array_append(v_effect_notes,'nocaute do defensor exige cara');
+    end if;
+
     if v_text like '%if your opponent''s active pokémon is affected by a special condition%it is knocked out%'
        and coalesce(p_defender_special,false) then
       v_instant_knockout:=true;
@@ -1652,8 +1688,14 @@ begin
       case when v_cooldown_attack>0 then 2 else 1 end
     );
 
-    if v_instant_knockout then
+    if v_instant_knockout and not v_self_knockout and not v_both_knockout then
       v_score:=2000000000-v_cost;
+    elsif v_both_knockout then
+      v_score:=500000-v_cost;
+    elsif v_self_knockout and v_remaining_hp>0 and (v_expected+v_direct_damage_counters)<v_remaining_hp then
+      v_score:=-1000000000-v_cost;
+    elsif v_self_knockout and v_remaining_hp>0 and (v_expected+v_direct_damage_counters)>=v_remaining_hp then
+      v_score:=500000-v_cost;
     elsif v_remaining_hp>0 and (v_expected+v_direct_damage_counters)>=v_remaining_hp then
       v_score:=1000000000+v_expected+v_direct_damage_counters-v_cost;
     else
@@ -1677,6 +1719,8 @@ begin
         +case when v_lock_defender_best then 28 else 0 end
         +v_self_energy_gain*18
         +v_defender_energy_return*18
+        +case when v_knockout_coin_count=1 and v_knockout_heads_required=1 then 220 else 0 end
+        +case when v_knockout_coin_count=2 and v_knockout_heads_required=2 then 180 else 0 end
         +case when v_delayed_knockout_next then 160 else 0 end
         +case when v_defender_heal_block_next then 24 else 0 end
         +case when v_extra_turn then 70 else 0 end
@@ -1731,6 +1775,10 @@ begin
         'selfEnergyGainChance',v_self_energy_gain_chance,
         'defenderEnergyReturn',v_defender_energy_return,
         'instantKnockout',v_instant_knockout,
+        'knockoutCoinCount',v_knockout_coin_count,
+        'knockoutHeadsRequired',v_knockout_heads_required,
+        'selfKnockout',v_self_knockout,
+        'bothKnockout',v_both_knockout,
         'delayedKnockoutNext',v_delayed_knockout_next,
         'defenderHealBlockNext',v_defender_heal_block_next,
         'extraTurn',v_extra_turn,
@@ -2065,6 +2113,7 @@ begin
               if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(c.id,v_plan->>'inflictSelfMajor') then c_major:=v_plan->>'inflictSelfMajor'; end if;
               if coalesce((v_plan->>'clearSelfSpecial')::boolean,false) then c_poison:=false; c_burn:=false; c_major:=null; end if;
               if coalesce((v_plan->>'clearSelfPoison')::boolean,false) then c_poison:=false; end if;
+              if coalesce((v_plan->>'selfKnockout')::boolean,false) or coalesce((v_plan->>'bothKnockout')::boolean,false) then c_damage:=c_hp; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
               then c_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
@@ -2080,7 +2129,14 @@ begin
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
-                if coalesce((v_plan->>'instantKnockout')::boolean,false) then o_damage:=o_hp; end if;
+                if coalesce((v_plan->>'bothKnockout')::boolean,false) then o_damage:=o_hp;
+                elsif coalesce((v_plan->>'knockoutCoinCount')::integer,0)>0 then
+                  v_heads:=0; v_coin_count:=(v_plan->>'knockoutCoinCount')::integer;
+                  for v_i in 1..v_coin_count loop
+                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':ko_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
+                  end loop;
+                  if v_heads>=coalesce((v_plan->>'knockoutHeadsRequired')::integer,v_coin_count) then o_damage:=o_hp; end if;
+                elsif coalesce((v_plan->>'instantKnockout')::boolean,false) then o_damage:=o_hp; end if;
                 if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and o_damage>=o_hp then v_extra_turn:=true; end if;
                 if coalesce((v_plan->>'delayedKnockoutNext')::boolean,false) then o_delayed_ko_next:=true; end if;
                 if coalesce((v_plan->>'defenderHealBlockNext')::boolean,false) then o_heal_block_next:=true; end if;
@@ -2294,6 +2350,7 @@ begin
               if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(o.id,v_plan->>'inflictSelfMajor') then o_major:=v_plan->>'inflictSelfMajor'; end if;
               if coalesce((v_plan->>'clearSelfSpecial')::boolean,false) then o_poison:=false; o_burn:=false; o_major:=null; end if;
               if coalesce((v_plan->>'clearSelfPoison')::boolean,false) then o_poison:=false; end if;
+              if coalesce((v_plan->>'selfKnockout')::boolean,false) or coalesce((v_plan->>'bothKnockout')::boolean,false) then o_damage:=o_hp; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
               then o_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
@@ -2309,7 +2366,14 @@ begin
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
                 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
-                if coalesce((v_plan->>'instantKnockout')::boolean,false) then c_damage:=c_hp; end if;
+                if coalesce((v_plan->>'bothKnockout')::boolean,false) then c_damage:=c_hp;
+                elsif coalesce((v_plan->>'knockoutCoinCount')::integer,0)>0 then
+                  v_heads:=0; v_coin_count:=(v_plan->>'knockoutCoinCount')::integer;
+                  for v_i in 1..v_coin_count loop
+                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':ko_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
+                  end loop;
+                  if v_heads>=coalesce((v_plan->>'knockoutHeadsRequired')::integer,v_coin_count) then c_damage:=c_hp; end if;
+                elsif coalesce((v_plan->>'instantKnockout')::boolean,false) then c_damage:=c_hp; end if;
                 if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and c_damage>=c_hp then v_extra_turn:=true; end if;
                 if coalesce((v_plan->>'delayedKnockoutNext')::boolean,false) then c_delayed_ko_next:=true; end if;
                 if coalesce((v_plan->>'defenderHealBlockNext')::boolean,false) then c_heal_block_next:=true; end if;
