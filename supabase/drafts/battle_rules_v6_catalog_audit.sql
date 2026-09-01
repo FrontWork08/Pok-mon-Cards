@@ -322,6 +322,7 @@ create or replace function private.battle_v6_attack_plan(
   p_attacker_damage numeric,
   p_defender_damage numeric,
   p_defender_special boolean,
+  p_defender_major text,
   p_ignore_defender_weakness boolean,
   p_blocked_attacks text[] default null
 )
@@ -695,6 +696,13 @@ begin
       v_raw:=0;
       v_expected_raw:=0;
       v_effect_notes:=array_append(v_effect_notes,'ataque exige defensor já ferido');
+    end if;
+
+    if v_text like '%if the defending pokémon is not asleep, this attack does nothing%'
+       and lower(coalesce(p_defender_major,''))<>'asleep' then
+      v_raw:=0;
+      v_expected_raw:=0;
+      v_effect_notes:=array_append(v_effect_notes,'ataque exige defensor Adormecido');
     end if;
 
     -- Attack gates.
@@ -1163,11 +1171,11 @@ begin
         v_blocked:=array[]::text[];
         if c_blocked_turns>0 and c_blocked_attack is not null then v_blocked:=array_append(v_blocked,c_blocked_attack); end if;
         if c_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_no_weakness_next,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_major,o_no_weakness_next,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           c_disable_best_next:=c_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_no_weakness_next,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,o_damage,(o_major is not null or o_poison or o_burn),o_major,o_no_weakness_next,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1340,11 +1348,11 @@ begin
         v_blocked:=array[]::text[];
         if o_blocked_turns>0 and o_blocked_attack is not null then v_blocked:=array_append(v_blocked,o_blocked_attack); end if;
         if o_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_no_weakness_next,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_major,c_no_weakness_next,v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           o_disable_best_next:=o_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_no_weakness_next,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,c_damage,(c_major is not null or c_poison or c_burn),c_major,c_no_weakness_next,v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1672,7 +1680,7 @@ revoke all on function private.battle_v6_turn_ability_effects(text) from public,
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,boolean,text[]) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,text,boolean,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
 grant execute on function public.server_resolve_battle_round(uuid) to service_role;
