@@ -71,7 +71,7 @@ returns boolean
 language plpgsql
 stable
 set search_path=''
-as $
+as $body$
 declare
   v_card public.cards%rowtype;
   v_classes text;
@@ -93,7 +93,7 @@ begin
     else true
   end;
 end;
-$;
+$body$;
 
 create or replace function private.battle_v6_defense_adjustment(
   p_attacker_card_id text,
