@@ -420,6 +420,9 @@ create or replace function private.battle_v6_attack_plan(
   p_defender_energy integer,
   p_attacker_damage numeric,
   p_attacker_last_damage_received numeric,
+  p_attacker_poison boolean,
+  p_attacker_burn boolean,
+  p_attacker_major text,
   p_defender_damage numeric,
   p_defender_special boolean,
   p_defender_poison boolean,
@@ -505,6 +508,9 @@ declare
   v_inflict_burn boolean:=false;
   v_inflict_self_poison boolean:=false;
   v_inflict_self_burn boolean:=false;
+  v_clear_self_special boolean:=false;
+  v_clear_self_poison boolean:=false;
+  v_clear_defender_special boolean:=false;
   v_direct_damage_counters numeric:=0;
   v_defender_classes text;
   v_defender_retreat integer:=0;
@@ -601,8 +607,9 @@ begin
     if (
       v_original_text like '%if the defending pokémon is not asleep, this attack does nothing%'
       or v_original_text like '%you can''t use this attack unless the defending pokémon is asleep%'
-      or v_original_text like '%this attack can be used if this pokémon is asleep. if it is not asleep, this attack does nothing%'
     ) and lower(coalesce(p_defender_major,''))<>'asleep' then continue; end if;
+    if v_original_text like '%this attack can be used if this pokémon is asleep. if it is not asleep, this attack does nothing%'
+       and lower(coalesce(p_attacker_major,''))<>'asleep' then continue; end if;
 
     if v_original_text like '%if your opponent''s active pokémon isn''t confused, this attack does nothing%'
        and lower(coalesce(p_defender_major,''))<>'confused' then continue; end if;
@@ -722,6 +729,9 @@ begin
     v_inflict_burn:=false;
     v_inflict_self_poison:=false;
     v_inflict_self_burn:=false;
+    v_clear_self_special:=false;
+    v_clear_self_poison:=false;
+    v_clear_defender_special:=false;
     v_direct_damage_counters:=0;
     v_heal_all:=false;
     v_self_energy_gain:=0;
@@ -856,6 +866,58 @@ begin
       v_raw:=v_raw+v_match[1]::numeric;
       v_expected_raw:=v_raw;
       v_effect_notes:=array_append(v_effect_notes,'bônus contra Pokémon Envenenado');
+    end if;
+
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is burned, this attack does ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_defender_burn,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus contra Pokémon Queimado');
+    end if;
+
+    v_match:=regexp_match(v_text,'if (?:your opponent''s active pok[eé]mon|the defending pok[eé]mon) is affected by (?:a|any) special conditions?, this attack does ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_defender_special,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus contra Condição Especial');
+    end if;
+
+    -- Bonuses based on the attacker's own Special Condition.
+    v_match:=regexp_match(v_text,'if this pok[eé]mon is poisoned, this attack does ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_attacker_poison,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus por atacante Envenenado');
+    end if;
+    v_match:=regexp_match(v_text,'if this pok[eé]mon is burned, this attack does ([0-9]+) more damage');
+    if v_match is not null and coalesce(p_attacker_burn,false) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus por atacante Queimado');
+    end if;
+    v_match:=regexp_match(v_text,'if this pok[eé]mon is affected by a special condition, this attack does ([0-9]+) more damage');
+    if v_match is not null and (coalesce(p_attacker_poison,false) or coalesce(p_attacker_burn,false) or p_attacker_major is not null) then
+      v_raw:=v_raw+v_match[1]::numeric;
+      v_expected_raw:=v_raw;
+      v_effect_notes:=array_append(v_effect_notes,'bônus por Condição Especial no atacante');
+    end if;
+
+    -- Legacy wording names the attacking Pokémon instead of saying "this Pokémon".
+    if position('if '||lower(coalesce(v_attacker.pokemon_name,''))||' is poisoned' in v_text)>0 and coalesce(p_attacker_poison,false) then
+      v_match:=regexp_match(v_text,'this attack does [0-9]+ damage plus ([0-9]+) more damage');
+      if v_match is null then v_match:=regexp_match(v_text,'this attack does ([0-9]+) more damage'); end if;
+      if v_match is not null then
+        v_raw:=v_raw+v_match[1]::numeric; v_expected_raw:=v_raw;
+        v_effect_notes:=array_append(v_effect_notes,'bônus por atacante Envenenado (texto legado)');
+      end if;
+    end if;
+    if position('if '||lower(coalesce(v_attacker.pokemon_name,''))||' is burned' in v_text)>0 and coalesce(p_attacker_burn,false) then
+      v_match:=regexp_match(v_text,'this attack does [0-9]+ damage plus ([0-9]+) more damage');
+      if v_match is null then v_match:=regexp_match(v_text,'this attack does ([0-9]+) more damage'); end if;
+      if v_match is not null then
+        v_raw:=v_raw+v_match[1]::numeric; v_expected_raw:=v_raw;
+        v_effect_notes:=array_append(v_effect_notes,'bônus por atacante Queimado (texto legado)');
+      end if;
     end if;
 
     v_match:=regexp_match(v_text,'(?:does )?([0-9]+) more damage (?:for each|times the amount of)(?: [a-z]+)? energy attached to this pok[eé]mon');
@@ -1377,6 +1439,25 @@ begin
       if v_status is not null then v_effect_notes:=array_append(v_effect_notes,'condição especial no defensor: '||v_status); end if;
     end if;
 
+    if v_text like '%remove all special conditions from this pokémon%'
+       or v_text like '%remove all special conditions from this pokemon%'
+       or position('remove all special conditions from '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0 then
+      v_clear_self_special:=true;
+      v_effect_notes:=array_append(v_effect_notes,'remove Condições Especiais do atacante');
+    end if;
+    if v_text like '%remove that special condition from this pokémon%'
+       or v_text like '%remove that special condition from this pokemon%'
+       or position('remove the special condition poisoned from '||lower(coalesce(v_attacker.pokemon_name,'')) in v_text)>0 then
+      v_clear_self_poison:=true;
+      v_effect_notes:=array_append(v_effect_notes,'remove Poison do atacante');
+    end if;
+    if v_text like '%remove all special conditions from the defending pokémon%'
+       or v_text like '%remove all special conditions from that pokémon%'
+       or v_text like '%remove all special conditions from your opponent''s active pokémon%' then
+      v_clear_defender_special:=true;
+      v_effect_notes:=array_append(v_effect_notes,'remove Condições Especiais do defensor');
+    end if;
+
     -- Recoil and healing.
     v_match:=regexp_match(v_text,'([0-9]+) damage to itself');
     if v_match is not null then v_recoil:=v_match[1]::numeric; v_effect_notes:=array_append(v_effect_notes,'dano de recuo'); end if;
@@ -1501,6 +1582,9 @@ begin
         -case v_inflict_self_major when 'paralyzed' then 45 when 'asleep' then 28 when 'confused' then 18 else 0 end
         -case when v_inflict_self_poison then 14 else 0 end
         -case when v_inflict_self_burn then 18 else 0 end
+        +case when v_clear_self_special and (coalesce(p_attacker_poison,false) or coalesce(p_attacker_burn,false) or p_attacker_major is not null) then 28 else 0 end
+        +case when v_clear_self_poison and coalesce(p_attacker_poison,false) then 16 else 0 end
+        -case when v_clear_defender_special and coalesce(p_defender_special,false) then 8 else 0 end
         +v_self_reduction_next*0.25
         +case when v_self_prevent_next then 45 else 0 end
         +case when v_self_no_weakness_next then 22 else 0 end
@@ -1581,6 +1665,9 @@ begin
         'inflictSelfMajor',v_inflict_self_major,
         'inflictSelfPoison',v_inflict_self_poison,
         'inflictSelfBurn',v_inflict_self_burn,
+        'clearSelfSpecial',v_clear_self_special,
+        'clearSelfPoison',v_clear_self_poison,
+        'clearDefenderSpecial',v_clear_defender_special,
         'directDamageCounters',v_direct_damage_counters,
         'coinGateCount',v_coin_gate_count,
         'coinGateHeads',v_coin_gate_heads,
@@ -1771,11 +1858,11 @@ begin
         end if;
         if c_blocked_turns>0 and c_blocked_attack is not null then v_blocked:=array_append(v_blocked,c_blocked_attack); end if;
         if c_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
+          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,c_poison,c_burn,c_major,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           c_disable_best_next:=c_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
+        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,c_poison,c_burn,c_major,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_burn,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1893,6 +1980,8 @@ begin
               if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; end if;
               if coalesce((v_plan->>'inflictSelfBurn')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
               if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(c.id,v_plan->>'inflictSelfMajor') then c_major:=v_plan->>'inflictSelfMajor'; end if;
+              if coalesce((v_plan->>'clearSelfSpecial')::boolean,false) then c_poison:=false; c_burn:=false; c_major:=null; end if;
+              if coalesce((v_plan->>'clearSelfPoison')::boolean,false) then c_poison:=false; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
               then c_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
@@ -1942,6 +2031,7 @@ begin
                   if coalesce((v_plan->>'inflictBurn')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
                   if v_status is not null and v_status not in ('poisoned','burned') and not private.battle_v6_status_immune(o.id,v_status) then o_major:=v_status; end if;
                 end if;
+                if coalesce((v_plan->>'clearDefenderSpecial')::boolean,false) then o_poison:=false; o_burn:=false; o_major:=null; end if;
               end if;
 
               if v_reactive>0 then c_damage:=least(c_hp,c_damage+v_reactive); end if;
@@ -1997,11 +2087,11 @@ begin
         end if;
         if o_blocked_turns>0 and o_blocked_attack is not null then v_blocked:=array_append(v_blocked,o_blocked_attack); end if;
         if o_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
+          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,o_poison,o_burn,o_major,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           o_disable_best_next:=o_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
+        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,o_poison,o_burn,o_major,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_burn,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -2119,6 +2209,8 @@ begin
               if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; end if;
               if coalesce((v_plan->>'inflictSelfBurn')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
               if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(o.id,v_plan->>'inflictSelfMajor') then o_major:=v_plan->>'inflictSelfMajor'; end if;
+              if coalesce((v_plan->>'clearSelfSpecial')::boolean,false) then o_poison:=false; o_burn:=false; o_major:=null; end if;
+              if coalesce((v_plan->>'clearSelfPoison')::boolean,false) then o_poison:=false; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
               then o_prevent_next_class:=coalesce(v_plan->>'selfPreventClass','all'); end if;
@@ -2168,6 +2260,7 @@ begin
                   if coalesce((v_plan->>'inflictBurn')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
                   if v_status is not null and v_status not in ('poisoned','burned') and not private.battle_v6_status_immune(c.id,v_status) then c_major:=v_status; end if;
                 end if;
+                if coalesce((v_plan->>'clearDefenderSpecial')::boolean,false) then c_poison:=false; c_burn:=false; c_major:=null; end if;
               end if;
 
               if v_reactive>0 then o_damage:=least(o_hp,o_damage+v_reactive); end if;
@@ -2388,7 +2481,7 @@ revoke all on function private.battle_v6_turn_ability_effects(text) from public,
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,numeric,boolean,boolean,boolean,text,boolean,boolean,boolean,boolean,text[]) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,boolean,text,numeric,boolean,boolean,boolean,text,boolean,boolean,boolean,boolean,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
 grant execute on function public.server_resolve_battle_round(uuid) to service_role;
