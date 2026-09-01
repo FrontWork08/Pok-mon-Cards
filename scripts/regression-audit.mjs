@@ -7,6 +7,7 @@ const assert = (condition, message) => {
 };
 
 const requiredFiles = [
+  'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
   'supabase/migrations/20260901115912_lower_coin_packs_more_and_optimize_bulk_duplicate_sales.sql',
   'supabase/migrations/20260901115248_lower_coin_pack_prices.sql',
@@ -335,6 +336,15 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   assert(read('app/_layout.tsx').includes("pathname === '/reset-password'"), 'Regressão: rota de redefinição de senha não está liberada no auth guard.');
   assert(reset.includes('SALVAR NOVA SENHA'), 'Regressão: tela de definição da nova senha ausente.');
   assert(reset.includes('await signOut()'), 'Regressão: recuperação deve encerrar a sessão temporária após trocar a senha.');
+}
+
+if (existsSync('supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql')) {
+  const coinCap25k = read('supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql');
+  assert(coinCap25k.includes("'coinPackCeiling',25000") && coinCap25k.includes('coin_pack_ceiling=25000'), 'Regressão econômica: teto dos packs de coins deve permanecer em 25.000.');
+  assert(coinCap25k.includes('least(\n            25000::bigint'), 'Regressão econômica: refresh automático deixou de aplicar o teto real de 25.000 coins.');
+  assert(coinCap25k.includes("'coinPackFloor',2500"), 'Regressão econômica: piso dos packs de coins deve permanecer em 2.500.');
+  assert(coinCap25k.includes("'boosterDiamondPriceMultiplier',0.90"), 'Regressão econômica: teto de coins não pode alterar preços de packs de diamante.');
+  assert(coinCap25k.includes("coalesce(p_price,0)>=20000") && coinCap25k.includes("coalesce(p_price,0)>=12500"), 'Regressão de balanceamento: teto de 25k não pode reduzir o bônus de qualidade dos boosters.');
 }
 
 if (existsSync('supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql')) {
