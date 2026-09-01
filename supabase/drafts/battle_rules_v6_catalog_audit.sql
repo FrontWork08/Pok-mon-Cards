@@ -621,8 +621,8 @@ begin
        or v_original_text like '%you can use this attack only if you have 10 or more cards in the lost zone%'
        or v_original_text like '%if the defending pokémon has no pokémon tool card attached to it, this attack does nothing%'
        or v_original_text like '%if this pokémon didn''t move from the bench to the active spot this turn, this attack does nothing%'
-       or v_original_text like '%if this pokémon didn't move from the bench to the active spot this turn, this attack does nothing%'
-       or v_original_text like '%if this pokémon didn't evolve from loudred during this turn, this attack does nothing%'
+       or v_original_text like '%if this pokémon didn''t move from the bench to the active spot this turn, this attack does nothing%'
+       or v_original_text like '%if this pokémon didn''t evolve from loudred during this turn, this attack does nothing%'
     then continue; end if;
 
     if v_original_text like '%prize card%' and (
