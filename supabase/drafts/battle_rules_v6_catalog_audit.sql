@@ -253,6 +253,67 @@ as $firstturn$
     );
 $firstturn$;
 
+create or replace function private.battle_v6_has_victory_star(p_card_id text)
+returns boolean
+language sql
+stable
+set search_path=''
+as $victory$
+  select exists(
+    select 1
+    from public.cards c
+    cross join lateral jsonb_array_elements(coalesce(c.tcg_data->'abilities','[]'::jsonb)) a
+    where c.id=p_card_id
+      and lower(coalesce(a->>'text','')) like '%after you flip any coins for an attack%ignore all effects of those coin flips%'
+      and lower(coalesce(a->>'text','')) like '%flip%coins again%'
+  );
+$victory$;
+
+create or replace function private.battle_v6_attack_coin_heads(
+  p_card_id text,p_key text,p_count integer,p_prefer_high boolean
+)
+returns integer
+language plpgsql
+stable
+set search_path=''
+as $coinheads$
+declare
+  v_i integer; v_first integer:=0; v_second integer:=0;
+  v_count integer:=greatest(0,least(coalesce(p_count,0),50));
+begin
+  for v_i in 1..v_count loop
+    if private.battle_v6_hash_roll(p_key||':first:'||v_i)>=0.5 then v_first:=v_first+1; end if;
+  end loop;
+  if not private.battle_v6_has_victory_star(p_card_id) then return v_first; end if;
+  for v_i in 1..v_count loop
+    if private.battle_v6_hash_roll(p_key||':reroll:'||v_i)>=0.5 then v_second:=v_second+1; end if;
+  end loop;
+  return case when coalesce(p_prefer_high,true) then greatest(v_first,v_second) else least(v_first,v_second) end;
+end;
+$coinheads$;
+
+create or replace function private.battle_v6_until_tails_heads(p_card_id text,p_key text)
+returns integer
+language plpgsql
+stable
+set search_path=''
+as $untiltails$
+declare
+  v_i integer; v_first integer:=0; v_second integer:=0;
+begin
+  for v_i in 1..20 loop
+    exit when private.battle_v6_hash_roll(p_key||':first:'||v_i)<0.5;
+    v_first:=v_first+1;
+  end loop;
+  if not private.battle_v6_has_victory_star(p_card_id) then return v_first; end if;
+  for v_i in 1..20 loop
+    exit when private.battle_v6_hash_roll(p_key||':reroll:'||v_i)<0.5;
+    v_second:=v_second+1;
+  end loop;
+  return greatest(v_first,v_second);
+end;
+$untiltails$;
+
 create or replace function private.battle_v6_ability_no_weakness(p_card_id text)
 returns boolean
 language sql
@@ -2927,10 +2988,7 @@ begin
             v_coin_count:=coalesce((v_plan->>'coinGateCount')::integer,0);
             v_required_heads:=coalesce((v_plan->>'coinGateHeads')::integer,0);
             if v_coin_count>0 then
-              v_heads:=0;
-              for v_i in 1..v_coin_count loop
-                if private.battle_v6_hash_roll(v_seed||':'||v_half||':gate:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-              end loop;
+              v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':gate',v_coin_count,true);
               v_gate_heads:=v_heads;
               if v_heads<v_required_heads then
                 v_attack_failed:=true;
@@ -2950,11 +3008,7 @@ begin
               v_raw:=coalesce((v_plan->>'rawDamage')::numeric,0);
 
               if coalesce((v_plan->>'coinUntilTails')::boolean,false) then
-                v_heads:=0;
-                for v_i in 1..20 loop
-                  exit when private.battle_v6_hash_roll(v_seed||':'||v_half||':until:'||v_i)<0.5;
-                  v_heads:=v_heads+1;
-                end loop;
+                v_heads:=private.battle_v6_until_tails_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':until');
                 v_bonus_heads:=v_heads;
                 if v_plan->>'dynamicKind'='both_heads_bonus' then
                   if v_heads=v_coin_count then v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0); end if;
@@ -2964,10 +3018,8 @@ begin
                   v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 end if;
               elsif coalesce((v_plan->>'coinBonusCount')::integer,0)>0 then
-                v_heads:=0; v_coin_count:=(v_plan->>'coinBonusCount')::integer;
-                for v_i in 1..v_coin_count loop
-                  if private.battle_v6_hash_roll(v_seed||':'||v_half||':bonus:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-                end loop;
+                v_coin_count:=(v_plan->>'coinBonusCount')::integer;
+                v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':bonus',v_coin_count,true);
                 v_bonus_heads:=v_heads;
                 if v_plan->>'dynamicKind'='both_heads_bonus' then
                   if v_heads=v_coin_count then v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0); end if;
@@ -3041,10 +3093,7 @@ begin
                   elsif coalesce((v_plan->>'coinGateCount')::integer,0)=v_recoil_coin_count and v_gate_heads>=0 then
                     v_recoil_heads:=v_gate_heads;
                   else
-                    v_recoil_heads:=0;
-                    for v_i in 1..v_recoil_coin_count loop
-                      if private.battle_v6_hash_roll(v_seed||':'||v_half||':recoil_coin:'||v_i)>=0.5 then v_recoil_heads:=v_recoil_heads+1; end if;
-                    end loop;
+                    v_recoil_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':recoil_coin',v_recoil_coin_count,(v_recoil_heads_min=0 and v_recoil_heads_max=0));
                   end if;
                   v_recoil_success:=v_recoil_heads between v_recoil_heads_min and v_recoil_heads_max;
                 else
@@ -3059,8 +3108,7 @@ begin
                 if v_gate_heads>=0 and coalesce((v_plan->>'coinGateCount')::integer,0)=v_coin_count then v_heads:=v_gate_heads;
                 elsif v_bonus_heads>=0 and coalesce((v_plan->>'coinBonusCount')::integer,0)=v_coin_count then v_heads:=v_bonus_heads;
                 else
-                  v_heads:=0;
-                  for v_i in 1..v_coin_count loop if private.battle_v6_hash_roll(v_seed||':'||v_half||':discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if; end loop;
+                  v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':discard_coin',v_coin_count,not (coalesce((v_plan->>'discardHeadsMin')::integer,0)=0 and coalesce((v_plan->>'discardHeadsMax')::integer,v_coin_count)=0));
                 end if;
                 if v_heads between coalesce((v_plan->>'discardHeadsMin')::integer,0) and coalesce((v_plan->>'discardHeadsMax')::integer,v_coin_count)
                 then c_energy:=greatest(0,c_energy-v_discard); end if;
@@ -3095,16 +3143,12 @@ begin
 
               if not v_effect_immune then
                 if coalesce((v_plan->>'defenderEnergyDiscardAllCoinCount')::integer,0)>0 then
-                  v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardAllCoinCount')::integer;
-                  for v_i in 1..v_coin_count loop
-                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_all_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-                  end loop;
+                  v_coin_count:=(v_plan->>'defenderEnergyDiscardAllCoinCount')::integer;
+                  v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':energy_discard_all_coin',v_coin_count,true);
                   if v_heads>=coalesce((v_plan->>'defenderEnergyDiscardAllHeads')::integer,v_coin_count) then o_energy:=0; end if;
                 elsif coalesce((v_plan->>'defenderEnergyDiscardCoins')::integer,0)>0 then
-                  v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardCoins')::integer;
-                  for v_i in 1..v_coin_count loop
-                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-                  end loop;
+                  v_coin_count:=(v_plan->>'defenderEnergyDiscardCoins')::integer;
+                  v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':energy_discard_coin',v_coin_count,true);
                   o_energy:=greatest(0,o_energy-v_heads);
                 elsif coalesce((v_plan->>'defenderEnergyDiscard')::integer,0)>0
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
@@ -3138,10 +3182,8 @@ begin
                 end if;
                 if coalesce((v_plan->>'bothKnockout')::boolean,false) then o_damage:=o_hp;
                 elsif coalesce((v_plan->>'knockoutCoinCount')::integer,0)>0 then
-                  v_heads:=0; v_coin_count:=(v_plan->>'knockoutCoinCount')::integer;
-                  for v_i in 1..v_coin_count loop
-                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':ko_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-                  end loop;
+                  v_coin_count:=(v_plan->>'knockoutCoinCount')::integer;
+                  v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':ko_coin',v_coin_count,true);
                   if v_heads>=coalesce((v_plan->>'knockoutHeadsRequired')::integer,v_coin_count) then o_damage:=o_hp; end if;
                 elsif coalesce((v_plan->>'instantKnockout')::boolean,false) then o_damage:=o_hp; end if;
                 if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and o_damage>=o_hp then v_extra_turn:=true; end if;
@@ -3163,10 +3205,7 @@ begin
                   elsif coalesce((v_plan->>'coinGateCount')::integer,0)=v_status_coin_count and v_gate_heads>=0 then
                     v_status_heads:=v_gate_heads;
                   else
-                    v_status_heads:=0;
-                    for v_i in 1..v_status_coin_count loop
-                      if private.battle_v6_hash_roll(v_seed||':'||v_half||':statuscoin:'||v_i)>=0.5 then v_status_heads:=v_status_heads+1; end if;
-                    end loop;
+                    v_status_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':statuscoin',v_status_coin_count,not (v_status_heads_min=0 and v_status_heads_max=0));
                   end if;
                   v_status_success:=v_status_heads between v_status_heads_min and v_status_heads_max;
                 else
@@ -3268,10 +3307,7 @@ begin
             v_coin_count:=coalesce((v_plan->>'coinGateCount')::integer,0);
             v_required_heads:=coalesce((v_plan->>'coinGateHeads')::integer,0);
             if v_coin_count>0 then
-              v_heads:=0;
-              for v_i in 1..v_coin_count loop
-                if private.battle_v6_hash_roll(v_seed||':'||v_half||':gate:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-              end loop;
+              v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':gate',v_coin_count,true);
               v_gate_heads:=v_heads;
               if v_heads<v_required_heads then
                 v_attack_failed:=true;
@@ -3291,11 +3327,7 @@ begin
               v_raw:=coalesce((v_plan->>'rawDamage')::numeric,0);
 
               if coalesce((v_plan->>'coinUntilTails')::boolean,false) then
-                v_heads:=0;
-                for v_i in 1..20 loop
-                  exit when private.battle_v6_hash_roll(v_seed||':'||v_half||':until:'||v_i)<0.5;
-                  v_heads:=v_heads+1;
-                end loop;
+                v_heads:=private.battle_v6_until_tails_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':until');
                 v_bonus_heads:=v_heads;
                 if v_plan->>'dynamicKind'='both_heads_bonus' then
                   if v_heads=v_coin_count then v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0); end if;
@@ -3305,10 +3337,8 @@ begin
                   v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0)*v_heads;
                 end if;
               elsif coalesce((v_plan->>'coinBonusCount')::integer,0)>0 then
-                v_heads:=0; v_coin_count:=(v_plan->>'coinBonusCount')::integer;
-                for v_i in 1..v_coin_count loop
-                  if private.battle_v6_hash_roll(v_seed||':'||v_half||':bonus:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-                end loop;
+                v_coin_count:=(v_plan->>'coinBonusCount')::integer;
+                v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':bonus',v_coin_count,true);
                 v_bonus_heads:=v_heads;
                 if v_plan->>'dynamicKind'='both_heads_bonus' then
                   if v_heads=v_coin_count then v_raw:=v_raw+coalesce((v_plan->>'coinBonusPerHead')::numeric,0); end if;
@@ -3382,10 +3412,7 @@ begin
                   elsif coalesce((v_plan->>'coinGateCount')::integer,0)=v_recoil_coin_count and v_gate_heads>=0 then
                     v_recoil_heads:=v_gate_heads;
                   else
-                    v_recoil_heads:=0;
-                    for v_i in 1..v_recoil_coin_count loop
-                      if private.battle_v6_hash_roll(v_seed||':'||v_half||':recoil_coin:'||v_i)>=0.5 then v_recoil_heads:=v_recoil_heads+1; end if;
-                    end loop;
+                    v_recoil_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':recoil_coin',v_recoil_coin_count,(v_recoil_heads_min=0 and v_recoil_heads_max=0));
                   end if;
                   v_recoil_success:=v_recoil_heads between v_recoil_heads_min and v_recoil_heads_max;
                 else
@@ -3400,8 +3427,7 @@ begin
                 if v_gate_heads>=0 and coalesce((v_plan->>'coinGateCount')::integer,0)=v_coin_count then v_heads:=v_gate_heads;
                 elsif v_bonus_heads>=0 and coalesce((v_plan->>'coinBonusCount')::integer,0)=v_coin_count then v_heads:=v_bonus_heads;
                 else
-                  v_heads:=0;
-                  for v_i in 1..v_coin_count loop if private.battle_v6_hash_roll(v_seed||':'||v_half||':discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if; end loop;
+                  v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':discard_coin',v_coin_count,not (coalesce((v_plan->>'discardHeadsMin')::integer,0)=0 and coalesce((v_plan->>'discardHeadsMax')::integer,v_coin_count)=0));
                 end if;
                 if v_heads between coalesce((v_plan->>'discardHeadsMin')::integer,0) and coalesce((v_plan->>'discardHeadsMax')::integer,v_coin_count)
                 then o_energy:=greatest(0,o_energy-v_discard); end if;
@@ -3436,16 +3462,12 @@ begin
 
               if not v_effect_immune then
                 if coalesce((v_plan->>'defenderEnergyDiscardAllCoinCount')::integer,0)>0 then
-                  v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardAllCoinCount')::integer;
-                  for v_i in 1..v_coin_count loop
-                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_all_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-                  end loop;
+                  v_coin_count:=(v_plan->>'defenderEnergyDiscardAllCoinCount')::integer;
+                  v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':energy_discard_all_coin',v_coin_count,true);
                   if v_heads>=coalesce((v_plan->>'defenderEnergyDiscardAllHeads')::integer,v_coin_count) then c_energy:=0; end if;
                 elsif coalesce((v_plan->>'defenderEnergyDiscardCoins')::integer,0)>0 then
-                  v_heads:=0; v_coin_count:=(v_plan->>'defenderEnergyDiscardCoins')::integer;
-                  for v_i in 1..v_coin_count loop
-                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-                  end loop;
+                  v_coin_count:=(v_plan->>'defenderEnergyDiscardCoins')::integer;
+                  v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':energy_discard_coin',v_coin_count,true);
                   c_energy:=greatest(0,c_energy-v_heads);
                 elsif coalesce((v_plan->>'defenderEnergyDiscard')::integer,0)>0
                    and private.battle_v6_hash_roll(v_seed||':'||v_half||':energy_discard')<=coalesce((v_plan->>'defenderEnergyDiscardChance')::numeric,1)
@@ -3479,10 +3501,8 @@ begin
                 end if;
                 if coalesce((v_plan->>'bothKnockout')::boolean,false) then c_damage:=c_hp;
                 elsif coalesce((v_plan->>'knockoutCoinCount')::integer,0)>0 then
-                  v_heads:=0; v_coin_count:=(v_plan->>'knockoutCoinCount')::integer;
-                  for v_i in 1..v_coin_count loop
-                    if private.battle_v6_hash_roll(v_seed||':'||v_half||':ko_coin:'||v_i)>=0.5 then v_heads:=v_heads+1; end if;
-                  end loop;
+                  v_coin_count:=(v_plan->>'knockoutCoinCount')::integer;
+                  v_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':ko_coin',v_coin_count,true);
                   if v_heads>=coalesce((v_plan->>'knockoutHeadsRequired')::integer,v_coin_count) then c_damage:=c_hp; end if;
                 elsif coalesce((v_plan->>'instantKnockout')::boolean,false) then c_damage:=c_hp; end if;
                 if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and c_damage>=c_hp then v_extra_turn:=true; end if;
@@ -3504,10 +3524,7 @@ begin
                   elsif coalesce((v_plan->>'coinGateCount')::integer,0)=v_status_coin_count and v_gate_heads>=0 then
                     v_status_heads:=v_gate_heads;
                   else
-                    v_status_heads:=0;
-                    for v_i in 1..v_status_coin_count loop
-                      if private.battle_v6_hash_roll(v_seed||':'||v_half||':statuscoin:'||v_i)>=0.5 then v_status_heads:=v_status_heads+1; end if;
-                    end loop;
+                    v_status_heads:=private.battle_v6_attack_coin_heads(case when v_is_c then c.id else o.id end,v_seed||':'||v_half||':statuscoin',v_status_coin_count,not (v_status_heads_min=0 and v_status_heads_max=0));
                   end if;
                   v_status_success:=v_status_heads between v_status_heads_min and v_status_heads_max;
                 else
@@ -3753,6 +3770,9 @@ revoke all on function private.battle_v6_matches_class(text,text,boolean) from p
 revoke all on function private.battle_v6_self_status_payoff(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_copy_source_attack(text,integer,boolean,boolean,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_has_go_first_override(text,integer) from public,anon,authenticated;
+revoke all on function private.battle_v6_has_victory_star(text) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_coin_heads(text,text,integer,boolean) from public,anon,authenticated;
+revoke all on function private.battle_v6_until_tails_heads(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_ability_no_weakness(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_ability_hp_bonus(text,integer) from public,anon,authenticated;
 revoke all on function private.battle_v6_ability_attack_bonus(text,integer,numeric,text) from public,anon,authenticated;
