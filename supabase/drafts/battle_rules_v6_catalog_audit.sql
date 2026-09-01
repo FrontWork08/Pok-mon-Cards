@@ -231,19 +231,46 @@ language sql
 stable
 set search_path=''
 as $firstturn$
+  select
+    exists(
+      select 1
+      from public.cards c
+      cross join lateral jsonb_array_elements(coalesce(c.tcg_data->'attacks','[]'::jsonb)) a
+      where c.id=p_card_id
+        and lower(coalesce(a->>'text','')) like '%if you go first, you can use this attack on your first turn%'
+        and greatest(0,least(12,coalesce(
+          nullif(regexp_replace(coalesce(a->>'convertedEnergyCost',''),'[^0-9]','','g'),'')::integer,
+          case when jsonb_typeof(a->'cost')='array' then jsonb_array_length(a->'cost') else 0 end,
+          0
+        )))<=coalesce(p_energy,0)
+    )
+    or exists(
+      select 1
+      from public.cards c
+      cross join lateral jsonb_array_elements(coalesce(c.tcg_data->'abilities','[]'::jsonb)) ab
+      where c.id=p_card_id
+        and lower(coalesce(ab->>'text','')) like '%if you go first, this pokémon can use attacks during your first turn%'
+    );
+$firstturn$;
+
+create or replace function private.battle_v6_ability_no_weakness(p_card_id text)
+returns boolean
+language sql
+stable
+set search_path=''
+as $noweak$
   select exists(
     select 1
     from public.cards c
-    cross join lateral jsonb_array_elements(coalesce(c.tcg_data->'attacks','[]'::jsonb)) a
+    cross join lateral jsonb_array_elements(coalesce(c.tcg_data->'abilities','[]'::jsonb)) a
     where c.id=p_card_id
-      and lower(coalesce(a->>'text','')) like '%if you go first, you can use this attack on your first turn%'
-      and greatest(0,least(12,coalesce(
-        nullif(regexp_replace(coalesce(a->>'convertedEnergyCost',''),'[^0-9]','','g'),'')::integer,
-        case when jsonb_typeof(a->'cost')='array' then jsonb_array_length(a->'cost') else 0 end,
-        0
-      )))<=coalesce(p_energy,0)
+      and (
+        lower(coalesce(a->>'text','')) like '%your pokémon in play have no weakness%'
+        or lower(coalesce(a->>'text','')) like '%this pokémon has no weakness%'
+        or lower(coalesce(a->>'text','')) like '%this pokemon has no weakness%'
+      )
   );
-$firstturn$;
+$noweak$;
 
 create or replace function private.battle_v6_ability_hp_bonus(p_card_id text,p_energy integer)
 returns numeric
@@ -506,7 +533,13 @@ as $immune$
           and (
             lower(coalesce(a->>'text','')) like '%can''t become%'
             or lower(coalesce(a->>'text','')) like '%cannot become%'
-            or lower(coalesce(a->>'text','')) like '%can''t be affected by any special conditions%'
+          )
+        )
+        or (
+          lower(p_status) in ('asleep','confused','paralyzed','poisoned','burned')
+          and (
+            lower(coalesce(a->>'text','')) like '%can''t be affected by any special conditions%'
+            or lower(coalesce(a->>'text','')) like '%cannot be affected by any special conditions%'
           )
         )
       )
@@ -568,6 +601,9 @@ declare
   v_is_vmax boolean:=false;
   v_is_gx boolean:=false;
   v_is_basic boolean:=false;
+  v_is_tag_team boolean:=false;
+  v_is_ultra_beast boolean:=false;
+  v_is_tera boolean:=false;
 begin
   select * into v_attacker from public.cards where id=p_attacker_card_id;
   select * into v_defender from public.cards where id=p_defender_card_id;
@@ -581,6 +617,9 @@ begin
   v_is_vmax:=v_attacker_classes ~ '"vmax"';
   v_is_gx:=v_attacker_classes ~ '"gx"';
   v_is_basic:=v_attacker_classes ~ '"basic"';
+  v_is_tag_team:=v_attacker_classes ~ '"tag team"';
+  v_is_ultra_beast:=v_attacker_classes ~ '"ultra beast"';
+  v_is_tera:=v_attacker_classes ~ '"tera"';
   v_has_ability:=jsonb_typeof(v_attacker.tcg_data->'abilities')='array'
     and jsonb_array_length(v_attacker.tcg_data->'abilities')>0;
 
@@ -641,6 +680,12 @@ begin
          and lower(coalesce(v_attacker.types[1],''))='colorless' then v_damage:=0; end if;
       if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s fire pokémon%'
          and lower(coalesce(v_attacker.types[1],''))='fire' then v_damage:=0; end if;
+      if v_text like '%prevent all damage from and effects of attacks from your opponent''s tera pokémon done to this pokémon%'
+         and v_is_tera then v_damage:=0; v_effect_immune:=true; end if;
+      if v_text like '%prevent all effects of attacks, including damage, done to this pokémon by your opponent''s tag team pokémon and ultra beasts%'
+         and (v_is_tag_team or v_is_ultra_beast) then v_damage:=0; v_effect_immune:=true; end if;
+      if v_text like '%as long as this pokémon is your active pokémon, prevent all effects of your opponent''s gx attacks, including damage%'
+         and v_is_gx then v_damage:=0; v_effect_immune:=true; end if;
       if v_text like '%prevent all damage done to this pokémon by your opponent''s attacks if that damage is exactly 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, or 260%'
          and v_damage between 20 and 260 and mod(v_damage,20)=0 then v_damage:=0; end if;
       if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s pokémon that have 2 or fewer energy attached to them%'
@@ -652,7 +697,9 @@ begin
       if (
         v_text like '%prevent all effects of attacks from your opponent''s pokémon done to this pokémon%'
         or v_text like '%prevent all effects of attacks used by your opponent''s pokémon done to this pokémon%'
-      ) and v_text like '%damage is not an effect%' then
+        or v_text like '%prevent all effects of your opponent''s attacks, except damage, done to this pokémon%'
+        or v_text like '%prevent all effects of your opponent''s pokémon''s attacks and abilities done to this pokémon%'
+      ) and (v_text like '%damage is not an effect%' or v_text like '%except damage%') then
         v_effect_immune:=true;
       end if;
 
@@ -667,6 +714,12 @@ begin
       end if;
 
       -- Reactive damage/status even if the defender is Knocked Out.
+      if v_damage>=greatest(0,v_def_hp-coalesce(p_defender_damage,0))
+         and v_text like '%is knocked out by damage from an attack%' then
+        v_match:=regexp_match(v_text,'(?:put|place) ([0-9]+) damage counters? on the attacking pok[eé]mon');
+        if v_match is not null then v_reactive_damage:=greatest(v_reactive_damage,v_match[1]::numeric*10); end if;
+      end if;
+
       if v_damage>0 and v_text like '%damaged by an attack%' then
         v_match:=regexp_match(v_text,'(?:put|place) ([0-9]+) damage counters? on the attacking pok[eé]mon');
         if v_match is not null then
@@ -680,6 +733,9 @@ begin
         end if;
         if v_text like '%attacking pokémon is now burned%' then v_reactive_status:='burned'; end if;
         if v_text like '%attacking pokémon is now poisoned%' then v_reactive_status:='poisoned'; end if;
+        if v_text like '%attacking pokémon is now confused%' then v_reactive_status:='confused'; end if;
+        if v_text like '%attacking pokémon is now paralyzed%' then v_reactive_status:='paralyzed'; end if;
+        if v_text like '%attacking pokémon is now asleep%' then v_reactive_status:='asleep'; end if;
       end if;
     end loop;
   end if;
@@ -862,7 +918,7 @@ begin
     end loop;
   end if;
 
-  if coalesce(p_ignore_defender_weakness,false) then
+  if coalesce(p_ignore_defender_weakness,false) or private.battle_v6_ability_no_weakness(v_defender.id) then
     v_weakness_multiplier:=1;
     v_weakness_bonus:=0;
   end if;
@@ -2725,7 +2781,8 @@ begin
                 v_reactive_counter:=greatest(0,o_reactive_next+o_reactive_multiplier_next*v_effective);
                 if v_reactive_counter>0 then c_damage:=least(c_hp,c_damage+v_reactive_counter); end if;
                 if o_reactive_status_next='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; c_poison_checkup_damage:=10;
-                elsif o_reactive_status_next='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
+                elsif o_reactive_status_next='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true;
+                elsif o_reactive_status_next is not null and not private.battle_v6_status_immune(c.id,o_reactive_status_next) then c_major:=o_reactive_status_next; end if;
               end if;
               c_last_attack:=v_attack_name; c_last_damage:=v_effective; c_last_advantage:=coalesce(v_plan->>'advantage','neutral');
 
@@ -2866,7 +2923,8 @@ begin
 
               if v_reactive>0 then c_damage:=least(c_hp,c_damage+v_reactive); end if;
               if v_reactive_status='poisoned' and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; c_poison_checkup_damage:=10;
-              elsif v_reactive_status='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
+              elsif v_reactive_status='burned' and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true;
+              elsif v_reactive_status is not null and not private.battle_v6_status_immune(c.id,v_reactive_status) then c_major:=v_reactive_status; end if;
 
               v_trace:=v_trace||jsonb_build_array(jsonb_build_object(
                 'halfTurn',v_half,'side','challenger','event','attack','attack',v_attack_name,
@@ -3032,7 +3090,8 @@ begin
                 v_reactive_counter:=greatest(0,c_reactive_next+c_reactive_multiplier_next*v_effective);
                 if v_reactive_counter>0 then o_damage:=least(o_hp,o_damage+v_reactive_counter); end if;
                 if c_reactive_status_next='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; o_poison_checkup_damage:=10;
-                elsif c_reactive_status_next='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
+                elsif c_reactive_status_next='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true;
+                elsif c_reactive_status_next is not null and not private.battle_v6_status_immune(o.id,c_reactive_status_next) then o_major:=c_reactive_status_next; end if;
               end if;
               o_last_attack:=v_attack_name; o_last_damage:=v_effective; o_last_advantage:=coalesce(v_plan->>'advantage','neutral');
 
@@ -3173,7 +3232,8 @@ begin
 
               if v_reactive>0 then o_damage:=least(o_hp,o_damage+v_reactive); end if;
               if v_reactive_status='poisoned' and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; o_poison_checkup_damage:=10;
-              elsif v_reactive_status='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
+              elsif v_reactive_status='burned' and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true;
+              elsif v_reactive_status is not null and not private.battle_v6_status_immune(o.id,v_reactive_status) then o_major:=v_reactive_status; end if;
 
               v_trace:=v_trace||jsonb_build_array(jsonb_build_object(
                 'halfTurn',v_half,'side','opponent','event','attack','attack',v_attack_name,
@@ -3399,6 +3459,7 @@ revoke all on function private.battle_v6_matches_class(text,text,boolean) from p
 revoke all on function private.battle_v6_self_status_payoff(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_copy_source_attack(text,integer,boolean,boolean,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_has_go_first_override(text,integer) from public,anon,authenticated;
+revoke all on function private.battle_v6_ability_no_weakness(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_ability_hp_bonus(text,integer) from public,anon,authenticated;
 revoke all on function private.battle_v6_ability_attack_bonus(text,integer,numeric,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_ability_cost_delta(text,text) from public,anon,authenticated;
