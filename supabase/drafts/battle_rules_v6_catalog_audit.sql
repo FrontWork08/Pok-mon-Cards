@@ -429,6 +429,7 @@ declare
   v_delayed_knockout_next boolean:=false;
   v_defender_heal_block_next boolean:=false;
   v_extra_turn boolean:=false;
+  v_extra_turn_on_knockout boolean:=false;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
 begin
@@ -544,6 +545,7 @@ begin
     v_delayed_knockout_next:=false;
     v_defender_heal_block_next:=false;
     v_extra_turn:=false;
+    v_extra_turn_on_knockout:=false;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
 
@@ -870,6 +872,12 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'remove toda Energia do defensor');
     end if;
 
+    if v_text ~ 'if 1 of your pok[eé]mon used .+ during your last turn, this attack can.t be used'
+       or v_text ~ 'if one of your pok[eé]mon used .+ during your last turn, this attack can.t be used' then
+      v_cooldown_attack:=greatest(v_cooldown_attack,1);
+      v_effect_notes:=array_append(v_effect_notes,'não pode repetir no turno seguinte');
+    end if;
+
     -- Cooldowns.
     if v_text like '%during your next turn, this pokémon can''t attack%'
        or v_text like '%during your next turn, this pokemon can''t attack%'
@@ -931,8 +939,14 @@ begin
     end if;
 
     if v_text like '%take another turn after this one%' then
-      v_extra_turn:=true;
-      v_effect_notes:=array_append(v_effect_notes,'concede um turno extra');
+      if v_text like '%if your opponent''s pokémon is knocked out by this attack%'
+         or v_text like '%if your opponent''s pokemon is knocked out by this attack%' then
+        v_extra_turn_on_knockout:=true;
+        v_effect_notes:=array_append(v_effect_notes,'turno extra somente após nocaute');
+      else
+        v_extra_turn:=true;
+        v_effect_notes:=array_append(v_effect_notes,'concede um turno extra');
+      end if;
     end if;
 
     -- Opponent next-turn attack interference.
@@ -1101,6 +1115,7 @@ begin
         +case when v_delayed_knockout_next then 160 else 0 end
         +case when v_defender_heal_block_next then 24 else 0 end
         +case when v_extra_turn then 70 else 0 end
+        +case when v_extra_turn_on_knockout then 35 else 0 end
         +case when v_defender_cannot_attack_next then 45 else 0 end
         +v_defender_outgoing_reduction_next*0.35
         +v_defender_attack_gate_chance*35
@@ -1151,6 +1166,7 @@ begin
         'delayedKnockoutNext',v_delayed_knockout_next,
         'defenderHealBlockNext',v_defender_heal_block_next,
         'extraTurn',v_extra_turn,
+        'extraTurnOnKnockout',v_extra_turn_on_knockout,
         'usesGxLimit',v_text like '%you can''t use more than 1 gx attack in a game%',
         'usesVstarLimit',v_text like '%you can''t use more than 1 vstar power in a game%',
         'selfPreventNext',v_self_prevent_next,
@@ -1434,6 +1450,7 @@ begin
               v_direct:=case when not v_effect_immune then coalesce((v_plan->>'directDamageCounters')::numeric,0) else 0 end;
               if v_direct>0 then o_damage:=least(o_hp,o_damage+v_direct); end if;
               c_damage_dealt:=c_damage_dealt+v_effective+v_direct;
+              if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and o_damage>=o_hp then v_extra_turn:=true; end if;
               if o_reactive_next>0 and v_effective>0 then c_damage:=least(c_hp,c_damage+o_reactive_next); end if;
               c_last_attack:=v_attack_name; c_last_damage:=v_effective; c_last_advantage:=coalesce(v_plan->>'advantage','neutral');
 
@@ -1474,6 +1491,7 @@ begin
                 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then o_energy:=greatest(0,o_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
                 if coalesce((v_plan->>'instantKnockout')::boolean,false) then o_damage:=o_hp; end if;
+                if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and o_damage>=o_hp then v_extra_turn:=true; end if;
                 if coalesce((v_plan->>'delayedKnockoutNext')::boolean,false) then o_delayed_ko_next:=true; end if;
                 if coalesce((v_plan->>'defenderHealBlockNext')::boolean,false) then o_heal_block_next:=true; end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then o_attack_gate_next:=greatest(o_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
@@ -1630,6 +1648,7 @@ begin
               v_direct:=case when not v_effect_immune then coalesce((v_plan->>'directDamageCounters')::numeric,0) else 0 end;
               if v_direct>0 then c_damage:=least(c_hp,c_damage+v_direct); end if;
               o_damage_dealt:=o_damage_dealt+v_effective+v_direct;
+              if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and c_damage>=c_hp then v_extra_turn:=true; end if;
               if c_reactive_next>0 and v_effective>0 then o_damage:=least(o_hp,o_damage+c_reactive_next); end if;
               o_last_attack:=v_attack_name; o_last_damage:=v_effective; o_last_advantage:=coalesce(v_plan->>'advantage','neutral');
 
@@ -1670,6 +1689,7 @@ begin
                 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyDiscard')::integer); end if;
                 if coalesce((v_plan->>'defenderEnergyReturn')::integer,0)>0 then c_energy:=greatest(0,c_energy-(v_plan->>'defenderEnergyReturn')::integer); end if;
                 if coalesce((v_plan->>'instantKnockout')::boolean,false) then c_damage:=c_hp; end if;
+                if coalesce((v_plan->>'extraTurnOnKnockout')::boolean,false) and c_damage>=c_hp then v_extra_turn:=true; end if;
                 if coalesce((v_plan->>'delayedKnockoutNext')::boolean,false) then c_delayed_ko_next:=true; end if;
                 if coalesce((v_plan->>'defenderHealBlockNext')::boolean,false) then c_heal_block_next:=true; end if;
                 if coalesce((v_plan->>'defenderAttackGateChance')::numeric,0)>0 then c_attack_gate_next:=greatest(c_attack_gate_next,(v_plan->>'defenderAttackGateChance')::numeric); end if;
