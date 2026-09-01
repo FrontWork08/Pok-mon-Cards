@@ -1259,7 +1259,12 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'ataque exige defensor Adormecido');
     end if;
 
-    if v_text like '%flip a coin%' and v_text like '%if tails%' and v_text like '%this attack does nothing%' then
+    if v_text like '%flip a coin%' and v_text like '%if tails%' and (
+         v_text like '%this attack does nothing%'
+         or v_text like '%this attack does no damage to the defending pokémon%'
+         or v_text like '%this attack does no damage to your opponent''s active pokémon%'
+         or v_text like '%this attack does nothing to the defending pokémon%'
+       ) then
       v_coin_gate_count:=greatest(v_coin_gate_count,1);
       v_coin_gate_heads:=greatest(v_coin_gate_heads,1);
       v_effect_notes:=array_append(v_effect_notes,'ataque exige cara');
