@@ -573,6 +573,9 @@ $punish$;
 create or replace function private.battle_v6_defense_adjustment(
   p_attacker_card_id text,
   p_defender_card_id text,
+  p_attacker_energy integer,
+  p_defender_energy integer,
+  p_defender_major text,
   p_defender_damage numeric,
   p_incoming_damage numeric,
   p_roll_key text
@@ -595,6 +598,10 @@ declare
   v_effect_immune boolean:=false;
   v_reactive_damage numeric:=0;
   v_reactive_status text:=null;
+  v_reactive_energy_discard integer:=0;
+  v_reactive_knockout_chance numeric:=0;
+  v_reactive_chance numeric:=1;
+  v_defender_classes text;
   v_roll numeric;
   v_is_ex boolean:=false;
   v_is_v boolean:=false;
@@ -612,6 +619,7 @@ begin
   end if;
 
   v_attacker_classes:=lower(coalesce(v_attacker.tcg_data->'subtypes','[]'::jsonb)::text);
+  v_defender_classes:=lower(coalesce(v_defender.tcg_data->'subtypes','[]'::jsonb)::text);
   v_is_ex:=v_attacker_classes ~ '"ex"' or v_attacker_classes ~ '"ex team plasma"';
   v_is_v:=v_attacker_classes ~ '"v"' or v_attacker_classes ~ '"vmax"' or v_attacker_classes ~ '"vstar"' or v_attacker_classes ~ '"v-union"';
   v_is_vmax:=v_attacker_classes ~ '"vmax"';
@@ -638,6 +646,36 @@ begin
       if v_match is not null then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
       v_match:=regexp_match(v_text,'any damage done to this pok[eé]mon by attacks is reduced by ([0-9]+)');
       if v_match is not null then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
+
+      v_match:=regexp_match(v_text,'all of your pok[eé]mon take ([0-9]+) less damage from (?:your opponent''s )?attacks');
+      if v_match is not null then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
+      v_match:=regexp_match(v_text,'as long as this pok[eé]mon is your active pok[eé]mon, all of your pok[eé]mon take ([0-9]+) less damage from your opponent''s attacks');
+      if v_match is not null then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
+      v_match:=regexp_match(v_text,'as long as this pok[eé]mon is in the active spot, attacks used by your opponent''s active pok[eé]mon do ([0-9]+) less damage');
+      if v_match is not null then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
+      v_match:=regexp_match(v_text,'as long as this pok[eé]mon is your active pok[eé]mon, your opponent''s active pok[eé]mon''s attacks do ([0-9]+) less damage');
+      if v_match is not null then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
+
+      v_match:=regexp_match(v_text,'if this pok[eé]mon has any energy attached, it takes ([0-9]+) less damage from attacks');
+      if v_match is not null and coalesce(p_defender_energy,0)>0 then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
+      v_match:=regexp_match(v_text,'if this pok[eé]mon has full hp, it takes ([0-9]+) less damage from (?:your opponent''s )?attacks');
+      if v_match is not null and coalesce(p_defender_damage,0)=0 then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
+      v_match:=regexp_match(v_text,'this pok[eé]mon takes ([0-9]+) less damage from attacks from your opponent''s fire or water pok[eé]mon');
+      if v_match is not null and lower(coalesce(v_attacker.types[1],'')) in ('fire','water') then v_damage:=greatest(0,v_damage-v_match[1]::numeric); end if;
+
+      if lower(coalesce(p_defender_major,''))='asleep'
+         and (
+           v_text like '%as long as this pokémon is asleep, prevent all damage%'
+           or (
+             position('as long as '||lower(coalesce(v_defender.pokemon_name,''))||' is asleep' in v_text)>0
+             and v_text like '%prevent all damage%'
+           )
+         ) then v_damage:=0; end if;
+
+      if v_text like '%if this pokémon and your opponent''s active pokémon have the same amount of energy attached%prevent all damage%'
+         and coalesce(p_attacker_energy,0)=coalesce(p_defender_energy,0) then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s pokémon that have 2 or fewer energy attached to them%'
+         and coalesce(p_attacker_energy,0)<=2 then v_damage:=0; end if;
 
       -- Full-HP survival abilities.
       if coalesce(p_defender_damage,0)=0
@@ -680,6 +718,14 @@ begin
          and lower(coalesce(v_attacker.types[1],''))='colorless' then v_damage:=0; end if;
       if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s fire pokémon%'
          and lower(coalesce(v_attacker.types[1],''))='fire' then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s lightning pokémon%'
+         and lower(coalesce(v_attacker.types[1],''))='lightning' then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s basic pokémon ex%'
+         and v_is_basic and v_is_ex then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s pokémon v%'
+         and v_is_v then v_damage:=0; end if;
+      if v_text like '%prevent all damage done to this pokémon by attacks from your opponent''s pokémon vmax, except any glaceon vmax%'
+         and v_is_vmax and lower(coalesce(v_attacker.pokemon_name,''))<>'glaceon vmax' then v_damage:=0; end if;
       if v_text like '%prevent all damage from and effects of attacks from your opponent''s tera pokémon done to this pokémon%'
          and v_is_tera then v_damage:=0; v_effect_immune:=true; end if;
       if v_text like '%prevent all effects of attacks, including damage, done to this pokémon by your opponent''s tag team pokémon and ultra beasts%'
@@ -736,6 +782,21 @@ begin
         if v_text like '%attacking pokémon is now confused%' then v_reactive_status:='confused'; end if;
         if v_text like '%attacking pokémon is now paralyzed%' then v_reactive_status:='paralyzed'; end if;
         if v_text like '%attacking pokémon is now asleep%' then v_reactive_status:='asleep'; end if;
+        if v_text like '%discard an energy from the attacking pokémon%' then v_reactive_energy_discard:=greatest(v_reactive_energy_discard,1); end if;
+      end if;
+
+      if v_damage>=greatest(0,v_def_hp-coalesce(p_defender_damage,0))
+         and v_text like '%is knocked out by damage from an attack%'
+         and v_text like '%if heads, the attacking pokémon is knocked out%' then
+        v_reactive_knockout_chance:=greatest(v_reactive_knockout_chance,0.5);
+      end if;
+
+      if v_damage>=greatest(0,v_def_hp-coalesce(p_defender_damage,0))
+         and position('when '||lower(coalesce(v_defender.pokemon_name,''))||' is knocked out by an attack' in v_text)>0
+         and v_text like '%flip a coin%if heads%20 damage for each%energy attached%'
+         and lower(coalesce(p_defender_major,'')) not in ('asleep','confused','paralyzed') then
+        v_reactive_damage:=greatest(v_reactive_damage,20*greatest(0,coalesce(p_defender_energy,0)));
+        v_reactive_chance:=least(v_reactive_chance,0.5);
       end if;
     end loop;
   end if;
@@ -744,7 +805,10 @@ begin
     'damage',greatest(0,v_damage),
     'effectImmune',v_effect_immune,
     'reactiveDamage',greatest(0,v_reactive_damage),
-    'reactiveStatus',v_reactive_status
+    'reactiveStatus',v_reactive_status,
+    'reactiveEnergyDiscard',v_reactive_energy_discard,
+    'reactiveKnockoutChance',v_reactive_knockout_chance,
+    'reactiveChance',v_reactive_chance
   );
 end;
 $$;
@@ -3683,7 +3747,7 @@ revoke all on function private.battle_v6_checkup_ability_effects(text,text,boole
 revoke all on function private.battle_v6_turn_ability_effects(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
-revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_defense_adjustment(text,text,integer,integer,text,numeric,numeric,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,boolean,boolean,text,numeric,boolean,boolean,boolean,text,boolean,boolean,boolean,boolean,boolean,text,numeric,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
