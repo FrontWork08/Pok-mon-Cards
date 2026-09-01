@@ -501,6 +501,10 @@ declare
   v_self_reactive_damage_next numeric:=0;
   v_self_prevent_damage_cap_next numeric:=0;
   v_inflict_self_major text:=null;
+  v_inflict_poison boolean:=false;
+  v_inflict_burn boolean:=false;
+  v_inflict_self_poison boolean:=false;
+  v_inflict_self_burn boolean:=false;
   v_direct_damage_counters numeric:=0;
   v_defender_classes text;
   v_defender_retreat integer:=0;
@@ -714,6 +718,10 @@ begin
     v_self_reactive_damage_next:=0;
     v_self_prevent_damage_cap_next:=0;
     v_inflict_self_major:=null;
+    v_inflict_poison:=false;
+    v_inflict_burn:=false;
+    v_inflict_self_poison:=false;
+    v_inflict_self_burn:=false;
     v_direct_damage_counters:=0;
     v_heal_all:=false;
     v_self_energy_gain:=0;
@@ -1261,38 +1269,112 @@ begin
       v_effect_notes:=array_append(v_effect_notes,'contadores distribuídos aplicados ao Ativo no 1x1');
     end if;
 
-    -- Special Conditions.
-    if v_text like '%is now paralyzed%' then v_status:='paralyzed'; v_status_bonus:=55; end if;
-    if v_text like '%is now asleep%' then v_status:='asleep'; v_status_bonus:=35; end if;
-    if v_text like '%is now confused%' then v_status:='confused'; v_status_bonus:=30; end if;
-    if v_text like '%is now poisoned%' then v_status:='poisoned'; v_status_bonus:=20; end if;
-    if v_text like '%is now burned%' then v_status:='burned'; v_status_bonus:=25; end if;
-    if v_status is not null or v_text like '%is now poisoned%' or v_text like '%is now burned%' then
+    -- Special Conditions. Keep defender and self conditions strictly separate.
+    -- Old cards often name the attacker instead of saying "this Pokémon".
+    if v_text like '%both active pokémon are now paralyzed%'
+       or v_text like '%both this pokémon and the defending pokémon are now paralyzed%' then
+      v_status:='paralyzed'; v_inflict_self_major:='paralyzed'; v_status_bonus:=55;
+      v_effect_notes:=array_append(v_effect_notes,'ambos ficam Paralisados');
+    elsif v_text like '%both active pokémon are now asleep%'
+       or v_text like '%both this pokémon and the defending pokémon are now asleep%' then
+      v_status:='asleep'; v_inflict_self_major:='asleep'; v_status_bonus:=35;
+      v_effect_notes:=array_append(v_effect_notes,'ambos ficam Adormecidos');
+    elsif v_text like '%both active pokémon are now confused%'
+       or v_text like '%both this pokémon and the defending pokémon are now confused%' then
+      v_status:='confused'; v_inflict_self_major:='confused'; v_status_bonus:=30;
+      v_effect_notes:=array_append(v_effect_notes,'ambos ficam Confusos');
+    end if;
+
+    if v_text like '%both active pokémon are now poisoned%'
+       or v_text like '%both this pokémon and the defending pokémon are now poisoned%' then
+      v_inflict_poison:=true; v_inflict_self_poison:=true; v_status_bonus:=greatest(v_status_bonus,20);
+      v_effect_notes:=array_append(v_effect_notes,'ambos ficam Envenenados');
+    end if;
+    if v_text like '%both active pokémon are now burned%'
+       or v_text like '%both this pokémon and the defending pokémon are now burned%' then
+      v_inflict_burn:=true; v_inflict_self_burn:=true; v_status_bonus:=greatest(v_status_bonus,25);
+      v_effect_notes:=array_append(v_effect_notes,'ambos ficam Queimados');
+    end if;
+
+    -- Conditions explicitly aimed at the opponent / Defending Pokémon.
+    if v_text like '%defending pokémon is now paralyzed%'
+       or v_text like '%opponent''s active pokémon is now paralyzed%' then
+      v_status:='paralyzed'; v_status_bonus:=greatest(v_status_bonus,55);
+    elsif v_text like '%defending pokémon is now asleep%'
+       or v_text like '%opponent''s active pokémon is now asleep%' then
+      v_status:='asleep'; v_status_bonus:=greatest(v_status_bonus,35);
+    elsif v_text like '%defending pokémon is now confused%'
+       or v_text like '%opponent''s active pokémon is now confused%' then
+      v_status:='confused'; v_status_bonus:=greatest(v_status_bonus,30);
+    end if;
+
+    if v_text like '%defending pokémon is now poisoned%'
+       or v_text like '%opponent''s active pokémon is now poisoned%' then
+      v_inflict_poison:=true; v_status_bonus:=greatest(v_status_bonus,20);
+    end if;
+    if v_text like '%defending pokémon is now burned%'
+       or v_text like '%opponent''s active pokémon is now burned%' then
+      v_inflict_burn:=true; v_status_bonus:=greatest(v_status_bonus,25);
+    end if;
+
+    -- Conditions explicitly aimed at the attacker.
+    if v_text like '%this pokémon is now paralyzed%'
+       or position(lower(coalesce(v_attacker.pokemon_name,''))||' is now paralyzed' in v_text)>0
+       or (v_copy_source is not null and position(lower(coalesce(v_defender.pokemon_name,''))||' is now paralyzed' in v_text)>0) then
+      v_inflict_self_major:='paralyzed';
+      v_effect_notes:=array_append(v_effect_notes,'atacante fica Paralisado');
+    elsif v_text like '%this pokémon is now asleep%'
+       or position(lower(coalesce(v_attacker.pokemon_name,''))||' is now asleep' in v_text)>0
+       or (v_copy_source is not null and position(lower(coalesce(v_defender.pokemon_name,''))||' is now asleep' in v_text)>0) then
+      v_inflict_self_major:='asleep';
+      v_effect_notes:=array_append(v_effect_notes,'atacante fica Adormecido');
+    elsif v_text like '%this pokémon is now confused%'
+       or position(lower(coalesce(v_attacker.pokemon_name,''))||' is now confused' in v_text)>0
+       or (v_copy_source is not null and position(lower(coalesce(v_defender.pokemon_name,''))||' is now confused' in v_text)>0) then
+      v_inflict_self_major:='confused';
+      v_effect_notes:=array_append(v_effect_notes,'atacante fica Confuso');
+    end if;
+
+    if v_text like '%this pokémon is now poisoned%'
+       or position(lower(coalesce(v_attacker.pokemon_name,''))||' is now poisoned' in v_text)>0
+       or (v_copy_source is not null and position(lower(coalesce(v_defender.pokemon_name,''))||' is now poisoned' in v_text)>0) then
+      v_inflict_self_poison:=true;
+      v_effect_notes:=array_append(v_effect_notes,'atacante fica Envenenado');
+    end if;
+    if v_text like '%this pokémon is now burned%'
+       or position(lower(coalesce(v_attacker.pokemon_name,''))||' is now burned' in v_text)>0
+       or (v_copy_source is not null and position(lower(coalesce(v_defender.pokemon_name,''))||' is now burned' in v_text)>0) then
+      v_inflict_self_burn:=true;
+      v_effect_notes:=array_append(v_effect_notes,'atacante fica Queimado');
+    end if;
+
+    -- Coin outcome tied to an opponent Special Condition.
+    if v_status is not null or v_inflict_poison or v_inflict_burn then
       v_match:=regexp_match(v_text,'flip ([0-9]+) coins?');
       if v_match is not null then
         v_status_coin_count:=greatest(1,least(v_match[1]::integer,20));
-        if v_text ~ 'if (?:both|all)(?: of them)? (?:are )?heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+        if v_text ~ 'if (?:both|all)(?: of them)? (?:are )?heads.*(?:defending pok[eé]mon|opponent''s active pok[eé]mon).*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
           v_status_heads_min:=v_status_coin_count; v_status_heads_max:=v_status_coin_count;
-        elsif v_text ~ 'if (?:either|1 or both|one or both)(?: of them| of the coins)? (?:is|are )?heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+        elsif v_text ~ 'if (?:either|1 or both|one or both)(?: of them| of the coins)? (?:is|are )?heads.*(?:defending pok[eé]mon|opponent''s active pok[eé]mon).*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
           v_status_heads_min:=1; v_status_heads_max:=v_status_coin_count;
-        elsif v_text ~ 'if (?:you get |at least )?2 or more heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)'
-           or v_text ~ 'if (?:at least )?2 (?:of them )?are heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+        elsif v_text ~ 'if (?:you get |at least )?2 or more heads.*(?:defending pok[eé]mon|opponent''s active pok[eé]mon).*is now (?:paralyzed|asleep|confused|poisoned|burned)'
+           or v_text ~ 'if (?:at least )?2 (?:of them )?are heads.*(?:defending pok[eé]mon|opponent''s active pok[eé]mon).*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
           v_status_heads_min:=2; v_status_heads_max:=v_status_coin_count;
-        elsif v_text ~ 'if (?:you get )?at least 1 heads?.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+        elsif v_text ~ 'if (?:you get )?at least 1 heads?.*(?:defending pok[eé]mon|opponent''s active pok[eé]mon).*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
           v_status_heads_min:=1; v_status_heads_max:=v_status_coin_count;
-        elsif v_text ~ 'if (?:both|all)(?: of them)? (?:are )?tails.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+        elsif v_text ~ 'if (?:both|all)(?: of them)? (?:are )?tails.*(?:defending pok[eé]mon|opponent''s active pok[eé]mon).*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
           v_status_heads_min:=0; v_status_heads_max:=0;
         else
           v_status_coin_count:=0;
         end if;
       elsif v_text like '%flip a coin%' then
-        if v_text ~ 'if heads.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+        if v_text ~ 'if heads.*(?:defending pok[eé]mon|opponent''s active pok[eé]mon).*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
           v_status_coin_count:=1; v_status_heads_min:=1; v_status_heads_max:=1;
-        elsif v_text ~ 'if tails.*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
+        elsif v_text ~ 'if tails.*(?:defending pok[eé]mon|opponent''s active pok[eé]mon).*is now (?:paralyzed|asleep|confused|poisoned|burned)' then
           v_status_coin_count:=1; v_status_heads_min:=0; v_status_heads_max:=0;
         end if;
       end if;
-      if v_status is not null then v_effect_notes:=array_append(v_effect_notes,'condição especial: '||v_status); end if;
+      if v_status is not null then v_effect_notes:=array_append(v_effect_notes,'condição especial no defensor: '||v_status); end if;
     end if;
 
     -- Recoil and healing.
@@ -1416,6 +1498,9 @@ begin
     else
       v_score:=(v_expected+v_direct_damage_counters)/v_interval
         +v_status_bonus
+        -case v_inflict_self_major when 'paralyzed' then 45 when 'asleep' then 28 when 'confused' then 18 else 0 end
+        -case when v_inflict_self_poison then 14 else 0 end
+        -case when v_inflict_self_burn then 18 else 0 end
         +v_self_reduction_next*0.25
         +case when v_self_prevent_next then 45 else 0 end
         +case when v_self_no_weakness_next then 22 else 0 end
@@ -1494,6 +1579,8 @@ begin
         'selfReactiveDamageNext',v_self_reactive_damage_next,
         'selfPreventDamageCapNext',v_self_prevent_damage_cap_next,
         'inflictSelfMajor',v_inflict_self_major,
+        'inflictSelfPoison',v_inflict_self_poison,
+        'inflictSelfBurn',v_inflict_self_burn,
         'directDamageCounters',v_direct_damage_counters,
         'coinGateCount',v_coin_gate_count,
         'coinGateHeads',v_coin_gate_heads,
@@ -1507,13 +1594,9 @@ begin
         'advantage',case when v_weakness_multiplier>1 or v_weakness_bonus>0 then 'weakness' when v_resistance>0 then 'resisted' else 'neutral' end,
         'ignoreWeaknessResistance',v_ignore_weakness_resistance,
         'ignoreResistance',v_ignore_resistance,
-        'inflictPoison',v_text like '%is now poisoned%',
-        'inflictBurn',v_text like '%is now burned%',
-        'inflictMajor',case
-          when v_text like '%is now paralyzed%' then 'paralyzed'
-          when v_text like '%is now asleep%' then 'asleep'
-          when v_text like '%is now confused%' then 'confused'
-          else null end,
+        'inflictPoison',v_inflict_poison,
+        'inflictBurn',v_inflict_burn,
+        'inflictMajor',v_status,
         'effectNotes',to_jsonb(v_effect_notes),
         'selectionScore',round(v_score,2)
       );
@@ -1807,6 +1890,8 @@ begin
               if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then c_no_weakness_next:=true; end if;
               if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then c_reactive_next:=greatest(c_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
               if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then c_prevent_damage_cap_next:=greatest(c_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
+              if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(c.id,'poisoned') then c_poison:=true; end if;
+              if coalesce((v_plan->>'inflictSelfBurn')::boolean,false) and not private.battle_v6_status_immune(c.id,'burned') then c_burn:=true; end if;
               if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(c.id,v_plan->>'inflictSelfMajor') then c_major:=v_plan->>'inflictSelfMajor'; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
@@ -2031,6 +2116,8 @@ begin
               if coalesce((v_plan->>'selfNoWeaknessNext')::boolean,false) then o_no_weakness_next:=true; end if;
               if coalesce((v_plan->>'selfReactiveDamageNext')::numeric,0)>0 then o_reactive_next:=greatest(o_reactive_next,(v_plan->>'selfReactiveDamageNext')::numeric); end if;
               if coalesce((v_plan->>'selfPreventDamageCapNext')::numeric,0)>0 then o_prevent_damage_cap_next:=greatest(o_prevent_damage_cap_next,(v_plan->>'selfPreventDamageCapNext')::numeric); end if;
+              if coalesce((v_plan->>'inflictSelfPoison')::boolean,false) and not private.battle_v6_status_immune(o.id,'poisoned') then o_poison:=true; end if;
+              if coalesce((v_plan->>'inflictSelfBurn')::boolean,false) and not private.battle_v6_status_immune(o.id,'burned') then o_burn:=true; end if;
               if coalesce(v_plan->>'inflictSelfMajor','')<>'' and not private.battle_v6_status_immune(o.id,v_plan->>'inflictSelfMajor') then o_major:=v_plan->>'inflictSelfMajor'; end if;
               if coalesce((v_plan->>'selfPreventNext')::boolean,false)
                  and private.battle_v6_hash_roll(v_seed||':'||v_half||':self_prevent')<=coalesce((v_plan->>'selfPreventChance')::numeric,1)
