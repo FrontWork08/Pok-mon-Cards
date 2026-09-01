@@ -95,6 +95,73 @@ begin
 end;
 $body$;
 
+create or replace function private.battle_v6_copy_source_attack(
+  p_defender_card_id text,
+  p_energy integer,
+  p_require_source_energy boolean,
+  p_gx_used boolean,
+  p_vstar_used boolean
+)
+returns jsonb
+language plpgsql
+stable
+set search_path=''
+as $copy$
+declare
+  v_card public.cards%rowtype;
+  v_attack jsonb;
+  v_text text;
+  v_damage text;
+  v_match text[];
+  v_base numeric;
+  v_cost integer;
+  v_score numeric;
+  v_best_score numeric:=-1e18;
+  v_best jsonb:=null;
+begin
+  select * into v_card from public.cards where id=p_defender_card_id;
+  if v_card.id is null or jsonb_typeof(v_card.tcg_data->'attacks')<>'array' then return null; end if;
+
+  for v_attack in select value from jsonb_array_elements(v_card.tcg_data->'attacks') loop
+    v_text:=lower(coalesce(v_attack->>'text',''));
+    if v_text like '%choose 1 of your opponent''s%attacks and use it as this attack%' then continue; end if;
+    if coalesce(p_gx_used,false) and v_text like '%you can''t use more than 1 gx attack in a game%' then continue; end if;
+    if coalesce(p_vstar_used,false) and v_text like '%you can''t use more than 1 vstar power in a game%' then continue; end if;
+
+    v_cost:=coalesce(
+      nullif(regexp_replace(coalesce(v_attack->>'convertedEnergyCost',''),'[^0-9]','','g'),'')::integer,
+      case when jsonb_typeof(v_attack->'cost')='array' then jsonb_array_length(v_attack->'cost') else 0 end,
+      0
+    );
+    if coalesce(p_require_source_energy,false) and coalesce(p_energy,0)<v_cost then continue; end if;
+
+    v_damage:=coalesce(v_attack->>'damage','');
+    v_match:=regexp_match(v_damage,'([0-9]+)');
+    v_base:=case when v_match is null then 0 else v_match[1]::numeric end;
+    v_score:=v_base;
+
+    if v_text like '%is knocked out%' or v_text like '%will be knocked out%' then v_score:=v_score+500; end if;
+    if v_text like '%take another turn after this one%' then v_score:=v_score+180; end if;
+    if v_text like '%is now paralyzed%' then v_score:=v_score+65; end if;
+    if v_text like '%is now asleep%' then v_score:=v_score+40; end if;
+    if v_text like '%is now confused%' then v_score:=v_score+35; end if;
+    if v_text like '%is now poisoned%' or v_text like '%is now burned%' then v_score:=v_score+30; end if;
+    if v_text ~ '(put|place) [0-9]+ damage counters?' then
+      v_match:=regexp_match(v_text,'(?:put|place) ([0-9]+) damage counters?');
+      if v_match is not null then v_score:=v_score+v_match[1]::numeric*10; end if;
+    end if;
+    if v_text like '%damage for each%' or v_text like '%more damage%' then v_score:=v_score+25; end if;
+
+    if v_score>v_best_score then
+      v_best_score:=v_score;
+      v_best:=v_attack||jsonb_build_object('copySourceScore',round(v_score,2));
+    end if;
+  end loop;
+
+  return v_best;
+end;
+$copy$;
+
 create or replace function private.battle_v6_has_go_first_override(p_card_id text,p_energy integer)
 returns boolean
 language sql
@@ -432,6 +499,13 @@ declare
   v_extra_turn_on_knockout boolean:=false;
   v_defender_attack_gate_chance numeric:=0;
   v_lock_defender_best boolean:=false;
+  v_original_text text;
+  v_copy_source jsonb;
+  v_copy_source_name text:=null;
+  v_copy_chance numeric:=1;
+  v_copy_requires_energy boolean:=false;
+  v_uses_gx_limit boolean:=false;
+  v_uses_vstar_limit boolean:=false;
 begin
   select * into v_attacker from public.cards where id=p_attacker_card_id;
   select * into v_defender from public.cards where id=p_defender_card_id;
@@ -490,12 +564,43 @@ begin
     v_cost:=greatest(0,least(12,v_cost));
     if coalesce(p_energy,0)<v_cost then continue; end if;
 
-    v_text:=lower(coalesce(v_attack->>'text',''));
-    if coalesce(p_gx_used,false) and v_text like '%you can''t use more than 1 gx attack in a game%' then continue; end if;
-    if coalesce(p_vstar_used,false) and v_text like '%you can''t use more than 1 vstar power in a game%' then continue; end if;
+    v_original_text:=lower(coalesce(v_attack->>'text',''));
+    v_text:=v_original_text;
+    if coalesce(p_gx_used,false) and v_original_text like '%you can''t use more than 1 gx attack in a game%' then continue; end if;
+    if coalesce(p_vstar_used,false) and v_original_text like '%you can''t use more than 1 vstar power in a game%' then continue; end if;
     if coalesce(p_second_player_first_turn,false)
-       and v_text like '%if you go second, you can''t use this attack during your first turn%' then continue; end if;
-    v_damage_text:=coalesce(v_attack->>'damage','');
+       and v_original_text like '%if you go second, you can''t use this attack during your first turn%' then continue; end if;
+
+    v_copy_source:=null;
+    v_copy_source_name:=null;
+    v_copy_chance:=1;
+    v_copy_requires_energy:=false;
+    v_uses_gx_limit:=v_original_text like '%you can''t use more than 1 gx attack in a game%';
+    v_uses_vstar_limit:=v_original_text like '%you can''t use more than 1 vstar power in a game%';
+
+    if v_original_text like '%choose 1 of your opponent''s%attacks and use it as this attack%' then
+      -- Prize-card-only copy attacks have no legal trigger in this isolated 1v1 format.
+      if v_original_text like '%only if your opponent has exactly 2 prize cards remaining%' then continue; end if;
+
+      v_copy_requires_energy:=
+        v_original_text like '%doesn''t have the necessary energy to use that attack%'
+        or v_original_text like '%does not have the necessary energy to use that attack%';
+      if v_original_text like '%flip a coin%' and v_original_text like '%if heads%' then v_copy_chance:=0.5; end if;
+
+      v_copy_source:=private.battle_v6_copy_source_attack(
+        v_defender.id,p_energy,v_copy_requires_energy,p_gx_used,p_vstar_used
+      );
+      if v_copy_source is null then continue; end if;
+
+      v_copy_source_name:=coalesce(nullif(v_copy_source->>'name',''),'Ataque copiado');
+      v_name:=v_name||' → '||v_copy_source_name;
+      v_text:=lower(coalesce(v_copy_source->>'text',''));
+      v_uses_gx_limit:=v_uses_gx_limit or v_text like '%you can''t use more than 1 gx attack in a game%';
+      v_uses_vstar_limit:=v_uses_vstar_limit or v_text like '%you can''t use more than 1 vstar power in a game%';
+      v_damage_text:=coalesce(v_copy_source->>'damage','');
+    else
+      v_damage_text:=coalesce(v_attack->>'damage','');
+    end if;
     v_match:=regexp_match(v_damage_text,'([0-9]+)');
     v_base:=case when v_match is null then 0 else v_match[1]::numeric end;
     v_raw:=v_base;
@@ -548,6 +653,13 @@ begin
     v_extra_turn_on_knockout:=false;
     v_defender_attack_gate_chance:=0;
     v_lock_defender_best:=false;
+    if v_copy_source is not null then
+      v_effect_notes:=array_append(v_effect_notes,'copia o ataque rival: '||v_copy_source_name);
+      if v_copy_chance<1 then
+        v_coin_gate_count:=1;
+        v_coin_gate_heads:=1;
+      end if;
+    end if;
 
     -- Text-only attacks that can target any opposing Pokemon target the Active in this 1v1 format.
     if v_base=0 and v_text not like '%benched pokémon%' then
@@ -1132,7 +1244,7 @@ begin
         'energyCost',v_cost,
         'energyCostSymbols',coalesce(v_attack->'cost','[]'::jsonb),
         'damageText',v_damage_text,
-        'attackText',coalesce(v_attack->>'text',''),
+        'attackText',case when v_copy_source is not null then coalesce(v_copy_source->>'text','') else coalesce(v_attack->>'text','') end,
         'rawDamage',round(v_raw,2),
         'expectedRawDamage',round(v_expected_raw,2),
         'effectiveDamage',round(v_effective,2),
@@ -1167,8 +1279,10 @@ begin
         'defenderHealBlockNext',v_defender_heal_block_next,
         'extraTurn',v_extra_turn,
         'extraTurnOnKnockout',v_extra_turn_on_knockout,
-        'usesGxLimit',v_text like '%you can''t use more than 1 gx attack in a game%',
-        'usesVstarLimit',v_text like '%you can''t use more than 1 vstar power in a game%',
+        'usesGxLimit',v_uses_gx_limit,
+        'usesVstarLimit',v_uses_vstar_limit,
+        'copiedAttack',v_copy_source is not null,
+        'copiedAttackName',v_copy_source_name,
         'selfPreventNext',v_self_prevent_next,
         'selfPreventChance',v_self_prevent_chance,
         'selfPreventClass',v_self_prevent_class,
@@ -1918,6 +2032,7 @@ $$;
 revoke all on function private.battle_v6_hash_roll(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_can_attack(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_matches_class(text,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_copy_source_attack(text,integer,boolean,boolean,boolean) from public,anon,authenticated;
 revoke all on function private.battle_v6_has_go_first_override(text,integer) from public,anon,authenticated;
 revoke all on function private.battle_v6_turn_ability_effects(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
