@@ -95,6 +95,26 @@ begin
 end;
 $body$;
 
+create or replace function private.battle_v6_has_go_first_override(p_card_id text,p_energy integer)
+returns boolean
+language sql
+stable
+set search_path=''
+as $firstturn$
+  select exists(
+    select 1
+    from public.cards c
+    cross join lateral jsonb_array_elements(coalesce(c.tcg_data->'attacks','[]'::jsonb)) a
+    where c.id=p_card_id
+      and lower(coalesce(a->>'text','')) like '%if you go first, you can use this attack on your first turn%'
+      and greatest(0,least(12,coalesce(
+        nullif(regexp_replace(coalesce(a->>'convertedEnergyCost',''),'[^0-9]','','g'),'')::integer,
+        case when jsonb_typeof(a->'cost')='array' then jsonb_array_length(a->'cost') else 0 end,
+        0
+      )))<=coalesce(p_energy,0)
+  );
+$firstturn$;
+
 create or replace function private.battle_v6_turn_ability_effects(p_card_id text)
 returns jsonb
 language plpgsql
@@ -328,6 +348,7 @@ create or replace function private.battle_v6_attack_plan(
   p_ignore_defender_weakness boolean,
   p_gx_used boolean,
   p_vstar_used boolean,
+  p_second_player_first_turn boolean,
   p_blocked_attacks text[] default null
 )
 returns jsonb
@@ -470,6 +491,8 @@ begin
     v_text:=lower(coalesce(v_attack->>'text',''));
     if coalesce(p_gx_used,false) and v_text like '%you can''t use more than 1 gx attack in a game%' then continue; end if;
     if coalesce(p_vstar_used,false) and v_text like '%you can''t use more than 1 vstar power in a game%' then continue; end if;
+    if coalesce(p_second_player_first_turn,false)
+       and v_text like '%if you go second, you can''t use this attack during your first turn%' then continue; end if;
     v_damage_text:=coalesce(v_attack->>'damage','');
     v_match:=regexp_match(v_damage_text,'([0-9]+)');
     v_base:=case when v_match is null then 0 else v_match[1]::numeric end;
@@ -1292,7 +1315,7 @@ begin
       v_energy_before:=c_energy;
       v_attack_failed:=false;
 
-      if v_half=1 then
+      if v_half=1 and not private.battle_v6_has_go_first_override(c.id,c_energy) then
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','challenger','event','first_player_no_attack','energy',c_energy));
       elsif c_major='paralyzed' then
         c_major:=null;
@@ -1308,13 +1331,16 @@ begin
       else
         c_attack_gate_next:=0;
         v_blocked:=array[]::text[];
+        if v_half=1 then
+          v_blocked:=v_blocked||coalesce((select array_agg(x->>'name') from jsonb_array_elements(coalesce(c.tcg_data->'attacks','[]'::jsonb)) x where lower(coalesce(x->>'text','')) not like '%if you go first, you can use this attack on your first turn%'),array[]::text[]);
+        end if;
         if c_blocked_turns>0 and c_blocked_attack is not null then v_blocked:=array_append(v_blocked,c_blocked_attack); end if;
         if c_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           c_disable_best_next:=c_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(c.id,o.id,c_energy,o_energy,c_damage,c_last_received_attack,o_damage,(o_major is not null or o_poison or o_burn),o_poison,o_major,o_no_weakness_next,c_gx_used,c_vstar_used,(c_turns=1 and not c_first),v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1482,7 +1508,7 @@ begin
       v_energy_before:=o_energy;
       v_attack_failed:=false;
 
-      if v_half=1 then
+      if v_half=1 and not private.battle_v6_has_go_first_override(o.id,o_energy) then
         v_trace:=v_trace||jsonb_build_array(jsonb_build_object('halfTurn',v_half,'side','opponent','event','first_player_no_attack','energy',o_energy));
       elsif o_major='paralyzed' then
         o_major:=null;
@@ -1498,13 +1524,16 @@ begin
       else
         o_attack_gate_next:=0;
         v_blocked:=array[]::text[];
+        if v_half=1 then
+          v_blocked:=v_blocked||coalesce((select array_agg(x->>'name') from jsonb_array_elements(coalesce(o.tcg_data->'attacks','[]'::jsonb)) x where lower(coalesce(x->>'text','')) not like '%if you go first, you can use this attack on your first turn%'),array[]::text[]);
+        end if;
         if o_blocked_turns>0 and o_blocked_attack is not null then v_blocked:=array_append(v_blocked,o_blocked_attack); end if;
         if o_disable_best_next>0 then
-          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,v_blocked);
+          v_probe:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
           if v_probe is not null then v_blocked:=array_append(v_blocked,v_probe->>'attackName'); end if;
           o_disable_best_next:=o_disable_best_next-1;
         end if;
-        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,v_blocked);
+        v_plan:=private.battle_v6_attack_plan(o.id,c.id,o_energy,c_energy,o_damage,o_last_received_attack,c_damage,(c_major is not null or c_poison or c_burn),c_poison,c_major,c_no_weakness_next,o_gx_used,o_vstar_used,(o_turns=1 and c_first),v_blocked);
 
         if v_plan is not null then
           v_attack_name:=v_plan->>'attackName';
@@ -1848,11 +1877,12 @@ $$;
 revoke all on function private.battle_v6_hash_roll(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_can_attack(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_matches_class(text,text) from public,anon,authenticated;
+revoke all on function private.battle_v6_has_go_first_override(text,integer) from public,anon,authenticated;
 revoke all on function private.battle_v6_turn_ability_effects(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_status_immune(text,text) from public,anon,authenticated;
 revoke all on function private.battle_v6_energy_attachment_punish(text) from public,anon,authenticated;
 revoke all on function private.battle_v6_defense_adjustment(text,text,numeric,numeric,text) from public,anon,authenticated;
-revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,numeric,boolean,boolean,text,boolean,boolean,boolean,text[]) from public,anon,authenticated;
+revoke all on function private.battle_v6_attack_plan(text,text,integer,integer,numeric,numeric,numeric,boolean,boolean,text,boolean,boolean,boolean,boolean,text[]) from public,anon,authenticated;
 revoke all on function private.battle_simulate_duel_v6(uuid,integer,text,text,text,boolean) from public,anon,authenticated;
 revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated;
 grant execute on function public.server_resolve_battle_round(uuid) to service_role;
