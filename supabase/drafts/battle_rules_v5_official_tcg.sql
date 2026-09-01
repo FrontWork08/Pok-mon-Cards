@@ -141,6 +141,9 @@ begin
       end if;
 
       v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each .*energy.*discard');
+      if v_match is null and v_text like '%discard any amount%energy%' then
+        v_match:=regexp_match(v_text,'does ([0-9]+) more damage for each card you discarded');
+      end if;
       if v_match is not null then
         v_per_unit:=v_match[1]::numeric;
         v_dynamic_count:=greatest(0,least(coalesce(p_energy,0),12));
