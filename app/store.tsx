@@ -539,11 +539,11 @@ function StoreCard({
         </View>
       ) : null}
 
-      {item.category==='card_style'||item.category==='deck_style' ? (
+      {item.category==='card_style'||item.category==='deck_style'||item.metadata?.universalTheme===true ? (
         <View style={[styles.applyHint,{backgroundColor:colors.surfaceAlt}]}>
-          <Ionicons name="flash-outline" size={13} color={colors.yellow}/>
+          <Ionicons name="checkmark-circle-outline" size={13} color={colors.yellow}/>
           <Text style={[styles.applyHintText,{color:colors.muted}]}>
-            Taxa de aplicação: 🪙 {Number(item.metadata?.applyCost??0).toLocaleString('pt-BR')}
+            COMPRA ÚNICA • depois de comprado, aplicar e trocar é grátis
           </Text>
         </View>
       ):null}
