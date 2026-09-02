@@ -74,7 +74,7 @@ export default function BattleScreen() {
           playerPairKey.current = pairKey;
           const { data: playerRows } = await supabase
             .from('players')
-            .select('id,username,level,battle_rating,equipped_frame_id,equipped_background_id')
+            .select('id,username,level,battle_rating,equipped_frame_id,equipped_background_id,is_bot')
             .in('id', ids);
           setPlayers(Object.fromEntries((playerRows ?? []).map((player) => [player.id, player])));
         }
@@ -415,7 +415,7 @@ export default function BattleScreen() {
           <View style={[styles.resultPanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
             <Ionicons name="trophy" size={45} color={colors.yellow} />
             <Text style={[styles.resultKicker, { color: colors.yellow }]}>BATALHA CONCLUÍDA</Text>
-            <Text style={[styles.resultTitle, { color: colors.text }]}>@{winnerName ?? 'Treinador'} venceu</Text>
+            <Text style={[styles.resultTitle, { color: colors.text }]}>{players[battle.winner_id]?.is_bot ? '🤖 ' : '@'}{winnerName ?? (players[battle.winner_id]?.is_bot ? 'Treinador IA' : 'Treinador')} venceu</Text>
             <Text style={[styles.resultMeta, { color: colors.muted }]}>{battle.challenger_score} × {battle.opponent_score} • {battle.reward_eligible ? 'resultado válido para progressão' : 'sem recompensa de progressão'}</Text>
             {battle.forfeited_by ? (
               <View style={[styles.forfeitResult,{backgroundColor:battle.forfeit_rating_neutral?'#162C22':'#321A20',borderColor:battle.forfeit_rating_neutral?'#367A58':'#6B303A'}]}>
@@ -487,9 +487,9 @@ function PlayerSide({ label, player, score, right }: { label: string; player?: a
       style={[styles.playerSide,right&&styles.right]}
     >
       <View style={[styles.playerSideInner,right&&styles.right]}>
-        <Text style={[styles.sideLabel, { color: colors.muted }]}>{label}</Text>
-        <Text style={[styles.playerName, { color: colors.text }]}>@{player?.username ?? 'Treinador'}</Text>
-        <Text style={[styles.ratingText, { color: colors.muted }]}>ELO {player?.battle_rating ?? 1000}</Text>
+        <Text style={[styles.sideLabel, { color: colors.muted }]}>{player?.is_bot ? 'TREINADOR IA' : label}</Text>
+        <Text style={[styles.playerName, { color: colors.text }]}>{player?.is_bot ? '🤖 ' : '@'}{player?.username ?? (player?.is_bot ? 'Treinador IA' : 'Treinador')}</Text>
+        <Text style={[styles.ratingText, { color: colors.muted }]}>{player?.is_bot ? 'ELO simulado' : 'ELO'} {player?.battle_rating ?? 1000}</Text>
         <Text style={[styles.score, { color: colors.yellow }]}>{score ?? 0}</Text>
       </View>
     </CompactTrainerBanner>
