@@ -323,9 +323,21 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
         {RAYS.map((rotation) => <Animated.View pointerEvents="none" key={`or-${rotation}`} style={[styles.openingRay, { opacity: openingColor, transform: [{ rotate: `${rotation}deg` }, { translateY: -210 }, { scaleY: openingRayScale }] }]} />)}
         {SPARKS.map((rotation) => <Animated.View pointerEvents="none" key={`os-${rotation}`} style={[styles.openingSpark, { backgroundColor: rotation % 36 === 0 ? '#fff' : '#FFD447', opacity: openingSparkOpacity, transform: [{ rotate: `${rotation}deg` }, { translateY: openingSparkTravel }] }]} />)}
         <Animated.View style={{ zIndex: 8, opacity: packOpacity, transform: [{ translateY: packY }, { rotate: packRotation }, { scale: packScale }] }}><BoosterPack2D pack={pack} width={openingPackWidth} tear={tear} seamCharge={seamCharge} /></Animated.View>
-        <View style={styles.openingCopy}><Text style={styles.stageEyebrow}>{stage === 'sealed' ? 'BOOSTER SELADO' : tear ? 'RASGANDO O LACRE' : 'ABRINDO'}</Text><Text style={styles.stageTitle}>{stage === 'sealed' ? 'Abra o pack.' : 'A energia está saindo de dentro.'}</Text><Text style={styles.stageSubtitle}>{stage === 'sealed' ? `${pack.cards_per_pack} card(s) • ${pack.currency === 'diamonds' ? '💎' : '🪙'} ${pack.price.toLocaleString('pt-BR')}` : 'O lacre foi rompido. Preparando suas recompensas…'}</Text></View>
+        {stage === 'sealed' ? (
+          <>
+            <View style={styles.openingCopy}>
+              <Text style={styles.stageEyebrow}>BOOSTER SELADO</Text>
+              <Text style={styles.stageTitle}>Abra o pack.</Text>
+              <Text style={styles.stageSubtitle}>{`${pack.cards_per_pack} card(s) • ${pack.currency === 'diamonds' ? '💎' : '🪙'} ${pack.price.toLocaleString('pt-BR')}`}</Text>
+            </View>
+            <Pressable style={styles.openButton} onPress={startOpening}>
+              <View style={styles.openButtonLine} />
+              <Text style={styles.openButtonText}>RASGAR E ABRIR</Text>
+              <Ionicons name="chevron-forward" size={18} color="#070707" />
+            </Pressable>
+          </>
+        ) : null}
         {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={19} color="#FF7A82" /><Text style={styles.errorText}>{error}</Text></View> : null}
-        {stage === 'sealed' ? <Pressable style={styles.openButton} onPress={startOpening}><View style={styles.openButtonLine} /><Text style={styles.openButtonText}>RASGAR E ABRIR</Text><Ionicons name="chevron-forward" size={18} color="#070707" /></Pressable> : <View style={styles.loadingTrack}><Animated.View style={[styles.loadingSweep, { opacity: seamCharge, transform: [{ scaleX: seamCharge }] }]} /></View>}
       </View> : null}
 
       {stage === 'cards' && currentCard ? <View style={styles.rewardStage}>
