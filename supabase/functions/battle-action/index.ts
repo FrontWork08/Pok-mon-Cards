@@ -229,10 +229,35 @@ Deno.serve(async (req: Request) => {
       return json({ data });
     }
 
+    if (body.action === "attack_state") {
+      const { data, error } = await admin.rpc("server_get_battle_attack_state", {
+        p_actor_id: user.id,
+        p_battle_id: body.battleId,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "attack") {
+      const { data: attackResult, error } = await admin.rpc("server_choose_battle_attack", {
+        p_actor_id: user.id,
+        p_battle_id: body.battleId,
+        p_attack_name: String(body.attackName ?? ""),
+      });
+      if (error) throw error;
+      if (!attackResult?.bothAttacksLocked) return json({ data: attackResult });
+
+      const { data: resolved, error: resolveError } = await admin.rpc("server_resolve_battle_round", {
+        p_battle_id: body.battleId,
+      });
+      if (resolveError) throw resolveError;
+      return json({ data: { ...attackResult, resolved } });
+    }
+
     if (body.action === "lock") {
       const { data: lockResult, error } = await admin.rpc("server_lock_battle_card", { p_actor_id: user.id, p_battle_id: body.battleId, p_card_id: body.cardId });
       if (error) throw error;
-      if (!lockResult?.bothLocked) return json({ data: lockResult });
+      if (!lockResult?.bothLocked || lockResult?.attackSelectionRequired) return json({ data: lockResult });
       const { data: resolved, error: resolveError } = await admin.rpc("server_resolve_battle_round", { p_battle_id: body.battleId });
       if (resolveError) throw resolveError;
       return json({ data: { ...lockResult, resolved } });
@@ -242,7 +267,7 @@ Deno.serve(async (req: Request) => {
       const { data: timeoutResult, error } = await admin.rpc("server_timeout_battle", { p_actor_id: user.id, p_battle_id: body.battleId });
       if (error) throw error;
       let resolved = null;
-      if (timeoutResult?.bothLocked) {
+      if (timeoutResult?.resolveReady || (timeoutResult?.bothLocked && !timeoutResult?.attackSelectionRequired)) {
         const result = await admin.rpc("server_resolve_battle_round", { p_battle_id: body.battleId });
         if (result.error) throw result.error;
         resolved = result.data;
