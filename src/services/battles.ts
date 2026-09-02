@@ -34,6 +34,14 @@ export async function lockBattleCard(battleId: string, cardId: string) {
   return invoke({ action: 'lock', battleId, cardId });
 }
 
+export async function getBattleAttackState(battleId: string) {
+  return invoke({ action: 'attack_state', battleId });
+}
+
+export async function chooseBattleAttack(battleId: string, attackName: string) {
+  return invoke({ action: 'attack', battleId, attackName });
+}
+
 export async function resolveBattleTimeout(battleId: string) {
   return invoke({ action: 'timeout', battleId });
 }
@@ -102,7 +110,7 @@ export async function getMyActiveBattle() {
     .from('battles')
     .select('id,status,mode,challenger_id,opponent_id,created_at')
     .or(`challenger_id.eq.${id},opponent_id.eq.${id}`)
-    .in('status', ['invited', 'drafting', 'selecting'])
+    .in('status', ['invited', 'drafting', 'selecting', 'revealing'])
     .order('created_at', { ascending: false })
     .limit(10);
   if (error) throw error;
