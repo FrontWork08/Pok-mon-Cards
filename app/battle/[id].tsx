@@ -149,8 +149,21 @@ export default function BattleScreen() {
     resolveBattleTimeout(String(id))
       .then(() => loadBattleState())
       .catch(async (error) => {
-        if (isFunctionErrorCode(error, 'NOT_EXPIRED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) { await loadBattleState(); return; }
+        if (isFunctionErrorCode(error, 'NOT_EXPIRED')) {
+          // The phone can display 0 a fraction of a second before the server deadline.
+          // Allow the same timeout key to retry instead of freezing permanently at 0.
+          timeoutRound.current = '';
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          await loadBattleState().catch(() => null);
+          return;
+        }
+        if (isFunctionErrorCode(error, 'INVALID_STATUS', 'SELECTION_EXPIRED')) {
+          await loadBattleState().catch(() => null);
+          return;
+        }
         setNotice(error instanceof Error ? error.message : 'O servidor está concluindo a rodada.');
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        timeoutRound.current = '';
         await loadBattleState().catch(() => null);
       });
   }, [battle, id, loadBattleState, remaining]);
