@@ -20,6 +20,7 @@ const requiredFiles = [
   'supabase/migrations/20260902150615_neutralize_bot_elo_after_daily_limit.sql',
   'supabase/migrations/20260902185822_expose_locked_battle_fighters_for_pixel_arena.sql',
   'src/components/PixelBattleArena.tsx',
+  'src/components/PokemonTypeSymbolFilter.tsx',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -95,6 +96,7 @@ if (existsSync('app/deck/[id].tsx')) {
   assert(deckEditor.includes("position: 'absolute'") && deckEditor.includes('saveDockInner'), 'Regressão de UX: barra fixa de salvar deck perdeu o posicionamento persistente.');
   const deckFooter = deckEditor.split('const footer = (')[1]?.split('return (')[0] ?? '';
   assert(!deckFooter.includes('SALVAR DECK'), 'Regressão de UX: salvar deck voltou a depender de rolar até o ListFooterComponent.');
+  assert(deckEditor.includes('PokemonTypeSymbolFilter'), 'Regressão de UX: editor de deck deixou de usar símbolos de tipo.');
 }
 
 if (existsSync('app/battle/[id].tsx')) {
@@ -248,13 +250,32 @@ if (existsSync('supabase/functions/battle-action/index.ts')) {
   assert(battleAction.includes('resolveReady'), 'Regressão Draft 3: timeout do Edge Function não respeita mais a fase de ataque.');
 }
 
+
+if (existsSync('src/components/PokemonTypeSymbolFilter.tsx')) {
+  const typeFilterUi = read('src/components/PokemonTypeSymbolFilter.tsx');
+  assert(typeFilterUi.includes('POKEMON_TYPE_SYMBOLS'), 'Regressão de UX: mapa central de símbolos de tipo foi removido.');
+  assert(typeFilterUi.includes("water: { label: 'ÁGUA', icon: 'water'"), 'Regressão de UX: símbolo de Água foi removido.');
+  assert(typeFilterUi.includes("fire: { label: 'FOGO', icon: 'flame'"), 'Regressão de UX: símbolo de Fogo foi removido.');
+  assert(typeFilterUi.includes("lightning: { label: 'ELÉTRICO', icon: 'flash'"), 'Regressão de UX: símbolo Elétrico foi removido.');
+  assert(typeFilterUi.includes('PokemonTypeSymbolFilter'), 'Regressão de UX: componente compartilhado de tipo foi removido.');
+}
+
+if (existsSync('app/trade/[id].tsx')) {
+  const tradeDetail = read('app/trade/[id].tsx');
+  assert(tradeDetail.includes('enableTypeFilter'), 'Regressão de UX: seletor de troca perdeu filtro simbólico por tipo.');
+}
+
+if (existsSync('app/legacy-selection.tsx')) {
+  const legacySelection = read('app/legacy-selection.tsx');
+  assert(legacySelection.includes('enableTypeFilter'), 'Regressão de UX: seletor do Legado perdeu filtro simbólico por tipo.');
+}
+
 if (existsSync('src/components/CardPickerModal.tsx')) {
   const picker = read('src/components/CardPickerModal.tsx');
   assert(picker.includes('Visão geral TCG'), 'Regressão de UX: seletor de batalha deixou de apresentar visão TCG.');
   assert(picker.includes('MAIOR ATQ') && picker.includes('MAIOR HP / DEF'), 'Regressão de UX: seletor de batalha perdeu filtros de maior ataque/defesa.');
-  assert(picker.includes('TIPO DO POKÉMON') && picker.includes('selectedType'), 'Regressão de UX: seletor de batalha perdeu filtro por tipo.');
-  assert(picker.includes('TypeSymbolChip') && picker.includes('TYPE_SYMBOLS'), 'Regressão de UX: filtro de tipo voltou a usar apenas texto em vez de símbolos.');
-  assert(picker.includes("water: { label: 'ÁGUA', icon: 'water'") && picker.includes("fire: { label: 'FOGO', icon: 'flame'") && picker.includes("lightning: { label: 'ELÉTRICO', icon: 'flash'"), 'Regressão de UX: símbolos principais de Água/Fogo/Elétrico foram removidos.');
+  assert(picker.includes('selectedType'), 'Regressão de UX: seletor de batalha perdeu filtro por tipo.');
+  assert(picker.includes('PokemonTypeSymbolFilter'), 'Regressão de UX: seletor reutilizado deixou de usar o filtro simbólico compartilhado.');
   assert(picker.includes('FONTE DAS CARTAS') && picker.includes('sourceOptions'), 'Regressão de UX: seletor de batalha perdeu escolha entre Bag e decks.');
   assert(!picker.includes('PWR ${combat.battleRating}'), 'Regressão de UX: seletor voltou a sugerir que PWR decide a batalha.');
 }
@@ -290,8 +311,7 @@ if (existsSync('app/(tabs)/bag.tsx')) {
   assert(bagUi.includes('AuraFrame'), 'Regressão visual: cartas personalizadas da Bag perderam a moldura temática.');
   assert(bagUi.includes('entry.economyStyle'), 'Regressão visual: Bag não usa mais o tema salvo por carta.');
   assert(bagUi.includes('themeTag'), 'Regressão de UX: Bag deixou de identificar o nome do tema aplicado.');
-  assert(bagUi.includes('BagTypeSymbolChip') && bagUi.includes('BAG_TYPE_SYMBOLS'), 'Regressão de UX: filtro de tipo da Bag voltou a usar apenas texto.');
-  assert(bagUi.includes("water: { label: 'ÁGUA', icon: 'water'") && bagUi.includes("fire: { label: 'FOGO', icon: 'flame'") && bagUi.includes("lightning: { label: 'ELÉTRICO', icon: 'flash'"), 'Regressão de UX: símbolos principais de tipo da Bag foram removidos.');
+  assert(bagUi.includes('PokemonTypeSymbolFilter'), 'Regressão de UX: Bag deixou de usar o filtro simbólico compartilhado.');
   assert(bagUi.includes('imageThemeTint') && bagUi.includes('imageThemeStroke'), 'Regressão visual: tema deixou de cobrir a imagem da carta na Bag.');
   assert(bagUi.includes("variant={galaxy?'galaxy':'energy'}"), 'Regressão visual: Galaxy Flow da Bag perdeu o efeito cósmico.');
   assert(bagUi.includes('cardThemed:{marginBottom:0}'), 'Regressão visual: cards temáticos voltaram a quebrar o espaçamento da grade.');
@@ -677,6 +697,7 @@ if (existsSync('app/guild-wars.tsx')) {
   assert(wars.includes('AuraFrame'), 'Regressão visual: flare de ginásio perdeu a aura animada.');
   assert(wars.includes('if (!picker || bagLoaded) return;'), 'Regressão: picker de Pokémon pode voltar ao loop infinito de loading.');
   assert(!wars.includes('[picker, bagCards.length, bagLoading]'), 'Regressão: bagLoading não pode voltar a cancelar a própria requisição do picker.');
+  assert(wars.includes('PokemonTypeSymbolFilter'), 'Regressão de UX: Guerra de Guilda deixou de usar símbolos de tipo.');
 }
 
 if (existsSync('supabase/migrations/20260831171936_universal_visual_themes.sql')) {
