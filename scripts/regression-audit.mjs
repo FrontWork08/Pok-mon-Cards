@@ -14,6 +14,7 @@ const requiredFiles = [
   'supabase/migrations/20260902120727_fix_restricted_entry_battle_cards.sql',
   'supabase/migrations/20260902122117_guard_elo_to_ranked_battles_only.sql',
   'supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_battles.sql',
+  'supabase/migrations/20260902134744_draft3_manual_attack_selection.sql',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -34,6 +35,8 @@ const requiredFiles = [
   'app/store.tsx',
   'app/friend-qr-scan.tsx',
   'app/reset-password.tsx',
+  'supabase/functions/battle-action/index.ts',
+  'src/services/battles.ts',
   'src/components/FriendQrCard.tsx',
   'src/components/GuildChatPanel.tsx',
   'src/components/ReleaseCampaignNotice.tsx',
@@ -94,6 +97,10 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(battle.includes('temporariamente bloqueada na rankeada'), 'Regressão de UX: carta em quarentena perdeu a mensagem amigável na batalha.');
   assert(battle.includes("timeoutRound.current = '';"), 'Regressão de batalha: tempo 0 perdeu o retry seguro após diferença de relógio.');
   assert(battle.includes('setTimeout(resolve, 350)'), 'Regressão de batalha: retry do timeout voltou a ser imediato e pode travar no 0.');
+  assert(battle.includes('ESCOLHA DE ATAQUE'), 'Regressão Draft 3: tela perdeu a fase manual de escolha de ataque.');
+  assert(battle.includes('USAR ESTE ATAQUE'), 'Regressão Draft 3: botão de confirmação de ataque foi removido.');
+  assert(battle.includes('Energia virtual começa em 0 e sobe +1 por turno'), 'Regressão Draft 3: UI deixou de explicar o custo de Energia do ataque manual.');
+  assert(battle.includes("battle?.status === 'revealing'"), 'Regressão Draft 3: tela deixou de reconhecer a fase revealing de ataque.');
   const stateLoader = battle.split('const loadBattleState')[1]?.split('const loadStaticBattleResources')[0] ?? '';
   assert(!stateLoader.includes('getMyBag()') && !stateLoader.includes('getMyDecks()'), 'Regressão de performance: realtime da batalha voltou a baixar Bag/Decks completos.');
 }
@@ -175,6 +182,36 @@ if (existsSync('supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_b
   const forfeitGuard = read('supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_battles.sql');
   assert(forfeitGuard.includes('if b.is_ranked and v_reward then'), 'Regressão de ELO: desistência casual voltou a alterar rating.');
   assert(forfeitGuard.includes('v_neutral := v_neutral or not b.is_ranked or not v_reward;'), 'Regressão de UX/ELO: desistência sem rating deixou de ser marcada como neutra.');
+}
+
+
+if (existsSync('supabase/migrations/20260902134744_draft3_manual_attack_selection.sql')) {
+  const manualDraft = read('supabase/migrations/20260902134744_draft3_manual_attack_selection.sql');
+  assert(manualDraft.includes('private.battle_attack_choices'), 'Regressão Draft 3: escolhas privadas de ataque foram removidas.');
+  assert(manualDraft.includes('battle_v6_manual_attack_name'), 'Regressão Draft 3: simulador deixou de forçar o ataque escolhido.');
+  assert(manualDraft.includes('server_choose_battle_attack'), 'Regressão Draft 3: RPC de escolha manual de ataque foi removida.');
+  assert(manualDraft.includes('server_get_battle_attack_state'), 'Regressão Draft 3: estado privado da escolha de ataque foi removido.');
+  assert(manualDraft.includes("'attack_selection_started'"), 'Regressão Draft 3: transição carta → ataque foi removida.');
+  assert(manualDraft.includes("'manual_attacks_revealed'"), 'Regressão Draft 3: ataques escolhidos deixaram de ser revelados após a rodada.');
+  assert(manualDraft.includes("'manualAttackChoice'"), 'Regressão Draft 3: histórico deixou de registrar o ataque manual.');
+  assert(manualDraft.includes("'revealing'"), 'Regressão Draft 3: fase de escolha de ataque deixou de existir.');
+  assert(manualDraft.includes("'resolveReady'"), 'Regressão Draft 3: timeout deixou de concluir a escolha de ataque.');
+  assert(manualDraft.includes("revoke all on function public.server_choose_battle_attack"), 'Regressão de segurança: escolha de ataque ficou exposta diretamente ao cliente.');
+}
+
+if (existsSync('src/services/battles.ts')) {
+  const battleService = read('src/services/battles.ts');
+  assert(battleService.includes("action: 'attack_state'"), 'Regressão Draft 3: serviço perdeu leitura segura do estado de ataque.');
+  assert(battleService.includes("action: 'attack'"), 'Regressão Draft 3: serviço perdeu envio da escolha de ataque.');
+  assert(battleService.includes("'revealing'"), 'Regressão Draft 3: batalha em escolha de ataque deixou de contar como ativa.');
+}
+
+if (existsSync('supabase/functions/battle-action/index.ts')) {
+  const battleAction = read('supabase/functions/battle-action/index.ts');
+  assert(battleAction.includes('body.action === "attack_state"'), 'Regressão Draft 3: Edge Function perdeu o estado privado de ataque.');
+  assert(battleAction.includes('body.action === "attack"'), 'Regressão Draft 3: Edge Function perdeu a escolha manual de ataque.');
+  assert(battleAction.includes('attackSelectionRequired'), 'Regressão Draft 3: Edge Function voltou a resolver antes da escolha do ataque.');
+  assert(battleAction.includes('resolveReady'), 'Regressão Draft 3: timeout do Edge Function não respeita mais a fase de ataque.');
 }
 
 if (existsSync('src/components/CardPickerModal.tsx')) {
