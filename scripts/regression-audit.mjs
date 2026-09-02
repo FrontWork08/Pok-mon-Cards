@@ -8,6 +8,7 @@ const assert = (condition, message) => {
 
 const requiredFiles = [
   'supabase/migrations/20260901180938_battle_rules_v6_exhaustive_catalog_resolution.sql',
+  'supabase/migrations/20260902111731_battle_rules_future_quarantine_and_regressions.sql',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -85,6 +86,7 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(!battle.includes('Regra v5 TCG'), 'Regressão de batalha: UI voltou a anunciar a v5 como regra ativa.');
   assert(!battle.includes('Regra v4: vence quem consegue o nocaute mais rápido'), 'Regressão de batalha: UI voltou a anunciar a fórmula antiga v4 como regra ativa.');
   assert(battle.includes('virtualEnergy'), 'Regressão de batalha: histórico deixou de renderizar o estado de Energia virtual da v6.');
+  assert(battle.includes('temporariamente bloqueada na rankeada'), 'Regressão de UX: carta em quarentena perdeu a mensagem amigável na batalha.');
   const stateLoader = battle.split('const loadBattleState')[1]?.split('const loadStaticBattleResources')[0] ?? '';
   assert(!stateLoader.includes('getMyBag()') && !stateLoader.includes('getMyDecks()'), 'Regressão de performance: realtime da batalha voltou a baixar Bag/Decks completos.');
 }
@@ -121,6 +123,18 @@ if (existsSync('supabase/migrations/20260901180938_battle_rules_v6_exhaustive_ca
   assert(battleV6.includes("'tcg_v6_resolved'"), 'Regressão v6: evento de resolução v6 deixou de ser registrado.');
   assert(battleV6.includes('revoke all on function public.server_resolve_battle_round(uuid) from public,anon,authenticated'), 'Regressão de segurança v6: resolver interno ficou exposto ao cliente.');
   assert(battleV6.includes('grant execute on function public.server_resolve_battle_round(uuid) to service_role'), 'Regressão de segurança v6: service_role perdeu acesso ao resolver interno.');
+}
+
+
+if (existsSync('supabase/migrations/20260902111731_battle_rules_future_quarantine_and_regressions.sql')) {
+  const hardening = read('supabase/migrations/20260902111731_battle_rules_future_quarantine_and_regressions.sql');
+  assert(hardening.includes('trg_00_audit_card_battle_rules'), 'Regressão v6: auditoria automática de regras novas foi removida.');
+  assert(hardening.includes('BATTLE_RULE_REVIEW_REQUIRED'), 'Regressão v6: cartas com regras novas deixaram de ser bloqueadas até revisão.');
+  assert(hardening.includes('battle_v6_regression_suite'), 'Regressão v6: suíte de regressão do servidor foi removida.');
+  assert(hardening.includes('battle_rule_attack_baseline'), 'Regressão v6: baseline de textos de ataque foi removida.');
+  assert(hardening.includes('battle_rule_coverage_issues'), 'Regressão v6: fila de regras complexas pendentes foi removida.');
+  assert(hardening.includes('dano textual condicionado a cara'), 'Regressão v6: dano textual condicionado a moeda perdeu a proteção.');
+  assert(hardening.includes("v_old := 'if v_base=0 and v_text not like ''%benched pokémon%'' then'"), 'Regressão v6: correção do falso bloqueio por menção ao Banco desapareceu.');
 }
 
 if (existsSync('src/components/CardPickerModal.tsx')) {
