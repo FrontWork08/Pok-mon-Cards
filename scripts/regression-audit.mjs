@@ -999,6 +999,10 @@ if (existsSync('src/components/PackOpeningModal.tsx')) {
   assert(opening.includes('TOQUE PARA VISUALIZAR'), 'Regressão de UX: resumo do booster deixou de indicar que as cartas são clicáveis.');
   assert(opening.includes('VOLTAR AO RESULTADO'), 'Regressão de booster: visualização ampliada não retorna mais ao resumo sem fechar o pack.');
   assert(opening.includes('setSummaryPreviewCard(card)'), 'Regressão de booster: toque na carta do resumo deixou de abrir a carta recebida.');
+  assert(!opening.includes('A energia está saindo de dentro.'), 'Regressão de UX: abertura do booster voltou a exibir frases durante a animação.');
+  assert(!opening.includes('O lacre foi rompido. Preparando suas recompensas'), 'Regressão de UX: abertura do booster voltou a exibir texto de carregamento.');
+  assert(!opening.includes('RASGANDO O LACRE'), 'Regressão de UX: abertura do booster voltou a exibir legenda durante o rasgo.');
+  assert(opening.includes("stage === 'sealed' ? ("), 'Regressão de UX: textos do booster deixaram de ficar restritos ao estado selado.');
 }
 
 if (existsSync('app/cosmetics.tsx')) {
