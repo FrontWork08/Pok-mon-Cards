@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
@@ -33,6 +33,7 @@ export default function BattleScreen() {
   const [selectedAttackName, setSelectedAttackName] = useState<string | null>(null);
   const [attackState, setAttackState] = useState<any>(null);
   const [arenaResultRound, setArenaResultRound] = useState<any>(null);
+  const [draftPreviewCard, setDraftPreviewCard] = useState<any>(null);
   const [stakeCardId, setStakeCardId] = useState<string | null>(null);
   const [sourceDeck, setSourceDeck] = useState<string>('bag');
   const [pickerMode, setPickerMode] = useState<'battle' | 'stake' | null>(null);
@@ -205,7 +206,7 @@ export default function BattleScreen() {
   const usedDraftIds = useMemo(() => new Set(rounds.map((round) => battle?.challenger_id === userId ? round.challenger_card_id : round.opponent_card_id).filter(Boolean)), [battle?.challenger_id, rounds, userId]);
   const pickerBag = useMemo(() => {
     if (battle?.mode !== 'draft3') return standardPickerBag;
-    if (isDrafting) return bag.filter((entry) => entry.cards?.id && !ownDraftIds.has(entry.cards.id));
+    if (isDrafting) return standardPickerBag.filter((entry) => entry.cards?.id && !ownDraftIds.has(entry.cards.id));
     return bag.filter((entry) => entry.cards?.id && ownDraftIds.has(entry.cards.id) && !usedDraftIds.has(entry.cards.id));
   }, [bag, battle?.mode, isDrafting, ownDraftIds, standardPickerBag, usedDraftIds]);
   const selectedEntry = useMemo(() => bag.find((entry) => entry.cards?.id === selectedId), [bag, selectedId]);
@@ -508,12 +509,20 @@ export default function BattleScreen() {
             <Text style={[styles.timer, { color: remaining <= 10 ? '#FF566B' : colors.text }]}>{String(Math.floor(remaining / 60)).padStart(2, '0')}:{String(remaining % 60).padStart(2, '0')}</Text>
             <Text style={[styles.timerHint, { color: colors.muted }]}>As escolhas ficam visíveis e alternam entre os jogadores. Depois da sexta escolha, os dois times voltam a ficar secretos.</Text>
             <View style={styles.draftGrid}>
-              {draftCards.map((item) => { const card = Array.isArray(item.cards) ? item.cards[0] : item.cards; return (
-                <View key={`${item.player_id}:${item.card_id}`} style={[styles.draftCard, { backgroundColor: colors.surfaceAlt, borderColor: item.player_id === userId ? colors.accent : colors.border }]}>
+              {draftCards.map((item) => { const card = Array.isArray(item.cards) ? item.cards[0] : item.cards; const combat = getBattleCardPreview(card); return (
+                <Pressable
+                  key={`${item.player_id}:${item.card_id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Visualizar ${card?.pokemon_name ?? 'carta escolhida'}`}
+                  onPress={() => setDraftPreviewCard(card)}
+                  style={({ pressed }) => [styles.draftCard, { backgroundColor: colors.surfaceAlt, borderColor: item.player_id === userId ? colors.accent : colors.border, opacity: pressed ? .72 : 1 }]}
+                >
                   {card?.image_small ? <Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.draftImage} /> : <View style={[styles.draftImage, { backgroundColor: colors.bg }]} />}
                   <Text numberOfLines={1} style={[styles.draftCardName, { color: colors.text }]}>{card?.pokemon_name ?? item.card_id}</Text>
                   <Text style={[styles.draftOwner, { color: colors.muted }]}>{item.player_id === userId ? 'VOCÊ' : `@${players[item.player_id]?.username ?? 'RIVAL'}`} • #{item.global_pick_no}</Text>
-                </View>
+                  <Text numberOfLines={1} style={[styles.draftStats, { color: colors.yellow }]}>HP {combat.hp} • ATQ {combat.maxDamage} • ⚡ {combat.bestEnergy}</Text>
+                  <View style={styles.draftViewHint}><Ionicons name="expand-outline" size={11} color={colors.accent}/><Text style={[styles.draftViewHintText,{color:colors.accent}]}>TOQUE PARA AMPLIAR</Text></View>
+                </Pressable>
               ); })}
             </View>
             {battle.draft_turn_id === userId ? (
@@ -678,6 +687,11 @@ export default function BattleScreen() {
         bag={pickerBag}
         mode="single"
         displayMode="battle"
+        enableCombatSort
+        enableTypeFilter
+        sourceOptions={drafting || battle?.mode !== 'draft3' ? [{ id: 'bag', label: 'Bag inteira' }, ...decks.map((deck) => ({ id: String(deck.id), label: `${deck.is_default ? '★ ' : ''}${deck.name}` }))] : []}
+        sourceId={sourceDeck}
+        onSourceChange={setSourceDeck}
         selectedId={selectedId}
         onSelectedIdChange={setSelectedId}
         onClose={() => setPickerMode(null)}
@@ -685,6 +699,8 @@ export default function BattleScreen() {
         confirmLabel={drafting ? "ESCOLHER NO DRAFT" : "USAR ESTA CARTA"}
         working={working}
       />
+      <DraftCardPreviewModal card={draftPreviewCard} visible={Boolean(draftPreviewCard)} onClose={() => setDraftPreviewCard(null)} />
+
       <CardPickerModal
         visible={pickerMode === 'stake'}
         title="Carta da aposta"
@@ -699,6 +715,42 @@ export default function BattleScreen() {
         working={working}
       />
     </View>
+  );
+}
+
+function DraftCardPreviewModal({ card, visible, onClose }: { card: any; visible: boolean; onClose: () => void }) {
+  const { colors } = useAppTheme();
+  if (!card) return null;
+  const combat = getBattleCardPreview(card);
+  const attacks = Array.isArray(card?.tcg_data?.attacks) ? card.tcg_data.attacks : [];
+  const abilities = Array.isArray(card?.tcg_data?.abilities) ? card.tcg_data.abilities : [];
+  const types = Array.isArray(card?.types) ? card.types : [];
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.draftPreviewBackdrop} onPress={onClose}>
+        <Pressable onPress={(event) => event.stopPropagation()} style={[styles.draftPreviewPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.draftPreviewHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.draftPreviewKicker, { color: colors.yellow }]}>CARTA REVELADA NO DRAFT</Text>
+              <Text style={[styles.draftPreviewTitle, { color: colors.text }]}>{card.pokemon_name ?? 'Pokémon'}</Text>
+              <Text style={[styles.draftPreviewMeta, { color: colors.muted }]}>{types.length ? types.join(' • ') : 'Tipo não informado'} • {card.rarity ?? 'Sem raridade'}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Fechar carta ampliada" onPress={onClose} style={[styles.draftPreviewClose,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="close" size={22} color={colors.text}/></Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.draftPreviewScroll} showsVerticalScrollIndicator={false}>
+            {card.image_large || card.image_small ? <Image source={{ uri: card.image_large ?? card.image_small }} resizeMode="contain" style={styles.draftPreviewImage}/> : <View style={[styles.draftPreviewImage,{backgroundColor:colors.surfaceAlt,alignItems:'center',justifyContent:'center'}]}><Ionicons name="image-outline" size={54} color={colors.muted}/></View>}
+            <View style={styles.draftPreviewStats}>
+              <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>HP / DEFESA</Text><Text style={[styles.draftPreviewStatValue,{color:colors.text}]}>{combat.hp}</Text></View>
+              <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>MAIOR ATAQUE</Text><Text style={[styles.draftPreviewStatValue,{color:colors.yellow}]}>{combat.maxDamage}</Text></View>
+              <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>ENERGIA MÍN.</Text><Text style={[styles.draftPreviewStatValue,{color:colors.accent}]}>⚡ {combat.bestEnergy}</Text></View>
+            </View>
+            {abilities.length ? <View style={styles.draftPreviewSection}><Text style={[styles.draftPreviewSectionTitle,{color:colors.muted}]}>HABILIDADES</Text>{abilities.map((ability:any,index:number)=><View key={`${ability?.name ?? 'ability'}:${index}`} style={[styles.draftPreviewMove,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewMoveName,{color:colors.text}]}>{String(ability?.name ?? 'Habilidade')}</Text>{ability?.text?<Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>{String(ability.text)}</Text>:null}</View>)}</View> : null}
+            <View style={styles.draftPreviewSection}><Text style={[styles.draftPreviewSectionTitle,{color:colors.muted}]}>ATAQUES</Text>{attacks.length ? attacks.map((attack:any,index:number)=><View key={`${attack?.name ?? 'attack'}:${index}`} style={[styles.draftPreviewMove,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><View style={styles.draftPreviewMoveHeader}><Text style={[styles.draftPreviewMoveName,{color:colors.text}]}>{String(attack?.name ?? 'Ataque')}</Text><Text style={[styles.draftPreviewMoveDamage,{color:colors.yellow}]}>{String(attack?.damage || '—')} dano</Text></View><Text style={[styles.draftPreviewMoveEnergy,{color:colors.accent}]}>⚡ {Number(attack?.convertedEnergyCost ?? (Array.isArray(attack?.cost) ? attack.cost.length : 0))} Energia</Text>{attack?.text?<Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>{String(attack.text)}</Text>:null}</View>) : <Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>Esta carta não possui ataque impresso.</Text>}</View>
+          </ScrollView>
+          <Pressable style={[styles.draftPreviewDone,{backgroundColor:colors.yellow}]} onPress={onClose}><Text style={styles.draftPreviewDoneText}>VOLTAR AO DRAFT</Text></Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -782,7 +834,16 @@ const styles = StyleSheet.create({
   forfeitResult:{width:'100%',borderRadius:13,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:7},
   forfeitResultText:{flex:1,fontSize:8,lineHeight:12,fontWeight:'800'}, panelTitle: { fontSize: 22, fontWeight: '900' }, panelText: { maxWidth: 620, textAlign: 'center', fontSize: 11, lineHeight: 17 }, stakeHeadline: { fontSize: 11, fontWeight: '900' }, actions: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 5 }, decline: { flex: 1, minHeight: 49, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 1, backgroundColor: '#231417' }, declineText: { color: '#FF8993', fontSize: 10, fontWeight: '900' }, accept: { flex: 1, minHeight: 49, alignItems: 'center', justifyContent: 'center', borderRadius: 13 }, acceptText: { color: '#07111F', fontSize: 10, fontWeight: '900' }, secondary: { flex: 1, minHeight: 49, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, secondaryText: { fontSize: 10, fontWeight: '900' }, disabled: { opacity: .42 },
   cardStakePanel: { width: '100%', maxWidth: 720, gap: 10, padding: 12, borderRadius: 17 }, stakePreview: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, borderWidth: 1 }, stakeImage: { width: 66, height: 88, borderRadius: 7 }, stakePreviewLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 1 }, stakeName: { fontSize: 14, fontWeight: '900', marginTop: 2 }, stakeMeta: { fontSize: 9, marginTop: 2 }, stakeValue: { fontSize: 11, fontWeight: '900', marginTop: 4 }, chooseStakeButton: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, borderWidth: 1 }, chooseStakeThumb: { width: 55, height: 73, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }, chooseStakeKicker: { fontSize: 7, fontWeight: '900', letterSpacing: 1 }, chooseStakeName: { fontSize: 13, fontWeight: '900', marginTop: 2 }, chooseStakeValue: { fontSize: 9, fontWeight: '800', marginTop: 3 },
-  draftPanel: { alignItems: 'center', gap: 10, padding: 15, borderRadius: 22, borderWidth: 1 }, draftTitle: { fontSize: 22, fontWeight: '900', textAlign: 'center' }, draftGrid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }, draftCard: { width: '30%', maxWidth: 150, minWidth: 92, padding: 7, borderRadius: 14, borderWidth: 1 }, draftImage: { width: '100%', aspectRatio: .72, borderRadius: 8 }, draftCardName: { fontSize: 10, fontWeight: '900', marginTop: 5 }, draftOwner: { fontSize: 7, fontWeight: '900', marginTop: 2 },
+  draftPanel: { alignItems: 'center', gap: 10, padding: 15, borderRadius: 22, borderWidth: 1 }, draftTitle: { fontSize: 22, fontWeight: '900', textAlign: 'center' }, draftGrid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }, draftCard: { width: '31%', maxWidth: 180, minWidth: 104, padding: 8, borderRadius: 14, borderWidth: 1 }, draftImage: { width: '100%', aspectRatio: .72, borderRadius: 8 }, draftCardName: { fontSize: 10, fontWeight: '900', marginTop: 5 }, draftOwner: { fontSize: 7, fontWeight: '900', marginTop: 2 }, draftStats:{fontSize:7,fontWeight:'900',marginTop:4},draftViewHint:{flexDirection:'row',alignItems:'center',gap:4,marginTop:5},draftViewHintText:{fontSize:6,fontWeight:'900'},
+  draftPreviewBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.88)',padding:14,alignItems:'center',justifyContent:'center'},
+  draftPreviewPanel:{width:'100%',maxWidth:650,maxHeight:'94%',borderRadius:22,borderWidth:1,padding:13},
+  draftPreviewHeader:{flexDirection:'row',alignItems:'center',gap:10,marginBottom:8},
+  draftPreviewKicker:{fontSize:8,fontWeight:'900',letterSpacing:1.1},draftPreviewTitle:{fontSize:20,fontWeight:'900',marginTop:2},draftPreviewMeta:{fontSize:9,fontWeight:'700',marginTop:3},
+  draftPreviewClose:{width:42,height:42,borderRadius:13,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  draftPreviewScroll:{paddingBottom:10},draftPreviewImage:{width:'100%',height:430,maxHeight:430},
+  draftPreviewStats:{flexDirection:'row',gap:7,marginTop:8},draftPreviewStat:{flex:1,minWidth:0,borderRadius:12,borderWidth:1,padding:9},draftPreviewStatLabel:{fontSize:7,fontWeight:'900'},draftPreviewStatValue:{fontSize:16,fontWeight:'900',marginTop:3},
+  draftPreviewSection:{gap:7,marginTop:12},draftPreviewSectionTitle:{fontSize:8,fontWeight:'900',letterSpacing:1},draftPreviewMove:{borderRadius:12,borderWidth:1,padding:10},draftPreviewMoveHeader:{flexDirection:'row',justifyContent:'space-between',gap:8},draftPreviewMoveName:{fontSize:11,fontWeight:'900',flex:1},draftPreviewMoveDamage:{fontSize:9,fontWeight:'900'},draftPreviewMoveEnergy:{fontSize:8,fontWeight:'900',marginTop:3},draftPreviewMoveText:{fontSize:8,lineHeight:13,marginTop:4},
+  draftPreviewDone:{minHeight:46,borderRadius:12,alignItems:'center',justifyContent:'center',marginTop:10},draftPreviewDoneText:{color:'#07111F',fontSize:9,fontWeight:'900'},
   timerPanel: { alignItems: 'center', paddingVertical: 10 }, roundLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, timer: { fontSize: 43, fontWeight: '900', marginTop: 4 }, timerHint: { fontSize: 9, textAlign: 'center', lineHeight: 14, marginTop: 5 }, rulesText: { maxWidth: 620, fontSize: 9, lineHeight: 14, fontWeight: '800', textAlign: 'center', marginTop: 7 },
   arena: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }, slot: { width: 245, alignItems: 'center', gap: 7 }, slotLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.1 }, slotCardWrap: { width: 218, aspectRatio: .72, borderRadius: 17, borderWidth: 2, padding: 5, position: 'relative' }, slotCard: { width: '100%', height: '100%' }, slotValue: { position: 'absolute', left: 10, bottom: 10, backgroundColor: '#050505E8', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999 }, slotValueText: { fontSize: 10, fontWeight: '900' }, hiddenCard: { width: 218, aspectRatio: .72, borderRadius: 19, borderWidth: 2, alignItems: 'center', justifyContent: 'center', gap: 15 }, questionCircle: { width: 105, height: 105, borderRadius: 53, borderWidth: 3, alignItems: 'center', justifyContent: 'center' }, question: { fontSize: 48, fontWeight: '900' }, hiddenState: { fontSize: 9, fontWeight: '900', letterSpacing: 1.4 }, arenaVs: { alignItems: 'center', gap: 2 }, arenaVsText: { fontSize: 8, fontWeight: '900' },
   sourcePanel: { borderRadius: 19, borderWidth: 1, padding: 12, gap: 10 }, sourceLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, sourceLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.1 }, editDecks: { fontSize: 8, fontWeight: '900' }, deckChips: { gap: 6 }, deckChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 }, deckChipText: { fontSize: 9, fontWeight: '800' }, openPicker: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 15, borderWidth: 1, padding: 12 }, openPickerTitle: { fontSize: 13, fontWeight: '900' }, openPickerMeta: { fontSize: 9, marginTop: 3 }, lockedNotice: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 16, borderWidth: 1, padding: 12 }, lockedText: { flex: 1, fontSize: 10, lineHeight: 15, fontWeight: '700' },
