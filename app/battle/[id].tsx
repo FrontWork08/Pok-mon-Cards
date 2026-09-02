@@ -5,6 +5,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { CardPickerModal, getBattleCardPreview } from '@/components/CardPickerModal';
 import { CompactTrainerBanner } from '@/components/CompactTrainerBanner';
+import { PixelBattleArena, type PixelBattleFighter } from '@/components/PixelBattleArena';
 import { supabase } from '@/lib/supabase';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
 import { getMyDecks } from '@/services/decks';
@@ -31,6 +32,7 @@ export default function BattleScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAttackName, setSelectedAttackName] = useState<string | null>(null);
   const [attackState, setAttackState] = useState<any>(null);
+  const [arenaResultRound, setArenaResultRound] = useState<any>(null);
   const [stakeCardId, setStakeCardId] = useState<string | null>(null);
   const [sourceDeck, setSourceDeck] = useState<string>('bag');
   const [pickerMode, setPickerMode] = useState<'battle' | 'stake' | null>(null);
@@ -41,6 +43,7 @@ export default function BattleScreen() {
   const timeoutRound = useRef<string | null>(null);
   const revealAnim = useRef(new Animated.Value(1)).current;
   const animatedRound = useRef(0);
+  const arenaResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const battleLoadPromise = useRef<Promise<void> | null>(null);
   const battleLoadPending = useRef(false);
   const battleLoadRef = useRef<(silent?: boolean) => Promise<void>>(async () => undefined);
@@ -209,6 +212,51 @@ export default function BattleScreen() {
   const stakeEntry = useMemo(() => bag.find((entry) => entry.cards?.id === stakeCardId), [bag, stakeCardId]);
   const latestRound = rounds.length ? rounds[rounds.length - 1] : null;
 
+  const resultRound = arenaResultRound;
+  const resultMyIsChallenger = battle?.challenger_id === userId;
+  const resultMyCard = resultRound ? (resultMyIsChallenger ? (Array.isArray(resultRound.c1) ? resultRound.c1[0] : resultRound.c1) : (Array.isArray(resultRound.c2) ? resultRound.c2[0] : resultRound.c2)) : null;
+  const resultRivalCard = resultRound ? (resultMyIsChallenger ? (Array.isArray(resultRound.c2) ? resultRound.c2[0] : resultRound.c2) : (Array.isArray(resultRound.c1) ? resultRound.c1[0] : resultRound.c1)) : null;
+  const resultMyCombat = resultRound ? (resultMyIsChallenger ? resultRound.challenger_combat : resultRound.opponent_combat) : null;
+  const resultRivalCombat = resultRound ? (resultMyIsChallenger ? resultRound.opponent_combat : resultRound.challenger_combat) : null;
+
+  const attackArenaMy: PixelBattleFighter | null = attacking ? {
+    name: String(attackState?.myCardName ?? 'Seu Pokémon'),
+    pokedexNumber: attackState?.myPokedexNumber == null ? null : Number(attackState.myPokedexNumber),
+    fallbackImage: attackState?.myCardImage ?? null,
+    hp: attackState?.myHp == null ? null : Number(attackState.myHp),
+    maxHp: attackState?.myHp == null ? null : Number(attackState.myHp),
+  } : null;
+  const attackArenaRival: PixelBattleFighter | null = attacking ? {
+    name: String(attackState?.opponentCardName ?? 'Pokémon rival'),
+    pokedexNumber: attackState?.opponentPokedexNumber == null ? null : Number(attackState.opponentPokedexNumber),
+    fallbackImage: attackState?.opponentCardImage ?? null,
+    hp: attackState?.opponentHp == null ? null : Number(attackState.opponentHp),
+    maxHp: attackState?.opponentHp == null ? null : Number(attackState.opponentHp),
+  } : null;
+
+  const resultArenaMy: PixelBattleFighter | null = resultRound && resultMyCard ? {
+    name: String(resultMyCard.pokemon_name ?? 'Seu Pokémon'),
+    pokedexNumber: Array.isArray(resultMyCard.pokedex_numbers) && resultMyCard.pokedex_numbers.length ? Number(resultMyCard.pokedex_numbers[0]) : null,
+    fallbackImage: resultMyCard.image_small ?? null,
+    hp: resultMyCombat?.remainingHp == null ? null : Number(resultMyCombat.remainingHp),
+    maxHp: resultMyCombat?.hp == null ? null : Number(resultMyCombat.hp),
+    attackName: resultMyCombat?.manualAttackChoice ?? resultMyCombat?.attackName ?? null,
+    damage: resultMyCombat?.effectiveDamage == null ? resultMyCombat?.totalDamageDealt ?? 0 : resultMyCombat.effectiveDamage,
+    firstPlayer: Boolean(resultMyCombat?.firstPlayer),
+    knockedOut: Boolean(resultMyCombat?.knockedOut),
+  } : null;
+  const resultArenaRival: PixelBattleFighter | null = resultRound && resultRivalCard ? {
+    name: String(resultRivalCard.pokemon_name ?? 'Pokémon rival'),
+    pokedexNumber: Array.isArray(resultRivalCard.pokedex_numbers) && resultRivalCard.pokedex_numbers.length ? Number(resultRivalCard.pokedex_numbers[0]) : null,
+    fallbackImage: resultRivalCard.image_small ?? null,
+    hp: resultRivalCombat?.remainingHp == null ? null : Number(resultRivalCombat.remainingHp),
+    maxHp: resultRivalCombat?.hp == null ? null : Number(resultRivalCombat.hp),
+    attackName: resultRivalCombat?.manualAttackChoice ?? resultRivalCombat?.attackName ?? null,
+    damage: resultRivalCombat?.effectiveDamage == null ? resultRivalCombat?.totalDamageDealt ?? 0 : resultRivalCombat.effectiveDamage,
+    firstPlayer: Boolean(resultRivalCombat?.firstPlayer),
+    knockedOut: Boolean(resultRivalCombat?.knockedOut),
+  } : null;
+
   useEffect(() => {
     if (selectedId && !pickerBag.some((entry) => entry.cards?.id === selectedId)) setSelectedId(null);
   }, [pickerBag, selectedId]);
@@ -224,6 +272,31 @@ export default function BattleScreen() {
     ]).start();
     if (settings?.battle_vibration ?? true) Vibration.vibrate([0, 60, 35, 110]);
   }, [latestRound?.round_no, revealAnim, settings?.battle_vibration]);
+
+  useEffect(() => {
+    const roundNo = Number(latestRound?.round_no ?? 0);
+    if (!roundNo || battle?.mode !== 'draft3') return;
+    setArenaResultRound(latestRound);
+    if (arenaResultTimer.current) clearTimeout(arenaResultTimer.current);
+    arenaResultTimer.current = setTimeout(() => {
+      setArenaResultRound((current: any) => Number(current?.round_no ?? 0) === roundNo ? null : current);
+    }, 5200);
+    return () => {
+      if (arenaResultTimer.current) {
+        clearTimeout(arenaResultTimer.current);
+        arenaResultTimer.current = null;
+      }
+    };
+  }, [battle?.mode, latestRound]);
+
+  useEffect(() => {
+    if (!attacking) return;
+    setArenaResultRound(null);
+    if (arenaResultTimer.current) {
+      clearTimeout(arenaResultTimer.current);
+      arenaResultTimer.current = null;
+    }
+  }, [attacking]);
 
   async function respond(accept: boolean) {
     if (!id) return;
@@ -468,6 +541,16 @@ export default function BattleScreen() {
               </View>
             ) : <View style={[styles.lockedNotice, { backgroundColor: colors.surface, borderColor: colors.accent }]}><Ionicons name="lock-closed" size={20} color={colors.accent} /><Text style={[styles.lockedText, { color: colors.text }]}>Sua carta está travada. Aguardando o oponente ou o servidor resolver a rodada.</Text></View>}
           </>
+        ) : null}
+
+        {battle.mode === 'draft3' && (attacking || Boolean(resultRound)) ? (
+          <PixelBattleArena
+            my={attacking ? attackArenaMy : resultArenaMy}
+            rival={attacking ? attackArenaRival : resultArenaRival}
+            resultKey={!attacking && resultRound ? `${battle.id}:${resultRound.round_no}` : null}
+            winner={!attacking && resultRound ? (resultRound.winner_id === userId ? 'me' : 'rival') : null}
+            title={attacking ? `RODADA ${currentRound} • ARENA 2D` : `RODADA ${Number(resultRound?.round_no ?? 0)} • SIMULAÇÃO VISUAL`}
+          />
         ) : null}
 
         {attacking ? (
