@@ -13,6 +13,7 @@ const requiredFiles = [
   'supabase/migrations/20260902115736_fix_bot_timeout_and_diversify_ranked_ai.sql',
   'supabase/migrations/20260902120727_fix_restricted_entry_battle_cards.sql',
   'supabase/migrations/20260902122117_guard_elo_to_ranked_battles_only.sql',
+  'supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_battles.sql',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -167,6 +168,13 @@ if (existsSync('supabase/migrations/20260902120727_fix_restricted_entry_battle_c
 if (existsSync('supabase/migrations/20260902122117_guard_elo_to_ranked_battles_only.sql')) {
   const eloGuard = read('supabase/migrations/20260902122117_guard_elo_to_ranked_battles_only.sql');
   assert(eloGuard.includes('if v_reward and b.is_ranked then'), 'Regressão de ELO: partida casual voltou a alterar rating.');
+}
+
+
+if (existsSync('supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_battles.sql')) {
+  const forfeitGuard = read('supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_battles.sql');
+  assert(forfeitGuard.includes('if b.is_ranked and v_reward then'), 'Regressão de ELO: desistência casual voltou a alterar rating.');
+  assert(forfeitGuard.includes('v_neutral := v_neutral or not b.is_ranked or not v_reward;'), 'Regressão de UX/ELO: desistência sem rating deixou de ser marcada como neutra.');
 }
 
 if (existsSync('src/components/CardPickerModal.tsx')) {
