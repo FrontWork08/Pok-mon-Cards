@@ -303,6 +303,7 @@ export default function TradeBuilderScreen() {
         subtitle="Lista virtualizada • ordene por valor e encontre cartas rapidamente."
         bag={bag}
         mode="quantity"
+        enableTypeFilter
         selectedMap={selected}
         onSelectedMapChange={setSelected}
         onClose={closePicker}
