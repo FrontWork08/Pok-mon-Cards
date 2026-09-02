@@ -6,30 +6,10 @@ import type { OwnedCardEntry } from '@/services/player';
 import { formatUsd } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { PokemonTypeSymbolFilter } from '@/components/PokemonTypeSymbolFilter';
 
 type SortMode = 'value' | 'battle' | 'atk_desc' | 'atk_asc' | 'def_desc' | 'def_asc' | 'name' | 'quantity' | 'recent';
 type QuantityMap = Record<string, number>;
-
-const TYPE_SYMBOLS: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; soft: string }> = {
-  water: { label: 'ÁGUA', icon: 'water', color: '#59A9FF', soft: '#132A3D' },
-  fire: { label: 'FOGO', icon: 'flame', color: '#FF725C', soft: '#3A1B18' },
-  grass: { label: 'PLANTA', icon: 'leaf', color: '#6FD072', soft: '#19311E' },
-  lightning: { label: 'ELÉTRICO', icon: 'flash', color: '#FFD447', soft: '#3A3214' },
-  electric: { label: 'ELÉTRICO', icon: 'flash', color: '#FFD447', soft: '#3A3214' },
-  psychic: { label: 'PSÍQUICO', icon: 'eye', color: '#D57CFF', soft: '#2F1B3A' },
-  fighting: { label: 'LUTADOR', icon: 'barbell', color: '#D99463', soft: '#332318' },
-  darkness: { label: 'SOMBRIO', icon: 'moon', color: '#8C93A0', soft: '#20242A' },
-  dark: { label: 'SOMBRIO', icon: 'moon', color: '#8C93A0', soft: '#20242A' },
-  metal: { label: 'METAL', icon: 'shield-half', color: '#B8C3CE', soft: '#252D34' },
-  colorless: { label: 'INCOLOR', icon: 'star', color: '#D8D8D8', soft: '#303030' },
-  dragon: { label: 'DRAGÃO', icon: 'diamond', color: '#C79BFF', soft: '#2B2035' },
-  fairy: { label: 'FADA', icon: 'sparkles', color: '#FF9DD3', soft: '#371D2D' },
-};
-
-function getTypeSymbol(type: string) {
-  const key = String(type ?? '').trim().toLowerCase();
-  return TYPE_SYMBOLS[key] ?? { label: String(type ?? '').toUpperCase(), icon: 'ellipse' as keyof typeof Ionicons.glyphMap, color: '#AAB4BF', soft: '#232A31' };
-}
 
 export { getBattleCardPreview } from '@/services/battleStats';
 type Props = {
@@ -208,21 +188,11 @@ export function CardPickerModal({
             {search ? <Pressable onPress={() => setSearch('')}><Ionicons name="close-circle" size={19} color={colors.muted} /></Pressable> : null}
           </View>
           {enableTypeFilter && availableTypes.length > 0 ? (
-            <View style={styles.typeFilter}>
-              <Text style={[styles.toolLabel, { color: colors.muted }]}>TIPO DO POKÉMON</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeChips}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Mostrar todos os tipos"
-                  onPress={() => setSelectedType('all')}
-                  style={[styles.allTypesChip, { backgroundColor: selectedType === 'all' ? colors.accentSoft : colors.surface, borderColor: selectedType === 'all' ? colors.accent : colors.border }]}
-                >
-                  <Ionicons name="apps" size={18} color={selectedType === 'all' ? colors.accent : colors.muted} />
-                  <Text style={[styles.allTypesText, { color: selectedType === 'all' ? colors.text : colors.muted }]}>TODOS</Text>
-                </Pressable>
-                {availableTypes.map((type) => <TypeSymbolChip key={type} type={type} active={selectedType === type} onPress={() => setSelectedType(type)} />)}
-              </ScrollView>
-            </View>
+            <PokemonTypeSymbolFilter
+              types={availableTypes}
+              selectedType={selectedType === 'all' ? null : selectedType}
+              onChange={(type) => setSelectedType(type ?? 'all')}
+            />
           ) : null}
           <View style={styles.sortRow}>
             {displayMode === 'battle'
@@ -347,29 +317,6 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
   );
 });
 
-function TypeSymbolChip({ type, active, onPress }: { type: string; active: boolean; onPress: () => void }) {
-  const visual = getTypeSymbol(type);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Filtrar tipo ${visual.label}`}
-      onPress={onPress}
-      style={styles.typeSymbolButton}
-    >
-      <View style={[
-        styles.typeSymbolCircle,
-        {
-          backgroundColor: active ? visual.soft : 'transparent',
-          borderColor: active ? visual.color : '#39414A',
-        },
-      ]}>
-        <Ionicons name={visual.icon} size={22} color={visual.color} />
-      </View>
-      <Text numberOfLines={1} style={[styles.typeSymbolLabel, { color: active ? visual.color : '#8E9AA6' }]}>{visual.label}</Text>
-    </Pressable>
-  );
-}
-
 function SortChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const { colors } = useAppTheme();
   return <Pressable onPress={onPress} style={[styles.chip, { backgroundColor: active ? colors.accentSoft : colors.surface, borderColor: active ? colors.accent : colors.border }]}><Text style={[styles.chipText, { color: active ? colors.text : colors.muted }]}>{label}</Text></Pressable>;
@@ -388,13 +335,6 @@ const styles = StyleSheet.create({
   sourceChips: { gap: 7, paddingRight: 8 },
   sourceChip: { minHeight: 38, maxWidth: 190, borderRadius: 999, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6 },
   sourceChipText: { fontSize: 8, fontWeight: '900', maxWidth: 145 },
-  typeFilter: { gap: 6 },
-  typeChips: { gap: 9, paddingRight: 8, alignItems: 'flex-start' },
-  allTypesChip: { minHeight: 46, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  allTypesText: { fontSize: 7, fontWeight: '900' },
-  typeSymbolButton: { width: 48, alignItems: 'center', gap: 4 },
-  typeSymbolCircle: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  typeSymbolLabel: { width: 52, textAlign: 'center', fontSize: 5.5, fontWeight: '900', letterSpacing: .1 },
   searchBox: { minHeight: 48, borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   search: { flex: 1, height: '100%', fontSize: 13 },
   sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
