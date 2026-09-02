@@ -52,6 +52,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const [faceUp, setFaceUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageFailureLevel, setImageFailureLevel] = useState<Record<string, number>>({});
+  const [summaryPreviewCard, setSummaryPreviewCard] = useState<OpenedCard | null>(null);
   const [boosterFx, setBoosterFx] = useState<{id:string;name:string;icon:string;rarity:string}|null>(null);
 
   const packY = useRef(new Animated.Value(0)).current;
@@ -84,7 +85,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
     if (!visible) return;
     setBoosterFx(null);
     void getMyEquippedBoosterFx().then(setBoosterFx).catch(() => setBoosterFx(null));
-    setStage('sealed'); setCards([]); setCardIndex(0); setFaceUp(false); setError(null); setImageFailureLevel({}); resetOpening(); resetReveal(); cardEnter.setValue(0); rarityPulse.setValue(0);
+    setStage('sealed'); setCards([]); setCardIndex(0); setFaceUp(false); setError(null); setImageFailureLevel({}); setSummaryPreviewCard(null); resetOpening(); resetReveal(); cardEnter.setValue(0); rarityPulse.setValue(0);
     const floating = Animated.loop(Animated.sequence([
       Animated.timing(packY, { toValue: -9, duration: 1350, useNativeDriver: USE_NATIVE_DRIVER }),
       Animated.timing(packY, { toValue: 7, duration: 1350, useNativeDriver: USE_NATIVE_DRIVER }),
@@ -187,7 +188,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 
   async function buyAnother() {
     if (!pack || stage !== 'summary') return;
-    setError(null); setCards([]); setCardIndex(0); setFaceUp(false); setImageFailureLevel({});
+    setError(null); setCards([]); setCardIndex(0); setFaceUp(false); setImageFailureLevel({}); setSummaryPreviewCard(null);
     resetOpening(); resetReveal(); cardEnter.setValue(0); rarityPulse.setValue(0); setStage('opening');
     try {
       const [receivedCards] = await Promise.all([onPurchase(), runOpeningAnimation()]);
@@ -375,7 +376,13 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
         <View style={styles.actionRow}><Pressable style={[styles.nextButton, { borderColor: `${revealColor}90` }]} onPress={nextCard}><Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text><Ionicons name="arrow-forward" size={18} color="#F4F4F4" /></Pressable>{cards.length > 1 ? <Pressable style={styles.revealAllButton} onPress={revealAll}><Ionicons name="albums" size={17} color="#FFD447" /><Text style={styles.revealAllText}>REVELAR TODAS</Text></Pressable> : null}</View>
       </View> : null}
 
-      {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPullLabel ? <Text style={styles.bestPull}>{bestPullLabel}</Text> : null}<View style={styles.summaryValuePill}><Ionicons name="cash-outline" size={16} color="#65D894"/><Text style={styles.summaryValueText}>{totalMarketValueLabel}</Text></View><Text style={styles.summarySubtitle}>{pack.currency === 'diamonds' ? 'Sua carta lendária foi enviada para a Bag.' : 'Todos os cards foram enviados para sua Bag • +20 XP'}</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <View key={key} style={[styles.summaryCard, { borderColor: `${cardTheme.color}70` }]}>{(() => {
+      {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPullLabel ? <Text style={styles.bestPull}>{bestPullLabel}</Text> : null}<View style={styles.summaryValuePill}><Ionicons name="cash-outline" size={16} color="#65D894"/><Text style={styles.summaryValueText}>{totalMarketValueLabel}</Text></View><Text style={styles.summarySubtitle}>{pack.currency === 'diamonds' ? 'Sua carta lendária foi enviada para a Bag.' : 'Todos os cards foram enviados para sua Bag • +20 XP'}</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <Pressable
+          key={key}
+          accessibilityRole="button"
+          accessibilityLabel={`Visualizar ${card.name}`}
+          onPress={() => setSummaryPreviewCard(card)}
+          style={({ pressed }) => [styles.summaryCard, { borderColor: `${cardTheme.color}70`, opacity: pressed ? .72 : 1 }]}
+        >{(() => {
           const candidates = cardImageCandidates(card);
           const level = imageFailureLevel[key] ?? 0;
           const uri = candidates[level] ?? null;
@@ -389,7 +396,66 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
           ) : (
             <View style={styles.summaryFallback}><Ionicons name="image-outline" size={28} color="#555" /></View>
           );
-        })()}<View style={styles.summaryBadgeRow}>{card.isNew ? <View style={styles.summaryNewBadge}><Text style={styles.summaryBadgeText}>NEW</Text></View> : null}{card.wishlistHit ? <View style={styles.summaryChaseBadge}><Text style={styles.summaryChaseText}>★ CHASE</Text></View> : null}</View><Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text><Text numberOfLines={1} style={styles.summaryPrice}>{card.marketPriceUsd == null || Number(card.marketPriceUsd) <= 0 ? 'Sem cotação' : formatUsd(card.marketPriceUsd)}</Text></View>; })}</View><View style={styles.summaryActions}>{pack.id !== 'guild-collective' ? <Pressable style={styles.buyAgainButton} onPress={()=>void buyAnother()}><Ionicons name="cube" size={18} color="#07111F"/><Text style={styles.buyAgainText}>COMPRAR OUTRO</Text></Pressable> : null}<Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Abrir Bag" style={styles.summaryBagButton} onPress={goToBag}><Ionicons name="bag-outline" size={22} color="#FFD447" /></Pressable>{bestPull ? <Pressable accessibilityRole="button" accessibilityLabel="Compartilhar melhor pull" style={styles.summaryBagButton} onPress={()=>void shareBestPull()}><Ionicons name="share-social-outline" size={22} color="#FFD447" /></Pressable> : null}</View></ScrollView> : null}
+        })()}<View style={styles.summaryBadgeRow}>{card.isNew ? <View style={styles.summaryNewBadge}><Text style={styles.summaryBadgeText}>NEW</Text></View> : null}{card.wishlistHit ? <View style={styles.summaryChaseBadge}><Text style={styles.summaryChaseText}>★ CHASE</Text></View> : null}</View><Text numberOfLines={1} style={styles.summaryName}>{card.name}</Text><Text numberOfLines={1} style={[styles.summaryRarity, { color: cardTheme.color }]}>{card.rarity ?? 'Comum'}</Text><Text numberOfLines={1} style={styles.summaryPrice}>{card.marketPriceUsd == null || Number(card.marketPriceUsd) <= 0 ? 'Sem cotação' : formatUsd(card.marketPriceUsd)}</Text><View style={styles.summaryPreviewHint}><Ionicons name="expand-outline" size={11} color="#B9C5D2"/><Text style={styles.summaryPreviewHintText}>TOQUE PARA VISUALIZAR</Text></View></Pressable>; })}</View><View style={styles.summaryActions}>{pack.id !== 'guild-collective' ? <Pressable style={styles.buyAgainButton} onPress={()=>void buyAnother()}><Ionicons name="cube" size={18} color="#07111F"/><Text style={styles.buyAgainText}>COMPRAR OUTRO</Text></Pressable> : null}<Pressable style={styles.summaryButton} onPress={onClose}><Text style={styles.summaryButtonText}>VOLTAR À LOJA</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Abrir Bag" style={styles.summaryBagButton} onPress={goToBag}><Ionicons name="bag-outline" size={22} color="#FFD447" /></Pressable>{bestPull ? <Pressable accessibilityRole="button" accessibilityLabel="Compartilhar melhor pull" style={styles.summaryBagButton} onPress={()=>void shareBestPull()}><Ionicons name="share-social-outline" size={22} color="#FFD447" /></Pressable> : null}</View></ScrollView> : null}
+
+      {summaryPreviewCard ? <Modal
+        visible
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSummaryPreviewCard(null)}
+      >
+        <Pressable style={styles.summaryPreviewBackdrop} onPress={() => setSummaryPreviewCard(null)}>
+          <Pressable
+            accessibilityRole="none"
+            onPress={(event) => event.stopPropagation()}
+            style={styles.summaryPreviewPanel}
+          >
+            <View style={styles.summaryPreviewHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryPreviewKicker}>CARTA DO BOOSTER</Text>
+                <Text style={styles.summaryPreviewTitle}>{summaryPreviewCard.name}</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fechar visualização da carta"
+                onPress={() => setSummaryPreviewCard(null)}
+                style={styles.summaryPreviewClose}
+              >
+                <Ionicons name="close" size={22} color="#F4F4F4"/>
+              </Pressable>
+            </View>
+            {(() => {
+              const candidates = cardImageCandidates(summaryPreviewCard);
+              const key = `preview-${summaryPreviewCard.id}`;
+              const level = imageFailureLevel[key] ?? 0;
+              const uri = candidates[level] ?? null;
+              return uri ? (
+                <Image
+                  source={{ uri }}
+                  resizeMode="contain"
+                  style={styles.summaryPreviewImage}
+                  onError={() => setImageFailureLevel((value) => ({ ...value, [key]: level + 1 }))}
+                />
+              ) : (
+                <View style={[styles.summaryPreviewImage, styles.summaryPreviewFallback]}>
+                  <Ionicons name="image-outline" size={52} color="#666"/>
+                </View>
+              );
+            })()}
+            <View style={styles.summaryPreviewDetails}>
+              <Text style={[styles.summaryPreviewRarity, { color: rarityTheme(summaryPreviewCard.rarity).color }]}>{summaryPreviewCard.rarity ?? 'Comum'}</Text>
+              <Text style={styles.summaryPreviewPrice}>{summaryPreviewCard.marketPriceUsd == null || Number(summaryPreviewCard.marketPriceUsd) <= 0 ? 'Valor indisponível' : formatUsd(summaryPreviewCard.marketPriceUsd)}</Text>
+              <View style={styles.summaryPreviewBadges}>
+                {summaryPreviewCard.isNew ? <View style={styles.summaryNewBadge}><Text style={styles.summaryBadgeText}>NEW</Text></View> : null}
+                {summaryPreviewCard.wishlistHit ? <View style={styles.summaryChaseBadge}><Text style={styles.summaryChaseText}>★ CHASE</Text></View> : null}
+              </View>
+            </View>
+            <Pressable style={styles.summaryPreviewDone} onPress={() => setSummaryPreviewCard(null)}>
+              <Text style={styles.summaryPreviewDoneText}>VOLTAR AO RESULTADO</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal> : null}
 
       {stage === 'opening' ? <><Animated.View pointerEvents="none" style={[styles.openingColorWash, { opacity: openingColorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: openingFlash }]} /></> : null}
       {stage === 'cards' && currentCard ? <><Animated.View pointerEvents="none" style={[styles.colorWash, { backgroundColor: revealColor, opacity: colorWash }]} /><Animated.View pointerEvents="none" style={[styles.fullFlash, { opacity: screenFlash }]} /></> : null}
@@ -410,6 +476,22 @@ const styles = StyleSheet.create({
   rewardPriceRow:{marginTop:7,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
   rewardPrice:{color:'#65D894',fontSize:13,fontWeight:'900'},
   summaryPrice:{color:'#65D894',fontSize:10,fontWeight:'900',marginTop:4},
+  summaryPreviewHint:{marginTop:7,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,borderTopWidth:1,borderTopColor:'#242A31',paddingTop:7},
+  summaryPreviewHintText:{color:'#B9C5D2',fontSize:6,fontWeight:'900',letterSpacing:.35},
+  summaryPreviewBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.88)',alignItems:'center',justifyContent:'center',padding:18},
+  summaryPreviewPanel:{width:'100%',maxWidth:520,maxHeight:'94%',borderRadius:22,borderWidth:1,borderColor:'#343A43',backgroundColor:'#0A0D11',padding:14,alignItems:'center'},
+  summaryPreviewHeader:{width:'100%',flexDirection:'row',alignItems:'center',gap:10,marginBottom:8},
+  summaryPreviewKicker:{color:'#FFD447',fontSize:8,fontWeight:'900',letterSpacing:1.4},
+  summaryPreviewTitle:{color:'#F5F5F5',fontSize:18,fontWeight:'900',marginTop:3},
+  summaryPreviewClose:{width:42,height:42,borderRadius:13,borderWidth:1,borderColor:'#343A43',backgroundColor:'#12171D',alignItems:'center',justifyContent:'center'},
+  summaryPreviewImage:{width:'100%',height:'68%',minHeight:320,maxHeight:600},
+  summaryPreviewFallback:{alignItems:'center',justifyContent:'center',borderRadius:16,backgroundColor:'#11161C'},
+  summaryPreviewDetails:{alignItems:'center',marginTop:8},
+  summaryPreviewRarity:{fontSize:11,fontWeight:'900'},
+  summaryPreviewPrice:{color:'#65D894',fontSize:13,fontWeight:'900',marginTop:5},
+  summaryPreviewBadges:{flexDirection:'row',gap:6,marginTop:7},
+  summaryPreviewDone:{marginTop:12,minHeight:46,borderRadius:12,backgroundColor:'#FFD447',paddingHorizontal:18,alignItems:'center',justifyContent:'center',alignSelf:'stretch'},
+  summaryPreviewDoneText:{color:'#07111F',fontSize:9,fontWeight:'900',letterSpacing:.5},
   summaryValuePill:{alignSelf:'center',marginTop:8,borderRadius:999,borderWidth:1,borderColor:'#2F6F52',backgroundColor:'#10251C',paddingHorizontal:11,paddingVertical:7,flexDirection:'row',alignItems:'center',gap:6},
   summaryValueText:{color:'#9FE7BE',fontSize:10,fontWeight:'900'},
   actionRow: { flexDirection:'row', flexWrap:'wrap', justifyContent:'center', gap:8 },
