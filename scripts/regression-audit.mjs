@@ -933,6 +933,10 @@ if (existsSync('src/components/PackOpeningModal.tsx')) {
   assert(opening.includes('GalaxyFlowOverlay'), 'Regressão Galaxy Flow: booster perdeu nebulosa animada.');
   assert(opening.includes("stage==='opening'?.86:stage==='cards'?.60:.70"), 'Regressão visual: Galaxy Flow do booster ficou invisível entre etapas.');
   assert(opening.includes('galaxyPortalOuter'), 'Regressão Galaxy Flow: booster perdeu portal cósmico.');
+  assert(opening.includes('summaryPreviewCard'), 'Regressão de booster: cartas do resumo final deixaram de abrir visualização ampliada.');
+  assert(opening.includes('TOQUE PARA VISUALIZAR'), 'Regressão de UX: resumo do booster deixou de indicar que as cartas são clicáveis.');
+  assert(opening.includes('VOLTAR AO RESULTADO'), 'Regressão de booster: visualização ampliada não retorna mais ao resumo sem fechar o pack.');
+  assert(opening.includes('setSummaryPreviewCard(card)'), 'Regressão de booster: toque na carta do resumo deixou de abrir a carta recebida.');
 }
 
 if (existsSync('app/cosmetics.tsx')) {
