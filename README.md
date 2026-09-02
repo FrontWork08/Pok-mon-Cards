@@ -1018,29 +1018,7 @@ O projeto permite demonstrar conhecimentos de diferentes áreas:
 
 ---
 
-# 33. Sugestão de apresentação para feira
-
-Uma demonstração curta pode seguir esta sequência:
-
-1. apresentar o problema e o objetivo;
-2. mostrar cadastro/login;
-3. abrir um booster;
-4. mostrar a carta obtida na Bag;
-5. demonstrar filtros;
-6. montar um deck;
-7. iniciar uma batalha Draft 3;
-8. mostrar a escolha de ataque;
-9. mostrar a arena 2D;
-10. mostrar marketplace/trocas;
-11. mostrar guildas;
-12. explicar o Supabase e a arquitetura;
-13. finalizar mostrando o pipeline de testes e atualização OTA.
-
-Isso permite apresentar tanto a parte visual quanto a parte técnica do trabalho.
-
----
-
-# 34. Conclusão
+# 33. Conclusão
 
 O Trainer Collection demonstra como uma ideia de entretenimento pode ser utilizada para estudar e aplicar conceitos reais de desenvolvimento de sistemas.
 
@@ -1050,7 +1028,7 @@ Mais do que um aplicativo de cartas, ele representa um projeto integrado de enge
 
 ---
 
-# 35. Identificação do trabalho
+# 34. Identificação do trabalho
 
 **Projeto:** Trainer Collection  
 **Categoria:** Aplicativo mobile / sistema Web / card game digital  
