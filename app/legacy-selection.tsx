@@ -359,6 +359,7 @@ export default function LegacySelectionScreen() {
         maxPerCard={1}
         maxTotal={limit}
         enableCombatSort
+        enableTypeFilter
         onSelectedMapChange={(next) => {
           setDraft(next);
           if (error) setError('');
