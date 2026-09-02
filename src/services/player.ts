@@ -221,20 +221,34 @@ export async function removeMyProfileAvatar(previousPath?: string | null) {
   return { path: null as string | null, updatedAt: new Date().toISOString() };
 }
 
+const FULL_BAG_PAGE_SIZE = 800;
+
 export async function getMyBag(search?: string) {
   const userId = await getSessionUserId(true);
+  const rows: OwnedCardEntry[] = [];
+  const term = search?.trim();
 
-  let query = supabase
-    .from('player_cards')
-    .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at, tcg_data)')
-    .eq('player_id', userId)
-    .gt('quantity', 0)
-    .order('first_obtained_at', { ascending: false });
+  for (let from = 0; ; from += FULL_BAG_PAGE_SIZE) {
+    let query = supabase
+      .from('player_cards')
+      .select('quantity, favorite, first_obtained_at, cards(id, pokemon_name, pokedex_numbers, set_id, set_name, card_number, rarity, types, image_small, image_large, game_value, market_price_usd, market_price_low_usd, market_price_high_usd, market_price_variant, market_price_source, market_price_updated_at, tcg_data)')
+      .eq('player_id', userId)
+      .gt('quantity', 0)
+      .order('first_obtained_at', { ascending: false })
+      .range(from, from + FULL_BAG_PAGE_SIZE - 1);
 
-  if (search?.trim()) query = query.ilike('cards.pokemon_name', `%${search.trim()}%`);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data as unknown as OwnedCardEntry[];
+    if (term) query = query.ilike('cards.pokemon_name', `%${term}%`);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const page = (data ?? []) as unknown as OwnedCardEntry[];
+    rows.push(...page);
+
+    if (page.length < FULL_BAG_PAGE_SIZE) break;
+  }
+
+  return rows;
 }
 
 export async function getMyLegacyCardPool(): Promise<OwnedCardEntry[]> {
