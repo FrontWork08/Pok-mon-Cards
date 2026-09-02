@@ -8,7 +8,7 @@ import { CompactTrainerBanner } from '@/components/CompactTrainerBanner';
 import { supabase } from '@/lib/supabase';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
 import { getMyDecks } from '@/services/decks';
-import { cancelBattle, forfeitBattle, getBattle, getBattleCardStakes, getBattleDraftCards, getBattleEvents, getBattleRounds, lockBattleCard, pickBattleDraftCard, rematchBattle, resolveBattleTimeout, respondToBattle, subscribeToBattle } from '@/services/battles';
+import { cancelBattle, chooseBattleAttack, forfeitBattle, getBattle, getBattleAttackState, getBattleCardStakes, getBattleDraftCards, getBattleEvents, getBattleRounds, lockBattleCard, pickBattleDraftCard, rematchBattle, resolveBattleTimeout, respondToBattle, subscribeToBattle } from '@/services/battles';
 import { isFunctionErrorCode } from '@/services/functionErrors';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -29,6 +29,8 @@ export default function BattleScreen() {
   const [decks, setDecks] = useState<any[]>([]);
   const [players, setPlayers] = useState<Record<string, any>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedAttackName, setSelectedAttackName] = useState<string | null>(null);
+  const [attackState, setAttackState] = useState<any>(null);
   const [stakeCardId, setStakeCardId] = useState<string | null>(null);
   const [sourceDeck, setSourceDeck] = useState<string>('bag');
   const [pickerMode, setPickerMode] = useState<'battle' | 'stake' | null>(null);
@@ -67,6 +69,15 @@ export default function BattleScreen() {
         setEvents(eventData);
         setStakes(stakeData ?? []);
         setDraftCards(draftData ?? []);
+
+        if (battleData.mode === 'draft3' && battleData.status === 'revealing') {
+          const nextAttackState = await getBattleAttackState(String(id)).catch(() => null);
+          setAttackState(nextAttackState);
+          if (nextAttackState?.myAttackName) setSelectedAttackName(String(nextAttackState.myAttackName));
+        } else {
+          setAttackState(null);
+          setSelectedAttackName(null);
+        }
 
         const ids = [String(battleData.challenger_id), String(battleData.opponent_id)];
         const pairKey = [...ids].sort().join(':');
@@ -134,7 +145,7 @@ export default function BattleScreen() {
   }, [id, loadBattleState]);
 
   useEffect(() => {
-    if (!battle?.selection_deadline || !['drafting', 'selecting'].includes(battle.status)) { setRemaining(0); return; }
+    if (!battle?.selection_deadline || !['drafting', 'selecting', 'revealing'].includes(battle.status)) { setRemaining(0); return; }
     const tick = () => setRemaining(Math.max(0, Math.ceil((new Date(battle.selection_deadline).getTime() - Date.now()) / 1000)));
     tick();
     const timer = setInterval(tick, 1000);
@@ -142,7 +153,7 @@ export default function BattleScreen() {
   }, [battle?.selection_deadline, battle?.status]);
 
   useEffect(() => {
-    if (!battle || !['drafting', 'selecting'].includes(battle.status) || remaining > 0 || !id) return;
+    if (!battle || !['drafting', 'selecting', 'revealing'].includes(battle.status) || remaining > 0 || !id) return;
     const timeoutKey = `${battle.status}:${battle.status === 'drafting' ? battle.draft_pick_count : battle.active_round}`;
     if (timeoutRound.current === timeoutKey) return;
     timeoutRound.current = timeoutKey;
@@ -170,6 +181,13 @@ export default function BattleScreen() {
 
   const currentRound = Number(battle?.active_round ?? 1);
   const isDrafting = battle?.status === 'drafting';
+  const choosingAttack = battle?.mode === 'draft3' && battle?.status === 'revealing';
+  const myAttackLocked = Boolean(attackState?.myLocked);
+  const opponentAttackLocked = Boolean(attackState?.opponentLocked);
+  const attackOptions = Array.isArray(attackState?.attacks) ? attackState.attacks : [];
+  const manualAttackOptions = attackOptions.length
+    ? attackOptions
+    : [{ name: 'Sem ataque', damage: '0', text: 'Este Pokémon não possui ataque impresso.', convertedEnergyCost: 0, __noAttack: true }];
   const lockedPlayers = useMemo(() => new Set(events.filter((event) => ['card_locked', 'auto_locked'].includes(event.event_type) && Number(event.payload?.round) === currentRound).map((event) => event.payload?.playerId).filter(Boolean)), [currentRound, events]);
   const selfLocked = lockedPlayers.has(userId);
   const otherId = battle ? (battle.challenger_id === userId ? battle.opponent_id : battle.challenger_id) : '';
@@ -245,7 +263,12 @@ export default function BattleScreen() {
       setWorking(true); setNotice(null);
       const result = await lockBattleCard(String(id), selectedId);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
-      if (result?.resolved) setNotice('As duas cartas foram travadas. Resultado revelado!');
+      if (result?.attackSelectionRequired) {
+        setSelectedAttackName(null);
+        setNotice('Pokémons definidos. Agora escolha o ataque desta rodada.');
+      } else if (result?.resolved) {
+        setNotice('As duas cartas foram travadas. Resultado revelado!');
+      }
       await loadBattleState();
     } catch (error) {
       if (isFunctionErrorCode(error, 'BATTLE_RULE_REVIEW_REQUIRED')) {
@@ -257,6 +280,29 @@ export default function BattleScreen() {
         setNotice(error instanceof Error ? error.message : 'Não foi possível travar a carta.');
       }
     } finally { setWorking(false); }
+  }
+
+  async function confirmAttack() {
+    if (!id || !choosingAttack || !selectedAttackName || myAttackLocked || working) return;
+    try {
+      setWorking(true);
+      setNotice(null);
+      const result = await chooseBattleAttack(String(id), selectedAttackName);
+      if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
+      if (result?.resolved) {
+        setNotice('Ataques definidos. Rodada resolvida!');
+      } else {
+        setNotice('Ataque travado. Aguardando o adversário.');
+      }
+      await loadBattleState();
+    } catch (error) {
+      if (isFunctionErrorCode(error, 'ALREADY_ATTACK_LOCKED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) {
+        await loadBattleState().catch(() => null);
+      }
+      setNotice(error instanceof Error ? error.message : 'Não foi possível escolher o ataque.');
+    } finally {
+      setWorking(false);
+    }
   }
 
   async function cancel() {
@@ -325,6 +371,7 @@ export default function BattleScreen() {
   const winnerName = players[battle.winner_id]?.username;
   const selecting = battle.status === 'selecting';
   const drafting = battle.status === 'drafting';
+  const attacking = battle.status === 'revealing' && battle.mode === 'draft3';
   const invited = battle.status === 'invited';
   const completed = battle.status === 'completed';
 
@@ -340,7 +387,7 @@ export default function BattleScreen() {
           <PlayerSide label="OPONENTE" player={opponent} score={battle.opponent_score} right />
         </View>
 
-        {(drafting || selecting) ? (
+        {(drafting || selecting || attacking) ? (
           <View style={[styles.forfeitPanel,{backgroundColor:colors.surface,borderColor:'#6B303A'}]}>
             <View style={styles.forfeitCopy}>
               <Ionicons name="flag" size={18} color="#FF8792"/>
@@ -423,6 +470,80 @@ export default function BattleScreen() {
           </>
         ) : null}
 
+        {attacking ? (
+          <View style={[styles.sourcePanel, { backgroundColor: colors.surface, borderColor: colors.accent }]}>
+            <View style={styles.timerPanel}>
+              <Text style={[styles.roundLabel, { color: colors.muted }]}>RODADA {currentRound} • ESCOLHA DE ATAQUE</Text>
+              <Text style={[styles.timer, { color: remaining <= 5 ? '#FF566B' : colors.text }]}>{String(Math.floor(remaining / 60)).padStart(2, '0')}:{String(remaining % 60).padStart(2, '0')}</Text>
+              <Text style={[styles.timerHint, { color: colors.muted }]}>
+                {remaining === 0 ? 'Tempo encerrado. O servidor escolherá um ataque automaticamente…' : 'Escolha qual ataque seu Pokémon usará neste confronto.'}
+              </Text>
+            </View>
+
+            <View style={[styles.openPicker, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+              {attackState?.myCardImage ? <Image source={{ uri: attackState.myCardImage }} style={styles.chooseStakeThumb} resizeMode="contain" /> : <Ionicons name="flash" size={30} color={colors.accent} />}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.openPickerTitle, { color: colors.text }]}>{attackState?.myCardName ?? 'Seu Pokémon'}</Text>
+                <Text style={[styles.openPickerMeta, { color: colors.muted }]}>Energia virtual começa em 0 e sobe +1 por turno. O ataque escolhido é usado assim que houver Energia suficiente.</Text>
+              </View>
+            </View>
+
+            <Text style={[styles.sourceLabel, { color: colors.muted }]}>ATAQUES DISPONÍVEIS</Text>
+            <View style={{ gap: 9 }}>
+              {manualAttackOptions.map((attack: any, index: number) => {
+                const rawName = attack?.__noAttack ? '__NO_ATTACK__' : String(attack?.name ?? '');
+                const displayName = attack?.__noAttack ? 'Sem ataque' : String(attack?.name ?? 'Ataque');
+                const energy = Number(attack?.convertedEnergyCost ?? (Array.isArray(attack?.cost) ? attack.cost.length : 0));
+                const selected = selectedAttackName === rawName || (myAttackLocked && attackState?.myAttackName === rawName);
+                return (
+                  <Pressable
+                    key={`${displayName}:${index}`}
+                    disabled={myAttackLocked || working || remaining === 0}
+                    onPress={() => setSelectedAttackName(rawName)}
+                    style={[
+                      styles.openPicker,
+                      {
+                        backgroundColor: selected ? colors.accentSoft : colors.surfaceAlt,
+                        borderColor: selected ? colors.yellow : colors.border,
+                        opacity: myAttackLocked && !selected ? 0.55 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.openPickerTitle, { color: colors.text }]}>{displayName}</Text>
+                      <Text style={[styles.openPickerMeta, { color: colors.yellow }]}>⚡ {energy} Energia • Dano {String(attack?.damage || '—')}</Text>
+                      {attack?.text ? <Text style={[styles.openPickerMeta, { color: colors.muted }]}>{String(attack.text)}</Text> : null}
+                    </View>
+                    <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={selected ? colors.yellow : colors.muted} />
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={[styles.lockedNotice, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+              <Ionicons name={opponentAttackLocked ? 'checkmark-circle' : 'time-outline'} size={20} color={opponentAttackLocked ? '#65D894' : colors.accent} />
+              <Text style={[styles.lockedText, { color: colors.text }]}>
+                {opponentAttackLocked ? 'O adversário já escolheu o ataque.' : 'O ataque do adversário continua secreto até a rodada ser resolvida.'}
+              </Text>
+            </View>
+
+            {myAttackLocked ? (
+              <View style={[styles.lockedNotice, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+                <Ionicons name="lock-closed" size={20} color={colors.accent} />
+                <Text style={[styles.lockedText, { color: colors.text }]}>Seu ataque está travado: {attackState?.myAttackName === '__NO_ATTACK__' ? 'Sem ataque' : attackState?.myAttackName}. Aguardando o adversário.</Text>
+              </View>
+            ) : (
+              <Pressable
+                disabled={!selectedAttackName || working || remaining === 0}
+                onPress={() => void confirmAttack()}
+                style={[styles.accept, { backgroundColor: colors.yellow }, (!selectedAttackName || working || remaining === 0) && styles.disabled]}
+              >
+                <Text style={styles.acceptText}>{working ? 'CONFIRMANDO…' : 'USAR ESTE ATAQUE'}</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : null}
+
         {rounds.length ? (
           <View style={[styles.historyPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.historyTitle, { color: colors.text }]}>Rodadas reveladas</Text>
@@ -449,7 +570,7 @@ export default function BattleScreen() {
           </View>
         ) : null}
 
-        {!invited && !drafting && !selecting && !completed ? <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.panelTitle, { color: colors.text }]}>Batalha {String(battle.status).toLowerCase()}</Text><Text style={[styles.panelText, { color: colors.muted }]}>Este desafio já não está ativo.</Text><Pressable style={[styles.secondary, { borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Text style={[styles.secondaryText, { color: colors.text }]}>VOLTAR</Text></Pressable></View> : null}
+        {!invited && !drafting && !selecting && !attacking && !completed ? <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.panelTitle, { color: colors.text }]}>Batalha {String(battle.status).toLowerCase()}</Text><Text style={[styles.panelText, { color: colors.muted }]}>Este desafio já não está ativo.</Text><Pressable style={[styles.secondary, { borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Text style={[styles.secondaryText, { color: colors.text }]}>VOLTAR</Text></Pressable></View> : null}
       </ScrollView>
 
       {selecting ? (
