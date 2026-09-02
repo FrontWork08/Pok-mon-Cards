@@ -219,14 +219,14 @@ export default function BattleScreen() {
   const resultMyCombat = resultRound ? (resultMyIsChallenger ? resultRound.challenger_combat : resultRound.opponent_combat) : null;
   const resultRivalCombat = resultRound ? (resultMyIsChallenger ? resultRound.opponent_combat : resultRound.challenger_combat) : null;
 
-  const attackArenaMy: PixelBattleFighter | null = attacking ? {
+  const attackArenaMy: PixelBattleFighter | null = choosingAttack ? {
     name: String(attackState?.myCardName ?? 'Seu Pokémon'),
     pokedexNumber: attackState?.myPokedexNumber == null ? null : Number(attackState.myPokedexNumber),
     fallbackImage: attackState?.myCardImage ?? null,
     hp: attackState?.myHp == null ? null : Number(attackState.myHp),
     maxHp: attackState?.myHp == null ? null : Number(attackState.myHp),
   } : null;
-  const attackArenaRival: PixelBattleFighter | null = attacking ? {
+  const attackArenaRival: PixelBattleFighter | null = choosingAttack ? {
     name: String(attackState?.opponentCardName ?? 'Pokémon rival'),
     pokedexNumber: attackState?.opponentPokedexNumber == null ? null : Number(attackState.opponentPokedexNumber),
     fallbackImage: attackState?.opponentCardImage ?? null,
@@ -287,16 +287,18 @@ export default function BattleScreen() {
         arenaResultTimer.current = null;
       }
     };
-  }, [battle?.mode, latestRound]);
+  // latestRound object is refreshed by realtime; the round number is the stable trigger.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [battle?.mode, latestRound?.round_no]);
 
   useEffect(() => {
-    if (!attacking) return;
+    if (!choosingAttack) return;
     setArenaResultRound(null);
     if (arenaResultTimer.current) {
       clearTimeout(arenaResultTimer.current);
       arenaResultTimer.current = null;
     }
-  }, [attacking]);
+  }, [choosingAttack]);
 
   async function respond(accept: boolean) {
     if (!id) return;
