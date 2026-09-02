@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { AuraFrame } from '@/components/AuraFrame';
+import { PokemonTypeSymbolFilter } from '@/components/PokemonTypeSymbolFilter';
 import {
   attackGuildWarGym,
   getGuildHub,
@@ -884,7 +885,7 @@ function CardPickerModal({
               </View>
 
               {types.length ? (
-                <>
+                <View style={styles.guildTypeFilterBlock}>
                   <View style={styles.filterHeadingRow}>
                     <Text style={[styles.filterHeading,{color:colors.muted}]}>TIPO</Text>
                     {hasFilters ? (
@@ -893,27 +894,13 @@ function CardPickerModal({
                       </Pressable>
                     ) : null}
                   </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipRow}>
-                    {['all', ...types].map((type) => {
-                      const active = typeFilter === type;
-                      return (
-                        <Pressable
-                          key={type}
-                          onPress={() => setTypeFilter(type)}
-                          style={[
-                            styles.statChip,
-                            {
-                              backgroundColor: active ? colors.accentSoft : colors.surfaceAlt,
-                              borderColor: active ? colors.accent : colors.border,
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.statChipText,{color:active?colors.accent:colors.muted}]}>{type==='all'?'TODOS':type.toUpperCase()}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                </>
+                  <PokemonTypeSymbolFilter
+                    types={types}
+                    selectedType={typeFilter === 'all' ? null : typeFilter}
+                    onChange={(type) => setTypeFilter(type ?? 'all')}
+                    title=""
+                  />
+                </View>
               ) : null}
             </View>
           ) : null}
