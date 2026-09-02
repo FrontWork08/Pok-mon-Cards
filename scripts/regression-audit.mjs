@@ -436,6 +436,11 @@ if (existsSync('src/services/player.ts')) {
   const profileStats = playerService.split('export async function getMyProfileStats')[1]?.split('\n}')[0] ?? '';
   assert(profileStats.includes("rpc('get_my_profile_stats_fast')"), 'Regressão de performance: perfil voltou a baixar a Bag inteira para calcular estatísticas.');
   assert(!profileStats.includes('getMyBag()'), 'Regressão de performance: getMyProfileStats voltou ao scan completo da Bag no cliente.');
+  const fullBag = playerService.split('export async function getMyBag')[1]?.split('export async function getMyLegacyCardPool')[0] ?? '';
+  assert(fullBag.includes('FULL_BAG_PAGE_SIZE'), 'Regressão: Bag completa deixou de paginar coleções grandes.');
+  assert(fullBag.includes('.range(from, from + FULL_BAG_PAGE_SIZE - 1)'), 'Regressão: getMyBag voltou a depender de uma única resposta limitada pela API.');
+  assert(fullBag.includes(".order('card_id', { ascending: true })"), 'Regressão: paginação da Bag completa perdeu ordenação estável e pode pular cartas.');
+  assert(fullBag.includes('if (page.length < FULL_BAG_PAGE_SIZE) break;'), 'Regressão: paginação da Bag completa não percorre todas as páginas.');
 }
 
 if (existsSync('app/(tabs)/profile.tsx')) {
