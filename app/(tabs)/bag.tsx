@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerPageHeader } from '@/components/TrainerPageHeader';
+import { PokemonTypeSymbolFilter } from '@/components/PokemonTypeSymbolFilter';
 import { AuraFrame } from '@/components/AuraFrame';
 import {
   getMyBagOverview,
@@ -32,27 +33,6 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
 
 const PAGE_SIZE = 48;
-
-const BAG_TYPE_SYMBOLS: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; soft: string }> = {
-  water: { label: 'ÁGUA', icon: 'water', color: '#59A9FF', soft: '#132A3D' },
-  fire: { label: 'FOGO', icon: 'flame', color: '#FF725C', soft: '#3A1B18' },
-  grass: { label: 'PLANTA', icon: 'leaf', color: '#6FD072', soft: '#19311E' },
-  lightning: { label: 'ELÉTRICO', icon: 'flash', color: '#FFD447', soft: '#3A3214' },
-  electric: { label: 'ELÉTRICO', icon: 'flash', color: '#FFD447', soft: '#3A3214' },
-  psychic: { label: 'PSÍQUICO', icon: 'eye', color: '#D57CFF', soft: '#2F1B3A' },
-  fighting: { label: 'LUTADOR', icon: 'barbell', color: '#D99463', soft: '#332318' },
-  darkness: { label: 'SOMBRIO', icon: 'moon', color: '#8C93A0', soft: '#20242A' },
-  dark: { label: 'SOMBRIO', icon: 'moon', color: '#8C93A0', soft: '#20242A' },
-  metal: { label: 'METAL', icon: 'shield-half', color: '#B8C3CE', soft: '#252D34' },
-  colorless: { label: 'INCOLOR', icon: 'star', color: '#D8D8D8', soft: '#303030' },
-  dragon: { label: 'DRAGÃO', icon: 'diamond', color: '#C79BFF', soft: '#2B2035' },
-  fairy: { label: 'FADA', icon: 'sparkles', color: '#FF9DD3', soft: '#371D2D' },
-};
-
-function getBagTypeSymbol(type: string) {
-  const key = String(type ?? '').trim().toLowerCase();
-  return BAG_TYPE_SYMBOLS[key] ?? { label: String(type ?? '').toUpperCase(), icon: 'ellipse' as keyof typeof Ionicons.glyphMap, color: '#AAB4BF', soft: '#232A31' };
-}
 
 function bagThemePalette(id:string,accent:string,yellow:string){
   const key=id.toLowerCase();
@@ -253,21 +233,12 @@ export default function BagScreen() {
       </View>
 
       {showAdvanced ? <View style={[styles.advancedPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={styles.filterGroup}>
-          <Text style={[styles.filterTitle, { color: colors.muted }]}>TIPO</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bagTypeChips}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Mostrar todos os tipos"
-              onPress={() => setTypeFilter(null)}
-              style={[styles.bagAllTypesChip, { backgroundColor: typeFilter === null ? colors.accentSoft : colors.surfaceAlt, borderColor: typeFilter === null ? colors.accent : colors.border }]}
-            >
-              <Ionicons name="apps" size={18} color={typeFilter === null ? colors.accent : colors.muted} />
-              <Text style={[styles.bagAllTypesText, { color: typeFilter === null ? colors.text : colors.muted }]}>TODOS</Text>
-            </Pressable>
-            {(overview?.types ?? []).map((type) => <BagTypeSymbolChip key={type} type={type} active={typeFilter === type} onPress={() => setTypeFilter(type)} />)}
-          </ScrollView>
-        </View>
+        <PokemonTypeSymbolFilter
+          types={overview?.types ?? []}
+          selectedType={typeFilter}
+          onChange={setTypeFilter}
+          title="TIPO"
+        />
         <FilterGroup title="RARIDADE"><SmallChip label="Todas" active={rarityFilter === null} onPress={() => setRarityFilter(null)} />{(overview?.rarities ?? []).map((rarity) => <SmallChip key={rarity} label={rarity} active={rarityFilter === rarity} onPress={() => setRarityFilter(rarity)} />)}</FilterGroup>
         <FilterGroup title="GERAÇÃO"><SmallChip label="Todas" active={generation === null} onPress={() => setGeneration(null)} />{[1,2,3,4,5,6,7,8,9].map((gen) => <SmallChip key={gen} label={`Gen ${gen}`} active={generation === gen} onPress={() => setGeneration(gen)} />)}</FilterGroup>
         <View style={styles.filterGroup}><Text style={[styles.filterTitle, { color: colors.muted }]}>SET</Text><TextInput value={setQuery} onChangeText={setSetQuery} placeholder="Ex.: Journey Together" placeholderTextColor={colors.muted} style={[styles.setInput, { color: colors.text, backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} /></View>
@@ -406,29 +377,6 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
   );
 });
 
-function BagTypeSymbolChip({ type, active, onPress }: { type: string; active: boolean; onPress: () => void }) {
-  const visual = getBagTypeSymbol(type);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Filtrar tipo ${visual.label}`}
-      onPress={onPress}
-      style={styles.bagTypeSymbolButton}
-    >
-      <View style={[
-        styles.bagTypeSymbolCircle,
-        {
-          backgroundColor: active ? visual.soft : 'transparent',
-          borderColor: active ? visual.color : '#39414A',
-        },
-      ]}>
-        <Ionicons name={visual.icon} size={22} color={visual.color} />
-      </View>
-      <Text numberOfLines={1} style={[styles.bagTypeSymbolLabel, { color: active ? visual.color : '#8E9AA6' }]}>{visual.label}</Text>
-    </Pressable>
-  );
-}
-
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) { const { colors } = useAppTheme(); return <View style={styles.filterGroup}><Text style={[styles.filterTitle, { color: colors.muted }]}>{title}</Text><View style={styles.smallChips}>{children}</View></View>; }
 function SmallChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) { const { colors } = useAppTheme(); return <Pressable onPress={onPress} style={[styles.smallChip, { backgroundColor: active ? colors.accentSoft : colors.surfaceAlt, borderColor: active ? colors.accent : colors.border }]}><Text style={[styles.smallChipText, { color: active ? colors.text : colors.muted }]}>{label}</Text></Pressable>; }
 function FilterChip({ active, label, icon, onPress }: { active: boolean; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }) { const { colors } = useAppTheme(); return <Pressable onPress={onPress} style={[styles.filterChip, { backgroundColor: active ? colors.yellow : colors.surface, borderColor: active ? colors.yellow : colors.border }]}><Ionicons name={icon} size={14} color={active ? '#07111F' : colors.muted} /><Text style={[styles.filterText, { color: active ? '#07111F' : colors.muted }]}>{label}</Text></Pressable>; }
@@ -475,12 +423,6 @@ const styles = StyleSheet.create({
   advancedPanel: { gap: 11, padding: 12, borderRadius: 17, borderWidth: 1 },
   filterGroup: { gap: 8 },
   filterTitle: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
-  bagTypeChips: { gap: 9, paddingRight: 8, alignItems: 'flex-start' },
-  bagAllTypesChip: { minHeight: 46, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  bagAllTypesText: { fontSize: 7, fontWeight: '900' },
-  bagTypeSymbolButton: { width: 48, alignItems: 'center', gap: 4 },
-  bagTypeSymbolCircle: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  bagTypeSymbolLabel: { width: 52, textAlign: 'center', fontSize: 5.5, fontWeight: '900', letterSpacing: .1 },
   smallChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   smallChip: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 999, borderWidth: 1 },
   smallChipText: { fontSize: 9, fontWeight: '800' },
