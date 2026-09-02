@@ -119,6 +119,11 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(battle.includes('PixelBattleArena'), 'Regressão de UX: Draft 3 perdeu a arena 2D experimental.');
   assert(battle.includes('arenaResultRound'), 'Regressão de UX: arena 2D deixou de exibir a animação após resolver a rodada.');
   assert(battle.includes('opponentPokedexNumber'), 'Regressão de UX: arena 2D perdeu o sprite do Pokémon rival.');
+  assert(battle.includes('enableCombatSort') && battle.includes('enableTypeFilter'), 'Regressão de UX: batalha deixou de ativar filtros TCG de ataque/defesa/tipo.');
+  assert(battle.includes('sourceOptions={drafting') && battle.includes('onSourceChange={setSourceDeck}'), 'Regressão Draft 3: seletor deixou de permitir escolher deck como fonte.');
+  assert(battle.includes('standardPickerBag.filter'), 'Regressão Draft 3: deck escolhido voltou a ser ignorado durante o draft público.');
+  assert(battle.includes('DraftCardPreviewModal') && battle.includes('TOQUE PARA AMPLIAR'), 'Regressão Draft 3: carta pública do rival deixou de abrir visualização ampliada.');
+  assert(battle.includes('HP / DEFESA') && battle.includes('MAIOR ATAQUE') && battle.includes('ATAQUES'), 'Regressão Draft 3: visualização ampliada perdeu características de batalha.');
   const stateLoader = battle.split('const loadBattleState')[1]?.split('const loadStaticBattleResources')[0] ?? '';
   assert(!stateLoader.includes('getMyBag()') && !stateLoader.includes('getMyDecks()'), 'Regressão de performance: realtime da batalha voltou a baixar Bag/Decks completos.');
 }
@@ -246,6 +251,9 @@ if (existsSync('supabase/functions/battle-action/index.ts')) {
 if (existsSync('src/components/CardPickerModal.tsx')) {
   const picker = read('src/components/CardPickerModal.tsx');
   assert(picker.includes('Visão geral TCG'), 'Regressão de UX: seletor de batalha deixou de apresentar visão TCG.');
+  assert(picker.includes('ATK MAIOR') && picker.includes('DEF MAIOR'), 'Regressão de UX: seletor de batalha perdeu filtros de maior ataque/defesa.');
+  assert(picker.includes('TIPO DO POKÉMON') && picker.includes('selectedType'), 'Regressão de UX: seletor de batalha perdeu filtro por tipo.');
+  assert(picker.includes('FONTE DAS CARTAS') && picker.includes('sourceOptions'), 'Regressão de UX: seletor de batalha perdeu escolha entre Bag e decks.');
   assert(!picker.includes('PWR ${combat.battleRating}'), 'Regressão de UX: seletor voltou a sugerir que PWR decide a batalha.');
 }
 
