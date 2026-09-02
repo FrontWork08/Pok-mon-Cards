@@ -64,6 +64,79 @@ Deno.serve(async (req: Request) => {
 
   const body = await req.json().catch(() => ({}));
 
+  async function ensureRankedBots() {
+    const specs = [
+      { key: "novato", username: "IA Novato", rating: 850, icon: "pokeball" },
+      { key: "bronze", username: "IA Bronze", rating: 1000, icon: "fire" },
+      { key: "prata", username: "IA Prata", rating: 1150, icon: "water" },
+      { key: "ouro", username: "IA Ouro", rating: 1300, icon: "electric" },
+      { key: "elite", username: "IA Elite", rating: 1500, icon: "dragon" },
+      { key: "mestre", username: "IA Mestre", rating: 1700, icon: "ghost" },
+      { key: "lenda", username: "IA Lenda", rating: 1950, icon: "diamond" },
+    ];
+
+    const { data: rows, error: rowsError } = await admin
+      .from("players")
+      .select("id,username,is_bot,bot_rating_base")
+      .eq("is_bot", true);
+    if (rowsError) throw rowsError;
+
+    const existingByName = new Map((rows ?? []).map((row: any) => [String(row.username), row]));
+
+    for (const spec of specs) {
+      let playerId = existingByName.get(spec.username)?.id as string | undefined;
+
+      if (!playerId) {
+        const email = `ranked-bot-${spec.key}@trainer-bots.invalid`;
+        let userId: string | undefined;
+
+        const created = await admin.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: { username: spec.username },
+          app_metadata: {
+            system_bot: true,
+            bot_rating: String(spec.rating),
+          },
+        });
+
+        if (created.error) {
+          const listed = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+          if (listed.error) throw created.error;
+          userId = listed.data.users.find((item) => item.email === email)?.id;
+          if (!userId) throw created.error;
+        } else {
+          userId = created.data.user?.id;
+        }
+
+        if (!userId) throw new Error("RANKED_BOT_CREATE_FAILED");
+        playerId = userId;
+      }
+
+      const { error: updateError } = await admin
+        .from("players")
+        .update({
+          username: spec.username,
+          is_bot: true,
+          bot_rating_base: spec.rating,
+          battle_rating: spec.rating,
+          battle_wins: 0,
+          battle_losses: 0,
+          battle_streak: 0,
+          best_battle_streak: 0,
+          coins: 0,
+          diamonds: 0,
+          xp: 0,
+          level: 1,
+          account_status: "active",
+          profile_icon: spec.icon,
+        })
+        .eq("id", playerId);
+      if (updateError) throw updateError;
+    }
+  }
+
+
   async function sendInviteMessage(opponentId: string, battleId: string, mode: string, stakeType: string, wagerCoins: number, rematchOf?: string | null) {
     const { data: conversationId } = await admin.rpc("server_get_or_create_conversation", { p_actor_id: user.id, p_friend_id: opponentId });
     if (!conversationId) return;
@@ -79,6 +152,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (body.action === "matchmaking_join") {
+      await ensureRankedBots();
       const mode = body.mode === "draft3" ? "draft3" : body.mode === "mystery" ? "mystery" : "quick";
       const { data, error } = await admin.rpc("server_matchmaking_join", {
         p_player_id: user.id,
