@@ -290,6 +290,8 @@ if (existsSync('app/(tabs)/bag.tsx')) {
   assert(bagUi.includes('AuraFrame'), 'Regressão visual: cartas personalizadas da Bag perderam a moldura temática.');
   assert(bagUi.includes('entry.economyStyle'), 'Regressão visual: Bag não usa mais o tema salvo por carta.');
   assert(bagUi.includes('themeTag'), 'Regressão de UX: Bag deixou de identificar o nome do tema aplicado.');
+  assert(bagUi.includes('BagTypeSymbolChip') && bagUi.includes('BAG_TYPE_SYMBOLS'), 'Regressão de UX: filtro de tipo da Bag voltou a usar apenas texto.');
+  assert(bagUi.includes("water: { label: 'ÁGUA', icon: 'water'") && bagUi.includes("fire: { label: 'FOGO', icon: 'flame'") && bagUi.includes("lightning: { label: 'ELÉTRICO', icon: 'flash'"), 'Regressão de UX: símbolos principais de tipo da Bag foram removidos.');
   assert(bagUi.includes('imageThemeTint') && bagUi.includes('imageThemeStroke'), 'Regressão visual: tema deixou de cobrir a imagem da carta na Bag.');
   assert(bagUi.includes("variant={galaxy?'galaxy':'energy'}"), 'Regressão visual: Galaxy Flow da Bag perdeu o efeito cósmico.');
   assert(bagUi.includes('cardThemed:{marginBottom:0}'), 'Regressão visual: cards temáticos voltaram a quebrar o espaçamento da grade.');
