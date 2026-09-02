@@ -11,6 +11,7 @@ const requiredFiles = [
   'supabase/migrations/20260901180938_battle_rules_v6_exhaustive_catalog_resolution.sql',
   'supabase/migrations/20260902111731_battle_rules_future_quarantine_and_regressions.sql',
   'supabase/migrations/20260902115736_fix_bot_timeout_and_diversify_ranked_ai.sql',
+  'supabase/migrations/20260902120727_fix_restricted_entry_battle_cards.sql',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -148,6 +149,17 @@ if (existsSync('supabase/migrations/20260902115736_fix_bot_timeout_and_diversify
   assert(botTimeout.includes('current_species') && botTimeout.includes('recent_species'), 'Regressão de IA: seleção perdeu diversidade por espécie atual/recente.');
   assert(botTimeout.includes('diverse_pool'), 'Regressão de IA: pool forte diversificado foi removido.');
   assert(botTimeout.includes('autoResolvedSelection'), 'Regressão de batalha: timeout não confirma mais a seleção automática completa.');
+}
+
+
+if (existsSync('supabase/migrations/20260902120727_fix_restricted_entry_battle_cards.sql')) {
+  const restrictedEntry = read('supabase/migrations/20260902120727_fix_restricted_entry_battle_cards.sql');
+  assert(restrictedEntry.includes('battle_v6_entry_setup_turns'), 'Regressão v6: regra de setup para cartas com entrada restrita foi removida.');
+  assert(restrictedEntry.includes('entry_setup_skip'), 'Regressão v6: simulador deixou de consumir o setup de Hero\'s Spirit/Shell Survival.');
+  assert(restrictedEntry.includes('palafinEntrySetup'), 'Regressão v6: Palafin ex perdeu o teste específico de Hero\'s Spirit.');
+  assert(restrictedEntry.includes('palafinCooldown'), 'Regressão v6: Giga Impact do Palafin perdeu o teste de cooldown.');
+  assert(restrictedEntry.includes('shedinjaEntrySetup'), 'Regressão v6: Shedinja perdeu o teste de entrada por Cast-Off Shell.');
+  assert(restrictedEntry.includes('v_setup_penalty:=0.88'), 'Regressão de balanceamento: força calculada ignora novamente o custo de setup das cartas restritas.');
 }
 
 if (existsSync('src/components/CardPickerModal.tsx')) {
