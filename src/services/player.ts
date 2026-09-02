@@ -235,6 +235,7 @@ export async function getMyBag(search?: string) {
       .eq('player_id', userId)
       .gt('quantity', 0)
       .order('first_obtained_at', { ascending: false })
+      .order('card_id', { ascending: true })
       .range(from, from + FULL_BAG_PAGE_SIZE - 1);
 
     if (term) query = query.ilike('cards.pokemon_name', `%${term}%`);
