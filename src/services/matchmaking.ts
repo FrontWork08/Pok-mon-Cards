@@ -34,6 +34,9 @@ export async function joinMatchmaking(mode: BattleMode) {
     battleId?: string;
     mode?: BattleMode;
     seasonId?: string | null;
+    botMatch?: boolean;
+    botRating?: number;
+    botFallbackAfterSeconds?: number;
   }>;
 }
 
