@@ -76,6 +76,40 @@ export default function BattlesHubScreen() {
       }
     });
   }, [profile?.id, router]);
+  useEffect(() => {
+    if (queueState?.status !== 'waiting') return;
+
+    let disposed = false;
+    let inFlight = false;
+
+    const poll = async () => {
+      if (disposed || inFlight) return;
+      inFlight = true;
+      try {
+        const result = await joinMatchmaking(queueState.mode_choice);
+        if (disposed) return;
+        if (result.status === 'matched' && result.battleId) {
+          setNotice(result.botMatch ? 'Fila preenchida por um Treinador IA de ELO próximo.' : 'Partida encontrada!');
+          router.push(`/battle/${result.battleId}`);
+        }
+      } catch (e) {
+        if (isFunctionErrorCode(e, 'ACTIVE_BATTLE_EXISTS')) {
+          const currentBattle = await getMyActiveBattle().catch(() => null);
+          if (!disposed && currentBattle?.id) router.push(`/battle/${currentBattle.id}`);
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const first = setTimeout(() => { void poll(); }, 4500);
+    const timer = setInterval(() => { void poll(); }, 5000);
+    return () => {
+      disposed = true;
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [queueState?.status, queueState?.mode_choice, router]);
   const completed = useMemo(() => history.filter((item) => item.status === 'completed'), [history]);
   const incomingInvites = useMemo(
     () => history.filter((item) => item.status === 'invited' && item.opponent_id === profile?.id),
@@ -242,7 +276,7 @@ export default function BattlesHubScreen() {
         <View style={styles.grow}>
           <Text style={[styles.rankedTitle, { color: colors.text }]}>Matchmaking Ranqueado</Text>
           <Text style={[styles.sectionDescription, { color: colors.muted }]}>
-            {queueState?.status === 'waiting' ? 'Procurando adversário em segundo plano. Pode navegar normalmente.' : 'Encontre qualquer treinador na fila. Se os modos forem diferentes, um dos dois é sorteado.'}
+            {queueState?.status === 'waiting' ? 'Procurando jogador real. Se ninguém aparecer, um Treinador IA de ELO próximo entra após 18 segundos.' : 'Jogadores reais têm prioridade. Se a fila estiver vazia, a IA preenche a rankeada sem travar sua busca.'}
           </Text>
         </View>
         {queueState?.status === 'waiting' ? <View style={styles.searchingDot}><ActivityIndicator size="small" color="#07111F"/></View> : null}
@@ -257,7 +291,7 @@ export default function BattlesHubScreen() {
       </View>
       {queueState?.status === 'waiting' ? (
         <View style={styles.queueFooter}>
-          <View style={styles.grow}><Text style={[styles.queueLabel,{color:colors.yellow}]}>BUSCANDO PARTIDA...</Text><Text style={[styles.sub,{color:colors.muted}]}>Modo escolhido: {queueState.mode_choice === 'draft3' ? 'Draft 3' : queueState.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'}</Text></View>
+          <View style={styles.grow}><Text style={[styles.queueLabel,{color:colors.yellow}]}>BUSCANDO PARTIDA...</Text><Text style={[styles.sub,{color:colors.muted}]}>Modo: {queueState.mode_choice === 'draft3' ? 'Draft 3' : queueState.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'} • jogador real primeiro • IA após 18s</Text></View>
           <Pressable disabled={working==='matchmaking'} onPress={()=>void stopRankedSearch()} style={[styles.cancelQueue,{borderColor:'#683243'}]}><Ionicons name="close" size={16} color="#FF8290"/><Text style={styles.cancelQueueText}>CANCELAR</Text></Pressable>
         </View>
       ) : (
@@ -409,13 +443,13 @@ export default function BattlesHubScreen() {
               <View style={[styles.resultIcon, { backgroundColor: won ? '#163426' : item.status === 'completed' ? '#391D26' : colors.surfaceAlt }]}><Ionicons name={won ? 'trophy' : item.status === 'completed' ? 'close-circle' : 'hourglass'} size={21} color={won ? '#63D99A' : item.status === 'completed' ? '#FF8290' : colors.muted}/></View>
               <TrainerAvatar icon={other?.profile_icon} avatarUrl={getProfileAvatarUrl(other?.avatar_path,other?.avatar_updated_at)} color={colors.accent} backgroundColor={colors.accentSoft} size={38}/>
               <View style={styles.grow}>
-                <Text style={[styles.name, { color: colors.text }]}>{item.status === 'completed' ? (won ? 'Vitória' : 'Derrota') : 'Batalha ' + item.status} vs @{other?.username ?? 'Treinador'}</Text>
-                <Text style={[styles.sub, { color: colors.muted }]}>{item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : item.stake_type === 'card' ? '🎴 valendo carta' : 'Casual'} • {item.challenger_score}–{item.opponent_score}</Text>
+                <Text style={[styles.name, { color: colors.text }]}>{item.status === 'completed' ? (won ? 'Vitória' : 'Derrota') : 'Batalha ' + item.status} vs {other?.is_bot ? `🤖 ${other?.username ?? 'Treinador IA'}` : `@${other?.username ?? 'Treinador'}`}</Text>
+                <Text style={[styles.sub, { color: colors.muted }]}>{item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.is_bot_match ? 'Treinador IA' : item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : item.stake_type === 'card' ? '🎴 valendo carta' : 'Casual'} • {item.challenger_score}–{item.opponent_score}</Text>
                 <Text style={[styles.sub, { color: item.reward_eligible === false ? '#E6A15A' : colors.muted }]}>{item.completed_at ? new Date(item.completed_at).toLocaleString('pt-BR') : new Date(item.created_at).toLocaleString('pt-BR')}{item.status === 'completed' ? ` • ELO ${delta >= 0 ? '+' : ''}${delta}` : ''}{item.reward_eligible === false ? ' • sem XP/ELO anti-farm' : ''}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.muted}/>
             </Pressable>
-            {item.status === 'completed' ? <Pressable style={[styles.rematch, { borderColor: colors.accent }]} onPress={() => rematch(item.id)} disabled={working === item.id}><Ionicons name="refresh" size={15} color={colors.accent}/><Text style={[styles.rematchText, { color: colors.accent }]}>{working === item.id ? 'CRIANDO...' : 'REVANCHE'}</Text></Pressable> : null}
+            {item.status === 'completed' && !item.is_bot_match ? <Pressable style={[styles.rematch, { borderColor: colors.accent }]} onPress={() => rematch(item.id)} disabled={working === item.id}><Ionicons name="refresh" size={15} color={colors.accent}/><Text style={[styles.rematchText, { color: colors.accent }]}>{working === item.id ? 'CRIANDO...' : 'REVANCHE'}</Text></Pressable> : null}
           </View>
         </CompactTrainerBanner>
       );
