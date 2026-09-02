@@ -1058,7 +1058,7 @@ Mais do que um aplicativo de cartas, ele representa um projeto integrado de enge
 
 **Aluno:** _Guilherme Teles_  
 **Turma:** _3°C_  
-**Instituição:** _E.E. Amaral Wagmer_ 
+**Instituição:** _E.E. Amaral Wagmer_
 **Ano:** 2026
 
 ---
