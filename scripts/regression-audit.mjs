@@ -18,6 +18,8 @@ const requiredFiles = [
   'supabase/migrations/20260902145620_make_owned_cosmetic_application_free.sql',
   'supabase/migrations/20260902145710_zero_cosmetic_application_metadata.sql',
   'supabase/migrations/20260902150615_neutralize_bot_elo_after_daily_limit.sql',
+  'supabase/migrations/20260902185822_expose_locked_battle_fighters_for_pixel_arena.sql',
+  'src/components/PixelBattleArena.tsx',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -114,6 +116,9 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(battle.includes('USAR ESTE ATAQUE'), 'Regressão Draft 3: botão de confirmação de ataque foi removido.');
   assert(battle.includes('Energia virtual começa em 0 e sobe +1 por turno'), 'Regressão Draft 3: UI deixou de explicar o custo de Energia do ataque manual.');
   assert(battle.includes("battle?.status === 'revealing'"), 'Regressão Draft 3: tela deixou de reconhecer a fase revealing de ataque.');
+  assert(battle.includes('PixelBattleArena'), 'Regressão de UX: Draft 3 perdeu a arena 2D experimental.');
+  assert(battle.includes('arenaResultRound'), 'Regressão de UX: arena 2D deixou de exibir a animação após resolver a rodada.');
+  assert(battle.includes('opponentPokedexNumber'), 'Regressão de UX: arena 2D perdeu o sprite do Pokémon rival.');
   const stateLoader = battle.split('const loadBattleState')[1]?.split('const loadStaticBattleResources')[0] ?? '';
   assert(!stateLoader.includes('getMyBag()') && !stateLoader.includes('getMyDecks()'), 'Regressão de performance: realtime da batalha voltou a baixar Bag/Decks completos.');
 }
@@ -227,6 +232,7 @@ if (existsSync('src/services/battles.ts')) {
   assert(battleService.includes("action: 'attack_state'"), 'Regressão Draft 3: serviço perdeu leitura segura do estado de ataque.');
   assert(battleService.includes("action: 'attack'"), 'Regressão Draft 3: serviço perdeu envio da escolha de ataque.');
   assert(battleService.includes("'revealing'"), 'Regressão Draft 3: batalha em escolha de ataque deixou de contar como ativa.');
+  assert(battleService.includes('pokedex_numbers'), 'Regressão de arena 2D: histórico deixou de carregar números da Pokédex para sprites.');
 }
 
 if (existsSync('supabase/functions/battle-action/index.ts')) {
@@ -925,6 +931,24 @@ if (existsSync('supabase/migrations/20260831121232_economy_v21_galaxy_flow_colle
   assert(galaxyDb.includes("'galaxy'::text"), 'Regressão Galaxy Flow: Marketplace perdeu o tema galaxy na constraint.');
   assert(galaxyDb.includes("when 'galaxy' then"), 'Regressão Galaxy Flow: ginásio perdeu o flare galáctico.');
   assert(galaxyDb.includes('750000'), 'Regressão Galaxy Flow: custo do flare de ginásio foi removido.');
+}
+
+
+if (existsSync('src/components/PixelBattleArena.tsx')) {
+  const pixelArena = read('src/components/PixelBattleArena.tsx');
+  assert(pixelArena.includes('raw.githubusercontent.com/PokeAPI/sprites'), 'Regressão de arena 2D: fonte dos sprites pixelados foi removida.');
+  assert(pixelArena.includes("back/"), 'Regressão de arena 2D: sprite traseiro do Pokémon do jogador foi removido.');
+  assert(pixelArena.includes('Animated.sequence'), 'Regressão de arena 2D: animações próprias de ataque/impacto foram removidas.');
+  assert(pixelArena.includes('REPLAY'), 'Regressão de arena 2D: replay da simulação visual foi removido.');
+  assert(pixelArena.includes('resultado continua vindo do motor TCG v6'), 'Regressão de batalha: arena visual deixou de declarar que não altera o motor v6.');
+}
+
+if (existsSync('supabase/migrations/20260902185822_expose_locked_battle_fighters_for_pixel_arena.sql')) {
+  const pixelArenaDb = read('supabase/migrations/20260902185822_expose_locked_battle_fighters_for_pixel_arena.sql');
+  assert(pixelArenaDb.includes("'opponentCardName'"), 'Regressão de arena 2D: estado seguro não envia o Pokémon rival após ambos travarem.');
+  assert(pixelArenaDb.includes("'opponentPokedexNumber'"), 'Regressão de arena 2D: número da Pokédex rival foi removido.');
+  assert(pixelArenaDb.includes("'myHp'") && pixelArenaDb.includes("'opponentHp'"), 'Regressão de arena 2D: HP dos lutadores deixou de alimentar a arena.');
+  assert(pixelArenaDb.includes('revoke all on function public.server_get_battle_attack_state'), 'Regressão de segurança: estado da arena ficou exposto diretamente ao cliente.');
 }
 
 if (existsSync('src/components/PackOpeningModal.tsx')) {
