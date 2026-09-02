@@ -253,6 +253,8 @@ if (existsSync('src/components/CardPickerModal.tsx')) {
   assert(picker.includes('Visão geral TCG'), 'Regressão de UX: seletor de batalha deixou de apresentar visão TCG.');
   assert(picker.includes('MAIOR ATQ') && picker.includes('MAIOR HP / DEF'), 'Regressão de UX: seletor de batalha perdeu filtros de maior ataque/defesa.');
   assert(picker.includes('TIPO DO POKÉMON') && picker.includes('selectedType'), 'Regressão de UX: seletor de batalha perdeu filtro por tipo.');
+  assert(picker.includes('TypeSymbolChip') && picker.includes('TYPE_SYMBOLS'), 'Regressão de UX: filtro de tipo voltou a usar apenas texto em vez de símbolos.');
+  assert(picker.includes("water: { label: 'ÁGUA', icon: 'water'") && picker.includes("fire: { label: 'FOGO', icon: 'flame'") && picker.includes("lightning: { label: 'ELÉTRICO', icon: 'flash'"), 'Regressão de UX: símbolos principais de Água/Fogo/Elétrico foram removidos.');
   assert(picker.includes('FONTE DAS CARTAS') && picker.includes('sourceOptions'), 'Regressão de UX: seletor de batalha perdeu escolha entre Bag e decks.');
   assert(!picker.includes('PWR ${combat.battleRating}'), 'Regressão de UX: seletor voltou a sugerir que PWR decide a batalha.');
 }
