@@ -82,6 +82,16 @@ const requiredFiles = [
 
 for (const file of requiredFiles) assert(existsSync(file), `Regressão: arquivo crítico ausente: ${file}`);
 
+
+if (existsSync('app/deck/[id].tsx')) {
+  const deckEditor = read('app/deck/[id].tsx');
+  assert(deckEditor.includes('styles.saveDock'), 'Regressão de UX: salvar deck deixou de ficar fixo e voltou para o fim da lista.');
+  assert(deckEditor.includes('SALVAR DECK'), 'Regressão de UX: botão fixo de salvar deck foi removido.');
+  assert(deckEditor.includes("position: 'absolute'") && deckEditor.includes('saveDockInner'), 'Regressão de UX: barra fixa de salvar deck perdeu o posicionamento persistente.');
+  const deckFooter = deckEditor.split('const footer = (')[1]?.split('return (')[0] ?? '';
+  assert(!deckFooter.includes('SALVAR DECK'), 'Regressão de UX: salvar deck voltou a depender de rolar até o ListFooterComponent.');
+}
+
 if (existsSync('app/battle/[id].tsx')) {
   const battle = read('app/battle/[id].tsx');
   assert(battle.includes('forfeitBattle'), 'Regressão: tela de batalha perdeu a desistência.');
