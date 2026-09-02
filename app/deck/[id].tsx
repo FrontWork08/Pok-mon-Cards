@@ -443,19 +443,9 @@ export default function DeckEditorScreen() {
         <Text style={[styles.endText, { color: colors.muted }]}>Todas as cartas carregadas.</Text>
       ) : null}
       {!loadingDeck ? (
-        <>
-          <Pressable
-            style={[styles.saveButton, { backgroundColor: colors.yellow }, (saving || total > 20) && styles.disabled]}
-            onPress={() => void save()}
-            disabled={saving || total > 20}
-          >
-            {saving ? <ActivityIndicator size="small" color="#07111F" /> : <Ionicons name="save" size={18} color="#07111F" />}
-            <Text style={styles.saveText}>{saving ? 'SALVANDO...' : `SALVAR DECK • ${formatUsd(totalValue)}`}</Text>
-          </Pressable>
-          <Pressable style={styles.backButton} onPress={() => goBackOrHome(router)}>
-            <Text style={[styles.backText, { color: colors.muted }]}>VOLTAR AOS DECKS</Text>
-          </Pressable>
-        </>
+        <Pressable style={styles.backButton} onPress={() => goBackOrHome(router)}>
+          <Text style={[styles.backText, { color: colors.muted }]}>VOLTAR AOS DECKS</Text>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -499,6 +489,36 @@ export default function DeckEditorScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       />
+
+      {!loadingDeck ? (
+        <View pointerEvents="box-none" style={styles.saveDock}>
+          <View
+            style={[
+              styles.saveDockInner,
+              {
+                width: usableWidth,
+                backgroundColor: colors.surface,
+                borderColor: total > 20 ? '#FF566B' : colors.border,
+              },
+            ]}
+          >
+            <View style={styles.saveDockSummary}>
+              <Text style={[styles.saveDockCount, { color: total > 20 ? '#FF8792' : colors.text }]}>{total}/20</Text>
+              <Text style={[styles.saveDockMeta, { color: colors.muted }]}>
+                {total > 20 ? 'Remova cartas para salvar' : `Deck • ${formatUsd(totalValue)}`}
+              </Text>
+            </View>
+            <Pressable
+              style={[styles.saveDockButton, { backgroundColor: colors.yellow }, (saving || total > 20) && styles.disabled]}
+              onPress={() => void save()}
+              disabled={saving || total > 20}
+            >
+              {saving ? <ActivityIndicator size="small" color="#07111F" /> : <Ionicons name="save" size={19} color="#07111F" />}
+              <Text style={styles.saveText}>{saving ? 'SALVANDO...' : 'SALVAR DECK'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       <Modal visible={Boolean(preview)} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
         <View style={styles.previewBackdrop}>
@@ -674,7 +694,7 @@ const DeckCardTile = memo(function DeckCardTile({
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { width: '100%', maxWidth: 1180, alignSelf: 'center', paddingTop: 12, paddingBottom: 112 },
+  content: { width: '100%', maxWidth: 1180, alignSelf: 'center', paddingTop: 12, paddingBottom: 154 },
   headerContent: { gap: 12, marginBottom: 10 },
   grow: { flex: 1, minWidth: 0 },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 11, borderRadius: 14, borderWidth: 1 },
@@ -730,7 +750,12 @@ const styles = StyleSheet.create({
   qty: { minWidth: 22, textAlign: 'center', fontWeight: '900' },
   footer: { gap: 10, paddingTop: 8 },
   endText: { textAlign: 'center', fontSize: 8, fontWeight: '700', paddingVertical: 4 },
-  saveButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 13 },
+  saveDock: { position: 'absolute', left: 0, right: 0, bottom: 10, alignItems: 'center', zIndex: 40, elevation: 20 },
+  saveDockInner: { minHeight: 68, borderRadius: 18, borderWidth: 1, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#000', shadowOpacity: .28, shadowRadius: 16, shadowOffset: { width: 0, height: 7 } },
+  saveDockSummary: { flex: 1, minWidth: 0, paddingLeft: 7 },
+  saveDockCount: { fontSize: 17, fontWeight: '900' },
+  saveDockMeta: { fontSize: 8, fontWeight: '800', marginTop: 2 },
+  saveDockButton: { minHeight: 50, minWidth: 150, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 13 },
   saveText: { color: '#07111F', fontSize: 10, fontWeight: '900' },
   disabled: { opacity: .45 },
   backButton: { alignItems: 'center', padding: 12 },
