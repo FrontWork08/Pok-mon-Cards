@@ -1102,6 +1102,7 @@ const styles = StyleSheet.create({
   pickerHint:{fontSize:8,lineHeight:12,marginTop:2},
   modalClose:{width:38,height:38,alignItems:'center',justifyContent:'center'},
   statFilters:{borderRadius:16,borderWidth:1,padding:9,gap:8},
+  guildTypeFilterBlock:{gap:4},
   pickerSearch:{minHeight:39,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},
   pickerSearchInput:{flex:1,fontSize:9,fontWeight:'700',paddingVertical:8},
   filterHeadingRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
