@@ -312,7 +312,7 @@ export default function BattlesHubScreen() {
         </View>
         <View style={styles.grow}>
           <Text style={[styles.rulesTitle, { color: colors.text }]}>Como funcionam as batalhas</Text>
-          <Text style={[styles.rulesSubtitle, { color: colors.muted }]}>Regra v4 • veja o que faz um Pokémon vencer outro</Text>
+          <Text style={[styles.rulesSubtitle, { color: colors.muted }]}>Regra v6 • veja o que faz um Pokémon vencer outro</Text>
         </View>
         <Ionicons name={showBattleRules ? 'chevron-up' : 'chevron-down'} size={21} color={colors.muted}/>
       </Pressable>
