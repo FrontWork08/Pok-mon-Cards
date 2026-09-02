@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerPageHeader } from '@/components/TrainerPageHeader';
+import { PokemonTypeSymbolFilter } from '@/components/PokemonTypeSymbolFilter';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import {
   getDeckBuilderPage,
@@ -389,17 +390,12 @@ export default function DeckEditorScreen() {
             ))}
           </View>
 
-          <Text style={[styles.filterLabel,{color:colors.muted}]}>TIPO</Text>
-          <View style={styles.filterChips}>
-            <Pressable onPress={() => setTypeFilter(null)} style={[styles.filterChip,{backgroundColor:!typeFilter?colors.accentSoft:colors.surfaceAlt,borderColor:!typeFilter?colors.accent:colors.border}]}>
-              <Text style={[styles.filterChipText,{color:!typeFilter?colors.text:colors.muted}]}>TODOS</Text>
-            </Pressable>
-            {availableTypes.map((type) => (
-              <Pressable key={type} onPress={() => setTypeFilter(typeFilter===type?null:type)} style={[styles.filterChip,{backgroundColor:typeFilter===type?colors.accentSoft:colors.surfaceAlt,borderColor:typeFilter===type?colors.accent:colors.border}]}>
-                <Text style={[styles.filterChipText,{color:typeFilter===type?colors.text:colors.muted}]}>{type.toUpperCase()}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <PokemonTypeSymbolFilter
+            types={availableTypes}
+            selectedType={typeFilter}
+            onChange={setTypeFilter}
+            title="TIPO"
+          />
 
           <Text style={[styles.filterLabel,{color:colors.muted}]}>RARIDADE</Text>
           <View style={styles.filterChips}>
