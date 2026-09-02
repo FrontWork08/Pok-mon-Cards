@@ -201,17 +201,15 @@ export function CardPickerModal({
               : <SortChip label="Mais caras" active={sort === 'value'} onPress={() => setSort('value')} />}
             {enableCombatSort ? (
               <>
-                <SortChip label="ATK MAIOR" active={sort === 'atk_desc'} onPress={() => setSort('atk_desc')} />
-                <SortChip label="ATK MENOR" active={sort === 'atk_asc'} onPress={() => setSort('atk_asc')} />
-                <SortChip label="DEF MAIOR" active={sort === 'def_desc'} onPress={() => setSort('def_desc')} />
-                <SortChip label="DEF MENOR" active={sort === 'def_asc'} onPress={() => setSort('def_asc')} />
+                <SortChip label="MAIOR ATQ" active={sort === 'atk_desc'} onPress={() => setSort('atk_desc')} />
+                <SortChip label="MAIOR HP / DEF" active={sort === 'def_desc'} onPress={() => setSort('def_desc')} />
               </>
             ) : null}
             <SortChip label="A–Z" active={sort === 'name'} onPress={() => setSort('name')} />
             <SortChip label="Quantidade" active={sort === 'quantity'} onPress={() => setSort('quantity')} />
             <SortChip label="Recentes" active={sort === 'recent'} onPress={() => setSort('recent')} />
           </View>
-          {enableCombatSort ? <Text style={[styles.combatSortHint,{color:colors.muted}]}>ATK = maior dano • DEF = HP da carta</Text> : null}
+          {enableCombatSort ? <Text style={[styles.combatSortHint,{color:colors.muted}]}>ATQ = maior dano de um ataque • HP/DEF = vida da carta</Text> : null}
           <Text style={[styles.result, { color: colors.muted }]}>{visibleCards.length} cartas disponíveis</Text>
         </View>
 
