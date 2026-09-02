@@ -92,6 +92,7 @@ Deno.serve(async (req: Request) => {
 
         const created = await admin.auth.admin.createUser({
           email,
+          password: `${crypto.randomUUID()}${crypto.randomUUID()}!Aa7`,
           email_confirm: true,
           user_metadata: { username: spec.username },
           app_metadata: {
