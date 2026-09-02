@@ -251,7 +251,7 @@ if (existsSync('supabase/functions/battle-action/index.ts')) {
 if (existsSync('src/components/CardPickerModal.tsx')) {
   const picker = read('src/components/CardPickerModal.tsx');
   assert(picker.includes('Visão geral TCG'), 'Regressão de UX: seletor de batalha deixou de apresentar visão TCG.');
-  assert(picker.includes('ATK MAIOR') && picker.includes('DEF MAIOR'), 'Regressão de UX: seletor de batalha perdeu filtros de maior ataque/defesa.');
+  assert(picker.includes('MAIOR ATQ') && picker.includes('MAIOR HP / DEF'), 'Regressão de UX: seletor de batalha perdeu filtros de maior ataque/defesa.');
   assert(picker.includes('TIPO DO POKÉMON') && picker.includes('selectedType'), 'Regressão de UX: seletor de batalha perdeu filtro por tipo.');
   assert(picker.includes('FONTE DAS CARTAS') && picker.includes('sourceOptions'), 'Regressão de UX: seletor de batalha perdeu escolha entre Bag e decks.');
   assert(!picker.includes('PWR ${combat.battleRating}'), 'Regressão de UX: seletor voltou a sugerir que PWR decide a batalha.');
