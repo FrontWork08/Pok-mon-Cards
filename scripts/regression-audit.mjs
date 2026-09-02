@@ -17,6 +17,7 @@ const requiredFiles = [
   'supabase/migrations/20260902134744_draft3_manual_attack_selection.sql',
   'supabase/migrations/20260902145620_make_owned_cosmetic_application_free.sql',
   'supabase/migrations/20260902145710_zero_cosmetic_application_metadata.sql',
+  'supabase/migrations/20260902150615_neutralize_bot_elo_after_daily_limit.sql',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -194,6 +195,16 @@ if (existsSync('supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_b
   const forfeitGuard = read('supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_battles.sql');
   assert(forfeitGuard.includes('if b.is_ranked and v_reward then'), 'Regressão de ELO: desistência casual voltou a alterar rating.');
   assert(forfeitGuard.includes('v_neutral := v_neutral or not b.is_ranked or not v_reward;'), 'Regressão de UX/ELO: desistência sem rating deixou de ser marcada como neutra.');
+}
+
+
+if (existsSync('supabase/migrations/20260902150615_neutralize_bot_elo_after_daily_limit.sql')) {
+  const botEloLimit = read('supabase/migrations/20260902150615_neutralize_bot_elo_after_daily_limit.sql');
+  assert(botEloLimit.includes('ranked_bot_elo_scale'), 'Regressão de ELO: escala diária contra bots foi removida.');
+  assert(botEloLimit.includes('when coalesce(p_prior,0)<6 then 1::numeric'), 'Regressão de ELO: primeiras 6 partidas contra bot perderam escala integral.');
+  assert(botEloLimit.includes('when p_prior<12 then .35::numeric'), 'Regressão de ELO: partidas 7–12 contra bot perderam escala de 35%.');
+  assert(botEloLimit.includes('else 0::numeric'), 'Regressão de ELO: após o limite diário o bot voltou a ganhar ou tirar pontos.');
+  assert(botEloLimit.includes('v_scale:=private.ranked_bot_elo_scale(v_prior);'), 'Regressão de ELO: conclusão contra bot deixou de usar a escala neutra após o limite.');
 }
 
 
