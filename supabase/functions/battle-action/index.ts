@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
 
         const created = await admin.auth.admin.createUser({
           email,
-          password: `${crypto.randomUUID()}${crypto.randomUUID()}!Aa7`,
+          password: `${crypto.randomUUID()}!Aa7`,
           email_confirm: true,
           user_metadata: { username: spec.username },
           app_metadata: {
@@ -153,7 +153,11 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (body.action === "matchmaking_join") {
-      await ensureRankedBots();
+      try {
+        await ensureRankedBots();
+      } catch (botProvisionError) {
+        console.error("ranked_bot_provision_failed", readableError(botProvisionError));
+      }
       const mode = body.mode === "draft3" ? "draft3" : body.mode === "mystery" ? "mystery" : "quick";
       const { data, error } = await admin.rpc("server_matchmaking_join", {
         p_player_id: user.id,
