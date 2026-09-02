@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(path, 'utf8');
+// Battle-rule hardening migrations are part of the release regression contract.
 const failures = [];
 const assert = (condition, message) => {
   if (!condition) failures.push(message);
