@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -78,6 +78,10 @@ export function CardPickerModal({
     });
     return [...values].sort((a, b) => a.localeCompare(b));
   }, [bag]);
+
+  useEffect(() => {
+    if (selectedType !== 'all' && !availableTypes.includes(selectedType)) setSelectedType('all');
+  }, [availableTypes, selectedType]);
 
   const visibleCards = useMemo(() => {
     const term = search.trim().toLowerCase();
