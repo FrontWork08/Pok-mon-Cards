@@ -12,6 +12,7 @@ const requiredFiles = [
   'supabase/migrations/20260902111731_battle_rules_future_quarantine_and_regressions.sql',
   'supabase/migrations/20260902115736_fix_bot_timeout_and_diversify_ranked_ai.sql',
   'supabase/migrations/20260902120727_fix_restricted_entry_battle_cards.sql',
+  'supabase/migrations/20260902122117_guard_elo_to_ranked_battles_only.sql',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -160,6 +161,12 @@ if (existsSync('supabase/migrations/20260902120727_fix_restricted_entry_battle_c
   assert(restrictedEntry.includes('palafinCooldown'), 'Regressão v6: Giga Impact do Palafin perdeu o teste de cooldown.');
   assert(restrictedEntry.includes('shedinjaEntrySetup'), 'Regressão v6: Shedinja perdeu o teste de entrada por Cast-Off Shell.');
   assert(restrictedEntry.includes('v_setup_penalty:=0.88'), 'Regressão de balanceamento: força calculada ignora novamente o custo de setup das cartas restritas.');
+}
+
+
+if (existsSync('supabase/migrations/20260902122117_guard_elo_to_ranked_battles_only.sql')) {
+  const eloGuard = read('supabase/migrations/20260902122117_guard_elo_to_ranked_battles_only.sql');
+  assert(eloGuard.includes('if v_reward and b.is_ranked then'), 'Regressão de ELO: partida casual voltou a alterar rating.');
 }
 
 if (existsSync('src/components/CardPickerModal.tsx')) {
@@ -746,6 +753,8 @@ if (existsSync('app/(tabs)/battles.tsx')) {
   assert(battleIdentity.includes('frameId={friend.equipped_frame_id}'), 'Regressão de identidade: cards de amigos na Battle Arena perderam a moldura.');
   assert(battleIdentity.includes('frameId={challenger?.equipped_frame_id}'), 'Regressão de identidade: convites de batalha perderam o banner do desafiante.');
   assert(battleIdentity.includes("textShadowColor:'#000000FF'"), 'Regressão de legibilidade: Battle Arena perdeu contraste forte nos nomes.');
+  const battlesHub = read('app/(tabs)/battles.tsx');
+  assert(battlesHub.includes('Regra v6 • veja o que faz um Pokémon vencer outro'), 'Regressão de UX: tela de batalhas voltou a mostrar versão antiga das regras.');
 }
 
 if (existsSync('app/friends.tsx')) {
