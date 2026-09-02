@@ -585,7 +585,7 @@ export default function DeckEditorScreen() {
                     <View style={[styles.themeOptionIcon,{backgroundColor:`${palette.primary}18`,borderColor:palette.primary}]}><Ionicons name={(option.icon||'albums') as keyof typeof Ionicons.glyphMap} size={20} color={palette.primary}/></View>
                     <View style={{flex:1,minWidth:0}}>
                       <View style={styles.themeNameRow}><Text numberOfLines={1} style={[styles.themeOptionName,{color:colors.text}]}>{option.name}</Text>{option.universalTheme?<View style={[styles.themeUniversal,{borderColor:palette.secondary}]}><Text style={[styles.themeUniversalText,{color:palette.secondary}]}>UNIVERSAL</Text></View>:null}</View>
-                      <Text style={[styles.themeOptionMeta,{color:colors.muted}]}>{option.effect==='galaxy'?'GALAXY FLOW • ':''}Aplicação 🪙 {option.applyCost.toLocaleString('pt-BR')}</Text>
+                      <Text style={[styles.themeOptionMeta,{color:colors.muted}]}>{option.effect==='galaxy'?'GALAXY FLOW • ':''}APLICAÇÃO GRÁTIS • COMPRA ÚNICA</Text>
                     </View>
                     {styleApplying===option.id?<ActivityIndicator color={palette.primary}/>:<Ionicons name={active?'checkmark-circle':'chevron-forward'} size={19} color={active?palette.primary:colors.muted}/>}
                   </Pressable>;
