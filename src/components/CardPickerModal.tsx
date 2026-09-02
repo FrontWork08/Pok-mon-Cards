@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { FlatList, Image, Modal, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { OwnedCardEntry } from '@/services/player';
@@ -23,6 +23,10 @@ type Props = {
   maxTotal?: number;
   displayMode?: 'market' | 'battle';
   enableCombatSort?: boolean;
+  enableTypeFilter?: boolean;
+  sourceOptions?: Array<{ id: string; label: string }>;
+  sourceId?: string;
+  onSourceChange?: (id: string) => void;
   onSelectedIdChange?: (id: string | null) => void;
   onSelectedMapChange?: (value: QuantityMap) => void;
   onClose: () => void;
@@ -44,6 +48,10 @@ export function CardPickerModal({
   maxTotal,
   displayMode = 'market',
   enableCombatSort = false,
+  enableTypeFilter = false,
+  sourceOptions = [],
+  sourceId,
+  onSourceChange,
   onSelectedIdChange,
   onSelectedMapChange,
   onClose,
@@ -57,17 +65,33 @@ export function CardPickerModal({
   const columns = width >= 1000 ? 4 : width >= 680 ? 3 : 2;
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortMode>(displayMode === 'battle' ? 'battle' : 'value');
+  const [selectedType, setSelectedType] = useState<string>('all');
+
+  const availableTypes = useMemo(() => {
+    const values = new Set<string>();
+    bag.forEach((entry) => {
+      const types = Array.isArray(entry.cards?.types) ? entry.cards.types : [];
+      types.forEach((type) => {
+        const value = String(type ?? '').trim();
+        if (value) values.add(value);
+      });
+    });
+    return [...values].sort((a, b) => a.localeCompare(b));
+  }, [bag]);
 
   const visibleCards = useMemo(() => {
     const term = search.trim().toLowerCase();
     const filtered = bag.filter((entry) => {
       const card = entry.cards;
       if (!card) return false;
+      const cardTypes = Array.isArray(card.types) ? card.types.map((type) => String(type).toLowerCase()) : [];
+      if (selectedType !== 'all' && !cardTypes.includes(selectedType.toLowerCase())) return false;
       if (!term) return true;
       return card.pokemon_name.toLowerCase().includes(term)
         || card.set_name.toLowerCase().includes(term)
         || String(card.rarity ?? '').toLowerCase().includes(term)
-        || String(card.card_number ?? '').toLowerCase().includes(term);
+        || String(card.card_number ?? '').toLowerCase().includes(term)
+        || cardTypes.some((type) => type.includes(term));
     });
     return [...filtered].sort((a, b) => {
       if (sort === 'battle') return getBattleCardPreview(b.cards).score - getBattleCardPreview(a.cards).score;
@@ -80,7 +104,7 @@ export function CardPickerModal({
       if (sort === 'quantity') return Number(b.quantity ?? 0) - Number(a.quantity ?? 0);
       return new Date(b.first_obtained_at).getTime() - new Date(a.first_obtained_at).getTime();
     });
-  }, [bag, search, sort]);
+  }, [bag, search, selectedType, sort]);
 
   const selectedCount = mode === 'single' ? (selectedId ? 1 : 0) : Object.values(selectedMap).reduce((sum, value) => sum + value, 0);
   const selectedValue = useMemo(() => {
@@ -127,6 +151,26 @@ export function CardPickerModal({
         </View>
 
         <View style={styles.tools}>
+          {sourceOptions.length > 0 ? (
+            <View style={styles.sourcePicker}>
+              <Text style={[styles.toolLabel, { color: colors.muted }]}>FONTE DAS CARTAS</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sourceChips}>
+                {sourceOptions.map((option) => {
+                  const active = sourceId === option.id;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      onPress={() => onSourceChange?.(option.id)}
+                      style={[styles.sourceChip, { backgroundColor: active ? colors.accentSoft : colors.surface, borderColor: active ? colors.accent : colors.border }]}
+                    >
+                      <Ionicons name={option.id === 'bag' ? 'bag-outline' : 'albums-outline'} size={14} color={active ? colors.accent : colors.muted} />
+                      <Text numberOfLines={1} style={[styles.sourceChipText, { color: active ? colors.text : colors.muted }]}>{option.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
           <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="search" size={19} color={colors.muted} />
             <TextInput
@@ -138,6 +182,15 @@ export function CardPickerModal({
             />
             {search ? <Pressable onPress={() => setSearch('')}><Ionicons name="close-circle" size={19} color={colors.muted} /></Pressable> : null}
           </View>
+          {enableTypeFilter && availableTypes.length > 0 ? (
+            <View style={styles.typeFilter}>
+              <Text style={[styles.toolLabel, { color: colors.muted }]}>TIPO DO POKÉMON</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeChips}>
+                <SortChip label="TODOS" active={selectedType === 'all'} onPress={() => setSelectedType('all')} />
+                {availableTypes.map((type) => <SortChip key={type} label={type.toUpperCase()} active={selectedType === type} onPress={() => setSelectedType(type)} />)}
+              </ScrollView>
+            </View>
+          ) : null}
           <View style={styles.sortRow}>
             {displayMode === 'battle'
               ? <SortChip label="Visão geral TCG" active={sort === 'battle'} onPress={() => setSort('battle')} />
@@ -276,6 +329,13 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 10, marginTop: 3 },
   close: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   tools: { paddingHorizontal: 14, paddingTop: 12, gap: 9 },
+  sourcePicker: { gap: 6 },
+  toolLabel: { fontSize: 8, fontWeight: '900', letterSpacing: .9 },
+  sourceChips: { gap: 7, paddingRight: 8 },
+  sourceChip: { minHeight: 38, maxWidth: 190, borderRadius: 999, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sourceChipText: { fontSize: 8, fontWeight: '900', maxWidth: 145 },
+  typeFilter: { gap: 6 },
+  typeChips: { gap: 7, paddingRight: 8 },
   searchBox: { minHeight: 48, borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   search: { flex: 1, height: '100%', fontSize: 13 },
   sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
