@@ -217,8 +217,12 @@ export default function BattleScreen() {
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
       await loadBattleState();
     } catch (error) {
-      if (isFunctionErrorCode(error, 'NOT_YOUR_TURN', 'CARD_ALREADY_DRAFTED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) await loadBattleState().catch(() => null);
-      setNotice(error instanceof Error ? error.message : 'Não foi possível escolher a carta do draft.');
+      if (isFunctionErrorCode(error, 'BATTLE_RULE_REVIEW_REQUIRED')) {
+        setNotice('Essa carta recebeu uma regra nova ou alterada e está temporariamente bloqueada na rankeada até a validação do motor. Escolha outra carta.');
+      } else {
+        if (isFunctionErrorCode(error, 'NOT_YOUR_TURN', 'CARD_ALREADY_DRAFTED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) await loadBattleState().catch(() => null);
+        setNotice(error instanceof Error ? error.message : 'Não foi possível escolher a carta do draft.');
+      }
     } finally { setWorking(false); }
   }
 
@@ -231,7 +235,9 @@ export default function BattleScreen() {
       if (result?.resolved) setNotice('As duas cartas foram travadas. Resultado revelado!');
       await loadBattleState();
     } catch (error) {
-      if (isFunctionErrorCode(error, 'ALREADY_LOCKED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) {
+      if (isFunctionErrorCode(error, 'BATTLE_RULE_REVIEW_REQUIRED')) {
+        setNotice('Essa carta recebeu uma regra nova ou alterada e está temporariamente bloqueada na rankeada até a validação do motor. Escolha outra carta.');
+      } else if (isFunctionErrorCode(error, 'ALREADY_LOCKED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) {
         setNotice(error instanceof Error ? error.message : 'A rodada foi atualizada.');
         await loadBattleState();
       } else {
