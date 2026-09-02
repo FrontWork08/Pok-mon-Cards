@@ -86,7 +86,7 @@ export async function getBattleCardStakes(battleId: string) {
 export async function getBattleRounds(battleId: string) {
   const { data, error } = await supabase
     .from('battle_rounds')
-    .select('battle_id,round_no,challenger_card_id,opponent_card_id,challenger_power,opponent_power,challenger_roll,opponent_roll,challenger_combat,opponent_combat,rules_version,winner_id,resolved_at,c1:cards!battle_rounds_challenger_card_id_fkey(id,pokemon_name,image_small,image_large,rarity,types,game_value,market_price_usd,market_price_variant,tcg_data),c2:cards!battle_rounds_opponent_card_id_fkey(id,pokemon_name,image_small,image_large,rarity,types,game_value,market_price_usd,market_price_variant,tcg_data)')
+    .select('battle_id,round_no,challenger_card_id,opponent_card_id,challenger_power,opponent_power,challenger_roll,opponent_roll,challenger_combat,opponent_combat,rules_version,winner_id,resolved_at,c1:cards!battle_rounds_challenger_card_id_fkey(id,pokemon_name,image_small,image_large,rarity,types,pokedex_numbers,game_value,market_price_usd,market_price_variant,tcg_data),c2:cards!battle_rounds_opponent_card_id_fkey(id,pokemon_name,image_small,image_large,rarity,types,pokedex_numbers,game_value,market_price_usd,market_price_variant,tcg_data)')
     .eq('battle_id', battleId)
     .order('round_no', { ascending: true });
   if (error) throw error;
