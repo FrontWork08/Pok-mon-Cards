@@ -15,6 +15,8 @@ const requiredFiles = [
   'supabase/migrations/20260902122117_guard_elo_to_ranked_battles_only.sql',
   'supabase/migrations/20260902122420_guard_forfeit_elo_to_ranked_battles.sql',
   'supabase/migrations/20260902134744_draft3_manual_attack_selection.sql',
+  'supabase/migrations/20260902145620_make_owned_cosmetic_application_free.sql',
+  'supabase/migrations/20260902145710_zero_cosmetic_application_metadata.sql',
   'supabase/migrations/20260901135056_battle_rules_v5_official_tcg_virtual_energy.sql',
   'supabase/migrations/20260901131651_cap_coin_packs_at_25k.sql',
   'supabase/migrations/20260901120813_lower_coin_pack_prices_further.sql',
@@ -661,6 +663,21 @@ if (existsSync('supabase/migrations/20260831171936_universal_visual_themes.sql')
   assert(universalThemes.includes('revoke execute on function public.get_my_visual_style_options(text) from public,anon'), 'Regressão de segurança: opções de tema não podem ser anônimas.');
 }
 
+
+if (existsSync('supabase/migrations/20260902145620_make_owned_cosmetic_application_free.sql')) {
+  const freeCosmetics = read('supabase/migrations/20260902145620_make_owned_cosmetic_application_free.sql');
+  assert(freeCosmetics.includes("'applyCost',0"), 'Regressão de economia: seletor de cosméticos voltou a anunciar custo de aplicação.');
+  assert(freeCosmetics.includes("'spentCoins',0"), 'Regressão de economia: aplicar cosmético possuído deixou de retornar custo zero.');
+  assert(!freeCosmetics.includes('private.spend_player_coins'), 'Regressão de economia: aplicar cosmético possuído voltou a gastar Coins.');
+}
+
+if (existsSync('supabase/migrations/20260902145710_zero_cosmetic_application_metadata.sql')) {
+  const zeroCosmeticMetadata = read('supabase/migrations/20260902145710_zero_cosmetic_application_metadata.sql');
+  assert(zeroCosmeticMetadata.includes("'{applyCardCost}','0'::jsonb"), 'Regressão de economia: metadata applyCardCost deixou de ser zerado.');
+  assert(zeroCosmeticMetadata.includes("'{applyDeckCost}','0'::jsonb"), 'Regressão de economia: metadata applyDeckCost deixou de ser zerado.');
+  assert(zeroCosmeticMetadata.includes("'{applyCost}','0'::jsonb"), 'Regressão de economia: metadata applyCost deixou de ser zerado.');
+}
+
 if (existsSync('src/services/economy.ts')) {
   const economyThemeService = read('src/services/economy.ts');
   assert(economyThemeService.includes('getMyVisualStyleOptions'), 'Regressão: cliente perdeu seletor de temas compatíveis.');
@@ -672,8 +689,9 @@ if (existsSync('app/economy.tsx')) {
   const economyThemeUi = read('app/economy.tsx');
   assert(economyThemeUi.includes("x.metadata?.cardCompatible===true"), 'Regressão: Economy Hub não mostra temas universais em cartas.');
   assert(economyThemeUi.includes("x.metadata?.deckCompatible===true"), 'Regressão: Economy Hub não mostra temas universais em decks.');
-  assert(economyThemeUi.includes('applyCardCost'), 'Regressão: Economy Hub não usa custo correto para tema universal em cartas.');
-  assert(economyThemeUi.includes('applyDeckCost'), 'Regressão: Economy Hub não usa custo correto para tema universal em decks.');
+  assert(economyThemeUi.includes('COMPRA ÚNICA • APLICAÇÃO GRÁTIS'), 'Regressão de economia: Economy Hub voltou a anunciar taxa para aplicar cosmético possuído.');
+  assert(economyThemeUi.includes('Aplicação grátis. O item já pertence à sua coleção.'), 'Regressão de UX: deck voltou a sugerir cobrança ao trocar tema possuído.');
+  assert(!economyThemeUi.includes('Custo de aplicação:'), 'Regressão de economia: Economy Hub voltou a exibir custo de aplicação.');
 }
 
 if (existsSync('app/card/[id].tsx')) {
@@ -683,6 +701,7 @@ if (existsSync('app/card/[id].tsx')) {
   assert(cardThemeUi.includes('applyCardEconomyStyle'), 'Regressão: carta não aplica tema escolhido.');
   assert(cardThemeUi.includes('clearCardEconomyStyle'), 'Regressão: carta não consegue remover tema.');
   assert(cardThemeUi.includes('UNIVERSAL'), 'Regressão de UX: carta não identifica temas universais.');
+  assert(cardThemeUi.includes('APLICAÇÃO GRÁTIS • COMPRA ÚNICA'), 'Regressão de economia: carta voltou a cobrar para aplicar tema já comprado.');
   assert(cardThemeUi.includes('imageColumn'), 'Regressão visual: área da carta perdeu o container de largura estável e pode colapsar em faixa vertical.');
   assert(cardThemeUi.includes('cardAuraShell'), 'Regressão visual: AuraFrame da carta não ocupa mais toda a área de exibição.');
   assert(cardThemeUi.includes('cardImageStage'), 'Regressão visual: tema deixou de cobrir a própria imagem da carta.');
@@ -696,12 +715,14 @@ if (existsSync('app/deck/[id].tsx')) {
   assert(deckThemeUi.includes("getMyVisualStyleOptions('deck')"), 'Regressão: deck não carrega temas universais.');
   assert(deckThemeUi.includes('applyDeckEconomyStyle'), 'Regressão: deck não aplica tema escolhido.');
   assert(deckThemeUi.includes('clearDeckEconomyStyle'), 'Regressão: deck não consegue remover tema.');
+  assert(deckThemeUi.includes('APLICAÇÃO GRÁTIS • COMPRA ÚNICA'), 'Regressão de economia: deck voltou a cobrar para aplicar tema já comprado.');
 }
 
 if (existsSync('app/store.tsx')) {
   const universalStoreUi = read('app/store.tsx');
   assert(universalStoreUi.includes('compatibilityRow'), 'Regressão de UX: Trainer Shop deixou de mostrar onde o tema pode ser usado.');
   assert(universalStoreUi.includes('CARTAS') && universalStoreUi.includes('DECKS'), 'Regressão de UX: usos universais sumiram da Trainer Shop.');
+  assert(universalStoreUi.includes('COMPRA ÚNICA • depois de comprado, aplicar e trocar é grátis'), 'Regressão de UX: Trainer Shop deixou de explicar que cosmético é compra única.');
 }
 
 if (existsSync('src/components/AuraFrame.tsx')) {
