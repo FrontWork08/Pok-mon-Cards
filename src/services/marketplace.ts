@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { createOperationId } from '@/lib/operationId';
 
 export type ShopTheme = 'guild' | 'classic' | 'night' | 'royal' | 'neon' | 'master' | 'celestial' | 'galaxy';
 
@@ -135,8 +136,14 @@ export async function getMarketplaceHub(): Promise<MarketplaceHub> {
   };
 }
 
+const pendingMarketplaceOperations=new Map<string,string>();
+
 async function action(args: Record<string, unknown>) {
-  const { data, error } = await supabase.rpc('marketplace_action', {
+  const key=JSON.stringify([args.action??null,args.listingId??null,args.cardId??null,args.quantity??null,args.price??null,args.shopName??null,args.themeStyle??null]);
+  const operationId=pendingMarketplaceOperations.get(key)??createOperationId();
+  pendingMarketplaceOperations.set(key,operationId);
+  const { data, error } = await supabase.rpc('server_idempotent_marketplace_action', {
+    p_operation_id:operationId,
     p_action: args.action,
     p_listing_id: args.listingId ?? null,
     p_card_id: args.cardId ?? null,
@@ -160,6 +167,7 @@ async function action(args: Record<string, unknown>) {
     const key=Object.keys(map).find((item)=>error.message.includes(item));
     throw new Error(key ? map[key] : error.message);
   }
+  pendingMarketplaceOperations.delete(key);
   return data;
 }
 
