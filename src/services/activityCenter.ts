@@ -90,9 +90,9 @@ export async function getActionableActivities():Promise<ActionableActivity[]>{
   }
 
   if(guildResult.status==='fulfilled'){
-    for(const invite of guildResult.value.myInvites.slice(0,5)){
+    for(const [inviteIndex,invite] of guildResult.value.myInvites.slice(0,5).entries()){
       items.push({
-        id:'guild-invite:'+String((invite as any).id??(invite as any).guildId??Math.random()),
+        id:'guild-invite:'+String((invite as any).id??(invite as any).guildId??(invite as any).guildName??inviteIndex),
         category:'social',
         title:'Convite de guilda',
         body:'Você recebeu um convite para '+String((invite as any).guildName??'uma guilda')+'.',
