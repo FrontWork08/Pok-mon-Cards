@@ -49,6 +49,7 @@ export type DeckBuilderCardEntry = {
     image_small: string | null;
     market_price_usd: number | null;
     types: string[];
+    game_types: string[];
     battle_profile?: {
       hp: number;
       maxDamage: number;
