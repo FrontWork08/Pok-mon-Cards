@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { getProfileAvatarUrl } from '@/services/player';
-import { globalSearch, type GlobalCardResult, type GlobalGuildResult, type GlobalPlayerResult } from '@/services/globalSearch';
+import { globalSearch, type GlobalCardResult, type GlobalDeckResult, type GlobalGuildResult, type GlobalPlayerResult, type GlobalSetResult, type GlobalTournamentResult } from '@/services/globalSearch';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -48,6 +48,9 @@ export default function GlobalSearchScreen(){
   const[cards,setCards]=useState<GlobalCardResult[]>([]);
   const[players,setPlayers]=useState<GlobalPlayerResult[]>([]);
   const[guilds,setGuilds]=useState<GlobalGuildResult[]>([]);
+  const[sets,setSets]=useState<GlobalSetResult[]>([]);
+  const[decks,setDecks]=useState<GlobalDeckResult[]>([]);
+  const[tournaments,setTournaments]=useState<GlobalTournamentResult[]>([]);
   const[loading,setLoading]=useState(false);
   const[error,setError]=useState<string|null>(null);
 
@@ -59,19 +62,19 @@ export default function GlobalSearchScreen(){
 
   useEffect(()=>{
     const term=query.trim();
-    if(term.length<2){setCards([]);setPlayers([]);setGuilds([]);setLoading(false);return;}
+    if(term.length<2){setCards([]);setPlayers([]);setGuilds([]);setSets([]);setDecks([]);setTournaments([]);setLoading(false);return;}
     let active=true;
     const timer=setTimeout(()=>{
       setLoading(true);setError(null);
       void globalSearch(term)
-        .then(result=>{if(!active)return;setCards(result.cards);setPlayers(result.players);setGuilds(result.guilds);})
+        .then(result=>{if(!active)return;setCards(result.cards);setPlayers(result.players);setGuilds(result.guilds);setSets(result.sets);setDecks(result.decks);setTournaments(result.tournaments);})
         .catch(err=>{if(active)setError(err instanceof Error?err.message:'Não foi possível pesquisar agora.');})
         .finally(()=>{if(active)setLoading(false);});
     },260);
     return()=>{active=false;clearTimeout(timer);};
   },[query]);
 
-  const count=functions.length+cards.length+players.length+guilds.length;
+  const count=functions.length+cards.length+players.length+guilds.length+sets.length+decks.length+tournaments.length;
 
   return <Screen title="Busca Global" subtitle="Encontre funções, cartas, treinadores e guildas sem ficar procurando em vários menus.">
     <View style={[styles.searchBox,{backgroundColor:colors.surface,borderColor:query?colors.accent:colors.border}]}>
@@ -100,6 +103,15 @@ export default function GlobalSearchScreen(){
     {cards.length?<SectionTitle icon="card" title="Cartas" count={cards.length}/>:null}
     {cards.length?<View style={styles.cardGrid}>{cards.map(card=><Pressable key={card.id} onPress={()=>router.push(('/card/'+card.id) as never)} style={[styles.cardResult,{backgroundColor:colors.surface,borderColor:colors.border}]}>{card.imageSmall?<Image source={{uri:card.imageSmall}} style={styles.cardImage} resizeMode="contain"/>:<View style={[styles.cardImage,{backgroundColor:colors.surfaceAlt}]}/>}<View style={styles.body}><Text numberOfLines={1} style={[styles.title,{color:colors.text}]}>{card.name}</Text><Text numberOfLines={1} style={[styles.meta,{color:colors.muted}]}>{card.setName}{card.rarity?' • '+card.rarity:''}</Text><Text style={[styles.price,{color:colors.yellow}]}>{card.marketPriceUsd==null?'US$ —':formatUsd(card.marketPriceUsd)}</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted}/></Pressable>)}</View>:null}
 
+    {sets.length?<SectionTitle icon="layers" title="Sets" count={sets.length}/>:null}
+    {sets.length?<View style={styles.list}>{sets.map(set=><Pressable key={set.id} onPress={()=>router.push(('/set/'+set.id) as never)} style={[styles.functionRow,{backgroundColor:colors.surface,borderColor:colors.border}]}>{set.image?<Image source={{uri:set.image}} style={styles.setImage} resizeMode="contain"/>:<View style={[styles.functionIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="layers" size={20} color={colors.accent}/></View>}<View style={styles.body}><Text style={[styles.title,{color:colors.text}]}>{set.name}</Text><Text style={[styles.meta,{color:colors.muted}]}>{set.totalCards} cartas • {set.id}</Text></View><Ionicons name="chevron-forward" size={18} color={colors.muted}/></Pressable>)}</View>:null}
+
+    {decks.length?<SectionTitle icon="albums" title="Seus Decks" count={decks.length}/>:null}
+    {decks.length?<View style={styles.list}>{decks.map(deck=><Pressable key={deck.id} onPress={()=>router.push(('/deck/'+deck.id) as never)} style={[styles.functionRow,{backgroundColor:colors.surface,borderColor:deck.isDefault?colors.yellow:colors.border}]}><View style={[styles.functionIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="albums" size={20} color={colors.accent}/></View><View style={styles.body}><Text style={[styles.title,{color:colors.text}]}>{deck.name}{deck.isDefault?' • PRINCIPAL':''}</Text><Text style={[styles.meta,{color:colors.muted}]}>{deck.cardCount} carta(s)</Text></View><Ionicons name="chevron-forward" size={18} color={colors.muted}/></Pressable>)}</View>:null}
+
+    {tournaments.length?<SectionTitle icon="trophy" title="Torneios" count={tournaments.length}/>:null}
+    {tournaments.length?<View style={styles.list}>{tournaments.map(item=><Pressable key={item.id||item.name} onPress={()=>router.push('/tournaments')} style={[styles.functionRow,{backgroundColor:colors.surface,borderColor:item.joined?colors.yellow:colors.border}]}><View style={[styles.functionIcon,{backgroundColor:'#FF735C1C'}]}><Ionicons name="trophy" size={20} color="#FF735C"/></View><View style={styles.body}><Text style={[styles.title,{color:colors.text}]}>{item.name}</Text><Text style={[styles.meta,{color:colors.muted}]}>{String(item.status).toUpperCase()} • {item.entries}/{item.maxPlayers} jogadores • prêmio 🪙 {item.prizePoolCoins.toLocaleString('pt-BR')}</Text></View><Ionicons name="chevron-forward" size={18} color={colors.muted}/></Pressable>)}</View>:null}
+
     {players.length?<SectionTitle icon="people" title="Treinadores" count={players.length}/>:null}
     {players.length?<View style={styles.list}>{players.map(player=>{const avatar=getProfileAvatarUrl(player.avatarPath,player.avatarUpdatedAt);return <Pressable key={player.id} onPress={()=>router.push(('/player/'+player.id) as never)} style={[styles.personRow,{backgroundColor:colors.surface,borderColor:colors.border}]}><TrainerAvatar icon={player.profileIcon} avatarUrl={avatar} color={colors.accent} backgroundColor={colors.accentSoft} size={44}/><View style={styles.body}><Text style={[styles.title,{color:colors.text}]}>@{player.username}</Text><Text style={[styles.meta,{color:colors.muted}]}>Nível {player.level} • ELO {player.battleRating}</Text></View><Ionicons name="chevron-forward" size={18} color={colors.muted}/></Pressable>;})}</View>:null}
 
@@ -122,7 +134,7 @@ const styles=StyleSheet.create({
   resultSummary:{flexDirection:'row',alignItems:'baseline',gap:6},resultCount:{fontSize:22,fontWeight:'900'},resultLabel:{fontSize:9,fontWeight:'800'},
   sectionTitle:{marginTop:4,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},sectionTitleLeft:{flexDirection:'row',alignItems:'center',gap:6},sectionTitleText:{fontSize:17,fontWeight:'900'},sectionCount:{fontSize:9,fontWeight:'900'},
   list:{gap:7},functionRow:{minHeight:60,borderRadius:16,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:9},functionIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},body:{flex:1,minWidth:0},title:{fontSize:11.5,fontWeight:'900'},meta:{fontSize:8.5,lineHeight:12,marginTop:2},price:{fontSize:9,fontWeight:'900',marginTop:3},
-  cardGrid:{flexDirection:'row',flexWrap:'wrap',gap:7},cardResult:{width:'48.8%',minWidth:255,minHeight:102,borderRadius:16,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},cardImage:{width:60,height:82,borderRadius:6},
+  setImage:{width:42,height:42,borderRadius:9},cardGrid:{flexDirection:'row',flexWrap:'wrap',gap:7},cardResult:{width:'48.8%',minWidth:255,minHeight:102,borderRadius:16,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},cardImage:{width:60,height:82,borderRadius:6},
   personRow:{minHeight:62,borderRadius:16,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:10},
   guildRow:{minHeight:64,borderRadius:16,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:10},guildIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},
 });
