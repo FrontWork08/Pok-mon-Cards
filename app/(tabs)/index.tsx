@@ -85,6 +85,7 @@ export default function HomeScreen() {
       <QuickAction icon="shield" label="Guilda" sub="Equipe e chat" onPress={()=>router.push('/guilds')}/>
       <QuickAction icon="podium" label="Ranking" sub="Coleções" onPress={()=>router.push('/collection-ranking')}/>
       <QuickAction icon="checkbox" label="Missões" sub="Ganhe recompensas" onPress={()=>router.push('/missions')}/>
+      <QuickAction icon="search" label="Busca Global" sub="Ache qualquer coisa" onPress={()=>router.push('/search')}/>
     </View>
     <View style={styles.statsGrid}><Stat icon="albums" label="Cards" value={stats.totalCards.toLocaleString('pt-BR')} onPress={()=>router.push('/(tabs)/bag')}/><Stat icon="paw" label="Pokédex" value={String(stats.species)} onPress={()=>router.push('/pokedex')}/><Stat icon="swap-horizontal" label="Trocas" value={String(stats.completedTrades)} onPress={()=>router.push('/(tabs)/trade')}/><Stat icon="flash" label="XP" value={Number(profile?.xp??0).toLocaleString('pt-BR')}/></View>
     <GlobalChatHomeCard />
