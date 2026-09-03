@@ -398,119 +398,97 @@ export default function MarketplaceScreen() {
 
 function MarketplaceCardPreviewModal({
   detail,
+  gameProfile,
   loading,
   sellEntry,
+  onOpenFullCard,
   onClose,
   onSelectForSale,
 }:{
   detail:CardDetailEntry|null;
+  gameProfile:CardGameProfile|null;
   loading:boolean;
   sellEntry:OwnedCardEntry|null;
+  onOpenFullCard:(cardId:string)=>void;
   onClose:()=>void;
   onSelectForSale:()=>void;
 }){
   const {colors}=useAppTheme();
   const card=detail?.cards??null;
-  const stats=card?getBattleCardPreview(card):null;
-  const tcg=(card?.tcg_data??{}) as any;
-  const attacks=Array.isArray(tcg?.attacks)?tcg.attacks:[];
-  const abilities=Array.isArray(tcg?.abilities)?tcg.abilities:[];
-  const weaknesses=Array.isArray(tcg?.weaknesses)?tcg.weaknesses:[];
-  const resistances=Array.isArray(tcg?.resistances)?tcg.resistances:[];
-  const types=Array.isArray(card?.types)?card.types:[];
+  const types=gameProfile?.types?.length?gameProfile.types:(Array.isArray(card?.game_types)&&card.game_types.length?card.game_types:Array.isArray(card?.types)?card.types:[]);
   const visible=loading||Boolean(card);
 
-  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-    <SafeAreaView style={[styles.previewSafe,{backgroundColor:colors.bg}]}>
-      <PremiumBackground/>
-      <View style={[styles.previewHeader,{borderBottomColor:colors.border}]}>
-        <View style={{flex:1}}>
-          <Text style={[styles.previewKicker,{color:colors.yellow}]}>VISUALIZAÇÃO DA CARTA</Text>
-          <Text numberOfLines={1} style={[styles.previewTitle,{color:colors.text}]}>{card?.pokemon_name??'Carregando…'}</Text>
+  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <View style={styles.previewBackdrop}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose}/>
+      <View style={[styles.previewSheet,{backgroundColor:colors.bg,borderColor:colors.border}]}>
+        <View style={[styles.previewHeader,{borderBottomColor:colors.border}]}>
+          <View style={{flex:1,minWidth:0}}>
+            <Text style={[styles.previewKicker,{color:colors.yellow}]}>PRÉVIA RÁPIDA • GAME_V1</Text>
+            <Text numberOfLines={1} style={[styles.previewTitle,{color:colors.text}]}>{card?.pokemon_name??'Carregando…'}</Text>
+          </View>
+          <Pressable onPress={onClose} style={[styles.previewClose,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+            <Ionicons name="close" size={22} color={colors.text}/>
+          </Pressable>
         </View>
-        <Pressable onPress={onClose} style={[styles.previewClose,{backgroundColor:colors.surface,borderColor:colors.border}]}>
-          <Ionicons name="close" size={23} color={colors.text}/>
-        </Pressable>
+
+        {loading&&!card?<View style={styles.previewLoading}><ActivityIndicator size="large" color={colors.yellow}/><Text style={[styles.previewLoadingText,{color:colors.muted}]}>Carregando carta e perfil de batalha…</Text></View>:null}
+
+        {card?<ScrollView contentContainerStyle={styles.previewContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.previewHero}>
+            {card.image_large||card.image_small
+              ? <Image source={{uri:card.image_large??card.image_small??''}} resizeMode="contain" style={styles.previewCardImage}/>
+              : <View style={[styles.previewCardImage,{backgroundColor:colors.surface}]}/>}
+            <View style={styles.previewIdentity}>
+              <Text style={[styles.previewName,{color:colors.text}]}>{card.pokemon_name}</Text>
+              <Text style={[styles.previewMeta,{color:colors.muted}]}>{card.set_name} {card.card_number?'• #'+card.card_number:''}</Text>
+              <Text style={[styles.previewMeta,{color:colors.muted}]}>{card.rarity??'Sem raridade'}</Text>
+              <View style={styles.previewTypeRow}>{types.map((type)=><View key={String(type)} style={[styles.previewTypeChip,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.previewTypeText,{color:colors.text}]}>{String(type).toUpperCase()}</Text></View>)}</View>
+              <View style={[styles.previewPriceBox,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+                <Text style={[styles.previewPriceLabel,{color:colors.muted}]}>VALOR DE MERCADO</Text>
+                <Text style={[styles.previewPriceValue,{color:'#65D894'}]}>{card.market_price_usd==null?'US$ —':formatUsd(Number(card.market_price_usd))}</Text>
+                {detail?.owned?<Text style={[styles.previewOwned,{color:colors.muted}]}>Você possui {detail.quantity} cópia(s) na Bag.</Text>:null}
+              </View>
+            </View>
+          </View>
+
+          {gameProfile?<>
+            <View style={styles.previewSectionRow}>
+              <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Batalha</Text>
+              <View style={[styles.engineBadge,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.engineBadgeText,{color:colors.accent}]}>GAME_V1 • LV {gameProfile.stats.level}</Text></View>
+            </View>
+            <View style={styles.previewStatsGrid}>
+              <PreviewStat label="HP" value={String(gameProfile.stats.hp)} icon="heart" colors={colors}/>
+              <PreviewStat label="ATAQUE" value={String(gameProfile.stats.attack)} icon="flash" colors={colors}/>
+              <PreviewStat label="DEFESA" value={String(gameProfile.stats.defense)} icon="shield" colors={colors}/>
+              <PreviewStat label="SP. ATK" value={String(gameProfile.stats.spAttack)} icon="sparkles" colors={colors}/>
+              <PreviewStat label="SP. DEF" value={String(gameProfile.stats.spDefense)} icon="shield-checkmark" colors={colors}/>
+              <PreviewStat label="SPEED" value={String(gameProfile.stats.speed)} icon="speedometer" colors={colors}/>
+            </View>
+            <View style={[styles.previewAbility,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+              <Text style={[styles.previewPriceLabel,{color:colors.muted}]}>HABILIDADE</Text>
+              <Text style={[styles.previewAbilityName,{color:colors.text}]}>{gameProfile.ability?formatGameIdentifier(gameProfile.ability):'Nenhuma'}</Text>
+            </View>
+            <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Golpes</Text>
+            <View style={styles.previewMoveGrid}>{gameProfile.moves.map((move)=><View key={move.id} style={[styles.previewMove,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+              <View style={styles.previewMoveHead}><Text style={[styles.previewMoveName,{color:colors.text}]}>{formatGameIdentifier(move.identifier)}</Text><Text style={[styles.previewDamage,{color:colors.yellow}]}>{move.power??'—'}</Text></View>
+              <Text style={[styles.previewMoveCost,{color:colors.accent}]}>{move.type.toUpperCase()} • {String(move.category).toUpperCase()} • PP {move.pp} • Precisão {move.accuracy==null?'—':move.accuracy+'%'}</Text>
+            </View>)}</View>
+          </>:<View style={[styles.previewDefenseRow,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.previewDefenseText,{color:colors.muted}]}>Esta carta não possui perfil game_v1 disponível.</Text></View>}
+
+          <View style={styles.previewActions}>
+            <Pressable onPress={()=>onOpenFullCard(card.id)} style={[styles.previewSecondaryButton,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+              <Ionicons name="open-outline" size={18} color={colors.accent}/>
+              <Text style={[styles.previewSecondaryText,{color:colors.text}]}>ABRIR DETALHE COMPLETO</Text>
+            </Pressable>
+            {sellEntry?<Pressable onPress={onSelectForSale} style={[styles.previewSellButton,{backgroundColor:colors.yellow}]}>
+              <Ionicons name="pricetag" size={20} color="#07111F"/>
+              <Text style={styles.previewSellText}>ESCOLHER PARA VENDER</Text>
+            </Pressable>:null}
+          </View>
+        </ScrollView>:null}
       </View>
-
-      {loading&&!card ? <View style={styles.previewLoading}><ActivityIndicator size="large" color={colors.yellow}/><Text style={[styles.previewLoadingText,{color:colors.muted}]}>Carregando carta e estatísticas…</Text></View> : null}
-
-      {card&&stats ? <ScrollView contentContainerStyle={styles.previewContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.previewHero}>
-          {card.image_large||card.image_small
-            ? <Image source={{uri:card.image_large??card.image_small??''}} resizeMode="contain" style={styles.previewCardImage}/>
-            : <View style={[styles.previewCardImage,{backgroundColor:colors.surface}]}/>}
-          <View style={styles.previewIdentity}>
-            <Text style={[styles.previewName,{color:colors.text}]}>{card.pokemon_name}</Text>
-            <Text style={[styles.previewMeta,{color:colors.muted}]}>{card.set_name} {card.card_number?'• #'+card.card_number:''}</Text>
-            <Text style={[styles.previewMeta,{color:colors.muted}]}>{card.rarity??'Sem raridade'}</Text>
-            <View style={styles.previewTypeRow}>{types.map((type)=><View key={String(type)} style={[styles.previewTypeChip,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.previewTypeText,{color:colors.text}]}>{String(type).toUpperCase()}</Text></View>)}</View>
-            <View style={[styles.previewPriceBox,{backgroundColor:colors.surface,borderColor:colors.border}]}>
-              <Text style={[styles.previewPriceLabel,{color:colors.muted}]}>VALOR DE MERCADO</Text>
-              <Text style={[styles.previewPriceValue,{color:'#65D894'}]}>{formatUsd(Number(card.market_price_usd??0))}</Text>
-              {detail?.owned?<Text style={[styles.previewOwned,{color:colors.muted}]}>Você possui {detail.quantity} cópia(s) na Bag.</Text>:null}
-            </View>
-          </View>
-        </View>
-
-        <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Estatísticas de batalha</Text>
-        <View style={styles.previewStatsGrid}>
-          <PreviewStat label="HP / DEF" value={String(stats.hp)} icon="heart" colors={colors}/>
-          <PreviewStat label="MAIOR ATQ" value={String(stats.maxDamage)} icon="flash" colors={colors}/>
-          <PreviewStat label="ENERGIA MÍN." value={String(stats.minEnergy)} icon="battery-half" colors={colors}/>
-          <PreviewStat label="RECUO" value={String(stats.retreatCost)} icon="walk" colors={colors}/>
-          <PreviewStat label="ATAQUES" value={String(stats.attackCount)} icon="fitness" colors={colors}/>
-          <PreviewStat label="HABILIDADES" value={String(stats.abilityCount)} icon="sparkles" colors={colors}/>
-        </View>
-
-        <View style={[styles.previewRating,{backgroundColor:colors.surface,borderColor:colors.border}]}>
-          <View style={{flex:1}}>
-            <Text style={[styles.previewPriceLabel,{color:colors.muted}]}>ÍNDICE DE BATALHA</Text>
-            <Text style={[styles.previewRatingValue,{color:colors.yellow}]}>{stats.battleRating}</Text>
-          </View>
-          <View style={{alignItems:'flex-end'}}>
-            <Text style={[styles.previewMiniStat,{color:colors.muted}]}>Dano/Energia: {stats.damagePerEnergy}</Text>
-            <Text style={[styles.previewMiniStat,{color:colors.muted}]}>Eficiência: {stats.efficiencyScore}</Text>
-            <Text style={[styles.previewMiniStat,{color:colors.muted}]}>Velocidade: {stats.speedScore}</Text>
-          </View>
-        </View>
-
-        <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Ataques</Text>
-        {attacks.length ? attacks.map((attack:any,index:number)=>{
-          const cost=Array.isArray(attack?.cost)?attack.cost.join(' • '):String(attack?.convertedEnergyCost??'—');
-          return <View key={'atk-'+index+'-'+String(attack?.name??'')} style={[styles.previewMove,{backgroundColor:colors.surface,borderColor:colors.border}]}>
-            <View style={styles.previewMoveHead}>
-              <Text style={[styles.previewMoveName,{color:colors.text}]}>{String(attack?.name??('Ataque '+(index+1)))}</Text>
-              <Text style={[styles.previewDamage,{color:colors.yellow}]}>{String(attack?.damage||'—')}</Text>
-            </View>
-            <Text style={[styles.previewMoveCost,{color:colors.accent}]}>⚡ {cost||'—'}</Text>
-            {attack?.text?<Text style={[styles.previewMoveText,{color:colors.muted}]}>{String(attack.text)}</Text>:null}
-          </View>;
-        }):<Text style={[styles.previewEmptyText,{color:colors.muted}]}>Nenhum ataque impresso encontrado nesta carta.</Text>}
-
-        {abilities.length ? <>
-          <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Habilidades</Text>
-          {abilities.map((ability:any,index:number)=><View key={'ability-'+index+'-'+String(ability?.name??'')} style={[styles.previewMove,{backgroundColor:colors.surface,borderColor:colors.accent}]}>
-            <Text style={[styles.previewMoveName,{color:colors.accent}]}>{String(ability?.name??('Habilidade '+(index+1)))}</Text>
-            {ability?.type?<Text style={[styles.previewMoveCost,{color:colors.muted}]}>{String(ability.type)}</Text>:null}
-            {ability?.text?<Text style={[styles.previewMoveText,{color:colors.muted}]}>{String(ability.text)}</Text>:null}
-          </View>)}
-        </>:null}
-
-        {(weaknesses.length||resistances.length)?<>
-          <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Fraqueza e resistência</Text>
-          <View style={[styles.previewDefenseRow,{backgroundColor:colors.surface,borderColor:colors.border}]}>
-            <Text style={[styles.previewDefenseText,{color:colors.muted}]}>Fraqueza: {weaknesses.length?weaknesses.map((value:any)=>String(value?.type??'?')+' '+String(value?.value??'')).join(' • '):'—'}</Text>
-            <Text style={[styles.previewDefenseText,{color:colors.muted}]}>Resistência: {resistances.length?resistances.map((value:any)=>String(value?.type??'?')+' '+String(value?.value??'')).join(' • '):'—'}</Text>
-          </View>
-        </>:null}
-
-        {sellEntry ? <Pressable onPress={onSelectForSale} style={[styles.previewSellButton,{backgroundColor:colors.yellow}]}>
-          <Ionicons name="pricetag" size={20} color="#07111F"/>
-          <Text style={styles.previewSellText}>ESCOLHER ESTA CARTA PARA VENDER</Text>
-        </Pressable> : null}
-      </ScrollView> : null}
-    </SafeAreaView>
+    </View>
   </Modal>;
 }
 
