@@ -17,6 +17,7 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import { formatUsd } from '@/services/market';
 import { formatGameIdentifier, getCardGameProfile, type CardGameProfile } from '@/services/cardGameProfile';
+import { getScreenPreference, setScreenPreference } from '@/services/screenPreferences';
 
 function themeAccent(theme:ShopTheme,fallback:string){
   if(theme==='royal')return '#FFD447';
@@ -56,6 +57,7 @@ export default function MarketplaceScreen() {
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
   const [search,setSearch]=useState('');
+  const [marketPrefsReady,setMarketPrefsReady]=useState(false);
   const [shopName,setShopName]=useState('');
   const [shopTheme,setShopTheme]=useState<ShopTheme>('guild');
   const [pickerOpen,setPickerOpen]=useState(false);
@@ -93,6 +95,21 @@ export default function MarketplaceScreen() {
     finally{setLoading(false);}
   },[]);
   useFocusEffect(useCallback(()=>{if(!loadedOnce.current)setLoading(true);void load();},[load]));
+
+  useEffect(()=>{
+    let active=true;
+    void getScreenPreference('marketplace_filters_v1',{search:''}).then((saved)=>{
+      if(!active)return;
+      setSearch(saved.search??'');
+      setMarketPrefsReady(true);
+    });
+    return()=>{active=false;};
+  },[]);
+
+  useEffect(()=>{
+    if(!marketPrefsReady)return;
+    void setScreenPreference('marketplace_filters_v1',{search});
+  },[marketPrefsReady,search]);
 
   useEffect(()=>{
     const contextCardId=sellCardId?String(sellCardId):'';
