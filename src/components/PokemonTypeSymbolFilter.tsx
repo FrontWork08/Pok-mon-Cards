@@ -58,7 +58,7 @@ export const POKEMON_TYPE_SYMBOLS: Record<string, TypeVisual> = {
   electric: { label: 'ELÉTRICO', icon: 'lightning-bolt', color: '#F7D02C', soft: '#393315' },
   psychic: { label: 'PSÍQUICO', icon: 'eye', color: '#F95587', soft: '#3A1B29' },
   ice: { label: 'GELO', icon: 'snowflake', color: '#96D9D6', soft: '#1D3334' },
-  dragon: { label: 'DRAGÃO', icon: 'trident', color: '#6F35FC', soft: '#251A43' },
+  dragon: { label: 'DRAGÃO', icon: 'bat', color: '#6F35FC', soft: '#251A43' },
   dark: { label: 'SOMBRIO', icon: 'weather-night', color: '#705746', soft: '#29221E' },
   fairy: { label: 'FADA', icon: 'star-four-points', color: '#D685AD', soft: '#382330' },
 
