@@ -1099,3 +1099,15 @@ if (existsSync('supabase/migrations/20260903024351_make_creator_supreme_owner_ex
   assert(creatorTitleDb.includes('players_creator_owner_equipped_singleton_idx'), 'Regressão: mais de uma conta pode voltar a equipar Criador Supremo.');
   assert(creatorTitleDb.includes("sender_title_id='creator_owner'"), 'Regressão: limpeza do título indevido no histórico de chat foi removida.');
 }
+
+
+if (existsSync('supabase/migrations/20260903031023_fix_legacy_selection_private_helper_permission.sql')) {
+  const legacyPermissionFix = read('supabase/migrations/20260903031023_fix_legacy_selection_private_helper_permission.sql');
+  assert(legacyPermissionFix.includes('legacy_card_is_available_for_current_user'), 'Regressão do Legado: salvamento voltou a chamar o helper privado amplo.');
+  assert(legacyPermissionFix.includes("auth.uid() is not null"), 'Regressão de segurança: helper seguro do Legado deixou de exigir usuário autenticado.');
+  assert(legacyPermissionFix.includes("legacy_card_is_available(auth.uid(),p_card_id)"), 'Regressão de segurança: helper seguro do Legado deixou de vincular a verificação ao próprio usuário.');
+  assert(legacyPermissionFix.includes("grant execute on function private.legacy_card_is_available_for_current_user(text)"), 'Regressão do Legado: usuário autenticado perdeu permissão para validar suas próprias cartas.');
+  assert(legacyPermissionFix.includes("revoke all on function private.legacy_card_is_available_for_current_user(text)\nfrom public,anon;"), 'Regressão de segurança: helper seguro do Legado ficou exposto a anon/public.');
+  assert(legacyPermissionFix.includes('security invoker'), 'Regressão de segurança: save_my_legacy_selection deixou de executar com as permissões do próprio usuário.');
+  assert(!legacyPermissionFix.includes("grant execute on function private.legacy_card_is_available(uuid,text)\nto authenticated"), 'Regressão de segurança: helper amplo de disponibilidade foi exposto ao cliente.');
+}
