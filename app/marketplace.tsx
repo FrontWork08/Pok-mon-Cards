@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
@@ -11,12 +11,12 @@ import { AuraFrame } from '@/components/AuraFrame';
 import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { MarketplaceListingSurface } from '@/components/MarketplaceListingSurface';
 import { getMyBagPage } from '@/services/bag';
-import { getCardDetail, type CardDetailEntry, type OwnedCardEntry } from '@/services/player';
+import { getCardDetail, getOwnedCard, type CardDetailEntry, type OwnedCardEntry } from '@/services/player';
 import { buyListing, cancelListing, createListing, createMarketOffer, getMarketplaceHub, saveMyShop, subscribeMarketplace, type MarketplaceHub, type MarketplaceListing, type ShopTheme } from '@/services/marketplace';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import { formatUsd } from '@/services/market';
-import { getBattleCardPreview } from '@/services/battleStats';
+import { formatGameIdentifier, getCardGameProfile, type CardGameProfile } from '@/services/cardGameProfile';
 
 function themeAccent(theme:ShopTheme,fallback:string){
   if(theme==='royal')return '#FFD447';
@@ -47,6 +47,7 @@ const THEMES: Array<{id:ShopTheme;label:string;icon:keyof typeof Ionicons.glyphM
 
 export default function MarketplaceScreen() {
   const router=useRouter();
+  const { sellCardId } = useLocalSearchParams<{ sellCardId?: string }>();
   const {colors}=useAppTheme();
   const wallet=useWallet();
   const [hub,setHub]=useState<MarketplaceHub|null>(null);
@@ -71,6 +72,11 @@ export default function MarketplaceScreen() {
   const [price,setPrice]=useState('1000');
   const [offerListing,setOfferListing]=useState<MarketplaceListing|null>(null);
   const [offerAmount,setOfferAmount]=useState('');
+  const [compareItems,setCompareItems]=useState<MarketplaceListing[]>([]);
+  const [compareProfiles,setCompareProfiles]=useState<Record<string,CardGameProfile|null>>({});
+  const [compareLoading,setCompareLoading]=useState<string|null>(null);
+  const [previewGameProfile,setPreviewGameProfile]=useState<CardGameProfile|null>(null);
+  const [sellCardHandled,setSellCardHandled]=useState(false);
   const loadedOnce=useRef(false);
   const realtimeRefreshTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const inventoryRequestSeq=useRef(0);
