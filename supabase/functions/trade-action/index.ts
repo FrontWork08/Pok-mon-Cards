@@ -75,6 +75,13 @@ Deno.serve(async (req: Request) => {
     if (!body.tradeId) return json({ error: "tradeId is required" }, 400);
     rpcName = "server_cancel_trade";
     args = { p_actor_id: user.id, p_trade_id: body.tradeId };
+  } else if (action === "abandon") {
+    if (!body.tradeId) return json({ error: "tradeId is required" }, 400);
+    rpcName = "server_abandon_trade";
+    args = { p_actor_id: user.id, p_trade_id: body.tradeId };
+  } else if (action === "cleanup_abandoned") {
+    rpcName = "server_cleanup_abandoned_trades";
+    args = { p_actor_id: user.id };
   } else {
     return json({ error: "Invalid action" }, 400);
   }
