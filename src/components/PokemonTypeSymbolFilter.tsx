@@ -2,24 +2,68 @@ import { ScrollView, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
+export const POKEMON_GAME_TYPES = [
+  'normal',
+  'fighting',
+  'flying',
+  'poison',
+  'ground',
+  'rock',
+  'bug',
+  'ghost',
+  'steel',
+  'fire',
+  'water',
+  'grass',
+  'electric',
+  'psychic',
+  'ice',
+  'dragon',
+  'dark',
+  'fairy',
+] as const;
+
+const TYPE_ALIASES: Record<string, string> = {
+  colorless: 'normal',
+  lightning: 'electric',
+  darkness: 'dark',
+  metal: 'steel',
+};
+
+export function normalizePokemonGameType(type: string | null | undefined) {
+  const key = String(type ?? '').trim().toLowerCase();
+  return TYPE_ALIASES[key] ?? key;
+}
+
 export const POKEMON_TYPE_SYMBOLS: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; soft: string }> = {
-  water: { label: 'ÁGUA', icon: 'water', color: '#59A9FF', soft: '#132A3D' },
-  fire: { label: 'FOGO', icon: 'flame', color: '#FF725C', soft: '#3A1B18' },
-  grass: { label: 'PLANTA', icon: 'leaf', color: '#6FD072', soft: '#19311E' },
-  lightning: { label: 'ELÉTRICO', icon: 'flash', color: '#FFD447', soft: '#3A3214' },
-  electric: { label: 'ELÉTRICO', icon: 'flash', color: '#FFD447', soft: '#3A3214' },
-  psychic: { label: 'PSÍQUICO', icon: 'eye', color: '#D57CFF', soft: '#2F1B3A' },
-  fighting: { label: 'LUTADOR', icon: 'barbell', color: '#D99463', soft: '#332318' },
-  darkness: { label: 'SOMBRIO', icon: 'moon', color: '#8C93A0', soft: '#20242A' },
-  dark: { label: 'SOMBRIO', icon: 'moon', color: '#8C93A0', soft: '#20242A' },
-  metal: { label: 'METAL', icon: 'shield-half', color: '#B8C3CE', soft: '#252D34' },
-  colorless: { label: 'INCOLOR', icon: 'star', color: '#D8D8D8', soft: '#303030' },
-  dragon: { label: 'DRAGÃO', icon: 'diamond', color: '#C79BFF', soft: '#2B2035' },
-  fairy: { label: 'FADA', icon: 'sparkles', color: '#FF9DD3', soft: '#371D2D' },
+  normal: { label: 'NORMAL', icon: 'radio-button-on', color: '#A8A77A', soft: '#2E2E24' },
+  fighting: { label: 'LUTADOR', icon: 'barbell', color: '#C22E28', soft: '#351A19' },
+  flying: { label: 'VOADOR', icon: 'airplane', color: '#A98FF3', soft: '#29243A' },
+  poison: { label: 'VENENO', icon: 'flask', color: '#A33EA1', soft: '#301C30' },
+  ground: { label: 'TERRA', icon: 'layers', color: '#E2BF65', soft: '#352D18' },
+  rock: { label: 'PEDRA', icon: 'diamond', color: '#B6A136', soft: '#332E18' },
+  bug: { label: 'INSETO', icon: 'bug', color: '#A6B91A', soft: '#2B3017' },
+  ghost: { label: 'FANTASMA', icon: 'skull', color: '#735797', soft: '#282034' },
+  steel: { label: 'AÇO', icon: 'construct', color: '#B7B7CE', soft: '#2B2D34' },
+  fire: { label: 'FOGO', icon: 'flame', color: '#EE8130', soft: '#3A2215' },
+  water: { label: 'ÁGUA', icon: 'water', color: '#6390F0', soft: '#17273D' },
+  grass: { label: 'PLANTA', icon: 'leaf', color: '#7AC74C', soft: '#20331A' },
+  electric: { label: 'ELÉTRICO', icon: 'flash', color: '#F7D02C', soft: '#393315' },
+  psychic: { label: 'PSÍQUICO', icon: 'eye', color: '#F95587', soft: '#3A1B29' },
+  ice: { label: 'GELO', icon: 'snow', color: '#96D9D6', soft: '#1D3334' },
+  dragon: { label: 'DRAGÃO', icon: 'diamond-outline', color: '#6F35FC', soft: '#251A43' },
+  dark: { label: 'SOMBRIO', icon: 'moon', color: '#705746', soft: '#29221E' },
+  fairy: { label: 'FADA', icon: 'sparkles', color: '#D685AD', soft: '#382330' },
+
+  // Compatibilidade com dados antigos do TCG enquanto clientes/objetos em cache são atualizados.
+  colorless: { label: 'NORMAL', icon: 'radio-button-on', color: '#A8A77A', soft: '#2E2E24' },
+  lightning: { label: 'ELÉTRICO', icon: 'flash', color: '#F7D02C', soft: '#393315' },
+  darkness: { label: 'SOMBRIO', icon: 'moon', color: '#705746', soft: '#29221E' },
+  metal: { label: 'AÇO', icon: 'construct', color: '#B7B7CE', soft: '#2B2D34' },
 };
 
 export function getPokemonTypeSymbol(type: string) {
-  const key = String(type ?? '').trim().toLowerCase();
+  const key = normalizePokemonGameType(type);
   return POKEMON_TYPE_SYMBOLS[key] ?? {
     label: String(type ?? '').toUpperCase(),
     icon: 'ellipse' as keyof typeof Ionicons.glyphMap,
@@ -42,8 +86,17 @@ export function PokemonTypeSymbolFilter({
   allLabel?: string;
 }) {
   const { colors } = useAppTheme();
-  const normalized = Array.from(new Set(types.map((type) => String(type ?? '').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-  if (!normalized.length) return null;
+  const selectedKey = selectedType ? normalizePokemonGameType(selectedType) : null;
+
+  const extras = Array.from(new Set(
+    types
+      .map((type) => normalizePokemonGameType(type))
+      .filter((type) => Boolean(type) && !POKEMON_GAME_TYPES.includes(type as (typeof POKEMON_GAME_TYPES)[number])),
+  )).sort((a, b) => a.localeCompare(b));
+
+  // Filtros de Pokémon usam sempre os 18 tipos oficiais do jogo.
+  // Tipos desconhecidos são mantidos no fim apenas por compatibilidade.
+  const normalized = [...POKEMON_GAME_TYPES, ...extras];
 
   return (
     <View style={styles.group}>
@@ -54,16 +107,16 @@ export function PokemonTypeSymbolFilter({
           accessibilityLabel="Mostrar todos os tipos"
           onPress={() => onChange(null)}
           style={[styles.allChip, {
-            backgroundColor: selectedType == null ? colors.accentSoft : colors.surfaceAlt,
-            borderColor: selectedType == null ? colors.accent : colors.border,
+            backgroundColor: selectedKey == null ? colors.accentSoft : colors.surfaceAlt,
+            borderColor: selectedKey == null ? colors.accent : colors.border,
           }]}
         >
-          <Ionicons name="apps" size={18} color={selectedType == null ? colors.accent : colors.muted}/>
-          <Text style={[styles.allText, { color: selectedType == null ? colors.text : colors.muted }]}>{allLabel}</Text>
+          <Ionicons name="apps" size={18} color={selectedKey == null ? colors.accent : colors.muted}/>
+          <Text style={[styles.allText, { color: selectedKey == null ? colors.text : colors.muted }]}>{allLabel}</Text>
         </Pressable>
         {normalized.map((type) => {
           const visual = getPokemonTypeSymbol(type);
-          const active = selectedType === type;
+          const active = selectedKey === type;
           return (
             <Pressable
               key={type}
@@ -93,7 +146,7 @@ const styles = StyleSheet.create({
   row: { gap: 9, paddingRight: 8, alignItems: 'flex-start' },
   allChip: { minHeight: 46, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   allText: { fontSize: 7, fontWeight: '900' },
-  typeButton: { width: 48, alignItems: 'center', gap: 4 },
+  typeButton: { width: 50, alignItems: 'center', gap: 4 },
   circle: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  label: { width: 52, textAlign: 'center', fontSize: 5.5, fontWeight: '900', letterSpacing: .1 },
+  label: { width: 54, textAlign: 'center', fontSize: 5.5, fontWeight: '900', letterSpacing: .1 },
 });
