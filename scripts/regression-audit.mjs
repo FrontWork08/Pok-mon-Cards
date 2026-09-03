@@ -1105,16 +1105,6 @@ if (existsSync('app/(tabs)/packs.tsx')) {
   assert(packs.includes('overScrollMode="never"'), 'Regressão: overscroll Android voltou a ficar livre na lista de Packs.');
 }
 
-if (failures.length) {
-  console.error('\n❌ Auditoria de regressão falhou:');
-  failures.forEach((failure) => console.error(' - ' + failure));
-  process.exit(1);
-}
-
-console.log('✅ Auditoria de regressão passou.');
-console.log('   Batalha, performance, Home, guilda, QR, Legado, Economy 2.1, reset, ginásios, Packs, Admin Abuse, atualização obrigatória e PWA permanecem protegidos.');
-
-
 if (existsSync('supabase/migrations/20260903024351_make_creator_supreme_owner_exclusive.sql')) {
   const creatorTitleDb = read('supabase/migrations/20260903024351_make_creator_supreme_owner_exclusive.sql');
   assert(creatorTitleDb.includes("a.role='owner'"), 'Regressão: Criador Supremo voltou a considerar qualquer admin como criador.');
@@ -1194,3 +1184,107 @@ if (existsSync('app/search.tsx') && existsSync('src/services/globalSearch.ts')) 
   assert(searchService.includes('getSetCatalog') && searchService.includes('getMyDecks') && searchService.includes('getTournamentHub'), 'Regressão da Busca Global: sets/decks/torneios deixaram de ser pesquisados.');
   assert(searchUi.includes('title="Sets"') && searchUi.includes('title="Seus Decks"') && searchUi.includes('title="Torneios"'), 'Regressão da Busca Global: novas categorias deixaram de aparecer.');
 }
+
+
+if (existsSync('app/career.tsx') && existsSync('src/services/career.ts')) {
+  const careerUi = read('app/career.tsx');
+  const careerService = read('src/services/career.ts');
+  assert(careerUi.includes('Carreira do Treinador') && careerUi.includes('JORNADA DO TREINADOR'), 'Regressão da Carreira: tela central ou Jornada foi removida.');
+  assert(careerUi.includes('Primeiros Passos') && careerUi.includes('Metas de Médio Prazo') && careerUi.includes('Metas de Longo Prazo'), 'Regressão da Jornada: metas curta/média/longa deixaram de existir.');
+  assert(careerUi.includes('POKÉDEX COMO META') && careerUi.includes('Histórico de temporadas'), 'Regressão da Carreira: Pokédex regional ou memória de temporadas foi removida.');
+  assert(careerUi.includes('Career Score não é moeda'), 'Regressão de produto: Career Score voltou a parecer uma moeda.');
+  assert(careerUi.includes('ProgressCelebration') && careerUi.includes('COLETAR TODAS'), 'Regressão de progressão: celebração ou coleta retroativa da Jornada foi removida.');
+  assert(careerService.includes('get_trainer_career') && careerService.includes('claim_all_trainer_journey_rewards'), 'Regressão da Carreira: serviço deixou de usar validação server-side da Jornada.');
+}
+
+if (existsSync('app/trainer-guide.tsx')) {
+  const guide = read('app/trainer-guide.tsx');
+  for (const term of ['PP','STAB','ELO','Career Score','Speed','Valor de mercado']) {
+    assert(guide.includes(term), `Regressão do Guia: explicação de ${term} foi removida.`);
+  }
+  assert(guide.includes('Colecione → monte → compita → evolua → socialize'), 'Regressão de produto: ciclo principal do Trainer Collection deixou de ser explicado.');
+  assert(guide.includes('Coleção cara não significa batalha ganha'), 'Regressão de balanceamento: Guia deixou de explicar que valor da carta não dá força.');
+}
+
+if (existsSync('app/(tabs)/index.tsx')) {
+  const homeJourney = read('app/(tabs)/index.tsx');
+  assert(homeJourney.includes('getTrainerJourneySummary') && homeJourney.includes('JORNADA DO TREINADOR'), 'Regressão da Home: próximo passo da Jornada deixou de aparecer.');
+}
+
+if (existsSync('src/services/activityCenter.ts')) {
+  const activityJourney = read('src/services/activityCenter.ts');
+  assert(activityJourney.includes('getTrainerJourneySummary') && activityJourney.includes('trainer-journey-claimable'), 'Regressão da Central de Atividades: recompensas da Jornada deixaram de aparecer.');
+}
+
+if (existsSync('src/services/guilds.ts') && existsSync('app/guilds.tsx')) {
+  const guildService = read('src/services/guilds.ts');
+  const guildUi = read('app/guilds.tsx');
+  assert(guildService.includes('get_my_guild_story_feed'), 'Regressão social: serviço perdeu o feed real de histórias da guilda.');
+  assert(guildUi.includes('HISTÓRIAS RECENTES') && guildUi.includes('O que sua guilda viveu'), 'Regressão social: Guild HQ voltou a mostrar só números sem histórias recentes.');
+}
+
+if (existsSync('app/season.tsx')) {
+  const seasonEvents = read('app/season.tsx');
+  assert(seasonEvents.includes('Temporada & Eventos'), 'Regressão de arquitetura: Temporada voltou a competir com a Jornada da Carreira.');
+  for (const eventType of ['double_xp','rare_boost','featured_set','free_boosters']) {
+    assert(seasonEvents.includes(eventType), `Regressão de eventos: efeito visível de ${eventType} foi removido.`);
+  }
+  assert(seasonEvents.includes('eventEffectText'), 'Regressão de UX: eventos deixaram de explicar o que realmente alteram no jogo.');
+}
+
+if (existsSync('src/components/AreaIdentityStrip.tsx')) {
+  for (const [path, area] of [
+    ['app/(tabs)/packs.tsx','packs'],
+    ['app/(tabs)/bag.tsx','collection'],
+    ['app/(tabs)/battles.tsx','competitive'],
+    ['app/(tabs)/trade.tsx','economy'],
+    ['app/marketplace.tsx','economy'],
+    ['app/guilds.tsx','social'],
+    ['app/career.tsx','progress'],
+  ]) {
+    if (!existsSync(path)) continue;
+    const areaUi = read(path);
+    assert(areaUi.includes('AreaIdentityStrip') && areaUi.includes(`area="${area}"`), `Regressão de identidade: ${path} perdeu a identidade discreta da área ${area}.`);
+  }
+}
+
+if (existsSync('app/player/[id].tsx') && existsSync('src/services/publicProfiles.ts')) {
+  const publicProfile = read('app/player/[id].tsx');
+  const publicProfileService = read('src/services/publicProfiles.ts');
+  assert(publicProfile.includes('IDENTIDADE DO TREINADOR') && publicProfile.includes('Career Score'), 'Regressão do perfil público: identidade voltou a ser resumida apenas por valor em USD.');
+  assert(publicProfile.includes('VALOR DE MERCADO DA COLEÇÃO') && publicProfile.includes('não aumenta stats nem dano em batalha'), 'Regressão de produto: perfil público voltou a sugerir valor financeiro como força.');
+  assert(publicProfileService.includes('get_public_trainer_identity'), 'Regressão do perfil público: resumo não sensível da Carreira foi removido.');
+}
+
+if (existsSync('supabase/migrations/20260903173157_trainer_career_and_guided_journey.sql')) {
+  const careerDb = read('supabase/migrations/20260903173157_trainer_career_and_guided_journey.sql');
+  assert(careerDb.includes('trainer_journey_claims'), 'Regressão da Jornada: persistência de recompensas coletadas foi removida.');
+  assert(careerDb.includes('JOURNEY_STEP_NOT_COMPLETE') && careerDb.includes('JOURNEY_STEP_ALREADY_CLAIMED'), 'Regressão de segurança: Jornada perdeu validação server-side de conclusão/duplo resgate.');
+  assert(careerDb.includes('grant execute on function public.get_trainer_career() to authenticated'), 'Regressão de segurança: RPC da Carreira perdeu ACL explícita para autenticados.');
+}
+
+if (existsSync('supabase/migrations/20260903173302_trainer_journey_summary_and_bulk_claim.sql')) {
+  const journeyDb = read('supabase/migrations/20260903173302_trainer_journey_summary_and_bulk_claim.sql');
+  assert(journeyDb.includes('claim_all_trainer_journey_rewards'), 'Regressão da Jornada: coleta em lote foi removida.');
+  assert(journeyDb.includes('on conflict(player_id,step_id) do nothing'), 'Regressão de segurança: coleta em lote deixou de ser idempotente contra duplicação.');
+}
+
+if (existsSync('supabase/migrations/20260903174143_guild_story_feed.sql')) {
+  const guildStoryDb = read('supabase/migrations/20260903174143_guild_story_feed.sql');
+  assert(guildStoryDb.includes('get_my_guild_story_feed') && guildStoryDb.includes("gm.guild_id=v_guild"), 'Regressão de privacidade: feed de histórias deixou de ficar limitado à própria guilda.');
+}
+
+if (existsSync('supabase/migrations/20260903174648_public_trainer_identity_summary.sql')) {
+  const identityDb = read('supabase/migrations/20260903174648_public_trainer_identity_summary.sql');
+  assert(identityDb.includes('get_public_trainer_identity') && identityDb.includes("account_status='active'"), 'Regressão do perfil público: identidade deixou de validar conta ativa.');
+  assert(!identityDb.includes("'coins'") && !identityDb.includes("'diamonds'"), 'Regressão de privacidade: resumo público da identidade passou a expor saldo.');
+}
+
+if (failures.length) {
+  console.error('\n❌ Auditoria de regressão falhou:');
+  failures.forEach((failure) => console.error(' - ' + failure));
+  process.exit(1);
+}
+
+console.log('✅ Auditoria de regressão passou.');
+console.log('   Batalha, Carreira, Jornada, identidade, eventos, social, performance, Home, guilda, Economy 2.1, reset, ginásios, Packs, Admin Abuse, atualização obrigatória e PWA permanecem protegidos.');
