@@ -15,6 +15,7 @@ import {
   type RetentionHub,
 } from '@/services/retention';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
 
 const TOTAL_MILESTONES = [50,151,251,386,493,649,721,809,905,1025];
 function eventEffectText(event:{type:string;payload:Record<string,unknown>}){
@@ -112,6 +113,7 @@ export default function SeasonScreen() {
   }
 
   return <Screen title="Temporada & Eventos" subtitle="Ranque competitivo, streak, eventos ativos e recompensas sazonais.">
+    <AreaIdentityStrip area="progress" />
     <Pressable style={styles.back} onPress={()=>goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
     {notice?<Pressable onPress={()=>setNotice(null)} style={[styles.notice,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Ionicons name="close" size={16} color={colors.muted}/></Pressable>:null}
     {loading?<ActivityIndicator size="large" color={colors.yellow}/>:null}
