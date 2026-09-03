@@ -259,6 +259,8 @@ export default function ProfileScreen() {
 
     <View style={styles.featureGrid}>
       <FeatureLink icon="compass" color={colors.yellow} title="Carreira do Treinador" text="Veja sua jornada, identidade, Pokédex regional e histórico de temporadas." onPress={() => router.push('/career')} />
+      <FeatureLink icon="library" color="#9B7BFF" title="Museu da Conta" text="Primeiros momentos, melhor pull, primeira vitória e outras memórias." onPress={() => router.push('/account-museum')} />
+      <FeatureLink icon="receipt" color="#54C78D" title="Histórico Financeiro" text="Veja todas as mudanças de Coins e Diamantes com saldo antes e depois." onPress={() => router.push('/financial-history')} />
       <FeatureLink icon="help-circle" color={colors.accent} title="Guia do Treinador" text="Entenda o ciclo do jogo, ELO, PP, Speed, STAB e outros números." onPress={() => router.push('/trainer-guide')} />
       <FeatureLink icon="qr-code" color={colors.accent} title="QR de amizade" text="Mostre seu Trainer Link para abrir seu perfil e receber pedidos de amizade." onPress={() => router.push('/friend-qr')} />
       <FeatureLink icon="ribbon" color={colors.yellow} title="Passe de Batalha" text="50 níveis, missões, recompensas grátis e trilha VIP." onPress={() => router.push('/battle-pass')} />
