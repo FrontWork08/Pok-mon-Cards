@@ -1,4 +1,7 @@
 import { supabase } from '@/lib/supabase';
+import { getMissions } from '@/services/missions';
+import { getGuildHub } from '@/services/guilds';
+import { getTournamentHub } from '@/services/tournaments';
 
 export type HomeDashboard = {
   profile: {
@@ -136,4 +139,107 @@ export async function getHomeContinueItems(): Promise<HomeContinueItem[]> {
   return items
     .sort((a, b) => b.priority - a.priority || String(b.updatedAt).localeCompare(String(a.updatedAt)))
     .slice(0, 3);
+}
+
+
+export type HomeProgressSnapshot = {
+  mission: {
+    id:string;
+    title:string;
+    progress:number;
+    target:number;
+    percent:number;
+    claimable:boolean;
+    route:string;
+  } | null;
+  claimableMissions:number;
+  weeklyRank:{
+    rank:number;
+    total:number;
+    weeklyValueUsd:number;
+    rewardCoins:number;
+    weekEnd:string;
+  };
+  guild:{
+    joined:boolean;
+    name:string|null;
+    rank:number|null;
+    claimableReward:boolean;
+    boosterProgress:number;
+    boosterTarget:number;
+  };
+  tournament:{
+    status:string;
+    joined:boolean;
+    name:string;
+    entries:number;
+    maxPlayers:number;
+    prizePoolCoins:number;
+  } | null;
+};
+
+export async function getHomeProgressSnapshot():Promise<HomeProgressSnapshot>{
+  const [missionsResult,guildResult,tournamentResult,weeklyResult] = await Promise.allSettled([
+    getMissions(),
+    getGuildHub(),
+    getTournamentHub(),
+    supabase.rpc('get_my_weekly_collection_rank'),
+  ]);
+
+  const missions = missionsResult.status==='fulfilled' ? missionsResult.value : [];
+  const claimable = missions.filter((mission)=>!mission.claimed && mission.progress>=mission.target);
+  const activeMissions = missions.filter((mission)=>!mission.claimed);
+  const bestMission = [...activeMissions].sort((a,b)=>{
+    const aDone=a.progress>=a.target?1:0;
+    const bDone=b.progress>=b.target?1:0;
+    if(aDone!==bDone)return bDone-aDone;
+    const ap=Math.min(1,a.progress/Math.max(1,a.target));
+    const bp=Math.min(1,b.progress/Math.max(1,b.target));
+    return bp-ap;
+  })[0] ?? null;
+
+  const guildHub = guildResult.status==='fulfilled' ? guildResult.value : null;
+  const membership = guildHub?.myMembership ?? null;
+  const myGuild = membership ? guildHub?.guilds.find((guild)=>guild.id===membership.guildId) ?? null : null;
+
+  const tournament = tournamentResult.status==='fulfilled' ? tournamentResult.value : null;
+  const weeklyData = weeklyResult.status==='fulfilled' && !weeklyResult.value.error
+    ? (weeklyResult.value.data ?? {})
+    : {};
+
+  return {
+    mission: bestMission ? {
+      id:bestMission.id,
+      title:bestMission.title,
+      progress:Number(bestMission.progress??0),
+      target:Number(bestMission.target??0),
+      percent:Math.min(100,Math.round(Number(bestMission.progress??0)/Math.max(1,Number(bestMission.target??1))*100)),
+      claimable:!bestMission.claimed && Number(bestMission.progress??0)>=Number(bestMission.target??0),
+      route:bestMission.action_route || '/missions',
+    } : null,
+    claimableMissions:claimable.length,
+    weeklyRank:{
+      rank:Number(weeklyData.rank??0),
+      total:Number(weeklyData.total??0),
+      weeklyValueUsd:Number(weeklyData.weeklyValueUsd??0),
+      rewardCoins:Number(weeklyData.rewardCoins??0),
+      weekEnd:String(weeklyData.weekEnd??''),
+    },
+    guild:{
+      joined:Boolean(membership),
+      name:myGuild?.name??null,
+      rank:myGuild?.rank??null,
+      claimableReward:Boolean(guildHub?.weeklyReward?.claimable),
+      boosterProgress:Number(guildHub?.collectiveBooster?.progress??0),
+      boosterTarget:Number(guildHub?.collectiveBooster?.target??40),
+    },
+    tournament:tournament ? {
+      status:tournament.status,
+      joined:tournament.joined,
+      name:tournament.name,
+      entries:tournament.entries.length,
+      maxPlayers:tournament.maxPlayers,
+      prizePoolCoins:tournament.prizePoolCoins,
+    } : null,
+  };
 }
