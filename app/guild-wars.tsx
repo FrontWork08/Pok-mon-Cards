@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, InteractionManager, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
@@ -146,18 +146,21 @@ export default function GuildWarsScreen() {
         sortMode: 'damage' as const,
       };
       const first = await getMyBagPage(0, 100, filters);
-      const pages = [first];
+      const items = first.items.filter((item) => Boolean(item.cards));
       const remainingOffsets:number[] = [];
       for (let offset = 100; offset < first.totalFiltered; offset += 100) {
         remainingOffsets.push(offset);
       }
-      if (remainingOffsets.length) {
-        const rest = await Promise.all(
-          remainingOffsets.map((offset) => getMyBagPage(offset, 100, filters)),
-        );
-        pages.push(...rest);
+
+      // Do not decode 15–20 large JSON pages at the same instant on Android.
+      // Small batches keep the JS thread responsive while still loading the full collection.
+      for (let index = 0; index < remainingOffsets.length; index += 3) {
+        const batch = remainingOffsets.slice(index, index + 3);
+        const pages = await Promise.all(batch.map((offset) => getMyBagPage(offset, 100, filters)));
+        items.push(...pages.flatMap((page) => page.items).filter((item) => Boolean(item.cards)));
+        await new Promise<void>((resolve) => InteractionManager.runAfterInteractions(() => resolve()));
       }
-      return pages.flatMap((page) => page.items).filter((item) => Boolean(item.cards));
+      return items;
     })()
       .then((items) => {
         if (disposed) return;
@@ -723,7 +726,10 @@ function CardPickerModal({
   }), [cards]);
 
   const types = useMemo(
-    () => [...new Set(candidates.flatMap(({ card }) => Array.isArray(card.types) ? card.types : []))]
+    () => [...new Set(candidates.flatMap(({ card }) => {
+      const gameTypes = Array.isArray(card.game_types) && card.game_types.length ? card.game_types : card.types;
+      return Array.isArray(gameTypes) ? gameTypes : [];
+    }))]
       .sort((a, b) => a.localeCompare(b, 'pt-BR')),
     [candidates],
   );
@@ -740,11 +746,12 @@ function CardPickerModal({
           card.pokemon_name,
           card.set_name,
           card.rarity,
-          ...(Array.isArray(card.types) ? card.types : []),
+          ...(Array.isArray(card.game_types) && card.game_types.length ? card.game_types : Array.isArray(card.types) ? card.types : []),
         ].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
         if (!haystack.includes(term)) return false;
       }
-      if (typeFilter !== 'all' && !(Array.isArray(card.types) && card.types.includes(typeFilter))) return false;
+      const gameTypes = Array.isArray(card.game_types) && card.game_types.length ? card.game_types : card.types;
+      if (typeFilter !== 'all' && !(Array.isArray(gameTypes) && gameTypes.includes(typeFilter))) return false;
       if (profile.hp < hpFloor) return false;
       if (profile.maxDamage < attackFloor) return false;
       if (profile.battleRating < ratingFloor) return false;
@@ -932,13 +939,26 @@ function CardPickerModal({
               </Pressable>
             </View>
           ) : (
-            <ScrollView style={styles.cardScroll} contentContainerStyle={styles.cardGrid} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {filteredCandidates.map(({ card, profile }) => {
+            <FlatList
+              style={styles.cardScroll}
+              contentContainerStyle={styles.virtualCardGrid}
+              columnWrapperStyle={styles.virtualCardRow}
+              data={filteredCandidates}
+              numColumns={2}
+              keyExtractor={({card}) => card.id}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews
+              initialNumToRender={8}
+              maxToRenderPerBatch={6}
+              updateCellsBatchingPeriod={70}
+              windowSize={5}
+              onEndReachedThreshold={0.6}
+              renderItem={({item:{card,profile}}) => {
                 const selectedIndex = attackTeam.indexOf(card.id);
                 const selected = selectedIndex >= 0;
                 return (
                   <Pressable
-                    key={card.id}
                     disabled={busy}
                     onPress={() => state.mode==='defense' ? onChooseDefender(card.id) : onToggleAttack(card.id)}
                     style={[
@@ -948,7 +968,7 @@ function CardPickerModal({
                     ]}
                   >
                     {selected ? <View style={[styles.orderBadge,{backgroundColor:colors.yellow}]}><Text style={styles.orderText}>{selectedIndex+1}</Text></View> : null}
-                    {card.image_small ? <Image source={{uri:card.image_small}} resizeMode="contain" style={styles.choiceImage}/> : <View style={[styles.choiceImage,{backgroundColor:colors.surfaceAlt}]}/>}
+                    {card.image_small ? <Image source={{uri:card.image_small}} resizeMode="contain" style={styles.choiceImage} fadeDuration={0}/> : <View style={[styles.choiceImage,{backgroundColor:colors.surfaceAlt}]}/>}
                     <Text numberOfLines={1} style={[styles.choiceName,{color:colors.text}]}>{card.pokemon_name}</Text>
                     <Text numberOfLines={1} style={[styles.choiceMeta,{color:colors.muted}]}>{card.rarity ?? 'Sem raridade'}</Text>
                     <View style={styles.choiceStats}>
@@ -965,8 +985,8 @@ function CardPickerModal({
                     </View>
                   </Pressable>
                 );
-              })}
-            </ScrollView>
+              }}
+            />
           )}
 
           {state.mode==='attack' ? (
@@ -1123,7 +1143,9 @@ const styles = StyleSheet.create({
   retryText:{fontSize:8,fontWeight:'900',letterSpacing:.4},
   cardScroll:{flexGrow:0},
   cardGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,paddingBottom:4},
-  choiceCard:{width:'31.5%',minWidth:130,borderRadius:15,borderWidth:1,padding:7,gap:3,position:'relative'},
+  virtualCardGrid:{paddingBottom:6},
+  virtualCardRow:{gap:8,marginBottom:8},
+  choiceCard:{flex:1,minWidth:0,borderRadius:15,borderWidth:1,padding:7,gap:3,position:'relative'},
   choiceImage:{width:'100%',height:138,borderRadius:9},
   choiceName:{fontSize:9,fontWeight:'900'},
   choiceMeta:{fontSize:7},
