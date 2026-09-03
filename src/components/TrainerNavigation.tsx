@@ -36,6 +36,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Busca Global', description:'Encontre cartas, treinadores, guildas e funções', href:'/search', icon:'search', group:'system' },
   { label:'Central de Atividades', description:'Mensagens, convites e avisos que precisam de atenção', href:'/inbox', icon:'notifications', group:'social' },
   { label:'Passe de Batalha', description:'50 níveis, recompensas grátis, VIP e missões', href:'/battle-pass', icon:'ribbon', group:'progress' },
+  { label:'Carreira do Treinador', description:'Jornada, identidade, Pokédex e histórico da conta', href:'/career', icon:'compass', group:'progress' },
   { label:'Temporada & Jornada', description:'Ranque, streak, eventos e recompensas', href:'/season', icon:'flame', group:'progress' },
   { label:'Card Chase', description:'Wishlist e alertas de cartas desejadas', href:'/wishlist', icon:'star', group:'collection' },
   { label:'Vitrine do Perfil', description:'Escolha suas 6 cartas de destaque', href:'/showcase', icon:'sparkles', group:'collection' },
@@ -57,6 +58,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Pokédex', description:'Espécies e cartas descobertas', href:'/pokedex', icon:'book', group:'collection' },
   { label:'Coleções por Set', description:'Acompanhe o progresso dos sets', href:'/sets', icon:'layers', group:'collection' },
   { label:'Histórico de Packs', description:'Reveja seus melhores pulls', href:'/history', icon:'time', group:'collection' },
+  { label:'Guia do Treinador', description:'Ciclo do jogo e glossário de stats', href:'/trainer-guide', icon:'help-circle', group:'system' },
   { label:'Configurações', description:'Aparência, batalha, notificações e privacidade', href:'/settings', icon:'settings', group:'system' },
   { label:'Admin Center', description:'Economia, usuários e sistema', href:'/admin', icon:'shield-checkmark', group:'system', adminOnly:true },
 ];
