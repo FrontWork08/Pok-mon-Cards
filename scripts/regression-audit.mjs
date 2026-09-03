@@ -1088,3 +1088,14 @@ if (failures.length) {
 
 console.log('✅ Auditoria de regressão passou.');
 console.log('   Batalha, performance, Home, guilda, QR, Legado, Economy 2.1, reset, ginásios, Packs, Admin Abuse, atualização obrigatória e PWA permanecem protegidos.');
+
+
+if (existsSync('supabase/migrations/20260903024351_make_creator_supreme_owner_exclusive.sql')) {
+  const creatorTitleDb = read('supabase/migrations/20260903024351_make_creator_supreme_owner_exclusive.sql');
+  assert(creatorTitleDb.includes("a.role='owner'"), 'Regressão: Criador Supremo voltou a considerar qualquer admin como criador.');
+  assert(creatorTitleDb.includes("CREATOR_TITLE_OWNER_ONLY"), 'Regressão de segurança: título Criador Supremo perdeu a trava exclusiva do owner.');
+  assert(creatorTitleDb.includes('trg_guard_creator_owner_achievement'), 'Regressão de segurança: achievement creator_owner perdeu o guard de banco.');
+  assert(creatorTitleDb.includes('player_achievements_creator_owner_singleton_idx'), 'Regressão: mais de uma conta pode voltar a possuir Criador Supremo.');
+  assert(creatorTitleDb.includes('players_creator_owner_equipped_singleton_idx'), 'Regressão: mais de uma conta pode voltar a equipar Criador Supremo.');
+  assert(creatorTitleDb.includes("sender_title_id='creator_owner'"), 'Regressão: limpeza do título indevido no histórico de chat foi removida.');
+}
