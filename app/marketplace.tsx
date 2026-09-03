@@ -93,6 +93,37 @@ export default function MarketplaceScreen() {
     finally{setLoading(false);}
   },[]);
   useFocusEffect(useCallback(()=>{if(!loadedOnce.current)setLoading(true);void load();},[load]));
+
+  useEffect(()=>{
+    if(!sellCardId||sellCardHandled)return;
+    setSellCardHandled(true);
+    void getOwnedCard(String(sellCardId))
+      .then((entry)=>{
+        setSelectedCard(entry);
+        setQuantity('1');
+        setNotice('Carta carregada da visualização. Defina quantidade e preço para publicar.');
+      })
+      .catch(()=>setError('Essa carta não está disponível na sua Bag para venda.'));
+  },[sellCardHandled,sellCardId]);
+
+  async function toggleCompare(item:MarketplaceListing){
+    const exists=compareItems.some((entry)=>entry.id===item.id);
+    if(exists){
+      setCompareItems((current)=>current.filter((entry)=>entry.id!==item.id));
+      return;
+    }
+
+    setCompareItems((current)=>current.length>=2?[current[1],item]:[...current,item]);
+    if(!(item.card.id in compareProfiles)){
+      try{
+        setCompareLoading(item.card.id);
+        const profile=await getCardGameProfile(item.card.id).catch(()=>null);
+        setCompareProfiles((current)=>({...current,[item.card.id]:profile}));
+      }finally{
+        setCompareLoading(null);
+      }
+    }
+  }
   useEffect(()=>{
     const unsubscribe=subscribeMarketplace(()=>{
       if(realtimeRefreshTimer.current)clearTimeout(realtimeRefreshTimer.current);
@@ -144,9 +175,14 @@ export default function MarketplaceScreen() {
     try{
       setPreviewSellEntry(entry);
       setCardPreview(null);
+      setPreviewGameProfile(null);
       setCardPreviewLoading(true);
-      const detail=await getCardDetail(entry.cards.id);
+      const [detail,profile]=await Promise.all([
+        getCardDetail(entry.cards.id),
+        getCardGameProfile(entry.cards.id).catch(()=>null),
+      ]);
       setCardPreview(detail);
+      setPreviewGameProfile(profile);
     }catch(e){
       setPreviewSellEntry(null);
       setError(e instanceof Error?e.message:'Não foi possível abrir os detalhes desta carta.');
@@ -159,9 +195,14 @@ export default function MarketplaceScreen() {
     try{
       setPreviewSellEntry(null);
       setCardPreview(null);
+      setPreviewGameProfile(null);
       setCardPreviewLoading(true);
-      const detail=await getCardDetail(item.card.id);
+      const [detail,profile]=await Promise.all([
+        getCardDetail(item.card.id),
+        getCardGameProfile(item.card.id).catch(()=>null),
+      ]);
       setCardPreview(detail);
+      setPreviewGameProfile(profile);
     }catch(e){
       setError(e instanceof Error?e.message:'Não foi possível abrir os detalhes desta carta.');
     }finally{
