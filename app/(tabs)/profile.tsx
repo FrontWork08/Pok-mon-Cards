@@ -262,7 +262,7 @@ export default function ProfileScreen() {
       <FeatureLink icon="help-circle" color={colors.accent} title="Guia do Treinador" text="Entenda o ciclo do jogo, ELO, PP, Speed, STAB e outros números." onPress={() => router.push('/trainer-guide')} />
       <FeatureLink icon="qr-code" color={colors.accent} title="QR de amizade" text="Mostre seu Trainer Link para abrir seu perfil e receber pedidos de amizade." onPress={() => router.push('/friend-qr')} />
       <FeatureLink icon="ribbon" color={colors.yellow} title="Passe de Batalha" text="50 níveis, missões, recompensas grátis e trilha VIP." onPress={() => router.push('/battle-pass')} />
-      <FeatureLink icon="flame" color={colors.yellow} title="Temporada & Jornada" text="Streak, ranque, eventos e recompensas da coleção." onPress={() => router.push('/season')} />
+      <FeatureLink icon="flame" color={colors.yellow} title="Temporada & Eventos" text="Ranque competitivo, streak e efeitos ativos do jogo." onPress={() => router.push('/season')} />
       <FeatureLink icon="sparkles" color={colors.yellow} title="Minha Vitrine" text="Escolha as 6 cartas que aparecem no seu perfil público." onPress={() => router.push('/showcase')} />
       <FeatureLink icon="star" color={colors.accent} title="Card Chase" text="Wishlist e alertas quando suas cartas desejadas aparecem." onPress={() => router.push('/wishlist')} />
       <FeatureLink icon="trophy" color={colors.yellow} title="Copa Trainer" text="Entre no torneio de 8 jogadores e acompanhe o bracket." onPress={() => router.push('/tournaments')} />
