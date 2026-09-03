@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { findPlayers } from '@/services/player';
 import { getMySocial, type SocialPlayer } from '@/services/social';
@@ -19,6 +19,7 @@ const statusLabels: Record<string, string> = {
 
 export default function TradeScreen() {
   const router = useRouter();
+  const { cardId } = useLocalSearchParams<{ cardId?: string }>();
   const { colors, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
   const [search, setSearch] = useState('');
@@ -67,7 +68,7 @@ export default function TradeScreen() {
       setCreatingId(receiverId);
       setNotice(null);
       const tradeId = await createTrade(receiverId);
-      router.push(`/trade/${tradeId}`);
+      router.push((cardId ? `/trade/${tradeId}?cardId=${encodeURIComponent(String(cardId))}` : `/trade/${tradeId}`) as never);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível criar a troca.');
     } finally {
@@ -77,6 +78,7 @@ export default function TradeScreen() {
 
   return (
     <Screen title="Trade Center" subtitle="Negocie cards com segurança, histórico transparente e validação no servidor.">
+      {cardId ? <View style={[styles.contextNotice,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name="card" size={19} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.contextNoticeTitle,{color:colors.text}]}>Carta carregada da coleção</Text><Text style={[styles.contextNoticeText,{color:colors.muted}]}>Escolha um treinador. A negociação abrirá com esta carta pré-selecionada.</Text></View></View> : null}
       {notice ? (
         <View style={[styles.notice,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="information-circle" size={20} color={colors.yellow} /><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Pressable onPress={() => setNotice(null)}><Ionicons name="close" size={18} color={colors.muted} /></Pressable></View>
       ) : null}
@@ -159,6 +161,7 @@ export default function TradeScreen() {
 }
 
 const styles = StyleSheet.create({
+  contextNotice:{borderRadius:15,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:8},contextNoticeTitle:{fontSize:10.5,fontWeight:'900'},contextNoticeText:{fontSize:8.5,lineHeight:13,marginTop:2},
   notice: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, borderRadius: 15, borderWidth: 1 },
   tradeHero:{minHeight:190,borderRadius:28,borderWidth:1,padding:17,overflow:'hidden',position:'relative'},
   tradeHeroGlow:{position:'absolute',right:-70,top:-90,width:280,height:280,borderRadius:999,opacity:.14},
