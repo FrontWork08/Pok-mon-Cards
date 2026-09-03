@@ -28,6 +28,7 @@ import {
 } from '@/services/decks';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { getScreenPreference, setScreenPreference } from '@/services/screenPreferences';
 import {
   applyDeckEconomyStyle,
   clearDeckEconomyStyle,
@@ -79,6 +80,7 @@ export default function DeckEditorScreen() {
   const [availableTypes, setAvailableTypes] = useState<string[]>([]);
   const [availableRarities, setAvailableRarities] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [filtersRestored, setFiltersRestored] = useState(false);
   const [preview, setPreview] = useState<DeckBuilderCardEntry | null>(null);
   const [loadingDeck, setLoadingDeck] = useState(true);
   const [loadingCards, setLoadingCards] = useState(true);
@@ -99,6 +101,34 @@ export default function DeckEditorScreen() {
     rarityFilter,
     sortMode,
   }), [rarityFilter, search, sortMode, typeFilter]);
+
+  useEffect(() => {
+    let active = true;
+    void getScreenPreference('deck_builder_filters_v1', {
+      typeFilter: null as string | null,
+      rarityFilter: null as string | null,
+      sortMode: 'name' as DeckBuilderSortMode,
+      showFilters: false,
+    }).then((saved) => {
+      if (!active) return;
+      setTypeFilter(saved.typeFilter ?? null);
+      setRarityFilter(saved.rarityFilter ?? null);
+      setSortMode(saved.sortMode ?? 'name');
+      setShowFilters(Boolean(saved.showFilters));
+      setFiltersRestored(true);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!filtersRestored) return;
+    void setScreenPreference('deck_builder_filters_v1', {
+      typeFilter,
+      rarityFilter,
+      sortMode,
+      showFilters,
+    });
+  }, [filtersRestored, rarityFilter, showFilters, sortMode, typeFilter]);
 
   const mergePrices = useCallback((rows: DeckBuilderCardEntry[]) => {
     setPrices((current) => {
@@ -169,11 +199,12 @@ export default function DeckEditorScreen() {
   }, [loadDeck]);
 
   useEffect(() => {
+    if (!filtersRestored) return;
     const timer = setTimeout(() => {
       void loadFirstPage();
     }, search.trim() ? 220 : 40);
     return () => clearTimeout(timer);
-  }, [loadFirstPage, search]);
+  }, [filtersRestored, loadFirstPage, search]);
 
   const loadMore = useCallback(async () => {
     if (loadingMoreRef.current || loadingCards || cards.length >= totalCards) return;
