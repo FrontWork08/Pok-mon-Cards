@@ -874,10 +874,12 @@ if (existsSync('app/marketplace.tsx')) {
   assert(marketUi.includes('inventory.length>=inventoryTotal'), 'Regressão do Marketplace: paginação deixou de parar somente após carregar todas as cartas filtradas.');
   assert(!marketUi.includes('Até 60 resultados por busca'), 'Regressão de UX: Marketplace voltou a informar um limite fixo de 60 cartas.');
   assert(marketUi.includes('MarketplaceCardPreviewModal'), 'Regressão do Marketplace: cartas deixaram de abrir a visualização detalhada.');
-  assert(marketUi.includes('getCardDetail(entry.cards.id)') && marketUi.includes('getCardDetail(item.card.id)'), 'Regressão do Marketplace: prévia deixou de carregar os dados TCG completos da carta.');
-  assert(marketUi.includes('getBattleCardPreview(card)'), 'Regressão do Marketplace: visualização da carta perdeu HP/ATQ e estatísticas de batalha.');
+  assert(marketUi.includes('getCardDetail(entry.cards.id)') && marketUi.includes('getCardDetail(item.card.id)'), 'Regressão do Marketplace: prévia deixou de carregar os dados completos da carta.');
+  assert(marketUi.includes('getCardGameProfile') && marketUi.includes('GAME_V1'), 'Regressão do Marketplace: visualização da carta deixou de usar o perfil canônico game_v1.');
   assert(marketUi.includes('ESCOLHER ESTA CARTA PARA VENDER'), 'Regressão de UX: prévia da carta perdeu a ação explícita de selecionar para venda.');
   assert(marketUi.includes('TOQUE PARA ABRIR A CARTA E VER ESTATÍSTICAS'), 'Regressão de UX: ofertas públicas deixaram de indicar que a carta é visualizável.');
+  assert(marketUi.includes('MarketplaceComparePanel') && marketUi.includes('COMPARAÇÃO RÁPIDA'), 'Regressão do Marketplace: comparação rápida de dois anúncios foi removida.');
+  assert(marketUi.includes('sellCardId') && marketUi.includes('getOwnedCard'), 'Regressão de contexto: Marketplace deixou de aceitar uma carta pré-selecionada para venda.');
 }
 
 if (existsSync('app/card/[id].tsx')) {
