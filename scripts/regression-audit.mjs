@@ -107,7 +107,7 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(battle.includes('loadStaticBattleResources'), 'Regressão de performance: recursos estáticos da batalha não estão separados.');
   assert(battle.includes('realtimeRefreshTimer'), 'Regressão de performance: eventos realtime da batalha perderam o coalescing.');
   assert(!battle.includes('setInterval(tick, 250)'), 'Regressão de performance: cronômetro da batalha voltou a renderizar 4x por segundo.');
-  assert(battle.includes('Regra v6 TCG'), 'Regressão de batalha: UI deixou de informar as regras TCG v6.');
+  assert(battle.includes("battle.engine_version === 'game_v1'") || battle.includes("battle?.engine_version === 'game_v1'"), 'Regressão de batalha: UI deixou de reconhecer o motor game_v1.');
   assert(!battle.includes('Regra v5 TCG'), 'Regressão de batalha: UI voltou a anunciar a v5 como regra ativa.');
   assert(!battle.includes('Regra v4: vence quem consegue o nocaute mais rápido'), 'Regressão de batalha: UI voltou a anunciar a fórmula antiga v4 como regra ativa.');
   assert(battle.includes('virtualEnergy'), 'Regressão de batalha: histórico deixou de renderizar o estado de Energia virtual da v6.');
@@ -116,7 +116,7 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(battle.includes('setTimeout(resolve, 350)'), 'Regressão de batalha: retry do timeout voltou a ser imediato e pode travar no 0.');
   assert(battle.includes('ESCOLHA DE ATAQUE'), 'Regressão Draft 3: tela perdeu a fase manual de escolha de ataque.');
   assert(battle.includes('USAR ESTE ATAQUE'), 'Regressão Draft 3: botão de confirmação de ataque foi removido.');
-  assert(battle.includes('Energia virtual começa em 0 e sobe +1 por turno'), 'Regressão Draft 3: UI deixou de explicar o custo de Energia do ataque manual.');
+  assert(battle.includes('MOVE_NO_PP') && battle.includes('PP'), 'Regressão Draft 3: UI perdeu validação/indicação de PP dos golpes no modo Pokémon.');
   assert(battle.includes("battle?.status === 'revealing'"), 'Regressão Draft 3: tela deixou de reconhecer a fase revealing de ataque.');
   assert(battle.includes('PixelBattleArena'), 'Regressão de UX: Draft 3 perdeu a arena 2D experimental.');
   assert(battle.includes('arenaResultRound'), 'Regressão de UX: arena 2D deixou de exibir a animação após resolver a rodada.');
@@ -1020,7 +1020,7 @@ if (existsSync('src/components/PixelBattleArena.tsx')) {
   assert(pixelArena.includes("back/"), 'Regressão de arena 2D: sprite traseiro do Pokémon do jogador foi removido.');
   assert(pixelArena.includes('Animated.sequence'), 'Regressão de arena 2D: animações próprias de ataque/impacto foram removidas.');
   assert(pixelArena.includes('REPLAY'), 'Regressão de arena 2D: replay da simulação visual foi removido.');
-  assert(pixelArena.includes('resultado continua vindo do motor TCG v6'), 'Regressão de batalha: arena visual deixou de declarar que não altera o motor v6.');
+  assert(pixelArena.includes('turnOnly') && pixelArena.includes('Turno concluído. Escolha o próximo golpe.'), 'Regressão de batalha: arena deixou de operar em turnos do motor game_v1.');
 }
 
 if (existsSync('supabase/migrations/20260902185822_expose_locked_battle_fighters_for_pixel_arena.sql')) {
