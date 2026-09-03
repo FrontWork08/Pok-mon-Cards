@@ -500,7 +500,66 @@ function PreviewStat({label,value,icon,colors}:{label:string;value:string;icon:k
   </View>;
 }
 
-function ListingCard({item,myId,working,onBuy,onOffer,onPreview}:{item:MarketplaceListing;myId:string;working:boolean;onBuy:(item:MarketplaceListing)=>void;onOffer:(item:MarketplaceListing)=>void;onPreview:(item:MarketplaceListing)=>void}){
+function MarketplaceComparePanel({
+  items,
+  profiles,
+  loadingCardId,
+  onRemove,
+  onClear,
+}:{
+  items:MarketplaceListing[];
+  profiles:Record<string,CardGameProfile|null>;
+  loadingCardId:string|null;
+  onRemove:(listingId:string)=>void;
+  onClear:()=>void;
+}){
+  const {colors}=useAppTheme();
+  return <View style={[styles.comparePanel,{backgroundColor:colors.surface,borderColor:colors.accent}]}>
+    <View style={styles.compareHead}>
+      <View style={{flex:1}}>
+        <Text style={[styles.compareKicker,{color:colors.yellow}]}>COMPARAÇÃO RÁPIDA</Text>
+        <Text style={[styles.compareTitle,{color:colors.text}]}>{items.length===1?'Escolha mais um anúncio':'Duas cartas lado a lado'}</Text>
+      </View>
+      <Pressable onPress={onClear} style={[styles.compareClear,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="close" size={16} color={colors.muted}/><Text style={[styles.compareClearText,{color:colors.muted}]}>LIMPAR</Text></Pressable>
+    </View>
+    <View style={styles.compareGrid}>
+      {items.map((item)=>{
+        const profile=profiles[item.card.id];
+        const marketTotal=item.card.marketPriceUsd==null?null:item.card.marketPriceUsd*item.quantity;
+        const discountPct=marketTotal&&marketTotal>0?Math.round(((item.price/Math.max(1,marketTotal*1000))-1)*100):null;
+        return <View key={item.id} style={[styles.compareCard,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+          <View style={styles.compareCardHead}>
+            {item.card.image?<Image source={{uri:item.card.image}} style={styles.compareImage} resizeMode="contain"/>:<View style={[styles.compareImage,{backgroundColor:colors.surface}]}/>}
+            <View style={{flex:1,minWidth:0}}>
+              <Text numberOfLines={1} style={[styles.compareName,{color:colors.text}]}>{item.card.name}</Text>
+              <Text numberOfLines={1} style={[styles.compareMeta,{color:colors.muted}]}>@{item.sellerName} • {item.quantity}×</Text>
+              <Text style={[styles.compareCoins,{color:colors.yellow}]}>🪙 {item.price.toLocaleString('pt-BR')}</Text>
+              <Text style={[styles.compareUsd,{color:colors.muted}]}>Mercado {marketTotal==null?'—':formatUsd(marketTotal)}</Text>
+            </View>
+            <Pressable onPress={()=>onRemove(item.id)} style={styles.compareRemove}><Ionicons name="close-circle" size={20} color={colors.muted}/></Pressable>
+          </View>
+          {loadingCardId===item.card.id?<ActivityIndicator color={colors.accent}/>:profile?<View style={styles.compareStats}>
+            <CompareMetric label="HP" value={profile.stats.hp}/>
+            <CompareMetric label="ATK" value={profile.stats.attack}/>
+            <CompareMetric label="DEF" value={profile.stats.defense}/>
+            <CompareMetric label="SP.ATK" value={profile.stats.spAttack}/>
+            <CompareMetric label="SP.DEF" value={profile.stats.spDefense}/>
+            <CompareMetric label="SPEED" value={profile.stats.speed}/>
+          </View>:<Text style={[styles.compareUnavailable,{color:colors.muted}]}>Perfil game_v1 indisponível.</Text>}
+          {discountPct!=null&&Number.isFinite(discountPct)?<Text style={[styles.compareSignal,{color:discountPct<=0?'#65D894':'#FF9A78'}]}>{discountPct<=0?'Preço proporcional abaixo':'Preço proporcional acima'} da referência calculada</Text>:null}
+        </View>;
+      })}
+      {items.length<2?<View style={[styles.comparePlaceholder,{borderColor:colors.border}]}><Ionicons name="add-circle-outline" size={28} color={colors.muted}/><Text style={[styles.comparePlaceholderText,{color:colors.muted}]}>Toque em COMPARAR em outro anúncio.</Text></View>:null}
+    </View>
+  </View>;
+}
+
+function CompareMetric({label,value}:{label:string;value:number}){
+  const {colors}=useAppTheme();
+  return <View style={[styles.compareMetric,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.compareMetricLabel,{color:colors.muted}]}>{label}</Text><Text style={[styles.compareMetricValue,{color:colors.text}]}>{value}</Text></View>;
+}
+
+function ListingCard({item,myId,working,comparing,onBuy,onOffer,onPreview,onCompare}:{item:MarketplaceListing;myId:string;working:boolean;comparing:boolean;onBuy:(item:MarketplaceListing)=>void;onOffer:(item:MarketplaceListing)=>void;onPreview:(item:MarketplaceListing)=>void;onCompare:(item:MarketplaceListing)=>void}){
   const {colors}=useAppTheme();
   const themeColor=
     item.shopTheme==='guild'?(item.guild?.color??colors.accent):
@@ -575,6 +634,7 @@ function ListingCard({item,myId,working,onBuy,onOffer,onPreview}:{item:Marketpla
             <Text style={[styles.buyText,item.sellerId===myId&&{color:themeColor}]}>{item.sellerId===myId?'SUA OFERTA':'COMPRAR'}</Text>
           </Pressable>
           {item.sellerId!==myId?<Pressable disabled={working} onPress={()=>onOffer(item)} style={[styles.buyButton,styles.flexButton,{backgroundColor:premiumTheme?`${themeColor}12`:colors.accentSoft,borderWidth:1,borderColor:premiumTheme?themeColor:colors.accent}]}><Ionicons name="chatbubble-ellipses" size={18} color={premiumTheme?themeColor:colors.accent}/><Text style={[styles.buyText,{color:colors.text}]}>FAZER OFERTA</Text></Pressable>:null}
+          <Pressable onPress={()=>void onCompare(item)} style={[styles.compareButton,{backgroundColor:comparing?`${themeColor}22`:colors.surfaceAlt,borderColor:comparing?themeColor:colors.border}]}><Ionicons name={comparing?'checkmark-circle':'git-compare-outline'} size={17} color={comparing?themeColor:colors.muted}/><Text style={[styles.compareButtonText,{color:comparing?themeColor:colors.text}]}>{comparing?'SELECIONADA':'COMPARAR'}</Text></Pressable>
         </View>
       </View>
     </MarketplaceListingSurface>
