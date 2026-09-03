@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -11,11 +11,12 @@ import { AuraFrame } from '@/components/AuraFrame';
 import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { MarketplaceListingSurface } from '@/components/MarketplaceListingSurface';
 import { getMyBagPage } from '@/services/bag';
-import type { OwnedCardEntry } from '@/services/player';
+import { getCardDetail, type CardDetailEntry, type OwnedCardEntry } from '@/services/player';
 import { buyListing, cancelListing, createListing, createMarketOffer, getMarketplaceHub, saveMyShop, subscribeMarketplace, type MarketplaceHub, type MarketplaceListing, type ShopTheme } from '@/services/marketplace';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import { formatUsd } from '@/services/market';
+import { getBattleCardPreview } from '@/services/battleStats';
 
 function themeAccent(theme:ShopTheme,fallback:string){
   if(theme==='royal')return '#FFD447';
@@ -60,6 +61,11 @@ export default function MarketplaceScreen() {
   const [inventory,setInventory]=useState<OwnedCardEntry[]>([]);
   const [inventorySearch,setInventorySearch]=useState('');
   const [inventoryLoading,setInventoryLoading]=useState(false);
+  const [inventoryLoadingMore,setInventoryLoadingMore]=useState(false);
+  const [inventoryTotal,setInventoryTotal]=useState(0);
+  const [cardPreview,setCardPreview]=useState<CardDetailEntry|null>(null);
+  const [cardPreviewLoading,setCardPreviewLoading]=useState(false);
+  const [previewSellEntry,setPreviewSellEntry]=useState<OwnedCardEntry|null>(null);
   const [selectedCard,setSelectedCard]=useState<OwnedCardEntry|null>(null);
   const [quantity,setQuantity]=useState('1');
   const [price,setPrice]=useState('1000');
@@ -67,6 +73,7 @@ export default function MarketplaceScreen() {
   const [offerAmount,setOfferAmount]=useState('');
   const loadedOnce=useRef(false);
   const realtimeRefreshTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const inventoryRequestSeq=useRef(0);
 
   const load=useCallback(async()=>{
     try{
@@ -91,19 +98,74 @@ export default function MarketplaceScreen() {
     };
   },[load]);
 
-  const loadInventory=useCallback(async(term='')=>{
+  const loadInventory=useCallback(async(term='',offset=0)=>{
+    const requestSeq=++inventoryRequestSeq.current;
     try{
-      setInventoryLoading(true);
-      const page=await getMyBagPage(0,60,{search:term,setQuery:'',quickFilter:'all',typeFilter:null,rarityFilter:null,generation:null,sortMode:'value'});
-      setInventory(page.items);
-    }catch(e){setError(e instanceof Error?e.message:'Não foi possível carregar sua Bag.');}
-    finally{setInventoryLoading(false);}
+      if(offset===0)setInventoryLoading(true);
+      else setInventoryLoadingMore(true);
+      const page=await getMyBagPage(offset,60,{search:term,setQuery:'',quickFilter:'all',typeFilter:null,rarityFilter:null,generation:null,sortMode:'value'});
+      if(requestSeq!==inventoryRequestSeq.current)return;
+      setInventoryTotal(page.totalFiltered);
+      setInventory((current)=>{
+        if(offset===0)return page.items;
+        const merged=new Map(current.map((entry)=>[entry.cards?.id??'',entry]));
+        page.items.forEach((entry)=>{if(entry.cards?.id)merged.set(entry.cards.id,entry);});
+        return [...merged.values()];
+      });
+    }catch(e){
+      if(requestSeq===inventoryRequestSeq.current)setError(e instanceof Error?e.message:'Não foi possível carregar sua Bag.');
+    }finally{
+      if(requestSeq===inventoryRequestSeq.current){
+        setInventoryLoading(false);
+        setInventoryLoadingMore(false);
+      }
+    }
   },[]);
   useEffect(()=>{
     if(!pickerOpen)return;
-    const timer=setTimeout(()=>{void loadInventory(inventorySearch);},320);
+    const timer=setTimeout(()=>{void loadInventory(inventorySearch,0);},320);
     return()=>clearTimeout(timer);
   },[pickerOpen,inventorySearch,loadInventory]);
+
+  const loadMoreInventory=useCallback(()=>{
+    if(inventoryLoading||inventoryLoadingMore||inventory.length>=inventoryTotal)return;
+    void loadInventory(inventorySearch,inventory.length);
+  },[inventory.length,inventoryLoading,inventoryLoadingMore,inventorySearch,inventoryTotal,loadInventory]);
+
+  const openInventoryPreview=useCallback((entry:OwnedCardEntry)=>{
+    if(!entry.cards)return;
+    setPreviewSellEntry(entry);
+    setCardPreview({
+      owned:true,
+      quantity:Number(entry.quantity??0),
+      favorite:Boolean(entry.favorite),
+      first_obtained_at:entry.first_obtained_at,
+      cards:entry.cards,
+    });
+  },[]);
+
+  const openListingPreview=useCallback(async(item:MarketplaceListing)=>{
+    try{
+      setPreviewSellEntry(null);
+      setCardPreview(null);
+      setCardPreviewLoading(true);
+      const detail=await getCardDetail(item.card.id);
+      setCardPreview(detail);
+    }catch(e){
+      setError(e instanceof Error?e.message:'Não foi possível abrir os detalhes desta carta.');
+    }finally{
+      setCardPreviewLoading(false);
+    }
+  },[]);
+
+  function selectPreviewForSale(){
+    if(!previewSellEntry?.cards)return;
+    setSelectedCard(previewSellEntry);
+    setQuantity('1');
+    setCardPreview(null);
+    setPreviewSellEntry(null);
+    setPickerOpen(false);
+  }
 
   const visibleListings=useMemo(()=>{
     const q=search.trim().toLowerCase();
@@ -215,19 +277,70 @@ export default function MarketplaceScreen() {
 
   const footer=<View style={styles.footer}><Text style={[styles.listTitle,{color:colors.text}]}>Minhas ofertas</Text>{(hub?.myListings??[]).length===0?<Text style={[styles.emptyText,{color:colors.muted}]}>Você ainda não publicou nenhuma carta.</Text>:(hub?.myListings??[]).map((item)=><View key={item.id} style={[styles.myRow,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text numberOfLines={1} style={[styles.myName,{color:colors.text}]}>{item.quantity}× {item.card.name}</Text><Text style={[styles.status,{color:item.status==='active'?'#65D894':colors.muted}]}>{item.status==='active'?'ATIVA':item.status==='sold'?'VENDIDA':'REMOVIDA'}</Text>{item.status==='active'?<Pressable disabled={working} onPress={()=>void remove(item)} style={styles.removeButton}><Ionicons name="trash" size={16} color="#FF8A9A"/></Pressable>:null}</View>)}</View>;
 
-  return <SafeAreaView style={[styles.safe,{backgroundColor:colors.bg}]}><PremiumBackground/><FlatList data={visibleListings} keyExtractor={(item)=>item.id} ListHeaderComponent={header} ListFooterComponent={footer} contentContainerStyle={styles.content} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={7} showsVerticalScrollIndicator={false} ListEmptyComponent={loading?<ActivityIndicator size="large" color={colors.yellow}/>:<View style={[styles.empty,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="storefront-outline" size={30} color={colors.muted}/><Text style={[styles.emptyText,{color:colors.muted}]}>Nenhuma oferta encontrada.</Text></View>} renderItem={({item})=><ListingCard item={item} myId={hub?.myId??''} working={working} onBuy={confirmBuy} onOffer={openOffer}/>}/>
+  return <SafeAreaView style={[styles.safe,{backgroundColor:colors.bg}]}><PremiumBackground/><FlatList data={visibleListings} keyExtractor={(item)=>item.id} ListHeaderComponent={header} ListFooterComponent={footer} contentContainerStyle={styles.content} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={7} showsVerticalScrollIndicator={false} ListEmptyComponent={loading?<ActivityIndicator size="large" color={colors.yellow}/>:<View style={[styles.empty,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="storefront-outline" size={30} color={colors.muted}/><Text style={[styles.emptyText,{color:colors.muted}]}>Nenhuma oferta encontrada.</Text></View>} renderItem={({item})=><ListingCard item={item} myId={hub?.myId??''} working={working} onBuy={confirmBuy} onOffer={openOffer} onPreview={openListingPreview}/>} />
 
     <Modal visible={Boolean(offerListing)} transparent animationType="fade" onRequestClose={()=>setOfferListing(null)}>
       <View style={styles.offerBackdrop}><View style={[styles.offerModal,{backgroundColor:colors.surface,borderColor:colors.yellow}]}><View style={styles.offerHead}><View style={{flex:1}}><Text style={[styles.sectionTitle,{color:colors.text}]}>Fazer oferta</Text><Text style={[styles.sectionHint,{color:colors.muted}]}>{offerListing?.card.name} • anúncio 🪙 {offerListing?.price.toLocaleString('pt-BR')} • mercado {offerListing?.card.marketPriceUsd == null ? '—' : formatUsd(offerListing.card.marketPriceUsd * offerListing.quantity)}</Text></View><Pressable onPress={()=>setOfferListing(null)}><Ionicons name="close" size={22} color={colors.muted}/></Pressable></View><Text style={[styles.label,{color:colors.muted}]}>SUA OFERTA EM COINS</Text><TextInput value={offerAmount} onChangeText={(v)=>setOfferAmount(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" autoFocus style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/><Text style={[styles.offerHint,{color:colors.muted}]}>A oferta vale por 24 horas. As Coins só são debitadas se o vendedor aceitar e você ainda tiver saldo.</Text><Pressable disabled={working||Number(offerAmount)<1} onPress={()=>void submitOffer()} style={[styles.primaryButton,{backgroundColor:colors.yellow}]}>{working?<ActivityIndicator color="#07111F"/>:<Ionicons name="send" size={18} color="#07111F"/>}<Text style={styles.primaryText}>ENVIAR OFERTA</Text></Pressable></View></View>
     </Modal>
 
     <Modal visible={pickerOpen} animationType="slide" onRequestClose={()=>setPickerOpen(false)}>
-      <SafeAreaView style={[styles.pickerSafe,{backgroundColor:colors.bg}]}><PremiumBackground/><View style={styles.pickerHeader}><View style={{flex:1}}><Text style={[styles.pageTitle,{color:colors.text}]}>Escolher carta</Text><Text style={[styles.subtitle,{color:colors.muted}]}>Até 60 resultados por busca para manter a tela leve.</Text></View><Pressable onPress={()=>setPickerOpen(false)}><Ionicons name="close" size={25} color={colors.text}/></Pressable></View><View style={[styles.searchBox,{marginHorizontal:14,backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="search" size={19} color={colors.muted}/><TextInput value={inventorySearch} onChangeText={setInventorySearch} placeholder="Buscar na Bag..." placeholderTextColor={colors.muted} style={[styles.searchInput,{color:colors.text}]}/></View>{inventoryLoading?<ActivityIndicator style={{margin:14}} color={colors.yellow}/>:null}<FlatList data={inventory} keyExtractor={(item,index)=>item.cards?.id??`inventory-${index}`} contentContainerStyle={styles.pickerList} initialNumToRender={10} maxToRenderPerBatch={10} windowSize={7} renderItem={({item})=><Pressable disabled={!item.cards} onPress={()=>{setSelectedCard(item);setQuantity('1');setPickerOpen(false);}} style={[styles.inventoryRow,{backgroundColor:colors.surface,borderColor:colors.border}]}>{item.cards?.image_small?<Image source={{uri:item.cards.image_small}} resizeMode="contain" style={styles.inventoryImage}/>:<View style={styles.inventoryImage}/>}<View style={{flex:1}}><Text style={[styles.inventoryName,{color:colors.text}]}>{item.cards?.pokemon_name??'Carta'}</Text><Text style={[styles.inventoryMeta,{color:colors.muted}]}>{item.cards?.rarity??'Sem raridade'} • {item.quantity} cópia(s)</Text></View><Ionicons name="add-circle" size={23} color={colors.accent}/></Pressable>}/></SafeAreaView>
+      <SafeAreaView style={[styles.pickerSafe,{backgroundColor:colors.bg}]}>
+        <PremiumBackground/>
+        <View style={styles.pickerHeader}>
+          <View style={{flex:1}}>
+            <Text style={[styles.pageTitle,{color:colors.text}]}>Escolher carta</Text>
+            <Text style={[styles.subtitle,{color:colors.muted}]}>Carregamento por páginas: todas as cartas elegíveis da Bag ficam acessíveis sem pesar a tela.</Text>
+          </View>
+          <Pressable onPress={()=>setPickerOpen(false)}><Ionicons name="close" size={25} color={colors.text}/></Pressable>
+        </View>
+        <View style={[styles.searchBox,{marginHorizontal:14,backgroundColor:colors.surface,borderColor:colors.border}]}>
+          <Ionicons name="search" size={19} color={colors.muted}/>
+          <TextInput value={inventorySearch} onChangeText={setInventorySearch} placeholder="Buscar em toda a Bag..." placeholderTextColor={colors.muted} style={[styles.searchInput,{color:colors.text}]}/>
+        </View>
+        <Text style={[styles.inventoryCount,{color:colors.muted}]}>{inventory.length} de {inventoryTotal} carta(s) carregadas</Text>
+        {inventoryLoading?<ActivityIndicator style={{margin:14}} color={colors.yellow}/>:null}
+        <FlatList
+          data={inventory}
+          keyExtractor={(item,index)=>item.cards?.id??`inventory-${index}`}
+          contentContainerStyle={styles.pickerList}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          onEndReached={loadMoreInventory}
+          onEndReachedThreshold={0.55}
+          ListFooterComponent={inventoryLoadingMore?<ActivityIndicator style={{margin:14}} color={colors.yellow}/>:null}
+          renderItem={({item})=>(
+            <View style={[styles.inventoryRow,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+              <Pressable disabled={!item.cards} onPress={()=>openInventoryPreview(item)} style={styles.inventoryPreviewTap}>
+                {item.cards?.image_small?<Image source={{uri:item.cards.image_small}} resizeMode="contain" style={styles.inventoryImage}/>:<View style={styles.inventoryImage}/>}
+                <View style={{flex:1}}>
+                  <Text style={[styles.inventoryName,{color:colors.text}]}>{item.cards?.pokemon_name??'Carta'}</Text>
+                  <Text style={[styles.inventoryMeta,{color:colors.muted}]}>{item.cards?.rarity??'Sem raridade'} • {item.quantity} cópia(s)</Text>
+                  <Text style={[styles.inventoryPreviewHint,{color:colors.accent}]}>TOQUE PARA VER ESTATÍSTICAS</Text>
+                </View>
+                <Ionicons name="eye" size={20} color={colors.accent}/>
+              </Pressable>
+              <Pressable disabled={!item.cards} onPress={()=>{setSelectedCard(item);setQuantity('1');setPickerOpen(false);}} style={[styles.inventorySelect,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
+                <Ionicons name="add-circle" size={20} color={colors.accent}/>
+                <Text style={[styles.inventorySelectText,{color:colors.text}]}>ESCOLHER</Text>
+              </Pressable>
+            </View>
+          )}
+        />
+      </SafeAreaView>
     </Modal>
+
+    <MarketplaceCardPreviewModal
+      detail={cardPreview}
+      loading={cardPreviewLoading}
+      sellEntry={previewSellEntry}
+      onClose={()=>{setCardPreview(null);setPreviewSellEntry(null);}}
+      onSelectForSale={selectPreviewForSale}
+    />
   </SafeAreaView>;
 }
 
-function ListingCard({item,myId,working,onBuy,onOffer}:{item:MarketplaceListing;myId:string;working:boolean;onBuy:(item:MarketplaceListing)=>void;onOffer:(item:MarketplaceListing)=>void}){
+function ListingCard({item,myId,working,onBuy,onOffer,onPreview}:{item:MarketplaceListing;myId:string;working:boolean;onBuy:(item:MarketplaceListing)=>void;onOffer:(item:MarketplaceListing)=>void;onPreview:(item:MarketplaceListing)=>void}){
   const {colors}=useAppTheme();
   const themeColor=
     item.shopTheme==='guild'?(item.guild?.color??colors.accent):
@@ -270,7 +383,7 @@ function ListingCard({item,myId,working,onBuy,onOffer}:{item:MarketplaceListing;
           {listingBoosted?<View style={[styles.boostBadge,{backgroundColor:'#332B11'}]}><Ionicons name="rocket" size={13} color="#FFD447"/><Text style={styles.boostText}>IMPULSIONADO</Text></View>:null}
         </View>
 
-        <View style={[
+        <Pressable onPress={()=>onPreview(item)} style={[
           styles.cardRow,
           premiumTheme&&styles.premiumCardPanel,
           premiumTheme&&{borderColor:`${themeColor}2F`},
@@ -281,8 +394,10 @@ function ListingCard({item,myId,working,onBuy,onOffer}:{item:MarketplaceListing;
             <Text style={[styles.cardMeta,{color:colors.muted}]}>{item.card.rarity??'Sem raridade'} • {item.quantity} cópia(s)</Text>
             <Text style={[styles.price,{color:item.shopTheme==='royal'?themeColor:colors.yellow}]}>🪙 {item.price.toLocaleString('pt-BR')}</Text>
             <Text style={[styles.marketUsd,{color:colors.muted}]}>Mercado USD: {item.card.marketPriceUsd == null ? '—' : formatUsd(item.card.marketPriceUsd * item.quantity)}{item.quantity > 1 && item.card.marketPriceUsd != null ? ` • ${formatUsd(item.card.marketPriceUsd)} cada` : ''}</Text>
+            <Text style={[styles.cardPreviewHint,{color:themeColor}]}>TOQUE PARA ABRIR A CARTA E VER ESTATÍSTICAS</Text>
           </View>
-        </View>
+          <Ionicons name="expand-outline" size={19} color={themeColor}/>
+        </Pressable>
 
         <View style={styles.listingActions}>
           <Pressable
@@ -315,5 +430,5 @@ const styles=StyleSheet.create({
   searchBox:{minHeight:49,borderRadius:15,borderWidth:1,paddingHorizontal:12,flexDirection:'row',alignItems:'center',gap:8},searchInput:{flex:1,minHeight:47,fontSize:12},listTitleRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},listTitle:{fontSize:20,fontWeight:'900'},count:{fontSize:14,fontWeight:'900'},
   listingSurface:{marginBottom:9},listing:{borderRadius:19,borderWidth:1,padding:12,gap:10,position:'relative',overflow:'hidden'},listingThemeGlow:{position:'absolute',right:-70,top:-85,width:190,height:190,borderRadius:999},listingThemeEdge:{position:'absolute',left:0,right:0,top:0,height:2},sellerRow:{flexDirection:'row',alignItems:'center',gap:9},premiumInnerPanel:{borderWidth:1,borderRadius:15,padding:9,backgroundColor:'rgba(255,255,255,.025)'},premiumCardPanel:{borderWidth:1,borderRadius:16,padding:9,backgroundColor:'rgba(255,255,255,.018)'},shopTitleRow:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},shopName:{fontSize:13,fontWeight:'900'},sellerName:{fontSize:8,marginTop:2},premiumBadge:{borderRadius:999,paddingHorizontal:6,paddingVertical:3,flexDirection:'row',alignItems:'center',gap:3},premiumText:{fontSize:6,fontWeight:'900'},boostBadge:{borderRadius:999,paddingHorizontal:7,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:4},boostText:{color:'#FFD447',fontSize:6,fontWeight:'900'},cardRow:{flexDirection:'row',alignItems:'center',gap:11},cardImage:{width:65,height:87,borderRadius:7},cardName:{fontSize:16,fontWeight:'900'},cardMeta:{fontSize:9,marginTop:3},price:{fontSize:15,fontWeight:'900',marginTop:8},buyButton:{minHeight:45,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},ownOfferButton:{borderWidth:1.2,overflow:'hidden'},buyText:{color:'#07111F',fontSize:9,fontWeight:'900'},
   footer:{gap:8,marginTop:12},myRow:{borderRadius:14,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:8},myName:{flex:1,fontSize:11,fontWeight:'900'},status:{fontSize:8,fontWeight:'900'},removeButton:{width:32,height:32,borderRadius:10,backgroundColor:'#351A24',alignItems:'center',justifyContent:'center'},empty:{borderRadius:18,borderWidth:1,padding:24,alignItems:'center',gap:8},emptyText:{fontSize:10,lineHeight:15},
-  pickerSafe:{flex:1},pickerHeader:{padding:14,flexDirection:'row',alignItems:'center',gap:10},pickerList:{padding:14,gap:8},inventoryRow:{borderRadius:15,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:10},inventoryImage:{width:49,height:66,borderRadius:6},inventoryName:{fontSize:13,fontWeight:'900'},inventoryMeta:{fontSize:9,marginTop:3},
+  pickerSafe:{flex:1},pickerHeader:{padding:14,flexDirection:'row',alignItems:'center',gap:10},pickerList:{padding:14,gap:8},inventoryRow:{borderRadius:15,borderWidth:1,padding:8,gap:8},inventoryPreviewTap:{flexDirection:'row',alignItems:'center',gap:10},inventoryImage:{width:49,height:66,borderRadius:6},inventoryName:{fontSize:13,fontWeight:'900'},inventoryMeta:{fontSize:9,marginTop:3},inventoryPreviewHint:{fontSize:6.5,fontWeight:'900',letterSpacing:.45,marginTop:5},inventorySelect:{minHeight:38,borderRadius:11,borderWidth:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},inventorySelectText:{fontSize:8,fontWeight:'900'},inventoryCount:{fontSize:8,fontWeight:'800',paddingHorizontal:16,paddingTop:8},cardPreviewHint:{fontSize:6.5,fontWeight:'900',letterSpacing:.4,marginTop:7},
 });
