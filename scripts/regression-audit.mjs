@@ -1302,6 +1302,49 @@ if (existsSync('supabase/migrations/20260903175516_optimize_trainer_journey_summ
   assert(journeyPerf.includes('revoke all on function public.get_trainer_journey_summary() from public,anon'), 'Regressão de segurança: resumo otimizado da Jornada voltou a ficar executável por anon.');
 }
 
+if (existsSync('app/card/[id].tsx') && existsSync('src/services/cardPassport.ts')) {
+  const cardDetail = read('app/card/[id].tsx');
+  const passportService = read('src/services/cardPassport.ts');
+  assert(cardDetail.includes("['passport','Passaporte'") && cardDetail.includes('PASSAPORTE DA CARTA'), 'Regressão do Passaporte: Card Detail perdeu a aba de histórico.');
+  assert(cardDetail.includes('CARTA BLOQUEADA 🔒') && cardDetail.includes('toggleCardLock'), 'Regressão de proteção: bloqueio de cartas saiu do Card Detail.');
+  assert(passportService.includes('get_card_passport') && passportService.includes('set_my_card_metadata'), 'Regressão do Passaporte: serviço deixou de usar RPCs canônicas.');
+}
+
+if (existsSync('app/battle-replay/[id].tsx') && existsSync('src/services/battleReplay.ts')) {
+  const replayUi = read('app/battle-replay/[id].tsx');
+  const replayService = read('src/services/battleReplay.ts');
+  const battleHubReplay = read('app/(tabs)/battles.tsx');
+  assert(replayUi.includes('Replay de Batalha') && replayUi.includes('SUPER EFETIVO') && replayUi.includes('CRÍTICO'), 'Regressão do Replay: detalhes game_v1 deixaram de aparecer.');
+  assert(replayService.includes('get_battle_replay'), 'Regressão do Replay: serviço perdeu RPC server-side.');
+  assert(battleHubReplay.includes('REPLAY') && battleHubReplay.includes('/battle-replay/'), 'Regressão do Replay: histórico deixou de abrir o replay.');
+}
+
+if (existsSync('app/admin-health.tsx') && existsSync('src/services/safetyAndAudit.ts')) {
+  const healthUi = read('app/admin-health.tsx');
+  const safetyService = read('src/services/safetyAndAudit.ts');
+  assert(healthUi.includes('Health Check') && healthUi.includes('Erros recentes'), 'Regressão Admin: Health Check ou Error Center foi removido.');
+  assert(safetyService.includes('get_admin_health_check') && safetyService.includes('get_admin_recent_errors'), 'Regressão Admin: serviço de saúde/erros perdeu RPCs.');
+}
+
+if (existsSync('app/financial-history.tsx') && existsSync('src/services/safetyAndAudit.ts')) {
+  const financeUi = read('app/financial-history.tsx');
+  assert(financeUi.includes('Histórico Financeiro') && financeUi.includes('balanceBefore'), 'Regressão financeira: histórico deixou de mostrar saldo anterior/posterior.');
+}
+
+if (existsSync('app/account-museum.tsx')) {
+  const museumUi = read('app/account-museum.tsx');
+  assert(museumUi.includes('Museu da Conta') && museumUi.includes('Linha do tempo'), 'Regressão do Museu: memória histórica da conta foi removida.');
+}
+
+if (existsSync('supabase/migrations/20260903184457_trainer_safety_identity_core.sql')) {
+  const safetyDb = read('supabase/migrations/20260903184457_trainer_safety_identity_core.sql');
+  for (const token of ['player_card_metadata','economy_ledger','app_error_log','get_card_passport','get_battle_replay','get_admin_health_check','get_account_museum']) {
+    assert(safetyDb.includes(token), `Regressão do core seguro: ${token} foi removido da migration.`);
+  }
+  assert(safetyDb.includes("raise exception 'CARD_LOCKED'"), 'Regressão de proteção: fluxos destrutivos deixaram de rejeitar carta bloqueada.');
+  assert(safetyDb.includes('audit_player_currency_change'), 'Regressão financeira: trigger de auditoria de saldo foi removida.');
+}
+
 if (failures.length) {
   console.error('\n❌ Auditoria de regressão falhou:');
   failures.forEach((failure) => console.error(' - ' + failure));
