@@ -17,6 +17,15 @@ import {
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const TOTAL_MILESTONES = [50,151,251,386,493,649,721,809,905,1025];
+function eventEffectText(event:{type:string;payload:Record<string,unknown>}){
+  const multiplier=Number(event.payload?.multiplier??1.5);
+  if(event.type==='double_xp')return 'Booster aberto durante o evento concede 2× XP ao treinador.';
+  if(event.type==='rare_boost')return `Cartas de raridade alta recebem multiplicador de até ${multiplier.toFixed(1)}× na seleção dos boosters.`;
+  if(event.type==='featured_set')return `Boosters do set destacado recebem multiplicador de até ${multiplier.toFixed(1)}× nas cartas de raridade alta.`;
+  if(event.type==='free_boosters')return 'Boosters de Coins ficam grátis; boosters de Diamante recebem 50% de desconto durante o evento.';
+  return 'Este evento altera temporariamente uma regra ou recompensa do jogo.';
+}
+
 const GENERATIONS = [
   { gen:1, min:1, max:151, label:'Kanto' },
   { gen:2, min:152, max:251, label:'Johto' },
@@ -102,7 +111,7 @@ export default function SeasonScreen() {
     } finally { setWorking(null); }
   }
 
-  return <Screen title="Temporada & Jornada" subtitle="Ranque, streak, eventos e recompensas de coleção em um só lugar.">
+  return <Screen title="Temporada & Eventos" subtitle="Ranque competitivo, streak, eventos ativos e recompensas sazonais.">
     <Pressable style={styles.back} onPress={()=>goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
     {notice?<Pressable onPress={()=>setNotice(null)} style={[styles.notice,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Ionicons name="close" size={16} color={colors.muted}/></Pressable>:null}
     {loading?<ActivityIndicator size="large" color={colors.yellow}/>:null}
@@ -111,7 +120,7 @@ export default function SeasonScreen() {
       <View style={styles.heroTop}><View style={{flex:1}}><Text style={[styles.kicker,{color:colors.yellow}]}>TEMPORADA ATIVA • {daysLeft} DIA(S)</Text><Text style={[styles.title,{color:colors.text}]}>{hub.season.name}</Text><Text style={[styles.sub,{color:colors.muted}]}>{hub.season.subtitle}</Text></View><View style={[styles.divisionBadge,{borderColor:hub.season.themeColor}]}><Text style={styles.divisionIcon}>{division.icon}</Text><Text style={[styles.divisionName,{color:colors.text}]}>{division.label}</Text></View></View>
       <View style={styles.pointsRow}><Text style={[styles.points,{color:colors.yellow}]}>{points.toLocaleString('pt-BR')} pts</Text><Text style={[styles.sub,{color:colors.muted}]}>{hub.season.my.wins}V • {hub.season.my.losses}D • {hub.season.my.matches} partidas</Text></View>
       <View style={[styles.track,{backgroundColor:colors.surfaceAlt}]}><View style={[styles.fill,{width:`${nextProgress}%`,backgroundColor:hub.season.themeColor}]}/></View>
-      <View style={styles.quickLinks}><Pressable onPress={()=>router.push('/(tabs)/battles')} style={[styles.quick,{borderColor:colors.accent}]}><Ionicons name="flash" size={18} color={colors.accent}/><Text style={[styles.quickText,{color:colors.text}]}>BUSCAR PARTIDA</Text></Pressable><Pressable onPress={()=>router.push('/wishlist')} style={[styles.quick,{borderColor:colors.yellow}]}><Ionicons name="star" size={18} color={colors.yellow}/><Text style={[styles.quickText,{color:colors.text}]}>WISHLIST ({hub.wishlistCount})</Text></Pressable></View>
+      <View style={styles.quickLinks}><Pressable onPress={()=>router.push('/(tabs)/battles')} style={[styles.quick,{borderColor:colors.accent}]}><Ionicons name="flash" size={18} color={colors.accent}/><Text style={[styles.quickText,{color:colors.text}]}>BUSCAR PARTIDA</Text></Pressable><Pressable onPress={()=>router.push('/career')} style={[styles.quick,{borderColor:colors.yellow}]}><Ionicons name="compass" size={18} color={colors.yellow}/><Text style={[styles.quickText,{color:colors.text}]}>MINHA CARREIRA</Text></Pressable></View>
     </View>:null}
 
     {hub?.claimableSeason ? <View style={[styles.panel,{backgroundColor:colors.surface,borderColor:colors.yellow}]}>
@@ -124,7 +133,7 @@ export default function SeasonScreen() {
       <Pressable disabled={working==='daily'||hub?.login.claimedToday} onPress={()=>void dailyClaim()} style={[styles.primary,{backgroundColor:hub?.login.claimedToday?colors.surfaceAlt:colors.yellow}]}><Text style={[styles.primaryText,hub?.login.claimedToday&&{color:colors.muted}]}>{hub?.login.claimedToday?'COLETADO HOJE':'COLETAR RECOMPENSA'}</Text></Pressable>
     </View>
 
-    {(hub?.activeEvents.length??0)>0?<View style={styles.stack}><Text style={[styles.sectionTitle,{color:colors.text}]}>Eventos ao vivo</Text>{hub!.activeEvents.map((event)=><View key={event.id} style={[styles.event,{backgroundColor:colors.surface,borderColor:colors.yellow}]}><Ionicons name="sparkles" size={20} color={colors.yellow}/><View style={{flex:1}}><Text style={[styles.eventTitle,{color:colors.text}]}>{event.title ?? event.type.replaceAll('_',' ').toUpperCase()}</Text><Text style={[styles.sub,{color:colors.muted}]}>Até {new Date(event.endsAt).toLocaleString('pt-BR')}</Text></View></View>)}</View>:null}
+    {(hub?.activeEvents.length??0)>0?<View style={styles.stack}><Text style={[styles.sectionTitle,{color:colors.text}]}>Eventos ao vivo</Text>{hub!.activeEvents.map((event)=><View key={event.id} style={[styles.event,{backgroundColor:colors.surface,borderColor:colors.yellow}]}><View style={[styles.eventIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="sparkles" size={20} color={colors.yellow}/></View><View style={{flex:1}}><Text style={[styles.eventTitle,{color:colors.text}]}>{event.title ?? event.type.replaceAll('_',' ').toUpperCase()}</Text><Text style={[styles.eventEffect,{color:colors.text}]}>{eventEffectText(event)}</Text><Text style={[styles.sub,{color:colors.muted}]}>Ativo até {new Date(event.endsAt).toLocaleString('pt-BR')}</Text></View></View>)}</View>:null}
 
     <View style={styles.stack}><Text style={[styles.sectionTitle,{color:colors.text}]}>Recompensas da Pokédex</Text>{TOTAL_MILESTONES.map((target)=>{const done=ownedNumbers.length>=target;const got=claimed.has(`pokedex_total:${target}`);return <View key={target} style={[styles.rewardRow,{backgroundColor:colors.surface,borderColor:done?colors.accent:colors.border}]}><View style={{flex:1}}><Text style={[styles.rewardTitle,{color:colors.text}]}>{target} espécies</Text><Text style={[styles.sub,{color:colors.muted}]}>{Math.min(ownedNumbers.length,target)} / {target}</Text></View><Pressable disabled={!done||got||Boolean(working)} onPress={()=>void claim('pokedex_total',String(target))} style={[styles.claim,{backgroundColor:got?colors.surfaceAlt:done?colors.yellow:colors.surfaceAlt}]}><Text style={[styles.claimText,{color:done&&!got?'#07111F':colors.muted}]}>{got?'COLETADO':done?'COLETAR':'BLOQUEADO'}</Text></Pressable></View>;})}</View>
 
