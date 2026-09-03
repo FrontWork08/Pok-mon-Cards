@@ -19,6 +19,7 @@ import { formatUsd } from '@/services/market';
 import { formatGameIdentifier, getCardGameProfile, type CardGameProfile } from '@/services/cardGameProfile';
 import { getScreenPreference, setScreenPreference } from '@/services/screenPreferences';
 import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
+import { getCardSellGuidance, type SellGuidance } from '@/services/trainerInsights';
 
 function themeAccent(theme:ShopTheme,fallback:string){
   if(theme==='royal')return '#FFD447';
@@ -73,6 +74,8 @@ export default function MarketplaceScreen() {
   const [selectedCard,setSelectedCard]=useState<OwnedCardEntry|null>(null);
   const [quantity,setQuantity]=useState('1');
   const [price,setPrice]=useState('1000');
+  const [sellGuidance,setSellGuidance]=useState<SellGuidance|null>(null);
+  const [guidanceLoading,setGuidanceLoading]=useState(false);
   const [offerListing,setOfferListing]=useState<MarketplaceListing|null>(null);
   const [offerAmount,setOfferAmount]=useState('');
   const [compareItems,setCompareItems]=useState<MarketplaceListing[]>([]);
@@ -111,6 +114,15 @@ export default function MarketplaceScreen() {
     if(!marketPrefsReady)return;
     void setScreenPreference('marketplace_filters_v1',{search});
   },[marketPrefsReady,search]);
+
+  useEffect(()=>{
+    const cardId=selectedCard?.cards?.id;
+    if(!cardId){setSellGuidance(null);return;}
+    let active=true;
+    setGuidanceLoading(true);
+    void getCardSellGuidance(cardId).then((next)=>{if(active)setSellGuidance(next);}).catch(()=>{if(active)setSellGuidance(null);}).finally(()=>{if(active)setGuidanceLoading(false);});
+    return()=>{active=false;};
+  },[selectedCard?.cards?.id]);
 
   useEffect(()=>{
     const contextCardId=sellCardId?String(sellCardId):'';
@@ -338,6 +350,15 @@ export default function MarketplaceScreen() {
         <View style={{flex:1}}><Text style={[styles.selectorTitle,{color:colors.text}]}>{selectedCard?.cards?.pokemon_name??'Escolher carta da Bag'}</Text><Text style={[styles.selectorHint,{color:colors.muted}]}>{selectedCard? `${selectedCard.quantity} cópia(s) disponíveis`:'Busque sem carregar a coleção inteira'}</Text></View><Ionicons name="chevron-forward" size={19} color={colors.muted}/>
       </Pressable>
       <View style={styles.formRow}><View style={styles.formField}><Text style={[styles.label,{color:colors.muted}]}>QUANTIDADE</Text><TextInput value={quantity} onChangeText={(v)=>setQuantity(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View><View style={styles.formField}><Text style={[styles.label,{color:colors.muted}]}>PREÇO TOTAL EM COINS</Text><TextInput value={price} onChangeText={(v)=>setPrice(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View></View>
+      {selectedCard?<View style={[styles.priceGuide,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+        <View style={styles.priceGuideHead}><Ionicons name="analytics" size={18} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.priceGuideTitle,{color:colors.text}]}>PREÇO INTELIGENTE</Text><Text style={[styles.priceGuideHint,{color:colors.muted}]}>Referência informativa baseada em anúncios ativos e vendas dos últimos 30 dias. Você continua escolhendo o preço.</Text></View>{guidanceLoading?<ActivityIndicator size="small" color={colors.yellow}/>:null}</View>
+        {sellGuidance?<View style={styles.priceGuideMetrics}>
+          <GuideMetric label="MENOR ATIVA" value={sellGuidance.lowestActiveCoins==null?'—':'🪙 '+Number(sellGuidance.lowestActiveCoins).toLocaleString('pt-BR')}/>
+          <GuideMetric label="MÉDIA VENDIDA" value={sellGuidance.recentSaleAvgCoins==null?'—':'🪙 '+Number(sellGuidance.recentSaleAvgCoins).toLocaleString('pt-BR')}/>
+          <GuideMetric label="VENDAS 30D" value={String(sellGuidance.recentSalesCount)}/>
+        </View>:null}
+        {sellGuidance?.suggestedCoins!=null?<Pressable onPress={()=>setPrice(String(Math.max(1,Math.round(Number(sellGuidance.suggestedCoins)))))} style={[styles.useSuggestion,{borderColor:colors.accent}]}><Ionicons name="sparkles" size={15} color={colors.accent}/><Text style={[styles.useSuggestionText,{color:colors.accent}]}>USAR SUGESTÃO 🪙 {Number(sellGuidance.suggestedCoins).toLocaleString('pt-BR')}</Text></Pressable>:null}
+      </View>:null}
       {Number(price)>0?<View style={[styles.feePreview,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="leaf" size={16} color={colors.accent}/><Text style={[styles.feePreviewText,{color:colors.muted}]}>Taxa econômica 8% • você recebe <Text style={{color:colors.yellow,fontWeight:'900'}}>🪙 {marketSellerNet(Number(price)).toLocaleString('pt-BR')}</Text></Text></View>:null}
       <Pressable disabled={!selectedCard||working||Number(quantity)<1||Number(price)<1} onPress={()=>void publish()} style={[styles.primaryButton,{backgroundColor:selectedCard?colors.yellow:colors.surfaceAlt}]}>{working?<ActivityIndicator color="#07111F"/>:<Ionicons name="add-circle" size={19} color="#07111F"/>}<Text style={styles.primaryText}>PUBLICAR OFERTA</Text></Pressable>
     </View>
@@ -520,6 +541,8 @@ function PreviewStat({label,value,icon,colors}:{label:string;value:string;icon:k
   </View>;
 }
 
+function GuideMetric({label,value}:{label:string;value:string}){const{colors}=useAppTheme();return <View style={styles.priceGuideMetric}><Text style={[styles.priceGuideMetricLabel,{color:colors.muted}]}>{label}</Text><Text style={[styles.priceGuideMetricValue,{color:colors.text}]}>{value}</Text></View>;}
+
 function MarketplaceComparePanel({
   items,
   profiles,
@@ -662,6 +685,8 @@ function ListingCard({item,myId,working,comparing,onBuy,onOffer,onPreview,onComp
 }
 
 const styles=StyleSheet.create({
+  priceGuide:{borderRadius:15,borderWidth:1,padding:10,gap:8},priceGuideHead:{flexDirection:'row',alignItems:'center',gap:8},priceGuideTitle:{fontSize:8,fontWeight:'900',letterSpacing:.6},priceGuideHint:{fontSize:6.8,lineHeight:10,marginTop:2},priceGuideMetrics:{flexDirection:'row',flexWrap:'wrap',gap:6},priceGuideMetric:{flexGrow:1,flexBasis:100,minWidth:95},priceGuideMetricLabel:{fontSize:5.8,fontWeight:'900'},priceGuideMetricValue:{fontSize:9,fontWeight:'900',marginTop:2},useSuggestion:{alignSelf:'flex-start',minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:5},useSuggestionText:{fontSize:7,fontWeight:'900'},
+
   compareHint:{fontSize:7.5,fontWeight:'700',marginTop:2},
   comparePanel:{borderRadius:19,borderWidth:1,padding:12,gap:10},
   compareHead:{flexDirection:'row',alignItems:'center',gap:9},

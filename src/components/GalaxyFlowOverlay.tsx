@@ -6,6 +6,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 type GalaxyIntensity='soft'|'premium'|'master';
 
@@ -92,10 +93,12 @@ export function GalaxyFlowOverlay({
   intensity?:GalaxyIntensity;
   opacity?:number;
 }){
+  const{effectsReduced}=useAppTheme();
   useEffect(()=>{
+    if(effectsReduced){sharedDrift.setValue(.42);sharedTwinkle.setValue(.55);return;}
     startSharedGalaxy();
     return stopSharedGalaxy;
-  },[]);
+  },[effectsReduced]);
 
   const strength=intensity==='master'?1:intensity==='premium'?.72:.44;
   const driftA=sharedDrift.interpolate({inputRange:[0,1],outputRange:[-52,62]});
@@ -123,18 +126,18 @@ export function GalaxyFlowOverlay({
         transform:[{translateX:driftA},{scale}],
       }]}/>
 
-      <Animated.View style={[styles.orbit,styles.orbitOuter,{
+      {!effectsReduced?<Animated.View style={[styles.orbit,styles.orbitOuter,{
         borderColor:'#8B5CFF',
         opacity:.24*strength,
         transform:[{rotate:ringRotate}],
-      }]}/>
-      <Animated.View style={[styles.orbit,styles.orbitInner,{
+      }]}/>:null}
+      {!effectsReduced?<Animated.View style={[styles.orbit,styles.orbitInner,{
         borderColor:'#55E6FF',
         opacity:.28*strength,
         transform:[{rotate:ringRotateBack}],
-      }]}/>
+      }]}/>:null}
 
-      {STARS.map(([left,top,size,phase],index)=>{
+      {!effectsReduced?STARS.map(([left,top,size,phase],index)=>{
         const starOpacity=sharedTwinkle.interpolate({
           inputRange:[0,Math.max(.05,phase),1],
           outputRange:[.18,.95,.25],
@@ -155,18 +158,18 @@ export function GalaxyFlowOverlay({
             transform:[{translateY:rise}],
           }]}/>
         );
-      })}
+      }):null}
 
-      <Animated.View style={[styles.flowRibbon,styles.ribbonA,{
+      {!effectsReduced?<Animated.View style={[styles.flowRibbon,styles.ribbonA,{
         borderColor:'#8B5CFF',
         opacity:.22*strength,
         transform:[{translateX:driftA},{rotate:'-14deg'}],
-      }]}/>
-      <Animated.View style={[styles.flowRibbon,styles.ribbonB,{
+      }]}/>:null}
+      {!effectsReduced?<Animated.View style={[styles.flowRibbon,styles.ribbonB,{
         borderColor:'#55E6FF',
         opacity:.20*strength,
         transform:[{translateX:driftB},{rotate:'18deg'}],
-      }]}/>
+      }]}/>:null}
     </View>
   );
 }

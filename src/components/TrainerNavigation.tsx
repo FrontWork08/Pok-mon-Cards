@@ -17,6 +17,7 @@ import {
 } from '@/services/navigationPreferences';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
+import { getMyFeatureFlags } from '@/services/playerExperience';
 
 type MenuGroupId = 'collection' | 'competitive' | 'social' | 'progress' | 'economy' | 'system';
 type MenuItem = { label:string; description:string; href:string; icon:keyof typeof Ionicons.glyphMap; group:MenuGroupId; adminOnly?:boolean };
@@ -37,7 +38,10 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Central de Atividades', description:'Mensagens, convites e avisos que precisam de atenção', href:'/inbox', icon:'notifications', group:'social' },
   { label:'Passe de Batalha', description:'50 níveis, recompensas grátis, VIP e missões', href:'/battle-pass', icon:'ribbon', group:'progress' },
   { label:'Carreira do Treinador', description:'Jornada, identidade, Pokédex e histórico da conta', href:'/career', icon:'compass', group:'progress' },
+  { label:'Museu da Conta', description:'Primeiros momentos, melhores pulls e memórias da conta', href:'/account-museum', icon:'library', group:'progress' },
+  { label:'Insights do Treinador', description:'Estatísticas e recomendações da sua coleção', href:'/trainer-insights', icon:'bulb', group:'progress' },
   { label:'Temporada & Eventos', description:'Ranque, streak e efeitos temporários do jogo', href:'/season', icon:'flame', group:'progress' },
+  { label:'Resumo Semanal', description:'Seus últimos 7 dias de coleção, batalha e progresso', href:'/weekly-summary', icon:'calendar', group:'progress' },
   { label:'Card Chase', description:'Wishlist e alertas de cartas desejadas', href:'/wishlist', icon:'star', group:'collection' },
   { label:'Vitrine do Perfil', description:'Escolha suas 6 cartas de destaque', href:'/showcase', icon:'sparkles', group:'collection' },
   { label:'Conquistas e Títulos', description:'Progresso e títulos equipáveis', href:'/achievements', icon:'medal', group:'progress' },
@@ -45,10 +49,13 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Guildas Pokémon', description:'Equipe, missões e ranking coletivo', href:'/guilds', icon:'shield', group:'social' },
   { label:'Guild Wars', description:'Confrontos semanais entre guildas', href:'/guild-wars', icon:'flash', group:'competitive' },
   { label:'Copa Trainer', description:'Torneio com bracket e prêmio acumulado', href:'/tournaments', icon:'trophy', group:'competitive' },
+  { label:'Battle Lab', description:'Simule confrontos sem afetar ELO ou inventário', href:'/battle-lab', icon:'flask', group:'competitive' },
+  { label:'Hall da Fama', description:'Campeões de temporadas, Copa e recordes', href:'/hall-of-fame', icon:'ribbon', group:'competitive' },
   { label:'Trainer Shop', description:'Cosméticos e itens compráveis', href:'/store', icon:'bag-handle', group:'economy' },
   { label:'Cosméticos', description:'Molduras, fundos e temas desbloqueáveis', href:'/cosmetics', icon:'color-wand', group:'economy' },
   { label:'Mercado de Treinadores', description:'Lojas e ofertas em tempo real', href:'/marketplace', icon:'storefront', group:'economy' },
   { label:'Economia', description:'Conversões e visão geral da economia', href:'/economy', icon:'cash', group:'economy' },
+  { label:'Histórico Financeiro', description:'Coins e Diamantes com saldo antes e depois', href:'/financial-history', icon:'receipt', group:'economy' },
   { label:'Vender Repetidas', description:'Venda cópias extras da sua coleção', href:'/sell-duplicates', icon:'pricetag', group:'economy' },
   { label:'Resgatar Código', description:'Recompensas únicas por conta', href:'/codes', icon:'ticket', group:'economy' },
   { label:'Amigos e Chat', description:'Amizades, presença e conversas', href:'/friends', icon:'people', group:'social' },
@@ -60,10 +67,23 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Histórico de Packs', description:'Reveja seus melhores pulls', href:'/history', icon:'time', group:'collection' },
   { label:'Guia do Treinador', description:'Ciclo do jogo e glossário de stats', href:'/trainer-guide', icon:'help-circle', group:'system' },
   { label:'Configurações', description:'Aparência, batalha, notificações e privacidade', href:'/settings', icon:'settings', group:'system' },
+  { label:'O que mudou', description:'Histórico de versões e novidades ainda não lidas', href:'/whats-new', icon:'newspaper', group:'system' },
+  { label:'Feedback', description:'Reporte bugs e envie sugestões dentro do app', href:'/feedback', icon:'chatbox', group:'system' },
+  { label:'Beta & Tester', description:'Transição 1.0, status Tester e recursos liberados', href:'/beta-tester', icon:'flask', group:'system' },
+  { label:'Health Check', description:'Saúde dos sistemas e erros recentes', href:'/admin-health', icon:'pulse', group:'system', adminOnly:true },
+  { label:'Controle Anti-inflação', description:'Snapshots e guardrails da economia', href:'/admin-economy-control', icon:'analytics', group:'system', adminOnly:true },
+  { label:'Freeze Simulator', description:'Prévia segura do freeze/reset 1.0', href:'/admin-freeze-simulator', icon:'snow', group:'system', adminOnly:true },
+  { label:'Battle Lab Admin', description:'Matriz massiva de confrontos sem writes', href:'/admin-battle-lab', icon:'grid', group:'system', adminOnly:true },
+  { label:'Feedback Admin', description:'Triagem e resposta aos feedbacks do app', href:'/admin-feedback', icon:'chatbubbles', group:'system', adminOnly:true },
+  { label:'Feature Flags', description:'Rollout gradual e recursos somente para testers', href:'/admin-feature-flags', icon:'git-branch', group:'system', adminOnly:true },
   { label:'Admin Center', description:'Economia, usuários e sistema', href:'/admin', icon:'shield-checkmark', group:'system', adminOnly:true },
 ];
 
 const EMPTY_PREFERENCES: TrainerNavigationPreferences = { favorites:[], recents:[] };
+const FEATURE_BY_HREF:Record<string,string>={
+  '/battle-lab':'battle_lab',
+  '/trainer-insights':'trainer_insights',
+};
 const normalizeSearch = (value:string) => value.trim().toLocaleLowerCase('pt-BR');
 
 export function TrainerNavigation() {
@@ -80,8 +100,13 @@ export function TrainerNavigation() {
   const[search,setSearch]=useState('');
   const[expanded,setExpanded]=useState<MenuGroupId|null>(null);
   const[preferences,setPreferences]=useState<TrainerNavigationPreferences>(EMPTY_PREFERENCES);
+  const[featureFlags,setFeatureFlags]=useState<Record<string,boolean>>({});
 
-  const visibleItems=useMemo(()=>MENU_ITEMS.filter(item=>!item.adminOnly||isAdmin),[isAdmin]);
+  const visibleItems=useMemo(()=>MENU_ITEMS.filter(item=>{
+    if(item.adminOnly&&!isAdmin)return false;
+    const flag=FEATURE_BY_HREF[item.href];
+    return !flag||featureFlags[flag]!==false;
+  }),[featureFlags,isAdmin]);
   const itemByHref=useMemo(()=>new Map(visibleItems.map(item=>[item.href,item])),[visibleItems]);
   const searchResults=useMemo(()=>{
     const term=normalizeSearch(search);
@@ -99,13 +124,14 @@ export function TrainerNavigation() {
   },[itemByHref,preferences]);
 
   useEffect(()=>{
-    if(!userId){setIsAdmin(false);setUnread(0);setRankSnapshot(null);setPreferences(EMPTY_PREFERENCES);return;}
+    if(!userId){setIsAdmin(false);setUnread(0);setRankSnapshot(null);setPreferences(EMPTY_PREFERENCES);setFeatureFlags({});return;}
     Promise.all([
       isCurrentUserAdmin().catch(()=>false),
       getUnreadConversationCount().catch(()=>0),
       getMyRankSnapshot().catch(()=>null),
       getTrainerNavigationPreferences().catch(()=>EMPTY_PREFERENCES),
-    ]).then(([admin,count,snapshot,prefs])=>{setIsAdmin(admin);setUnread(count);setRankSnapshot(snapshot);setPreferences(prefs);});
+      getMyFeatureFlags().catch(()=>({})),
+    ]).then(([admin,count,snapshot,prefs,flags])=>{setIsAdmin(admin);setUnread(count);setRankSnapshot(snapshot);setPreferences(prefs);setFeatureFlags(flags);});
   },[userId]);
 
   useEffect(()=>{
@@ -113,7 +139,8 @@ export function TrainerNavigation() {
     void Promise.all([
       getUnreadConversationCount().catch(()=>0),
       getTrainerNavigationPreferences().catch(()=>EMPTY_PREFERENCES),
-    ]).then(([count,prefs])=>{setUnread(count);setPreferences(prefs);});
+      getMyFeatureFlags().catch(()=>({})),
+    ]).then(([count,prefs,flags])=>{setUnread(count);setPreferences(prefs);setFeatureFlags(flags);});
   },[open,userId]);
 
   if(!userId)return null;
@@ -198,7 +225,7 @@ export function TrainerNavigation() {
                   </View>;
                 })}</View>
               </View>
-              {isAdmin?<View style={styles.section}><Text style={[styles.sectionTitle,{color:'#FF7ACF'}]}>Administração</Text>{renderMenuItem(MENU_ITEMS.find(item=>item.adminOnly)!)}</View>:null}
+              {isAdmin?<View style={styles.section}><Text style={[styles.sectionTitle,{color:'#FF7ACF'}]}>Administração</Text>{MENU_ITEMS.filter(item=>item.adminOnly).map(item=>renderMenuItem(item))}</View>:null}
             </>}
           </ScrollView>
         </View>

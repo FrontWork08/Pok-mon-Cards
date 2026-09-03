@@ -3,6 +3,7 @@ import { getSessionUserId } from '@/lib/session';
 import { normalizeFunctionError } from '@/services/functionErrors';
 import { getPhysicalPackshots } from '@/data/physicalPackshots';
 import { getActiveFreeBoosterEvent } from '@/services/liveEvents';
+import { createOperationId } from '@/lib/operationId';
 
 export type Pack = {
   id: string;
@@ -132,11 +133,17 @@ export async function listPacks(): Promise<Pack[]> {
   });
 }
 
+const pendingPackOperations=new Map<string,string>();
+let pendingLegendaryOperation:string|null=null;
+
 export async function openPack(packId: string) {
-  const { data, error } = await supabase.functions.invoke('open-pack', { body: { packId } });
+  const operationId=pendingPackOperations.get(packId)??createOperationId();
+  pendingPackOperations.set(packId,operationId);
+  const { data, error } = await supabase.functions.invoke('open-pack', { body: { packId, operationId } });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível abrir este booster.');
   if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível abrir este booster.');
   const result = data as { openingId: string; cards: OpenedCard[] };
+  pendingPackOperations.delete(packId);
   return {
     ...result,
     cards: await hydrateOpenedCardPrices(Array.isArray(result.cards) ? result.cards : []),
@@ -158,12 +165,15 @@ export async function getLegendaryPackConfig() {
 }
 
 export async function openLegendaryDiamondPack() {
+  const operationId=pendingLegendaryOperation??createOperationId();
+  pendingLegendaryOperation=operationId;
   const { data, error } = await supabase.functions.invoke('open-pack', {
-    body: { kind: 'legendary_diamond' },
+    body: { kind: 'legendary_diamond', operationId },
   });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível abrir o pacote lendário.');
   if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível abrir o pacote lendário.');
   const result = data as { openingId: string; cards: OpenedCard[]; diamonds: number; pricePaid: number };
+  pendingLegendaryOperation=null;
   return {
     ...result,
     cards: await hydrateOpenedCardPrices(Array.isArray(result.cards) ? result.cards : []),

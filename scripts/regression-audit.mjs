@@ -372,7 +372,7 @@ if (existsSync('app/sell-duplicates.tsx') && existsSync('src/services/cardSales.
   const salesService = read('src/services/cardSales.ts');
   assert(salesUi.includes('VENDER TODAS AS REPETIDAS'), 'Regressão: tela de repetidas perdeu a venda em lote.');
   assert(salesUi.includes('sellAllDuplicateCards'), 'Regressão: botão de venda em lote não está conectado ao serviço.');
-  assert(salesService.includes("rpc('sell_all_duplicate_cards')"), 'Regressão: serviço perdeu a RPC de venda de todas as repetidas.');
+  assert(salesService.includes('server_idempotent_sell_all_duplicate_cards') || salesService.includes("rpc('sell_all_duplicate_cards')"), 'Regressão: serviço perdeu a RPC protegida de venda de todas as repetidas.');
 }
 
 if (existsSync('supabase/migrations/20260831135024_bulk_duplicate_sales.sql')) {
@@ -381,6 +381,25 @@ if (existsSync('supabase/migrations/20260831135024_bulk_duplicate_sales.sql')) {
   assert(bulkSales.includes('DUPLICATE_SALES_PAUSED_DURING_FREE_EVENT'), 'Regressão: venda em lote precisa respeitar bloqueio durante boosters grátis.');
   assert(bulkSales.includes('private.duplicate_sale_coin_value'), 'Regressão: venda em lote deixou de usar a cotação econômica oficial.');
   assert(bulkSales.includes('grant execute on function public.sell_all_duplicate_cards() to authenticated'), 'Regressão de segurança: venda em lote deve ficar restrita a autenticados.');
+}
+
+if (existsSync('src/services/soundEffects.ts') && existsSync('app/battle/[id].tsx')) {
+  const sounds = read('src/services/soundEffects.ts');
+  const battleUi = read('app/battle/[id].tsx');
+  assert(sounds.includes('playBattleSound') && sounds.includes('CLICK_WAV_BASE64'), 'Regressão: efeitos sonoros leves de batalha foram removidos.');
+  assert(battleUi.includes("settings?.battle_sounds") && battleUi.includes('playBattleSound'), 'Regressão: preferência de sons deixou de controlar a batalha.');
+}
+
+if (existsSync('src/services/marketplace.ts') && existsSync('src/services/packs.ts')) {
+  const marketService = read('src/services/marketplace.ts');
+  const packService = read('src/services/packs.ts');
+  assert(marketService.includes('server_idempotent_marketplace_action'), 'Regressão de segurança: Marketplace perdeu idempotência.');
+  assert(packService.includes('operationId') && packService.includes("functions.invoke('open-pack'"), 'Regressão de segurança: abertura de pack perdeu operationId estável.');
+}
+
+if (existsSync('supabase/migrations/20260903195204_schedule_weekly_trainer_summary.sql')) {
+  const weekly = read('supabase/migrations/20260903195204_schedule_weekly_trainer_summary.sql');
+  assert(weekly.includes('trainer-weekly-summary') && weekly.includes('weekKey'), 'Regressão: resumo semanal deixou de ter agendamento/deduplicação.');
 }
 
 if (existsSync('app/store.tsx') && existsSync('src/services/store.ts')) {
@@ -1300,6 +1319,49 @@ if (existsSync('supabase/migrations/20260903175516_optimize_trainer_journey_summ
   assert(journeyPerf.includes('owned as materialized') && journeyPerf.includes('metrics as materialized'), 'Regressão de performance: resumo da Jornada deixou de consolidar métricas em uma passagem.');
   assert(journeyPerf.includes('get_trainer_journey_summary') && journeyPerf.includes('currentStep'), 'Regressão da Home: resumo otimizado da Jornada perdeu o próximo passo.');
   assert(journeyPerf.includes('revoke all on function public.get_trainer_journey_summary() from public,anon'), 'Regressão de segurança: resumo otimizado da Jornada voltou a ficar executável por anon.');
+}
+
+if (existsSync('app/card/[id].tsx') && existsSync('src/services/cardPassport.ts')) {
+  const cardDetail = read('app/card/[id].tsx');
+  const passportService = read('src/services/cardPassport.ts');
+  assert(cardDetail.includes("['passport','Passaporte'") && cardDetail.includes('PASSAPORTE DA CARTA'), 'Regressão do Passaporte: Card Detail perdeu a aba de histórico.');
+  assert(cardDetail.includes('CARTA BLOQUEADA 🔒') && cardDetail.includes('toggleCardLock'), 'Regressão de proteção: bloqueio de cartas saiu do Card Detail.');
+  assert(passportService.includes('get_card_passport') && passportService.includes('set_my_card_metadata'), 'Regressão do Passaporte: serviço deixou de usar RPCs canônicas.');
+}
+
+if (existsSync('app/battle-replay/[id].tsx') && existsSync('src/services/battleReplay.ts')) {
+  const replayUi = read('app/battle-replay/[id].tsx');
+  const replayService = read('src/services/battleReplay.ts');
+  const battleHubReplay = read('app/(tabs)/battles.tsx');
+  assert(replayUi.includes('Replay de Batalha') && replayUi.includes('SUPER EFETIVO') && replayUi.includes('CRÍTICO'), 'Regressão do Replay: detalhes game_v1 deixaram de aparecer.');
+  assert(replayService.includes('get_battle_replay'), 'Regressão do Replay: serviço perdeu RPC server-side.');
+  assert(battleHubReplay.includes('REPLAY') && battleHubReplay.includes('/battle-replay/'), 'Regressão do Replay: histórico deixou de abrir o replay.');
+}
+
+if (existsSync('app/admin-health.tsx') && existsSync('src/services/safetyAndAudit.ts')) {
+  const healthUi = read('app/admin-health.tsx');
+  const safetyService = read('src/services/safetyAndAudit.ts');
+  assert(healthUi.includes('Health Check') && healthUi.includes('Erros recentes'), 'Regressão Admin: Health Check ou Error Center foi removido.');
+  assert(safetyService.includes('get_admin_health_check') && safetyService.includes('get_admin_recent_errors'), 'Regressão Admin: serviço de saúde/erros perdeu RPCs.');
+}
+
+if (existsSync('app/financial-history.tsx') && existsSync('src/services/safetyAndAudit.ts')) {
+  const financeUi = read('app/financial-history.tsx');
+  assert(financeUi.includes('Histórico Financeiro') && financeUi.includes('balanceBefore'), 'Regressão financeira: histórico deixou de mostrar saldo anterior/posterior.');
+}
+
+if (existsSync('app/account-museum.tsx')) {
+  const museumUi = read('app/account-museum.tsx');
+  assert(museumUi.includes('Museu da Conta') && museumUi.includes('Linha do tempo'), 'Regressão do Museu: memória histórica da conta foi removida.');
+}
+
+if (existsSync('supabase/migrations/20260903184457_trainer_safety_identity_core.sql')) {
+  const safetyDb = read('supabase/migrations/20260903184457_trainer_safety_identity_core.sql');
+  for (const token of ['player_card_metadata','economy_ledger','app_error_log','get_card_passport','get_battle_replay','get_admin_health_check','get_account_museum']) {
+    assert(safetyDb.includes(token), `Regressão do core seguro: ${token} foi removido da migration.`);
+  }
+  assert(safetyDb.includes("raise exception 'CARD_LOCKED'"), 'Regressão de proteção: fluxos destrutivos deixaram de rejeitar carta bloqueada.');
+  assert(safetyDb.includes('audit_player_currency_change'), 'Regressão financeira: trigger de auditoria de saldo foi removida.');
 }
 
 if (failures.length) {

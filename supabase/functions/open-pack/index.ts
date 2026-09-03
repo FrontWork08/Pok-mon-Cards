@@ -86,9 +86,13 @@ Deno.serve(async (req: Request) => {
   }
 
   const body = await req.json().catch(() => ({}));
+  const operationId = typeof body.operationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.operationId)
+    ? body.operationId
+    : crypto.randomUUID();
   if (body.kind === "legendary_diamond") {
-    const { data, error } = await admin.rpc("server_open_legendary_diamond_pack", {
+    const { data, error } = await admin.rpc("server_idempotent_open_legendary_pack", {
       p_player_id: user.id,
+      p_operation_id: operationId,
     });
     if (error) {
       const message = error.message ?? "Could not open legendary pack";
@@ -103,9 +107,10 @@ Deno.serve(async (req: Request) => {
   const packId = body.packId;
   if (!packId) return json({ error: "packId is required" }, 400);
 
-  const { data, error } = await admin.rpc("server_open_pack", {
+  const { data, error } = await admin.rpc("server_idempotent_open_pack", {
     p_player_id: user.id,
     p_pack_id: packId,
+    p_operation_id: operationId,
   });
 
   if (error) {

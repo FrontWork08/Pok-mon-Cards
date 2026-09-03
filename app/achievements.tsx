@@ -34,7 +34,16 @@ export default function AchievementsScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const unlockedCount = achievements.filter((item) => item.unlocked_at).length;
-  const visible = useMemo(() => achievements.filter((item) => filter === 'all' || (filter === 'unlocked' ? Boolean(item.unlocked_at) : !item.unlocked_at)), [achievements, filter]);
+  const visible = useMemo(() => achievements.filter((item) => {
+    const def=Array.isArray(item.achievement)?item.achievement[0]:item.achievement;
+    const hiddenSecret=Boolean(def?.secret)&&!item.unlocked_at;
+    if(hiddenSecret)return false;
+    return filter === 'all' || (filter === 'unlocked' ? Boolean(item.unlocked_at) : !item.unlocked_at);
+  }), [achievements, filter]);
+  const secretUnlocked=achievements.filter((item)=>{
+    const def=Array.isArray(item.achievement)?item.achievement[0]:item.achievement;
+    return Boolean(def?.secret)&&Boolean(item.unlocked_at);
+  }).length;
   const equippedRow = achievements.find((item) => item.achievement_id === profile?.equipped_title_id);
   const equipped = equippedRow ? (Array.isArray(equippedRow.achievement) ? equippedRow.achievement[0] : equippedRow.achievement) : null;
 
@@ -55,7 +64,7 @@ export default function AchievementsScreen() {
 
     <View style={[styles.hero, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
       <View style={[styles.heroIcon, { backgroundColor: colors.surface }]}><Ionicons name="ribbon" size={31} color={colors.yellow} /></View>
-      <View style={styles.grow}><Text style={[styles.kicker, { color: colors.yellow }]}>TÍTULO EQUIPADO</Text><Text style={[styles.heroTitle, { color: colors.text }]}>{equipped ? `${equipped.icon} ${equipped.title}` : 'Nenhum título equipado'}</Text><Text style={[styles.heroMeta, { color: colors.muted }]}>{unlockedCount} de {achievements.length} conquistas desbloqueadas</Text></View>
+      <View style={styles.grow}><Text style={[styles.kicker, { color: colors.yellow }]}>TÍTULO EQUIPADO</Text><Text style={[styles.heroTitle, { color: colors.text }]}>{equipped ? `${equipped.icon} ${equipped.title}` : 'Nenhum título equipado'}</Text><Text style={[styles.heroMeta, { color: colors.muted }]}>{unlockedCount} conquistas desbloqueadas • {secretUnlocked} secreta(s) descoberta(s)</Text></View>
     </View>
 
     <View style={styles.filters}>
@@ -63,6 +72,7 @@ export default function AchievementsScreen() {
       <FilterChip label="Desbloqueadas" active={filter === 'unlocked'} onPress={() => setFilter('unlocked')} />
       <FilterChip label="Bloqueadas" active={filter === 'locked'} onPress={() => setFilter('locked')} />
     </View>
+    <View style={[styles.secretHint,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="eye-off" size={17} color="#9B7BFF"/><Text style={[styles.secretHintText,{color:colors.muted}]}>Conquistas secretas não aparecem como bloqueadas. Elas só são reveladas quando você descobre a condição jogando.</Text></View>
 
     {!loading && visible.length === 0 ? <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="ribbon-outline" size={34} color={colors.muted} /><Text style={[styles.emptyText, { color: colors.muted }]}>Nenhuma conquista neste filtro.</Text></View> : null}
 
@@ -102,6 +112,7 @@ const styles = StyleSheet.create({
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   filter: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1 },
   filterText: { fontSize: 9, fontWeight: '900' },
+  secretHint:{borderRadius:13,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:7},secretHintText:{fontSize:7.5,lineHeight:11,flex:1},
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   card: { flexGrow: 1, flexBasis: 245, minWidth: 170, padding: 13, borderRadius: 17, borderWidth: 1 },
   locked: { opacity: .64 },

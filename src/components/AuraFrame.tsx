@@ -8,6 +8,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 type AuraIntensity='soft'|'premium'|'master';
 
@@ -97,11 +98,13 @@ export function AuraFrame({
   style?:StyleProp<ViewStyle>;
 }){
   const second=secondaryColor??'#FFD447';
+  const{effectsReduced}=useAppTheme();
 
   useEffect(()=>{
+    if(effectsReduced){sharedAuraFlow.setValue(.42);return;}
     startSharedAura();
     return stopSharedAura;
-  },[]);
+  },[effectsReduced]);
 
   const config=useMemo(()=>{
     if(intensity==='master')return {border:.96,glow:.25,shine:.22,particle:.95,rail:3.5};
@@ -171,7 +174,7 @@ export function AuraFrame({
       <View style={[styles.content,{borderRadius:radius}]}>
         <View style={styles.inner}>{children}</View>
 
-        <Animated.View
+        {!effectsReduced?<Animated.View
           pointerEvents="none"
           style={[
             styles.glow,
@@ -182,8 +185,8 @@ export function AuraFrame({
               transform:[{translateX:driftA},{scale:pulseScale}],
             },
           ]}
-        />
-        <Animated.View
+        />:null}
+        {!effectsReduced?<Animated.View
           pointerEvents="none"
           style={[
             styles.glow,
@@ -194,9 +197,9 @@ export function AuraFrame({
               transform:[{translateX:driftB}],
             },
           ]}
-        />
+        />:null}
 
-        <Animated.View
+        {!effectsReduced?<Animated.View
           pointerEvents="none"
           style={[
             styles.flowTop,
@@ -207,8 +210,8 @@ export function AuraFrame({
               transform:[{translateX:topX}],
             },
           ]}
-        />
-        <Animated.View
+        />:null}
+        {!effectsReduced?<Animated.View
           pointerEvents="none"
           style={[
             styles.flowBottom,
@@ -219,9 +222,9 @@ export function AuraFrame({
               transform:[{translateX:bottomX}],
             },
           ]}
-        />
+        />:null}
 
-        {intensity!=='soft'?(
+        {!effectsReduced&&intensity!=='soft'?(
           <Animated.View
             pointerEvents="none"
             style={[
@@ -249,7 +252,7 @@ export function AuraFrame({
         <Animated.View pointerEvents="none" style={[styles.gem,styles.gemTL,{backgroundColor:second,opacity:twinkle}]}/>
         <Animated.View pointerEvents="none" style={[styles.gem,styles.gemBR,{backgroundColor:primaryColor,opacity:pulse}]}/>
 
-        {intensity!=='soft'?STARS.map(([left,top,size],index)=>(
+        {!effectsReduced&&intensity!=='soft'?STARS.map(([left,top,size],index)=>(
           <Animated.View
             key={index}
             pointerEvents="none"
@@ -268,7 +271,7 @@ export function AuraFrame({
           />
         )):null}
 
-        {variant==='galaxy'?(
+        {!effectsReduced&&variant==='galaxy'?(
           <>
             <Animated.View
               pointerEvents="none"

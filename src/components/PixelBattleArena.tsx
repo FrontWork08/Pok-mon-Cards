@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '@/theme/ThemeProvider';
 
 export type PixelBattleFighter = {
   name: string;
@@ -51,6 +52,7 @@ function damageLabel(fighter: PixelBattleFighter | null) {
 }
 
 export function PixelBattleArena({ my, rival, resultKey = null, winner = null, title = 'ARENA 2D', subtitle = 'Batalha por turnos • HP, golpes, PP, tipos e velocidade', turnOnly = false }: Props) {
+  const{effectsReduced}=useAppTheme();
   const myIdle = useRef(new Animated.Value(0)).current;
   const rivalIdle = useRef(new Animated.Value(0)).current;
   const myAction = useRef(new Animated.Value(0)).current;
@@ -72,6 +74,7 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
   useEffect(() => { setRivalSpriteFailed(false); }, [rivalSprite]);
 
   useEffect(() => {
+    if(effectsReduced){myIdle.setValue(0);rivalIdle.setValue(0);return;}
     const myLoop = Animated.loop(Animated.sequence([
       Animated.timing(myIdle, { toValue: -1, duration: 780, useNativeDriver: USE_NATIVE_DRIVER }),
       Animated.timing(myIdle, { toValue: 1, duration: 780, useNativeDriver: USE_NATIVE_DRIVER }),
@@ -86,7 +89,7 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
       myLoop.stop();
       rivalLoop.stop();
     };
-  }, [myIdle, rivalIdle]);
+  }, [effectsReduced,myIdle, rivalIdle]);
 
   useEffect(() => {
     myAction.stopAnimation(); rivalAction.stopAnimation(); myHit.stopAnimation(); rivalHit.stopAnimation();
@@ -96,6 +99,11 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
 
     if (resultKey == null || !my || !rival || (!winner && !turnOnly)) {
       setMessage('Os Pokémon estão prontos.');
+      return;
+    }
+    if(effectsReduced){
+      if(winner)setMessage(`${winner === 'me' ? my.name : rival.name} venceu o confronto.`);
+      else setMessage('Turno concluído. Escolha o próximo golpe.');
       return;
     }
 
@@ -157,7 +165,7 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
       cancelled = true;
       timers.forEach(clearTimeout);
     };
-  }, [flash, my, myAction, myHit, myOpacity, replayNonce, resultKey, rival, rivalAction, rivalHit, rivalOpacity, turnOnly, winner]);
+  }, [effectsReduced,flash, my, myAction, myHit, myOpacity, replayNonce, resultKey, rival, rivalAction, rivalHit, rivalOpacity, turnOnly, winner]);
 
   const myHp = hpPercent(my);
   const rivalHp = hpPercent(rival);

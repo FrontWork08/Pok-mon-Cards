@@ -16,6 +16,7 @@ import { cancelMatchmaking, getMyMatchmakingState, joinMatchmaking, subscribeMyM
 import { isFunctionErrorCode } from '@/services/functionErrors';
 import { StatusPill } from '@/components/StatusPill';
 import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
+import { getBattleFormats, setBattleFormat, type BattleFormat } from '@/services/trainerInsights';
 
 const MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
   { id: 'quick', label: 'Quick', detail: '1 carta' },
@@ -51,15 +52,18 @@ export default function BattlesHubScreen() {
   const [rankedMode, setRankedMode] = useState<BattleMode>('draft3');
   const [queueState, setQueueState] = useState<MatchmakingState | null>(null);
   const [showBattleRules, setShowBattleRules] = useState(false);
+  const [formats,setFormats]=useState<BattleFormat[]>([]);
+  const [formatId,setFormatId]=useState('standard');
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [p, h, l, social] = await Promise.all([getMyProfile(), getMyBattleHistory(), getBattleLeaderboard(25), getMySocial()]);
+      const [p, h, l, social, availableFormats] = await Promise.all([getMyProfile(), getMyBattleHistory(), getBattleLeaderboard(25), getMySocial(), getBattleFormats().catch(()=>[])]);
       setProfile(p);
       setHistory(h);
       setLeaderboard(l);
       setFriends(social.friends);
+      setFormats(availableFormats);
       setQueueState(await getMyMatchmakingState().catch(() => null));
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Não foi possível carregar as batalhas.');
@@ -192,8 +196,10 @@ export default function BattlesHubScreen() {
     try {
       setWorking('challenge');
       const battleId = await createBattle(opponent.id, mode, stakeType, stakeType === 'coins' ? wagerCoins : 0, selectedCardId);
+      if(formatId!=='standard')await setBattleFormat(battleId,formatId);
       setOpponent(null);
       setSelectedCardId(null);
+      setFormatId('standard');
       router.push(`/battle/${battleId}`);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Não foi possível enviar o desafio.');
@@ -459,7 +465,10 @@ export default function BattlesHubScreen() {
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.muted}/>
             </Pressable>
-            {item.status === 'completed' && !item.is_bot_match ? <Pressable style={[styles.rematch, { borderColor: colors.accent }]} onPress={() => rematch(item.id)} disabled={working === item.id}><Ionicons name="refresh" size={15} color={colors.accent}/><Text style={[styles.rematchText, { color: colors.accent }]}>{working === item.id ? 'CRIANDO...' : 'REVANCHE'}</Text></Pressable> : null}
+            {item.status === 'completed' ? <View style={styles.historyActions}>
+              <Pressable style={[styles.rematch, { borderColor: colors.yellow }]} onPress={() => router.push(('/battle-replay/'+item.id) as never)}><Ionicons name="play-back" size={15} color={colors.yellow}/><Text style={[styles.rematchText, { color: colors.yellow }]}>REPLAY</Text></Pressable>
+              {!item.is_bot_match ? <Pressable style={[styles.rematch, { borderColor: colors.accent }]} onPress={() => rematch(item.id)} disabled={working === item.id}><Ionicons name="refresh" size={15} color={colors.accent}/><Text style={[styles.rematchText, { color: colors.accent }]}>{working === item.id ? 'CRIANDO...' : 'REVANCHE'}</Text></Pressable> : null}
+            </View> : null}
           </View>
         </CompactTrainerBanner>
       );
@@ -475,6 +484,9 @@ export default function BattlesHubScreen() {
           ) : null}
           <Text style={[styles.optionLabel, { color: colors.muted }]}>MODO</Text>
           <View style={styles.optionGrid}>{MODES.map((item) => <Pressable key={item.id} onPress={() => setMode(item.id)} style={[styles.option, { backgroundColor: mode === item.id ? colors.accentSoft : colors.surfaceAlt, borderColor: mode === item.id ? colors.accent : colors.border }]}><Text style={[styles.optionTitle, { color: colors.text }]}>{item.label}</Text><Text style={[styles.optionDetail, { color: colors.muted }]}>{item.detail}</Text></Pressable>)}</View>
+          <Text style={[styles.optionLabel, { color: colors.muted }]}>FORMATO</Text>
+          <View style={styles.formatList}>{(formats.length?formats:[{id:'standard',name:'Padrão',description:'Sem restrições extras.',icon:'game-controller',rules:{},rankedAllowed:true}]).map((item)=>{const active=formatId===item.id;return <Pressable key={item.id} onPress={()=>setFormatId(item.id)} style={[styles.formatOption,{backgroundColor:active?colors.accentSoft:colors.surfaceAlt,borderColor:active?colors.accent:colors.border}]}><Ionicons name={(item.icon||'game-controller') as keyof typeof Ionicons.glyphMap} size={17} color={active?colors.accent:colors.muted}/><View style={{flex:1}}><Text style={[styles.optionTitle,{color:colors.text}]}>{item.name}</Text><Text style={[styles.optionDetail,{color:colors.muted}]}>{item.description}</Text></View>{active?<Ionicons name="checkmark-circle" size={18} color={colors.accent}/>:null}</Pressable>;})}</View>
+          <Text style={[styles.formatHint,{color:colors.muted}]}>Formatos alternativos valem apenas para desafios entre amigos. A ranqueada continua no formato Padrão.</Text>
           <Text style={[styles.optionLabel, { color: colors.muted }]}>APOSTA</Text>
           <View style={styles.optionGrid}>{STAKES.map((item) => <Pressable key={item.id} onPress={() => { setStakeType(item.id); if (item.id !== 'card') setSelectedCardId(null); }} style={[styles.stake, { backgroundColor: stakeType === item.id ? colors.accentSoft : colors.surfaceAlt, borderColor: stakeType === item.id ? colors.accent : colors.border }]}><Ionicons name={item.icon} size={18} color={stakeType === item.id ? colors.accent : colors.muted}/><Text style={[styles.optionTitle, { color: colors.text }]}>{item.label}</Text></Pressable>)}</View>
           {stakeType === 'coins' ? <View style={styles.wagers}>{COIN_WAGERS.map((value) => <Pressable key={value} onPress={() => setWagerCoins(value)} style={[styles.wager, { backgroundColor: wagerCoins === value ? colors.yellow : colors.surfaceAlt, borderColor: wagerCoins === value ? colors.yellow : colors.border }]}><Text style={[styles.wagerText, { color: wagerCoins === value ? '#07111F' : colors.text }]}>🪙 {value.toLocaleString('pt-BR')}</Text></Pressable>)}</View> : null}
@@ -552,11 +564,11 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }, sectionTitle: { fontSize: 20, fontWeight: '900' }, sectionDescription: { fontSize: 9, marginTop: 2 }, sectionMeta: { fontSize: 9, fontWeight: '900' }, sectionLink: { fontSize: 9, fontWeight: '900' },
   friendList: { gap: 9, paddingRight: 8 }, friendBanner:{width:150}, friend: { width: 150, borderRadius: 19, borderWidth: 1, padding: 12, alignItems: 'flex-start' }, friendAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, friendName: { width: '100%', fontSize: 12, fontWeight: '900', marginTop: 8, textShadowColor:'#000000FF', textShadowOffset:{width:0,height:1}, textShadowRadius:4 }, friendLevel: { fontSize: 8, marginTop: 2 }, challengeTag: { marginTop: 10, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }, challengeTagText: { color: '#07111F', fontSize: 7, fontWeight: '900' },
   list: { gap: 8 }, rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, borderWidth: 1 }, position: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, positionText: { fontWeight: '900' }, grow: { flex: 1, minWidth: 0 }, name: { fontSize: 12, fontWeight: '900', textShadowColor:'#000000FF', textShadowOffset:{width:0,height:1}, textShadowRadius:4 }, sub: { fontSize: 9, marginTop: 3 }, elo: { fontSize: 16, fontWeight: '900', textShadowColor:'#000000F2', textShadowOffset:{width:0,height:1}, textShadowRadius:4 },
-  battleRow: { borderRadius: 17, borderWidth: 1, overflow: 'hidden' }, battleTitleRow:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'}, battleBody: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11 }, resultIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, rematch: { alignSelf: 'flex-end', marginRight: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1 }, rematchText: { fontSize: 8, fontWeight: '900' },
+  battleRow: { borderRadius: 17, borderWidth: 1, overflow: 'hidden' }, historyActions:{flexDirection:'row',flexWrap:'wrap',justifyContent:'flex-end',gap:6,paddingHorizontal:10,paddingBottom:9}, battleTitleRow:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'}, battleBody: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11 }, resultIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, rematch: { alignSelf: 'flex-end', marginRight: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1 }, rematchText: { fontSize: 8, fontWeight: '900' },
   empty: { padding: 24, borderRadius: 18, borderWidth: 1, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 15, fontWeight: '900' }, emptyText: { fontSize: 10, textAlign: 'center' }, findFriends: { marginTop: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   invitePanel: { borderRadius: 20, borderWidth: 1, padding: 13, gap: 10 },
   inviteRow: { minHeight: 68, borderRadius: 14, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   inviteActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   inviteButton: { minHeight: 36, minWidth: 70, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,.76)', justifyContent: 'center', padding: 14 }, modalCard: { width: '100%', maxWidth: 600, maxHeight: '92%', alignSelf: 'center', borderRadius: 24, borderWidth: 1, padding: 16, gap: 12 }, modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 11 }, modalTitle: { fontSize: 18, fontWeight: '900' }, modalSubtitle: { fontSize: 9, marginTop: 2 }, optionLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2, marginTop: 2 }, optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, option: { flexGrow: 1, flexBasis: 100, borderRadius: 13, borderWidth: 1, padding: 10 }, stake: { flexGrow: 1, flexBasis: 90, borderRadius: 13, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 7 }, optionTitle: { fontSize: 10, fontWeight: '900' }, optionDetail: { fontSize: 8, marginTop: 2 }, wagers: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, wager: { borderRadius: 11, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 }, wagerText: { fontSize: 9, fontWeight: '900' }, cardChoice: { minHeight: 59, borderRadius: 14, borderWidth: 1, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 9 }, send: { minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }, sendText: { color: '#07111F', fontSize: 10, fontWeight: '900' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,.76)', justifyContent: 'center', padding: 14 }, modalCard: { width: '100%', maxWidth: 600, maxHeight: '92%', alignSelf: 'center', borderRadius: 24, borderWidth: 1, padding: 16, gap: 12 }, modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 11 }, modalTitle: { fontSize: 18, fontWeight: '900' }, modalSubtitle: { fontSize: 9, marginTop: 2 }, optionLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2, marginTop: 2 }, formatList:{gap:6},formatOption:{minHeight:52,borderRadius:13,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:8},formatHint:{fontSize:7,lineHeight:11,marginTop:-2}, optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, option: { flexGrow: 1, flexBasis: 100, borderRadius: 13, borderWidth: 1, padding: 10 }, stake: { flexGrow: 1, flexBasis: 90, borderRadius: 13, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 7 }, optionTitle: { fontSize: 10, fontWeight: '900' }, optionDetail: { fontSize: 8, marginTop: 2 }, wagers: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, wager: { borderRadius: 11, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 }, wagerText: { fontSize: 9, fontWeight: '900' }, cardChoice: { minHeight: 59, borderRadius: 14, borderWidth: 1, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 9 }, send: { minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }, sendText: { color: '#07111F', fontSize: 10, fontWeight: '900' },
 });
