@@ -307,11 +307,13 @@ if (existsSync('supabase/migrations/20260903023545_harden_provisional_legacy_con
 
 if (existsSync('src/components/CardPickerModal.tsx')) {
   const picker = read('src/components/CardPickerModal.tsx');
-  assert(picker.includes('Visão geral TCG'), 'Regressão de UX: seletor de batalha deixou de apresentar visão TCG.');
-  assert(picker.includes('MAIOR ATQ') && picker.includes('MAIOR HP / DEF'), 'Regressão de UX: seletor de batalha perdeu filtros de maior ataque/defesa.');
+  assert(picker.includes("gameStyle ? 'HP • ATK • DEF • SP.ATK • SP.DEF • SPEED • 4 golpes com PP'"), 'Regressão de UX: seletor de batalha perdeu a visão game_v1.');
   assert(picker.includes('selectedType'), 'Regressão de UX: seletor de batalha perdeu filtro por tipo.');
   assert(picker.includes('PokemonTypeSymbolFilter'), 'Regressão de UX: seletor reutilizado deixou de usar o filtro simbólico compartilhado.');
   assert(picker.includes('FONTE DAS CARTAS') && picker.includes('sourceOptions'), 'Regressão de UX: seletor de batalha perdeu escolha entre Bag e decks.');
+  assert(picker.includes('getScreenPreference') && picker.includes('setScreenPreference'), 'Regressão de UX: seletor deixou de lembrar ordenação/tipo entre usos.');
+  assert(picker.includes('DETALHES') && picker.includes("router.push(('/card/' + cardId)"), 'Regressão de UX: seletor deixou de abrir o Card Detail universal.');
+  assert(picker.includes('styles.sheet') && picker.includes('transparent animationType="slide"'), 'Regressão mobile: seletor voltou a ocupar uma tela pesada sem sheet compartilhado.');
   assert(!picker.includes('PWR ${combat.battleRating}'), 'Regressão de UX: seletor voltou a sugerir que PWR decide a batalha.');
 }
 
@@ -331,6 +333,7 @@ if (existsSync('app/_layout.tsx')) {
 if (existsSync('app/(tabs)/index.tsx')) {
   const home = read('app/(tabs)/index.tsx');
   assert(home.includes('getHomeDashboard'), 'Regressão de performance: Home deixou de usar o dashboard compacto.');
+  assert(home.includes('getHomeProgressSnapshot') && home.includes('HOJE NO TRAINER COLLECTION'), 'Regressão de UX: Home perdeu o painel compacto de missão/rank/guilda/Copa.');
   assert(!home.includes('getMyBag()') && !home.includes('getMyTrades()'), 'Regressão de performance: Home voltou a baixar Bag/Trocas completas.');
 }
 
@@ -350,6 +353,8 @@ if (existsSync('app/(tabs)/bag.tsx')) {
   assert(bagUi.includes('imageThemeTint') && bagUi.includes('imageThemeStroke'), 'Regressão visual: tema deixou de cobrir a imagem da carta na Bag.');
   assert(bagUi.includes("variant={galaxy?'galaxy':'energy'}"), 'Regressão visual: Galaxy Flow da Bag perdeu o efeito cósmico.');
   assert(bagUi.includes('cardThemed:{marginBottom:0}'), 'Regressão visual: cards temáticos voltaram a quebrar o espaçamento da grade.');
+  assert(bagUi.includes('AÇÕES RÁPIDAS') && bagUi.includes('QuickBagAction'), 'Regressão de UX: Bag perdeu ações rápidas contextuais nas cartas.');
+  assert(bagUi.includes('sellCardId') && bagUi.includes('cardId='), 'Regressão de contexto: ações rápidas da Bag deixaram de carregar a carta em Vender/Trocar.');
 }
 
 if (existsSync('app/sell-duplicates.tsx') && existsSync('src/services/cardSales.ts')) {
@@ -931,7 +936,9 @@ if (existsSync('app/(tabs)/battles.tsx')) {
   assert(battleIdentity.includes('frameId={challenger?.equipped_frame_id}'), 'Regressão de identidade: convites de batalha perderam o banner do desafiante.');
   assert(battleIdentity.includes("textShadowColor:'#000000FF'"), 'Regressão de legibilidade: Battle Arena perdeu contraste forte nos nomes.');
   const battlesHub = read('app/(tabs)/battles.tsx');
-  assert(battlesHub.includes('Regra v6 • veja o que faz um Pokémon vencer outro'), 'Regressão de UX: tela de batalhas voltou a mostrar versão antiga das regras.');
+  assert(battlesHub.includes('GAME_V1 • turnos, golpes, PP, tipos e estatísticas reais da espécie'), 'Regressão de UX: tela de batalhas deixou de explicar o motor game_v1.');
+  assert(battlesHub.includes('Não existem cartas de Energia no game_v1'), 'Regressão de UX: regras da Battle Arena podem voltar a sugerir Energia no game_v1.');
+  assert(battlesHub.includes('StatusPill'), 'Regressão de UX: estados das batalhas deixaram de usar o padrão visual compartilhado.');
 }
 
 if (existsSync('app/friends.tsx')) {
@@ -1170,4 +1177,20 @@ if (existsSync('supabase/migrations/20260903110359_harden_trainer_cup_rpc_wrappe
   assert(tournamentRpcDb.includes('grant execute on function public.join_tournament() to authenticated,service_role'), 'Regressão da Copa Trainer: jogadores autenticados perderam acesso à inscrição.');
   assert(tournamentRpcDb.includes('revoke all on function private.join_tournament() from public,anon'), 'Regressão de segurança: helper privado de inscrição ficou exposto a anon/public.');
   assert(tournamentRpcDb.includes('grant execute on function private.join_tournament() to authenticated,service_role'), 'Regressão da Copa Trainer: wrapper público deixou de conseguir chamar o helper privado seguro.');
+}
+
+if (existsSync('app/inbox.tsx') && existsSync('src/services/activityCenter.ts')) {
+  const inbox = read('app/inbox.tsx');
+  const activity = read('src/services/activityCenter.ts');
+  assert(inbox.includes('Precisa de atenção') && inbox.includes('StatusPill'), 'Regressão de UX: Central de Atividades perdeu pendências acionáveis padronizadas.');
+  for (const source of ['getMyActiveBattle','getMyTrades','getMySocial','getGuildHub','getMarketOffers','getTournamentHub','getMissions','getBattlePass']) {
+    assert(activity.includes(source), `Regressão da Central de Atividades: fonte ${source} deixou de ser agregada.`);
+  }
+}
+
+if (existsSync('app/search.tsx') && existsSync('src/services/globalSearch.ts')) {
+  const searchUi = read('app/search.tsx');
+  const searchService = read('src/services/globalSearch.ts');
+  assert(searchService.includes('getSetCatalog') && searchService.includes('getMyDecks') && searchService.includes('getTournamentHub'), 'Regressão da Busca Global: sets/decks/torneios deixaram de ser pesquisados.');
+  assert(searchUi.includes('title="Sets"') && searchUi.includes('title="Seus Decks"') && searchUi.includes('title="Torneios"'), 'Regressão da Busca Global: novas categorias deixaram de aparecer.');
 }
