@@ -66,6 +66,9 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const openingShock = useRef(new Animated.Value(0)).current;
   const openingColor = useRef(new Animated.Value(0)).current;
   const floorPulse = useRef(new Animated.Value(0)).current;
+  const boosterFxPulse = useRef(new Animated.Value(0)).current;
+  const boosterFxOrbit = useRef(new Animated.Value(0)).current;
+  const boosterFxDrift = useRef(new Animated.Value(0)).current;
 
   const cardEnter = useRef(new Animated.Value(0)).current;
   const flip = useRef(new Animated.Value(0)).current;
@@ -95,6 +98,41 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   // Animated values are stable refs; pack id intentionally resets a new opening.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, pack?.id]);
+
+  useEffect(() => {
+    boosterFxPulse.stopAnimation();
+    boosterFxOrbit.stopAnimation();
+    boosterFxDrift.stopAnimation();
+    boosterFxPulse.setValue(0);
+    boosterFxOrbit.setValue(0);
+    boosterFxDrift.setValue(0);
+
+    if (!visible || !boosterFx) return;
+
+    const pulseLoop = Animated.loop(Animated.sequence([
+      Animated.timing(boosterFxPulse, { toValue: 1, duration: 1150, useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(boosterFxPulse, { toValue: 0, duration: 1150, useNativeDriver: USE_NATIVE_DRIVER }),
+    ]));
+    const orbitLoop = Animated.loop(Animated.timing(boosterFxOrbit, {
+      toValue: 1,
+      duration: boosterFx.id.includes('galaxy') ? 5200 : 6800,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }));
+    const driftLoop = Animated.loop(Animated.sequence([
+      Animated.timing(boosterFxDrift, { toValue: 1, duration: 1800, useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(boosterFxDrift, { toValue: 0, duration: 1800, useNativeDriver: USE_NATIVE_DRIVER }),
+    ]));
+
+    pulseLoop.start();
+    orbitLoop.start();
+    driftLoop.start();
+
+    return () => {
+      pulseLoop.stop();
+      orbitLoop.stop();
+      driftLoop.stop();
+    };
+  }, [boosterFx, boosterFxDrift, boosterFxOrbit, boosterFxPulse, visible]);
 
   function animateCardIn() {
     cardEnter.setValue(0);
@@ -298,23 +336,41 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const boosterFxIcon = (boosterFx?.icon || 'sparkles') as keyof typeof Ionicons.glyphMap;
   const boosterFxScale = openingCore.interpolate({ inputRange: [0, 1], outputRange: [.6, 2.5] });
   const boosterFxOpacity = openingFlash.interpolate({ inputRange: [0, .25, 1], outputRange: [.12, .52, .9] });
+  const boosterFxFrameOpacity = boosterFxPulse.interpolate({ inputRange: [0, 1], outputRange: [.34, .82] });
+  const boosterFxFrameScale = boosterFxPulse.interpolate({ inputRange: [0, 1], outputRange: [.995, 1.012] });
+  const boosterFxInnerOpacity = boosterFxPulse.interpolate({ inputRange: [0, 1], outputRange: [.08, .36] });
+  const boosterFxBadgeY = boosterFxDrift.interpolate({ inputRange: [0, 1], outputRange: [0, 5] });
+  const boosterFxBadgeScale = boosterFxPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.055] });
+  const boosterFxAmbientScale = boosterFxPulse.interpolate({ inputRange: [0, 1], outputRange: [.88, 1.13] });
+  const boosterFxAmbientOpacity = boosterFxPulse.interpolate({ inputRange: [0, 1], outputRange: [.20, .62] });
+  const boosterFxOrbitRotation = boosterFxOrbit.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const boosterFxOrbitRotationReverse = boosterFxOrbit.interpolate({ inputRange: [0, 1], outputRange: ['360deg', '0deg'] });
+  const boosterFxSweepX = boosterFxOrbit.interpolate({ inputRange: [0, 1], outputRange: [-Math.max(width, 420), Math.max(width, 420)] });
 
   return <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={() => { if (stage !== 'opening') onClose(); }}>
     <View style={styles.container}>
       <PremiumBackground />
       <View style={styles.shadeTop} /><View style={styles.shadeBottom} />
       {isGalaxyBoosterFx && stage!=='summary' ? <GalaxyFlowOverlay intensity="master" opacity={stage==='opening'?.86:stage==='cards'?.60:.70}/> : null}
-      {boosterFx ? <View pointerEvents="none" style={[styles.boosterFxFrame,{borderColor:boosterFxColor}]} /> : null}
-      {boosterFx ? <View pointerEvents="none" style={[styles.boosterFxBadge,{borderColor:boosterFxColor,backgroundColor:'#0A0F18E8'}]}><Ionicons name={boosterFxIcon} size={14} color={boosterFxColor}/><Text style={[styles.boosterFxBadgeText,{color:boosterFxColor}]}>{boosterFx.name.toUpperCase()}</Text></View> : null}
+      {boosterFx ? <>
+        <Animated.View pointerEvents="none" style={[styles.boosterFxFrame,{borderColor:boosterFxColor,opacity:boosterFxFrameOpacity,transform:[{scale:boosterFxFrameScale}]}]} />
+        <Animated.View pointerEvents="none" style={[styles.boosterFxFrameInner,{borderColor:boosterFxColor,opacity:boosterFxInnerOpacity,transform:[{scale:boosterFxFrameScale}]}]} />
+        <Animated.View pointerEvents="none" style={[styles.boosterFxSweep,{backgroundColor:boosterFxColor,opacity:boosterFxInnerOpacity,transform:[{translateX:boosterFxSweepX},{rotate:'-18deg'}]}]} />
+      </> : null}
+      {boosterFx ? <Animated.View pointerEvents="none" style={[styles.boosterFxBadge,{borderColor:boosterFxColor,backgroundColor:'#0A0F18E8',transform:[{translateY:boosterFxBadgeY},{scale:boosterFxBadgeScale}]}]}><Ionicons name={boosterFxIcon} size={14} color={boosterFxColor}/><Text style={[styles.boosterFxBadgeText,{color:boosterFxColor}]}>{boosterFx.name.toUpperCase()}</Text></Animated.View> : null}
       <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 17), minHeight: 66 + insets.top }]}><View style={{ flex: 1 }}><Text style={styles.kicker}>PACK OPENING</Text><Text numberOfLines={1} style={styles.title}>{pack.name}</Text></View>{stage !== 'opening' ? <Pressable style={styles.closeButton} onPress={onClose}><Ionicons name="close" size={21} color="#F4F4F4" /></Pressable> : null}</View>
 
       {(stage === 'sealed' || stage === 'opening') ? <View style={styles.openingStage}>
         {boosterFx ? <Animated.View pointerEvents="none" style={[styles.boosterFxBurst,{borderColor:boosterFxColor,opacity:boosterFxOpacity,transform:[{scale:boosterFxScale}]}]} /> : null}
         {boosterFx && stage==='opening' ? <Animated.View pointerEvents="none" style={[styles.boosterFxCore,{backgroundColor:boosterFxColor,opacity:boosterFxOpacity,transform:[{scale:boosterFxScale}]}]} /> : null}
+        {boosterFx ? <>
+          <Animated.View pointerEvents="none" style={[styles.boosterFxAmbientOrbit,styles.boosterFxAmbientOrbitOuter,{borderColor:boosterFxColor,opacity:boosterFxAmbientOpacity,transform:[{scale:boosterFxAmbientScale},{rotate:boosterFxOrbitRotation}]}]} />
+          <Animated.View pointerEvents="none" style={[styles.boosterFxAmbientOrbit,styles.boosterFxAmbientOrbitInner,{borderColor:isGalaxyBoosterFx?'#55E6FF':boosterFxColor,opacity:boosterFxInnerOpacity,transform:[{scale:boosterFxAmbientScale},{rotate:boosterFxOrbitRotationReverse}]}]} />
+        </> : null}
         {isGalaxyBoosterFx ? <>
-          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalOuter,{borderColor:'#8B5CFF',opacity:boosterFxOpacity,transform:[{scale:boosterFxScale},{rotate:'18deg'}]}]} />
-          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalMid,{borderColor:'#55E6FF',opacity:boosterFxOpacity,transform:[{scale:boosterFxScale},{rotate:'-22deg'}]}]} />
-          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalInner,{borderColor:'#E056FD',opacity:boosterFxOpacity,transform:[{scale:boosterFxScale}]}]} />
+          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalOuter,{borderColor:'#8B5CFF',opacity:boosterFxAmbientOpacity,transform:[{scale:boosterFxAmbientScale},{rotate:boosterFxOrbitRotation}]}]} />
+          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalMid,{borderColor:'#55E6FF',opacity:boosterFxAmbientOpacity,transform:[{scale:boosterFxAmbientScale},{rotate:boosterFxOrbitRotationReverse}]}]} />
+          <Animated.View pointerEvents="none" style={[styles.galaxyPortal,styles.galaxyPortalInner,{borderColor:'#E056FD',opacity:boosterFxInnerOpacity,transform:[{scale:boosterFxAmbientScale},{rotate:boosterFxOrbitRotation}]}]} />
         </> : null}
         <Animated.View pointerEvents="none" style={[styles.floorHalo, { opacity: floorPulse, transform: [{ scaleX: floorScale }] }]} />
         <Animated.View pointerEvents="none" style={[styles.openingCore, { opacity: openingCoreOpacity, transform: [{ scale: openingCoreScale }] }]} />
@@ -476,11 +532,16 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
 }
 
 const styles = StyleSheet.create({
-  boosterFxFrame:{position:'absolute',left:7,right:7,top:7,bottom:7,borderWidth:2,borderRadius:24,opacity:.32,zIndex:8},
+  boosterFxFrame:{position:'absolute',left:7,right:7,top:7,bottom:7,borderWidth:2,borderRadius:24,zIndex:8},
+  boosterFxFrameInner:{position:'absolute',left:12,right:12,top:12,bottom:12,borderWidth:1,borderRadius:20,zIndex:8},
+  boosterFxSweep:{position:'absolute',top:-120,bottom:-120,width:42,zIndex:7},
   boosterFxBadge:{position:'absolute',right:14,top:14,zIndex:20,borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:5},
   boosterFxBadgeText:{fontSize:7,fontWeight:'900',letterSpacing:.6},
   boosterFxBurst:{position:'absolute',width:250,height:250,borderRadius:999,borderWidth:3,zIndex:1},
   boosterFxCore:{position:'absolute',width:95,height:95,borderRadius:999,zIndex:1},
+  boosterFxAmbientOrbit:{position:'absolute',borderRadius:999,borderWidth:2,zIndex:2},
+  boosterFxAmbientOrbitOuter:{width:365,height:190},
+  boosterFxAmbientOrbitInner:{width:290,height:142,borderStyle:'dashed'},
   galaxyPortal:{position:'absolute',borderRadius:999,borderWidth:2,zIndex:2},
   galaxyPortalOuter:{width:330,height:180},
   galaxyPortalMid:{width:265,height:145},
