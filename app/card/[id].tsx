@@ -22,7 +22,15 @@ import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { useWallet } from '@/wallet/WalletProvider';
 import { formatGameIdentifier, getCardGameProfile, type CardGameProfile } from '@/services/cardGameProfile';
 import { getPokemonTypeSymbol } from '@/components/PokemonTypeSymbolFilter';
-import { getCardPassport, setCardMetadata, type CardPassport } from '@/services/cardPassport';
+import { getCardPassport, setCardMetadata, type CardPassport, type CardTag } from '@/services/cardPassport';
+
+const CARD_TAGS:Array<{id:CardTag;label:string;icon:keyof typeof Ionicons.glyphMap}>=[
+  {id:'team',label:'Time principal',icon:'game-controller'},
+  {id:'collection',label:'Coleção',icon:'albums'},
+  {id:'trade',label:'Para trocar',icon:'swap-horizontal'},
+  {id:'sell',label:'Para vender',icon:'pricetag'},
+  {id:'do_not_sell',label:'Não vender',icon:'shield-checkmark'},
+];
 
 function economyStylePalette(id:string,accent:string,yellow:string){
   const key=id.toLowerCase();
@@ -89,6 +97,18 @@ export default function CardDetailScreen() {
     try { setSaving(true); await setCardFavorite(entry.cards.id, next); setEntry((current) => current ? { ...current, favorite: next } : current); }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível atualizar o favorito.'); }
     finally { setSaving(false); }
+  }
+
+  async function toggleCardTag(tag:CardTag){
+    if(!entry?.owned||!entry.cards||!passport||passportWorking)return;
+    try{
+      setPassportWorking(true);
+      const current=passport.ownership.tags??[];
+      const next=current.includes(tag)?current.filter(item=>item!==tag):[...current,tag];
+      await setCardMetadata(entry.cards.id,{tags:next});
+      setPassport(value=>value?{...value,ownership:{...value.ownership,tags:next}}:value);
+    }catch(err){setError(err instanceof Error?err.message:'Não foi possível atualizar as tags.');}
+    finally{setPassportWorking(false);}
   }
 
   async function toggleCardLock(){
@@ -361,7 +381,12 @@ export default function CardDetailScreen() {
                   <View style={{flex:1}}><Text style={[styles.lockTitle,{color:colors.text}]}>{passport.ownership.locked?'CARTA BLOQUEADA 🔒':'PROTEGER ESTA CARTA'}</Text><Text style={[styles.lockText,{color:colors.muted}]}>{passport.ownership.locked?'Não pode ser listada, trocada, vendida como duplicada nem usada como aposta até ser desbloqueada.':'Bloqueie para evitar venda, troca ou aposta acidental. Uso normal em batalhas continua permitido.'}</Text></View>
                   <Text style={[styles.lockAction,{color:passport.ownership.locked?colors.yellow:colors.accent}]}>{passportWorking?'...':passport.ownership.locked?'DESBLOQUEAR':'BLOQUEAR'}</Text>
                 </Pressable>
-                {passport.ownership.tags.length?<View style={styles.passportTags}>{passport.ownership.tags.map(tag=><View key={tag} style={[styles.passportTag,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.passportTagText,{color:colors.text}]}>{tag.replaceAll('_',' ').toUpperCase()}</Text></View>)}</View>:null}
+                <Text style={[styles.panelSectionTitle,{color:colors.text}]}>Organização pessoal</Text>
+                <View style={styles.passportTags}>{CARD_TAGS.map(tag=>{
+                  const active=passport.ownership.tags.includes(tag.id);
+                  return <Pressable key={tag.id} disabled={passportWorking} onPress={()=>void toggleCardTag(tag.id)} style={[styles.passportTag,{backgroundColor:active?colors.accentSoft:colors.surfaceAlt,borderColor:active?colors.accent:colors.border}]}><Ionicons name={tag.icon} size={13} color={active?colors.accent:colors.muted}/><Text style={[styles.passportTagText,{color:active?colors.text:colors.muted}]}>{tag.label.toUpperCase()}</Text></Pressable>;
+                })}</View>
+                <Text style={[styles.battleHint,{color:colors.muted}]}>Tags são pessoais e não mudam stats. “Não vender” é uma organização visual; para proteção forte use o cadeado 🔒.</Text>
                 <Text style={[styles.panelSectionTitle,{color:colors.text}]}>Linha do tempo</Text>
                 {passport.timeline.length?<View style={styles.timeline}>{passport.timeline.map((item,index)=>{
                   const icon=(item.kind==='pack'?'cube':item.kind==='diamond_pack'?'diamond':item.kind==='market_purchase'?'storefront':'swap-horizontal') as keyof typeof Ionicons.glyphMap;
@@ -436,7 +461,7 @@ function BattleStat({ label, value, suffix = '' }: { label: string; value: numbe
 
 function Info({ label, value }: { label: string; value: string }) { const { colors } = useAppTheme(); return <View style={[styles.infoCard, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Text style={[styles.infoLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.infoValue, { color: colors.text }]} numberOfLines={2}>{value}</Text></View>; }
 
-const styles = StyleSheet.create({passportHero:{borderRadius:17,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:9,marginTop:12},passportIcon:{width:46,height:46,borderRadius:14,alignItems:'center',justifyContent:'center'},passportTitle:{fontSize:13,fontWeight:'900',marginTop:2},passportText:{fontSize:7.8,lineHeight:12,marginTop:2},lockCard:{borderRadius:16,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:9,marginTop:12},lockTitle:{fontSize:10,fontWeight:'900'},lockText:{fontSize:7.5,lineHeight:11,marginTop:2},lockAction:{fontSize:7,fontWeight:'900'},passportTags:{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:10},passportTag:{borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:5},passportTagText:{fontSize:6.5,fontWeight:'900'},timeline:{gap:6},timelineRow:{borderRadius:13,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},timelineIcon:{width:34,height:34,borderRadius:10,alignItems:'center',justifyContent:'center'},timelineTitle:{fontSize:9,fontWeight:'900'},timelineMeta:{fontSize:6.8,marginTop:2},
+const styles = StyleSheet.create({passportHero:{borderRadius:17,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:9,marginTop:12},passportIcon:{width:46,height:46,borderRadius:14,alignItems:'center',justifyContent:'center'},passportTitle:{fontSize:13,fontWeight:'900',marginTop:2},passportText:{fontSize:7.8,lineHeight:12,marginTop:2},lockCard:{borderRadius:16,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:9,marginTop:12},lockTitle:{fontSize:10,fontWeight:'900'},lockText:{fontSize:7.5,lineHeight:11,marginTop:2},lockAction:{fontSize:7,fontWeight:'900'},passportTags:{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:10},passportTag:{borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:4},passportTagText:{fontSize:6.5,fontWeight:'900'},timeline:{gap:6},timelineRow:{borderRadius:13,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},timelineIcon:{width:34,height:34,borderRadius:10,alignItems:'center',justifyContent:'center'},timelineTitle:{fontSize:9,fontWeight:'900'},timelineMeta:{fontSize:6.8,marginTop:2},
   detailTabs:{marginTop:14,flexDirection:'row',flexWrap:'wrap',gap:6},
   detailTab:{flexGrow:1,minWidth:105,minHeight:42,borderRadius:13,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
   detailTabLabel:{fontSize:7.5,fontWeight:'900',letterSpacing:.45},
