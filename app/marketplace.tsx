@@ -526,7 +526,7 @@ function MarketplaceComparePanel({
       {items.map((item)=>{
         const profile=profiles[item.card.id];
         const marketTotal=item.card.marketPriceUsd==null?null:item.card.marketPriceUsd*item.quantity;
-        const discountPct=marketTotal&&marketTotal>0?Math.round(((item.price/Math.max(1,marketTotal*1000))-1)*100):null;
+        const coinsPerUsd=marketTotal&&marketTotal>0?Math.round(item.price/marketTotal):null;
         return <View key={item.id} style={[styles.compareCard,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
           <View style={styles.compareCardHead}>
             {item.card.image?<Image source={{uri:item.card.image}} style={styles.compareImage} resizeMode="contain"/>:<View style={[styles.compareImage,{backgroundColor:colors.surface}]}/>}
@@ -546,7 +546,7 @@ function MarketplaceComparePanel({
             <CompareMetric label="SP.DEF" value={profile.stats.spDefense}/>
             <CompareMetric label="SPEED" value={profile.stats.speed}/>
           </View>:<Text style={[styles.compareUnavailable,{color:colors.muted}]}>Perfil game_v1 indisponível.</Text>}
-          {discountPct!=null&&Number.isFinite(discountPct)?<Text style={[styles.compareSignal,{color:discountPct<=0?'#65D894':'#FF9A78'}]}>{discountPct<=0?'Preço proporcional abaixo':'Preço proporcional acima'} da referência calculada</Text>:null}
+          {coinsPerUsd!=null&&Number.isFinite(coinsPerUsd)?<Text style={[styles.compareSignal,{color:colors.muted}]}>{coinsPerUsd.toLocaleString('pt-BR')} coins por US$ 1 de valor de mercado</Text>:null}
         </View>;
       })}
       {items.length<2?<View style={[styles.comparePlaceholder,{borderColor:colors.border}]}><Ionicons name="add-circle-outline" size={28} color={colors.muted}/><Text style={[styles.comparePlaceholderText,{color:colors.muted}]}>Toque em COMPARAR em outro anúncio.</Text></View>:null}
@@ -642,6 +642,43 @@ function ListingCard({item,myId,working,comparing,onBuy,onOffer,onPreview,onComp
 }
 
 const styles=StyleSheet.create({
+  compareHint:{fontSize:7.5,fontWeight:'700',marginTop:2},
+  comparePanel:{borderRadius:19,borderWidth:1,padding:12,gap:10},
+  compareHead:{flexDirection:'row',alignItems:'center',gap:9},
+  compareKicker:{fontSize:7,fontWeight:'900',letterSpacing:.8},
+  compareTitle:{fontSize:15,fontWeight:'900',marginTop:2},
+  compareClear:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:4},
+  compareClearText:{fontSize:7,fontWeight:'900'},
+  compareGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  compareCard:{flexGrow:1,flexBasis:280,minWidth:250,borderRadius:16,borderWidth:1,padding:9,gap:8},
+  compareCardHead:{flexDirection:'row',alignItems:'center',gap:8},
+  compareImage:{width:50,height:68,borderRadius:6},
+  compareName:{fontSize:11.5,fontWeight:'900'},
+  compareMeta:{fontSize:7.5,marginTop:2},
+  compareCoins:{fontSize:12,fontWeight:'900',marginTop:4},
+  compareUsd:{fontSize:7.5,marginTop:2},
+  compareRemove:{width:28,height:28,alignItems:'center',justifyContent:'center'},
+  compareStats:{flexDirection:'row',flexWrap:'wrap',gap:5},
+  compareMetric:{flexGrow:1,flexBasis:62,minWidth:58,borderRadius:9,borderWidth:1,padding:6},
+  compareMetricLabel:{fontSize:5.8,fontWeight:'900'},
+  compareMetricValue:{fontSize:10.5,fontWeight:'900',marginTop:2},
+  compareUnavailable:{fontSize:7.5,fontWeight:'700'},
+  compareSignal:{fontSize:7,fontWeight:'800'},
+  comparePlaceholder:{flexGrow:1,flexBasis:280,minWidth:250,minHeight:150,borderRadius:16,borderWidth:1,borderStyle:'dashed',alignItems:'center',justifyContent:'center',gap:6,padding:14},
+  comparePlaceholderText:{fontSize:8,textAlign:'center',fontWeight:'700'},
+  compareButton:{minHeight:40,borderRadius:12,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},
+  compareButtonText:{fontSize:8,fontWeight:'900'},
+  previewBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.78)',alignItems:'center',justifyContent:'center',padding:12},
+  previewSheet:{width:'100%',maxWidth:780,maxHeight:'90%',borderRadius:22,borderWidth:1,overflow:'hidden'},
+  previewSectionRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
+  engineBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:5},
+  engineBadgeText:{fontSize:6.5,fontWeight:'900'},
+  previewAbility:{borderRadius:13,borderWidth:1,padding:10},
+  previewAbilityName:{fontSize:12,fontWeight:'900',marginTop:3},
+  previewMoveGrid:{gap:7},
+  previewActions:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:4},
+  previewSecondaryButton:{flexGrow:1,minWidth:190,minHeight:50,borderRadius:14,borderWidth:1,paddingHorizontal:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
+  previewSecondaryText:{fontSize:8,fontWeight:'900'},
   marketUsd:{fontSize:9,fontWeight:'800',marginTop:3},
   safe:{flex:1,overflow:'hidden'},marketNav:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'center',gap:8},offersLink:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:6},offersLinkText:{fontSize:8,fontWeight:'900'},offerBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.75)',alignItems:'center',justifyContent:'center',padding:15},offerModal:{width:'100%',maxWidth:460,borderRadius:22,borderWidth:1,padding:16,gap:10},offerHead:{flexDirection:'row',alignItems:'center',gap:9},offerHint:{fontSize:8,lineHeight:13},listingActions:{flexDirection:'row',flexWrap:'wrap',gap:7},flexButton:{flexGrow:1,flexBasis:140},content:{width:'100%',maxWidth:1120,alignSelf:'center',paddingHorizontal:14,paddingTop:12,paddingBottom:110,gap:9},marketHeroStats:{flexDirection:'row',flexWrap:'wrap',gap:7},marketHeroStat:{flexGrow:1,minWidth:125,borderRadius:13,borderWidth:1,padding:9},marketHeroValue:{fontSize:13,fontWeight:'900'},marketHeroLabel:{fontSize:6.5,fontWeight:'900',letterSpacing:.6,marginTop:2},headerStack:{gap:13,marginBottom:4},top:{flexDirection:'row',flexWrap:'wrap',alignItems:'flex-start',justifyContent:'space-between',gap:10},eyebrow:{fontSize:10,fontWeight:'900',letterSpacing:1.5},pageTitle:{fontSize:29,fontWeight:'900',letterSpacing:-.5},subtitle:{fontSize:11,lineHeight:17,marginTop:3},back:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:7},backText:{fontSize:11,fontWeight:'800'},
   notice:{borderRadius:14,borderWidth:1,borderColor:'#4A9B70',backgroundColor:'#142C23',padding:11,flexDirection:'row',alignItems:'center',gap:8},noticeText:{flex:1,color:'#D9FFEC',fontSize:10,fontWeight:'800'},error:{borderRadius:14,borderWidth:1,borderColor:'#683243',backgroundColor:'#351A24',padding:11,flexDirection:'row',alignItems:'center',gap:8},errorText:{flex:1,color:'#FFD7DD',fontSize:10,fontWeight:'800'},
