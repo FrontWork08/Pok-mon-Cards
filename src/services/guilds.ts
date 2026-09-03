@@ -176,6 +176,14 @@ export type GuildHub = {
   collectiveBooster: GuildCollectiveBooster;
 };
 
+export type GuildStory = {
+  type:'battle_win'|'pack_open'|'member_join'|string;
+  actor:string;
+  text:string;
+  createdAt:string;
+  metadata:Record<string,unknown>;
+};
+
 function normalizeWeeklyReward(data: any): GuildWeeklyReward {
   return {
     guildId: data?.guildId ?? null,
@@ -252,6 +260,18 @@ export async function getGuildHub(): Promise<GuildHub> {
   if (warsResult.error) throw warsResult.error;
   if (collectiveResult.error) throw collectiveResult.error;
   return normalizeHub(hubResult.data, rewardResult.data, warsResult.data, collectiveResult.data);
+}
+
+export async function getMyGuildStoryFeed(limit=12):Promise<GuildStory[]>{
+  const {data,error}=await supabase.rpc('get_my_guild_story_feed',{p_limit:limit});
+  if(error)throw error;
+  return Array.isArray(data)?data.map((row:any)=>({
+    type:String(row?.type??'activity'),
+    actor:String(row?.actor??'Treinador'),
+    text:String(row?.text??'fez algo na guilda'),
+    createdAt:String(row?.createdAt??''),
+    metadata:row?.metadata&&typeof row.metadata==='object'?row.metadata:{},
+  })):[];
 }
 
 function guildGymError(error:any){
