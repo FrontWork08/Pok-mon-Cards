@@ -15,6 +15,7 @@ import { getThemeVisual } from '@/theme/themeCatalog';
 import { cancelMatchmaking, getMyMatchmakingState, joinMatchmaking, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
 import { isFunctionErrorCode } from '@/services/functionErrors';
 import { StatusPill } from '@/components/StatusPill';
+import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
 
 const MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
   { id: 'quick', label: 'Quick', detail: '1 carta' },
@@ -227,6 +228,7 @@ export default function BattlesHubScreen() {
   }
 
   return <Screen title="Battle Arena" subtitle="Ranqueadas, desafios entre amigos, histórico, regras e matchmaking competitivo.">
+      <AreaIdentityStrip area="competitive" />
     {notice ? <Pressable style={styles.notice} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={18} color={colors.yellow}/><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
     {loading ? <ActivityIndicator size="large" color={colors.yellow}/> : null}
 
