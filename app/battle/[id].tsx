@@ -14,6 +14,7 @@ import { isFunctionErrorCode } from '@/services/functionErrors';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
+import { setBattleSpectatorEnabled } from '@/services/adminLaunchTools';
 
 export default function BattleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -489,6 +490,18 @@ export default function BattleScreen() {
     ]);
   }
 
+  async function toggleSpectators(){
+    if(!id||working)return;
+    try{
+      setWorking(true);
+      const next=!Boolean(battle?.spectator_enabled);
+      const result=await setBattleSpectatorEnabled(String(id),next);
+      setBattle((current:any)=>current?{...current,spectator_enabled:result.spectatorEnabled}:current);
+      setNotice(result.spectatorEnabled?'Modo espectador liberado. Apenas informações já reveladas serão exibidas.':'Modo espectador desativado.');
+    }catch(e){setNotice(e instanceof Error?e.message:'Não foi possível alterar o modo espectador.');}
+    finally{setWorking(false);}
+  }
+
   async function rematch() {
     if (!id) return;
     try { setWorking(true); const next = await rematchBattle(String(id)); router.replace(`/battle/${next}`); }
@@ -519,6 +532,13 @@ export default function BattleScreen() {
           <View style={styles.vs}><Text style={[styles.vsText, { color: colors.text }]}>VS</Text><Text style={[styles.mode, { color: colors.accent }]}>{battle.mode === 'draft3' ? 'DRAFT • 3 RODADAS' : battle.mode === 'mystery' ? 'MELHOR DE 3' : '1 CARTA'}</Text>{battle.stake_type === 'coins' ? <Text style={[styles.wager, { color: colors.yellow }]}>🪙 {Number(battle.wager_coins).toLocaleString('pt-BR')} CADA</Text> : battle.stake_type === 'card' ? <Text style={[styles.wager, { color: '#C7A8FF' }]}>🎴 1 CARTA CADA</Text> : <Text style={[styles.casual, { color: colors.muted }]}>CASUAL</Text>}</View>
           <PlayerSide label="OPONENTE" player={opponent} score={battle.opponent_score} right />
         </View>
+
+        {battle.stake_type==='none'&&!invited?<View style={[styles.spectatorPanel,{backgroundColor:colors.surface,borderColor:battle.spectator_enabled?'#4FB77F':colors.border}]}>
+          <Ionicons name={battle.spectator_enabled?'eye':'eye-off'} size={20} color={battle.spectator_enabled?'#65D894':colors.muted}/>
+          <View style={{flex:1}}><Text style={[styles.spectatorTitle,{color:colors.text}]}>Modo Espectador</Text><Text style={[styles.spectatorText,{color:colors.muted}]}>{battle.spectator_enabled?'Ativo. Escolhas secretas continuam ocultas e só turnos resolvidos aparecem.':'Desativado. Ninguém de fora da partida consegue acompanhar.'}</Text></View>
+          {battle.spectator_enabled?<Pressable onPress={()=>router.push(('/battle-spectate/'+String(id)) as never)} style={[styles.spectatorAction,{borderColor:colors.accent}]}><Text style={[styles.spectatorActionText,{color:colors.accent}]}>VER</Text></Pressable>:null}
+          <Pressable disabled={working} onPress={()=>void toggleSpectators()} style={[styles.spectatorAction,{borderColor:battle.spectator_enabled?'#D96575':colors.yellow}]}><Text style={[styles.spectatorActionText,{color:battle.spectator_enabled?'#FF8290':colors.yellow}]}>{battle.spectator_enabled?'DESATIVAR':'ATIVAR'}</Text></Pressable>
+        </View>:null}
 
         {(drafting || selecting || attacking) ? (
           <View style={[styles.forfeitPanel,{backgroundColor:colors.surface,borderColor:'#6B303A'}]}>
@@ -944,7 +964,7 @@ function MiniRoundCard({ label, card, duel }: { label: string; card: any; duel?:
 const styles = StyleSheet.create({
   safe: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, content: { width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 15, paddingBottom: 48, gap: 13 }, contentWithDock: { paddingBottom: 112 },
   notice: { flexDirection: 'row', gap: 9, alignItems: 'center', padding: 12, borderRadius: 15, borderWidth: 1 }, noticeText: { flex: 1, fontSize: 11, fontWeight: '700' },
-  hero: { flexDirection: 'row', alignItems: 'stretch', borderRadius: 22, borderWidth: 1, padding: 15 }, playerSide: { flex: 1, justifyContent: 'center' }, playerSideInner:{padding:10,justifyContent:'center',minHeight:118}, right: { alignItems: 'flex-end' }, sideLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 }, playerName: { fontSize: 17, fontWeight: '900', marginTop: 3, textShadowColor:'#000000FF', textShadowOffset:{width:0,height:1}, textShadowRadius:5 }, ratingText: { fontSize: 9, marginTop: 2 }, score: { fontSize: 32, fontWeight: '900', marginTop: 5 }, vs: { width: 120, alignItems: 'center', justifyContent: 'center' }, vsText: { fontSize: 27, fontWeight: '900' }, mode: { fontSize: 9, fontWeight: '900', marginTop: 3 }, wager: { fontSize: 8, fontWeight: '900', marginTop: 4 }, casual: { fontSize: 8, fontWeight: '900', marginTop: 4 },
+  hero: { flexDirection: 'row', alignItems: 'stretch', borderRadius: 22, borderWidth: 1, padding: 15 }, spectatorPanel:{borderRadius:15,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:8},spectatorTitle:{fontSize:9.5,fontWeight:'900'},spectatorText:{fontSize:7,lineHeight:10.5,marginTop:2},spectatorAction:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:8,alignItems:'center',justifyContent:'center'},spectatorActionText:{fontSize:7,fontWeight:'900'}, playerSide: { flex: 1, justifyContent: 'center' }, playerSideInner:{padding:10,justifyContent:'center',minHeight:118}, right: { alignItems: 'flex-end' }, sideLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 }, playerName: { fontSize: 17, fontWeight: '900', marginTop: 3, textShadowColor:'#000000FF', textShadowOffset:{width:0,height:1}, textShadowRadius:5 }, ratingText: { fontSize: 9, marginTop: 2 }, score: { fontSize: 32, fontWeight: '900', marginTop: 5 }, vs: { width: 120, alignItems: 'center', justifyContent: 'center' }, vsText: { fontSize: 27, fontWeight: '900' }, mode: { fontSize: 9, fontWeight: '900', marginTop: 3 }, wager: { fontSize: 8, fontWeight: '900', marginTop: 4 }, casual: { fontSize: 8, fontWeight: '900', marginTop: 4 },
   panel: { alignItems: 'center', gap: 10, padding: 18, borderRadius: 22, borderWidth: 1 },
   forfeitPanel:{borderRadius:16,borderWidth:1,padding:10,flexDirection:'row',alignItems:'center',gap:10},
   forfeitCopy:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:8},
