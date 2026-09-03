@@ -14,6 +14,7 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
 import { cancelMatchmaking, getMyMatchmakingState, joinMatchmaking, subscribeMyMatchmaking, type MatchmakingState } from '@/services/matchmaking';
 import { isFunctionErrorCode } from '@/services/functionErrors';
+import { StatusPill } from '@/components/StatusPill';
 
 const MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
   { id: 'quick', label: 'Quick', detail: '1 carta' },
@@ -312,7 +313,7 @@ export default function BattlesHubScreen() {
         </View>
         <View style={styles.grow}>
           <Text style={[styles.rulesTitle, { color: colors.text }]}>Como funcionam as batalhas</Text>
-          <Text style={[styles.rulesSubtitle, { color: colors.muted }]}>Regra v6 • veja o que faz um Pokémon vencer outro</Text>
+          <Text style={[styles.rulesSubtitle, { color: colors.muted }]}>GAME_V1 • turnos, golpes, PP, tipos e estatísticas reais da espécie</Text>
         </View>
         <Ionicons name={showBattleRules ? 'chevron-up' : 'chevron-down'} size={21} color={colors.muted}/>
       </Pressable>
@@ -323,28 +324,28 @@ export default function BattlesHubScreen() {
             <View style={styles.grow}>
               <Text style={[styles.rulesKicker, { color: colors.yellow }]}>OBJETIVO DA RODADA</Text>
               <Text style={[styles.rulesHeroTitle, { color: colors.text }]}>Nocauteie o rival no menor número de turnos</Text>
-              <Text style={[styles.rulesText, { color: colors.muted }]}>O servidor escolhe o ataque mais eficiente de cada carta para aquele confronto. Preço, raridade e valor em Coins não aumentam a força de batalha.</Text>
+              <Text style={[styles.rulesText, { color: colors.muted }]}>Cada treinador escolhe um dos golpes disponíveis. O game_v1 resolve prioridade, Speed, precisão, crítico, STAB, tipos, status e dano. Preço, raridade e Coins não aumentam a força.</Text>
             </View>
             <Ionicons name="flash" size={30} color={colors.yellow}/>
           </View>
 
           <View style={styles.rulesStats}>
-            <RuleStat icon="heart" label="HP" text="Vida da carta. Quanto maior, mais dano aguenta." />
-            <RuleStat icon="flame" label="ATAQUE" text="Maior dano base disponível nos ataques impressos." />
-            <RuleStat icon="flash" label="ENERGIA" text="Quanto tempo o ataque leva para ficar disponível." />
-            <RuleStat icon="speedometer" label="EFICIÊNCIA" text="Dano causado em relação ao custo de energia." />
-            <RuleStat icon="walk" label="VELOCIDADE" text="Ataque inicial e custo de recuo da carta." />
-            <RuleStat icon="construct" label="TÉCNICA" text="Efeitos, habilidades, ataques extras e resistências." />
-            <RuleStat icon="shield-checkmark" label="PWR" text="Nota geral de combate de 1 a 1000." />
+            <RuleStat icon="heart" label="HP" text="Vida real calculada para o nível 50 do perfil game_v1." />
+            <RuleStat icon="fitness" label="ATAQUE" text="Força usada pelos golpes físicos." />
+            <RuleStat icon="shield" label="DEFESA" text="Reduz o dano recebido de golpes físicos." />
+            <RuleStat icon="sparkles" label="SP. ATK" text="Força usada pelos golpes especiais." />
+            <RuleStat icon="shield-checkmark" label="SP. DEF" text="Reduz o dano recebido de golpes especiais." />
+            <RuleStat icon="speedometer" label="SPEED" text="Ajuda a decidir quem age primeiro, depois da prioridade do golpe." />
+            <RuleStat icon="water" label="PP" text="Cada golpe tem usos próprios. Quando o PP acaba, ele não pode ser escolhido." />
           </View>
 
           <View style={[styles.rulesOrder, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-            <Text style={[styles.rulesOrderTitle, { color: colors.text }]}>Como o vencedor é decidido</Text>
-            <RuleStep number="1" title="Menos turnos para nocautear" text="Quem consegue derrubar o rival primeiro vence a rodada." />
-            <RuleStep number="2" title="Melhor confronto" text="Em empate, entram dano efetivo, HP, eficiência, velocidade, técnica e recoil." />
-            <RuleStep number="3" title="PWR geral" text="Se o confronto continuar empatado, vence a carta com maior Poder de Batalha." />
-            <RuleStep number="4" title="HP" text="Persistindo o empate, a carta com mais HP leva vantagem." />
-            <RuleStep number="5" title="Sorte apenas no empate total" text="Cara ou coroa só é usado quando todas as estatísticas também empatam." />
+            <Text style={[styles.rulesOrderTitle, { color: colors.text }]}>Como um turno é resolvido</Text>
+            <RuleStep number="1" title="Você escolhe o golpe" text="A escolha é confirmada no servidor e fica travada até o adversário escolher." />
+            <RuleStep number="2" title="Prioridade e Speed" text="Golpes com maior prioridade agem primeiro; depois entra a Speed efetiva." />
+            <RuleStep number="3" title="Acerto e dano" text="Precisão, Attack/Sp. Atk, Defense/Sp. Def, STAB, tipo, crítico e variação de dano entram no cálculo." />
+            <RuleStep number="4" title="Efeitos do golpe" text="Status, cura, recoil, flinch e mudanças de atributos são aplicados quando cabível." />
+            <RuleStep number="5" title="Nocaute" text="Quando o HP chega a zero, a rodada é encerrada e o vencedor recebe o ponto." />
           </View>
 
           <View style={styles.matchupRow}>
@@ -358,7 +359,7 @@ export default function BattlesHubScreen() {
             </View>
           </View>
 
-          <Text style={[styles.rulesFootnote, { color: colors.muted }]}>Exemplo: um ataque de 50 contra fraqueza ×2 causa 100 de dano efetivo. Se o rival tiver resistência −30, esse valor é reduzido quando o tipo do atacante corresponder.</Text>
+          <Text style={[styles.rulesFootnote, { color: colors.muted }]}>Tipos seguem a tabela completa do jogo: por exemplo, Elétrico contra Terra causa 0×, Normal contra Fantasma causa 0× e Fogo contra Planta causa 2×. Não existem cartas de Energia no game_v1.</Text>
         </View>
       ) : null}
     </View>
@@ -443,7 +444,14 @@ export default function BattlesHubScreen() {
               <View style={[styles.resultIcon, { backgroundColor: won ? '#163426' : item.status === 'completed' ? '#391D26' : colors.surfaceAlt }]}><Ionicons name={won ? 'trophy' : item.status === 'completed' ? 'close-circle' : 'hourglass'} size={21} color={won ? '#63D99A' : item.status === 'completed' ? '#FF8290' : colors.muted}/></View>
               <TrainerAvatar icon={other?.profile_icon} avatarUrl={getProfileAvatarUrl(other?.avatar_path,other?.avatar_updated_at)} color={colors.accent} backgroundColor={colors.accentSoft} size={38}/>
               <View style={styles.grow}>
-                <Text style={[styles.name, { color: colors.text }]}>{item.status === 'completed' ? (won ? 'Vitória' : 'Derrota') : 'Batalha ' + item.status} vs {other?.is_bot ? `🤖 ${other?.username ?? 'Treinador IA'}` : `@${other?.username ?? 'Treinador'}`}</Text>
+                <View style={styles.battleTitleRow}>
+                  <Text style={[styles.name, { color: colors.text }]}>{item.status === 'completed' ? (won ? 'Vitória' : 'Derrota') : 'Batalha vs'} {other?.is_bot ? `🤖 ${other?.username ?? 'Treinador IA'}` : `@${other?.username ?? 'Treinador'}`}</Text>
+                  <StatusPill
+                    status={item.status}
+                    tone={item.status === 'completed' ? (won ? 'success' : 'danger') : undefined}
+                    label={item.status === 'completed' ? (won ? 'VITÓRIA' : 'DERROTA') : item.status === 'invited' ? 'CONVITE' : item.status === 'drafting' ? 'DRAFT' : item.status === 'selecting' ? 'ESCOLHENDO' : item.status === 'revealing' ? 'SEU TURNO' : String(item.status).toUpperCase()}
+                  />
+                </View>
                 <Text style={[styles.sub, { color: colors.muted }]}>{item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.is_bot_match ? 'Treinador IA' : item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : item.stake_type === 'card' ? '🎴 valendo carta' : 'Casual'} • {item.challenger_score}–{item.opponent_score}</Text>
                 <Text style={[styles.sub, { color: item.reward_eligible === false ? '#E6A15A' : colors.muted }]}>{item.completed_at ? new Date(item.completed_at).toLocaleString('pt-BR') : new Date(item.created_at).toLocaleString('pt-BR')}{item.status === 'completed' ? ` • ELO ${delta >= 0 ? '+' : ''}${delta}` : ''}{item.reward_eligible === false ? ' • sem XP/ELO anti-farm' : ''}</Text>
               </View>
@@ -542,7 +550,7 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }, sectionTitle: { fontSize: 20, fontWeight: '900' }, sectionDescription: { fontSize: 9, marginTop: 2 }, sectionMeta: { fontSize: 9, fontWeight: '900' }, sectionLink: { fontSize: 9, fontWeight: '900' },
   friendList: { gap: 9, paddingRight: 8 }, friendBanner:{width:150}, friend: { width: 150, borderRadius: 19, borderWidth: 1, padding: 12, alignItems: 'flex-start' }, friendAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, friendName: { width: '100%', fontSize: 12, fontWeight: '900', marginTop: 8, textShadowColor:'#000000FF', textShadowOffset:{width:0,height:1}, textShadowRadius:4 }, friendLevel: { fontSize: 8, marginTop: 2 }, challengeTag: { marginTop: 10, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }, challengeTagText: { color: '#07111F', fontSize: 7, fontWeight: '900' },
   list: { gap: 8 }, rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 16, borderWidth: 1 }, position: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, positionText: { fontWeight: '900' }, grow: { flex: 1, minWidth: 0 }, name: { fontSize: 12, fontWeight: '900', textShadowColor:'#000000FF', textShadowOffset:{width:0,height:1}, textShadowRadius:4 }, sub: { fontSize: 9, marginTop: 3 }, elo: { fontSize: 16, fontWeight: '900', textShadowColor:'#000000F2', textShadowOffset:{width:0,height:1}, textShadowRadius:4 },
-  battleRow: { borderRadius: 17, borderWidth: 1, overflow: 'hidden' }, battleBody: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11 }, resultIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, rematch: { alignSelf: 'flex-end', marginRight: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1 }, rematchText: { fontSize: 8, fontWeight: '900' },
+  battleRow: { borderRadius: 17, borderWidth: 1, overflow: 'hidden' }, battleTitleRow:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'}, battleBody: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11 }, resultIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, rematch: { alignSelf: 'flex-end', marginRight: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1 }, rematchText: { fontSize: 8, fontWeight: '900' },
   empty: { padding: 24, borderRadius: 18, borderWidth: 1, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 15, fontWeight: '900' }, emptyText: { fontSize: 10, textAlign: 'center' }, findFriends: { marginTop: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   invitePanel: { borderRadius: 20, borderWidth: 1, padding: 13, gap: 10 },
   inviteRow: { minHeight: 68, borderRadius: 14, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
