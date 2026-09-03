@@ -14,7 +14,7 @@ export function TrainerPageHeader({
   icon?: keyof typeof Ionicons.glyphMap;
   compact?: boolean;
 }) {
-  const { colors, themeName, isLight } = useAppTheme();
+  const { colors, themeName, isLight, effectsReduced, largeText } = useAppTheme();
   const visual = getThemeVisual(themeName);
 
   return (
@@ -29,12 +29,12 @@ export function TrainerPageHeader({
       ]}
     >
       <View style={[styles.accentRail, { backgroundColor: colors.accent }]} />
-      <View style={[styles.glow, { backgroundColor: colors.accent }]} />
-      <Image
+      {!effectsReduced?<View style={[styles.glow, { backgroundColor: colors.accent }]} />:null}
+      {!effectsReduced?<Image
         source={{ uri: visual.image }}
         resizeMode="contain"
         style={[styles.mascot, compact && styles.mascotCompact]}
-      />
+      />:null}
 
       <View style={[styles.icon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
         <Ionicons name={icon} size={compact ? 18 : 22} color={colors.yellow} />
@@ -51,14 +51,14 @@ export function TrainerPageHeader({
 
         <Text
           numberOfLines={compact ? 1 : 2}
-          style={[styles.title, compact && styles.titleCompact, { color: colors.text }]}
+          style={[styles.title, compact && styles.titleCompact, largeText&&styles.titleLarge, { color: colors.text }]}
         >
           {title}
         </Text>
         {subtitle ? (
           <Text
             numberOfLines={compact ? 2 : 3}
-            style={[styles.subtitle, compact && styles.subtitleCompact, { color: colors.muted }]}
+            style={[styles.subtitle, compact && styles.subtitleCompact, largeText&&styles.subtitleLarge, { color: colors.muted }]}
           >
             {subtitle}
           </Text>
@@ -174,6 +174,7 @@ const styles = StyleSheet.create({
     fontSize: 21,
     lineHeight: 25,
   },
+  titleLarge:{fontSize:30,lineHeight:35},
   subtitle: {
     fontSize: 11,
     lineHeight: 16,
@@ -184,4 +185,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 15,
   },
+  subtitleLarge:{fontSize:13,lineHeight:19},
 });
