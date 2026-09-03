@@ -114,8 +114,8 @@ if (existsSync('app/battle/[id].tsx')) {
   assert(battle.includes('temporariamente bloqueada na rankeada'), 'Regressão de UX: carta em quarentena perdeu a mensagem amigável na batalha.');
   assert(battle.includes("timeoutRound.current = '';"), 'Regressão de batalha: tempo 0 perdeu o retry seguro após diferença de relógio.');
   assert(battle.includes('setTimeout(resolve, 350)'), 'Regressão de batalha: retry do timeout voltou a ser imediato e pode travar no 0.');
-  assert(battle.includes('ESCOLHA DE ATAQUE'), 'Regressão Draft 3: tela perdeu a fase manual de escolha de ataque.');
-  assert(battle.includes('USAR ESTE ATAQUE'), 'Regressão Draft 3: botão de confirmação de ataque foi removido.');
+  assert(battle.includes('SEU TURNO') && battle.includes('GOLPE CONFIRMADO'), 'Regressão Draft 3: tela perdeu os estados explícitos de escolha e confirmação do golpe.');
+  assert(battle.includes('CONFIRMAR GOLPE') && battle.includes('chooseBattleAttack'), 'Regressão Draft 3: botão ou RPC de confirmação manual do golpe foi removido.');
   assert(battle.includes('MOVE_NO_PP') && battle.includes('PP'), 'Regressão Draft 3: UI perdeu validação/indicação de PP dos golpes no modo Pokémon.');
   assert(battle.includes("battle?.status === 'revealing'"), 'Regressão Draft 3: tela deixou de reconhecer a fase revealing de ataque.');
   assert(battle.includes('PixelBattleArena'), 'Regressão de UX: Draft 3 perdeu a arena 2D experimental.');
