@@ -30,10 +30,12 @@ const FUNCTIONS: FunctionResult[] = [
   {label:'Amigos e Chat',description:'Rede de treinadores',route:'/friends',keywords:'amigos social chat pessoas',icon:'people'},
   {label:'Central de Atividades',description:'Pendências, convites e mensagens',route:'/inbox',keywords:'notificação atividade mensagem convite pendente',icon:'notifications'},
   {label:'Passe de Batalha',description:'Níveis e recompensas',route:'/battle-pass',keywords:'passe progresso vip recompensa',icon:'ribbon'},
+  {label:'Carreira do Treinador',description:'Jornada, identidade, Pokédex e temporadas',route:'/career',keywords:'carreira jornada progresso treinador histórico carreira score',icon:'compass'},
   {label:'Missões',description:'Objetivos e recompensas',route:'/missions',keywords:'missão objetivo recompensa',icon:'checkbox'},
   {label:'Ranking de Coleções',description:'Posições por coleção',route:'/collection-ranking',keywords:'rank ranking coleção',icon:'podium'},
   {label:'Copa Trainer',description:'Torneios e brackets',route:'/tournaments',keywords:'copa torneio campeonato bracket',icon:'trophy'},
   {label:'Cosméticos',description:'Temas, molduras e fundos',route:'/cosmetics',keywords:'cosmético tema moldura fundo galaxy',icon:'color-wand'},
+  {label:'Guia do Treinador',description:'Entenda ELO, PP, Speed, STAB e o ciclo do jogo',route:'/trainer-guide',keywords:'guia ajuda tutorial elo pp speed stab stats como funciona',icon:'help-circle'},
   {label:'Configurações',description:'Aparência, privacidade e preferências',route:'/settings',keywords:'configuração settings tema som privacidade',icon:'settings'},
 ];
 
