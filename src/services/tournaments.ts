@@ -26,6 +26,8 @@ export type TournamentHub = {
   startsAt: string | null;
   endsAt: string;
   maxPlayers: number;
+  entryFeeCoins: number;
+  prizePoolCoins: number;
   rewardCoins: number;
   rewardDiamonds: number;
   winnerId: string | null;
@@ -43,7 +45,9 @@ function normalize(data:any):TournamentHub{
     startsAt:data?.startsAt??null,
     endsAt:String(data?.endsAt??''),
     maxPlayers:Number(data?.maxPlayers??8),
-    rewardCoins:Number(data?.rewardCoins??0),
+    entryFeeCoins:Number(data?.entryFeeCoins??10000),
+    prizePoolCoins:Number(data?.prizePoolCoins??data?.rewardCoins??0),
+    rewardCoins:Number(data?.rewardCoins??data?.prizePoolCoins??0),
     rewardDiamonds:Number(data?.rewardDiamonds??0),
     winnerId:data?.winnerId??null,
     joined:Boolean(data?.joined),
@@ -63,13 +67,21 @@ export async function getTournamentHub(){
 }
 export async function joinTournament(){
   const {data,error}=await supabase.rpc('join_tournament');
-  if(error) throw error;
-  return data;
+  if(error){
+    if(error.message.includes('NOT_ENOUGH_COINS')) throw new Error('Coins insuficientes para pagar a taxa de inscrição da Copa Trainer.');
+    if(error.message.includes('TOURNAMENT_FULL')) throw new Error('A Copa Trainer já está com todas as vagas preenchidas.');
+    if(error.message.includes('REGISTRATION_CLOSED')) throw new Error('As inscrições desta Copa Trainer já foram encerradas.');
+    throw error;
+  }
+  return data as { tournamentId:string; joined:boolean; entries:number; maxPlayers:number; entryFeeCoins:number; feeCharged:number; prizePoolCoins:number };
 }
 export async function leaveTournament(){
   const {data,error}=await supabase.rpc('leave_tournament');
-  if(error) throw error;
-  return data;
+  if(error){
+    if(error.message.includes('NO_OPEN_TOURNAMENT')) throw new Error('Não há uma Copa Trainer com inscrições abertas para sair.');
+    throw error;
+  }
+  return data as { tournamentId:string; joined:boolean; refundedCoins:number; prizePoolCoins:number };
 }
 export function subscribeTournaments(onChange:()=>void){
   const channel=supabase.channel(`tournaments-live-${Date.now()}`)
