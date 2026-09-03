@@ -1036,6 +1036,11 @@ if (existsSync('src/components/PackOpeningModal.tsx')) {
   assert(!opening.includes('O lacre foi rompido. Preparando suas recompensas'), 'Regressão de UX: abertura do booster voltou a exibir texto de carregamento.');
   assert(!opening.includes('RASGANDO O LACRE'), 'Regressão de UX: abertura do booster voltou a exibir legenda durante o rasgo.');
   assert(opening.includes("stage === 'sealed' ? ("), 'Regressão de UX: textos do booster deixaram de ficar restritos ao estado selado.');
+  assert(opening.includes('boosterFxPulse') && opening.includes('boosterFxOrbit') && opening.includes('boosterFxDrift'), 'Regressão de cosmético: banner equipado do booster voltou a ficar estático.');
+  assert(opening.includes('boosterFxFrameInner') && opening.includes('boosterFxSweep'), 'Regressão de cosmético: moldura animada do booster perdeu profundidade/brilho em movimento.');
+  assert(opening.includes('boosterFxAmbientOrbitOuter') && opening.includes('boosterFxAmbientOrbitInner'), 'Regressão de cosmético: aura contínua ao redor do booster foi removida.');
+  assert(opening.includes('boosterFxOrbitRotationReverse'), 'Regressão de cosmético: efeito orbital perdeu movimento em sentidos opostos.');
+  assert(opening.includes("boosterFx.id.includes('galaxy') ? 5200 : 6800"), 'Regressão de cosmético: velocidade contínua do banner equipado foi removida.');
 }
 
 if (existsSync('app/cosmetics.tsx')) {
