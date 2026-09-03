@@ -12,6 +12,17 @@ export type PublicRareCard = {
   rarity_tier: number;
 };
 
+export type PublicTrainerIdentity = {
+  species:number;
+  completedSets:number;
+  achievementsUnlocked:number;
+  friends:number;
+  completedTrades:number;
+  seasonsPlayed:number;
+  bestSeasonStreak:number;
+  careerScore:number;
+};
+
 export type PublicPlayerProfile = {
   player: {
     id: string;
@@ -72,6 +83,21 @@ export type PublicPlayerProfile = {
     }>;
   };
 };
+
+export async function getPublicTrainerIdentity(playerId:string):Promise<PublicTrainerIdentity>{
+  const {data,error}=await supabase.rpc('get_public_trainer_identity',{p_player_id:playerId});
+  if(error)throw error;
+  return {
+    species:Number(data?.species??0),
+    completedSets:Number(data?.completedSets??0),
+    achievementsUnlocked:Number(data?.achievementsUnlocked??0),
+    friends:Number(data?.friends??0),
+    completedTrades:Number(data?.completedTrades??0),
+    seasonsPlayed:Number(data?.seasonsPlayed??0),
+    bestSeasonStreak:Number(data?.bestSeasonStreak??0),
+    careerScore:Number(data?.careerScore??0),
+  };
+}
 
 export async function getPublicPlayerProfile(playerId: string): Promise<PublicPlayerProfile> {
   const { data, error } = await supabase.rpc('get_public_player_profile', {
