@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { createOperationId } from '@/lib/operationId';
 
 export type DuplicateSaleCard = {
   quantity: number;
@@ -98,10 +99,16 @@ function duplicateSaleError(error: unknown) {
   return new Error(mapped?.[1] ?? message);
 }
 
+let pendingSellAllOperation:string|null=null;
+const pendingSingleSales=new Map<string,string>();
+
 export async function sellAllDuplicateCards(): Promise<BulkDuplicateSaleResult> {
-  const { data, error } = await supabase.rpc('sell_all_duplicate_cards');
+  const operationId=pendingSellAllOperation??createOperationId();
+  pendingSellAllOperation=operationId;
+  const { data, error } = await supabase.rpc('server_idempotent_sell_all_duplicate_cards',{p_operation_id:operationId});
   if (error) throw duplicateSaleError(error);
   if (!data || data.ok !== true) throw new Error('O servidor não confirmou a venda em lote. Atualize a tela antes de tentar novamente.');
+  pendingSellAllOperation=null;
   return {
     ok: true,
     uniqueCardsSold: Number(data.uniqueCardsSold ?? 0),
@@ -114,10 +121,15 @@ export async function sellAllDuplicateCards(): Promise<BulkDuplicateSaleResult> 
 }
 
 export async function sellDuplicateCards(cardId: string, quantity: number): Promise<DuplicateSaleResult> {
-  const { data, error } = await supabase.rpc('sell_duplicate_cards', {
+  const key=cardId+':'+quantity;
+  const operationId=pendingSingleSales.get(key)??createOperationId();
+  pendingSingleSales.set(key,operationId);
+  const { data, error } = await supabase.rpc('server_idempotent_sell_duplicate_cards', {
+    p_operation_id:operationId,
     p_card_id: cardId,
     p_quantity: quantity,
   });
   if (error) throw duplicateSaleError(error);
+  pendingSingleSales.delete(key);
   return data as DuplicateSaleResult;
 }
