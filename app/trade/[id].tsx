@@ -6,7 +6,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { CardPickerModal } from '@/components/CardPickerModal';
 import { getMyBag, type OwnedCardEntry } from '@/services/player';
-import { cancelTrade, confirmTrade, getTrade, setTradeCards, subscribeToTrade } from '@/services/trades';
+import { abandonTrade, cancelTrade, confirmTrade, getTrade, setTradeCards, subscribeToTrade } from '@/services/trades';
 import { supabase } from '@/lib/supabase';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -28,6 +28,13 @@ function selectionFromTrade(trade: any, ownerId: string): SelectedMap {
   return offer;
 }
 
+function isEmptyPendingTrade(trade: any) {
+  return trade?.status === 'pending'
+    && !trade?.sender_confirmed
+    && !trade?.receiver_confirmed
+    && (trade?.trade_cards?.length ?? 0) === 0;
+}
+
 export default function TradeBuilderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -44,6 +51,8 @@ export default function TradeBuilderScreen() {
   const [syncStatus, setSyncStatus] = useState<'connecting' | 'live' | 'fallback'>('connecting');
   const syncingRef = useRef(false);
   const pickerOpenRef = useRef(false);
+  const tradeRef = useRef<any>(null);
+  const leavingRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -56,6 +65,7 @@ export default function TradeBuilderScreen() {
       ]);
       const uid = auth.user?.id ?? '';
       setUserId(uid);
+      tradeRef.current = tradeData;
       setTrade(tradeData);
       setBag(bagData ?? []);
 
@@ -71,13 +81,22 @@ export default function TradeBuilderScreen() {
     }
   }, [id]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+
+    return () => {
+      const current = tradeRef.current;
+      if (!id || !isEmptyPendingTrade(current)) return;
+      void abandonTrade(String(id)).catch(() => null);
+    };
+  }, [id, load]));
 
   const refreshTrade = useCallback(async () => {
     if (!id || syncingRef.current) return;
     syncingRef.current = true;
     try {
       const tradeData = await getTrade(String(id));
+      tradeRef.current = tradeData;
       setTrade((current: any) => {
         if (
           current?.status !== 'completed' &&
@@ -209,11 +228,30 @@ export default function TradeBuilderScreen() {
     }
   }
 
+  async function leaveTrade() {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+
+    try {
+      const current = tradeRef.current;
+      if (id && isEmptyPendingTrade(current)) {
+        await abandonTrade(String(id));
+      }
+    } catch {
+      // The Trade Center cleanup is a second safety net if the connection drops here.
+    } finally {
+      goBackOrHome(router);
+    }
+  }
+
   async function cancel() {
     if (!id) return;
     try {
       setSaving(true);
       await cancelTrade(String(id));
+      if (tradeRef.current) {
+        tradeRef.current = { ...tradeRef.current, status: 'cancelled' };
+      }
       goBackOrHome(router);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível cancelar a troca.');
@@ -228,7 +266,7 @@ export default function TradeBuilderScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={[styles.content, pending && styles.contentWithDock]} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <Pressable style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable>
+          <Pressable style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => { void leaveTrade(); }}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable>
           <View style={styles.topInfo}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>NEGOCIAÇÃO SEGURA</Text>
             <Text style={[styles.title, { color: colors.text }]}>Troca #{String(id).slice(0, 8)}</Text>
