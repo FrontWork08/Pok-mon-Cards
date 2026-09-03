@@ -41,6 +41,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Museu da Conta', description:'Primeiros momentos, melhores pulls e memórias da conta', href:'/account-museum', icon:'library', group:'progress' },
   { label:'Insights do Treinador', description:'Estatísticas e recomendações da sua coleção', href:'/trainer-insights', icon:'bulb', group:'progress' },
   { label:'Temporada & Eventos', description:'Ranque, streak e efeitos temporários do jogo', href:'/season', icon:'flame', group:'progress' },
+  { label:'Resumo Semanal', description:'Seus últimos 7 dias de coleção, batalha e progresso', href:'/weekly-summary', icon:'calendar', group:'progress' },
   { label:'Card Chase', description:'Wishlist e alertas de cartas desejadas', href:'/wishlist', icon:'star', group:'collection' },
   { label:'Vitrine do Perfil', description:'Escolha suas 6 cartas de destaque', href:'/showcase', icon:'sparkles', group:'collection' },
   { label:'Conquistas e Títulos', description:'Progresso e títulos equipáveis', href:'/achievements', icon:'medal', group:'progress' },
@@ -66,10 +67,15 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Histórico de Packs', description:'Reveja seus melhores pulls', href:'/history', icon:'time', group:'collection' },
   { label:'Guia do Treinador', description:'Ciclo do jogo e glossário de stats', href:'/trainer-guide', icon:'help-circle', group:'system' },
   { label:'Configurações', description:'Aparência, batalha, notificações e privacidade', href:'/settings', icon:'settings', group:'system' },
+  { label:'O que mudou', description:'Histórico de versões e novidades ainda não lidas', href:'/whats-new', icon:'newspaper', group:'system' },
+  { label:'Feedback', description:'Reporte bugs e envie sugestões dentro do app', href:'/feedback', icon:'chatbox', group:'system' },
+  { label:'Beta & Tester', description:'Transição 1.0, status Tester e recursos liberados', href:'/beta-tester', icon:'flask', group:'system' },
   { label:'Health Check', description:'Saúde dos sistemas e erros recentes', href:'/admin-health', icon:'pulse', group:'system', adminOnly:true },
   { label:'Controle Anti-inflação', description:'Snapshots e guardrails da economia', href:'/admin-economy-control', icon:'analytics', group:'system', adminOnly:true },
   { label:'Freeze Simulator', description:'Prévia segura do freeze/reset 1.0', href:'/admin-freeze-simulator', icon:'snow', group:'system', adminOnly:true },
   { label:'Battle Lab Admin', description:'Matriz massiva de confrontos sem writes', href:'/admin-battle-lab', icon:'grid', group:'system', adminOnly:true },
+  { label:'Feedback Admin', description:'Triagem e resposta aos feedbacks do app', href:'/admin-feedback', icon:'chatbubbles', group:'system', adminOnly:true },
+  { label:'Feature Flags', description:'Rollout gradual e recursos somente para testers', href:'/admin-feature-flags', icon:'git-branch', group:'system', adminOnly:true },
   { label:'Admin Center', description:'Economia, usuários e sistema', href:'/admin', icon:'shield-checkmark', group:'system', adminOnly:true },
 ];
 
@@ -219,7 +225,7 @@ export function TrainerNavigation() {
                   </View>;
                 })}</View>
               </View>
-              {isAdmin?<View style={styles.section}><Text style={[styles.sectionTitle,{color:'#FF7ACF'}]}>Administração</Text>{renderMenuItem(MENU_ITEMS.find(item=>item.adminOnly)!)}</View>:null}
+              {isAdmin?<View style={styles.section}><Text style={[styles.sectionTitle,{color:'#FF7ACF'}]}>Administração</Text>{MENU_ITEMS.filter(item=>item.adminOnly).map(item=>renderMenuItem(item))}</View>:null}
             </>}
           </ScrollView>
         </View>
