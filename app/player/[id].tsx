@@ -5,7 +5,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { formatUsd } from '@/services/market';
-import { getPublicPlayerProfile, type PublicPlayerProfile } from '@/services/publicProfiles';
+import { getPublicPlayerProfile, getPublicTrainerIdentity, type PublicPlayerProfile, type PublicTrainerIdentity } from '@/services/publicProfiles';
 import { getProfileAvatarUrl } from '@/services/player';
 import { getTrainerRank } from '@/services/ranks';
 import { runFriendAction } from '@/services/playerActions';
@@ -15,6 +15,7 @@ import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { AuraBanner } from '@/components/AuraBanner';
 import { PremiumProfileFrame } from '@/components/PremiumProfileFrame';
 import { getThemeVisual } from '@/theme/themeCatalog';
+import { careerTier } from '@/services/career';
 
 function trophyColor(rarity:string){
   const value=rarity.toLowerCase();
@@ -30,6 +31,7 @@ export default function PlayerShowcaseScreen() {
   const { colors, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
   const [profile, setProfile] = useState<PublicPlayerProfile | null>(null);
+  const [identity,setIdentity]=useState<PublicTrainerIdentity|null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [relationship, setRelationship] = useState<PublicRelationshipState>('none');
@@ -41,11 +43,13 @@ export default function PlayerShowcaseScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [nextProfile, nextRelationship] = await Promise.all([
+      const [nextProfile, nextIdentity, nextRelationship] = await Promise.all([
         getPublicPlayerProfile(id),
+        getPublicTrainerIdentity(id),
         getRelationshipWith(id),
       ]);
       setProfile(nextProfile);
+      setIdentity(nextIdentity);
       setRelationship(nextRelationship);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível abrir este perfil.');
@@ -165,8 +169,23 @@ export default function PlayerShowcaseScreen() {
           </View>
         ) : null}
 
+        {identity ? <View style={[styles.identityPanel,{backgroundColor:colors.surface,borderColor:frameColor}]}>
+          <View style={styles.identityHead}>
+            <View><Text style={[styles.identityKicker,{color:frameColor}]}>IDENTIDADE DO TREINADOR</Text><Text style={[styles.identityTitle,{color:colors.text}]}>{careerTier(identity.careerScore).label}</Text><Text style={[styles.identitySub,{color:colors.muted}]}>Career Score {identity.careerScore.toLocaleString('pt-BR')} • não é moeda e não define força em batalha</Text></View>
+            <Ionicons name="compass" size={27} color={frameColor}/>
+          </View>
+          <View style={styles.identityMetrics}>
+            <IdentityMetric label="ESPÉCIES" value={identity.species.toLocaleString('pt-BR')}/>
+            <IdentityMetric label="SETS COMPLETOS" value={identity.completedSets.toLocaleString('pt-BR')}/>
+            <IdentityMetric label="CONQUISTAS" value={identity.achievementsUnlocked.toLocaleString('pt-BR')}/>
+            <IdentityMetric label="TEMPORADAS" value={identity.seasonsPlayed.toLocaleString('pt-BR')}/>
+            <IdentityMetric label="TROCAS" value={identity.completedTrades.toLocaleString('pt-BR')}/>
+            <IdentityMetric label="AMIGOS" value={identity.friends.toLocaleString('pt-BR')}/>
+          </View>
+        </View> : null}
+
         <View style={[styles.valuePanel, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
-          <View style={{ flex: 1 }}><Text style={[styles.valueKicker, { color: colors.yellow }]}>VALOR TOTAL DA CONTA</Text><Text style={[styles.value, { color: colors.text }]}>{formatUsd(collection.totalValueUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>Soma do preço TCGplayer de todas as cópias da coleção</Text></View>
+          <View style={{ flex: 1 }}><Text style={[styles.valueKicker, { color: colors.yellow }]}>VALOR DE MERCADO DA COLEÇÃO</Text><Text style={[styles.value, { color: colors.text }]}>{formatUsd(collection.totalValueUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>Prestígio de coleção e comércio; este valor não aumenta stats nem dano em batalha.</Text></View>
           <View style={[styles.valueIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="diamond" size={27} color={colors.yellow} /></View>
         </View>
 
@@ -248,12 +267,14 @@ export default function PlayerShowcaseScreen() {
   );
 }
 
+function IdentityMetric({label,value}:{label:string;value:string}){const{colors}=useAppTheme();return <View style={[styles.identityMetric,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.identityMetricValue,{color:colors.text}]}>{value}</Text><Text style={[styles.identityMetricLabel,{color:colors.muted}]}>{label}</Text></View>;}
+
 function Metric({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   const { colors } = useAppTheme();
   return <View style={[styles.metric, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name={icon} size={19} color={colors.accent} /><Text style={[styles.metricValue, { color: colors.text }]}>{value}</Text><Text style={[styles.metricLabel, { color: colors.muted }]}>{label}</Text></View>;
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create({identityPanel:{borderRadius:21,borderWidth:1,padding:14,gap:10},identityHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:9},identityKicker:{fontSize:7,fontWeight:'900',letterSpacing:.9},identityTitle:{fontSize:18,fontWeight:'900',marginTop:2},identitySub:{fontSize:7.5,marginTop:2},identityMetrics:{flexDirection:'row',flexWrap:'wrap',gap:7},identityMetric:{flexGrow:1,flexBasis:100,minWidth:88,borderRadius:12,borderWidth:1,padding:8},identityMetricValue:{fontSize:13,fontWeight:'900'},identityMetricLabel:{fontSize:5.8,fontWeight:'900',letterSpacing:.45,marginTop:2},
   back: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7 },
   backText: { fontSize: 12, fontWeight: '800' },
   error: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, padding: 12, backgroundColor: '#351A24', borderWidth: 1, borderColor: '#683243' },
