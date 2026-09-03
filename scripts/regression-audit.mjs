@@ -867,6 +867,15 @@ if (existsSync('app/marketplace.tsx')) {
   assert(marketUi.includes('premiumInnerPanel'), 'Regressão visual: cabeçalho premium do anúncio voltou a ser chapado.');
   assert(marketUi.includes('premiumCardPanel'), 'Regressão visual: área da carta no anúncio voltou a esconder os efeitos.');
   assert(marketUi.includes('ownOfferButton'), 'Regressão visual: bloco SUA OFERTA perdeu o acabamento premium.');
+  assert(marketUi.includes('getMyBagPage(offset,60'), 'Regressão do Marketplace: seletor de venda voltou a carregar apenas a primeira página da Bag.');
+  assert(marketUi.includes('onEndReached={loadMoreInventory}'), 'Regressão do Marketplace: seletor de venda perdeu paginação infinita.');
+  assert(marketUi.includes('inventory.length>=inventoryTotal'), 'Regressão do Marketplace: paginação deixou de parar somente após carregar todas as cartas filtradas.');
+  assert(!marketUi.includes('Até 60 resultados por busca'), 'Regressão de UX: Marketplace voltou a informar um limite fixo de 60 cartas.');
+  assert(marketUi.includes('MarketplaceCardPreviewModal'), 'Regressão do Marketplace: cartas deixaram de abrir a visualização detalhada.');
+  assert(marketUi.includes('getCardDetail(entry.cards.id)') && marketUi.includes('getCardDetail(item.card.id)'), 'Regressão do Marketplace: prévia deixou de carregar os dados TCG completos da carta.');
+  assert(marketUi.includes('getBattleCardPreview(card)'), 'Regressão do Marketplace: visualização da carta perdeu HP/ATQ e estatísticas de batalha.');
+  assert(marketUi.includes('ESCOLHER ESTA CARTA PARA VENDER'), 'Regressão de UX: prévia da carta perdeu a ação explícita de selecionar para venda.');
+  assert(marketUi.includes('TOQUE PARA ABRIR A CARTA E VER ESTATÍSTICAS'), 'Regressão de UX: ofertas públicas deixaram de indicar que a carta é visualizável.');
 }
 
 if (existsSync('app/card/[id].tsx')) {
