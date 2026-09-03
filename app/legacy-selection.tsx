@@ -23,6 +23,21 @@ function toSelectionMap(cardIds: string[]): SelectionMap {
   return Object.fromEntries(cardIds.map((cardId) => [cardId, 1]));
 }
 
+function formatLegacyDeadline(value: string | null | undefined) {
+  if (!value) return 'o prazo do Legado';
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value));
+  } catch {
+    return 'o fim do dia anterior ao freeze';
+  }
+}
+
 export default function LegacySelectionScreen() {
   const router = useRouter();
   const { colors, themeName } = useAppTheme();
@@ -40,6 +55,12 @@ export default function LegacySelectionScreen() {
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -116,17 +137,25 @@ export default function LegacySelectionScreen() {
     () => recommendedEntries.reduce((sum, entry) => sum + Number(entry.cards.market_price_usd ?? 0), 0),
     [recommendedEntries],
   );
-  const selectionOpen = Boolean(
+  const deadlineMs = campaign?.legacy_edit_deadline
+    ? new Date(campaign.legacy_edit_deadline).getTime()
+    : Number.POSITIVE_INFINITY;
+  const deadlinePassed = Number.isFinite(deadlineMs) && nowMs > deadlineMs;
+  const deadlineLabel = formatLegacyDeadline(campaign?.legacy_edit_deadline);
+  const phaseOpen = Boolean(
     campaign?.active
     && campaign.phase === 'legacy_selection'
     && campaign.legacy_selection_enabled,
   );
-  const locked = Boolean(submission);
+  const locked = Boolean(submission?.locked_at);
+  const provisionalConfirmed = Boolean(submission && !submission.locked_at && !deadlinePassed);
+  const selectionOpen = phaseOpen && !deadlinePassed;
+  const editable = selectionOpen && !locked;
   const autoFilledCount = Number(submission?.auto_filled_count ?? 0);
   const draftCount = Object.values(draft).reduce((sum, value) => sum + Number(value), 0);
 
   function openPicker() {
-    if (!selectionOpen || locked) return;
+    if (!editable) return;
     setDraft(toSelectionMap(savedCardIds));
     setNotice('');
     setError('');
@@ -135,7 +164,7 @@ export default function LegacySelectionScreen() {
   }
 
   function useRecommendedSelection() {
-    if (!selectionOpen || locked || !recommendedEntries.length) return;
+    if (!editable || !recommendedEntries.length) return;
     const recommendedIds = recommendedEntries.map((entry) => entry.cards.id);
     setDraft(toSelectionMap(recommendedIds));
     setNotice(`Pré-selecionamos ${recommendedIds.length} carta(s) com a mesma regra de valor usada no preenchimento automático. Revise antes de salvar.`);
@@ -150,7 +179,7 @@ export default function LegacySelectionScreen() {
   }
 
   async function saveDraft() {
-    if (!campaign || !playerId || locked || working) return;
+    if (!campaign || !playerId || !editable || working) return;
     const cardIds = Object.entries(draft).filter(([, qty]) => qty > 0).map(([cardId]) => cardId);
     if (cardIds.length < 1) {
       setError('Escolha pelo menos uma carta para salvar.');
@@ -171,7 +200,13 @@ export default function LegacySelectionScreen() {
       setSubmission(result.submission);
       setPickerOpen(false);
       setConfirmArmed(false);
-      setNotice(`Seleção salva: ${result.cardIds.length}/${limit} cartas. Você ainda pode alterar antes da confirmação final.`);
+      setNotice(
+        result.submission
+          ? `Seleção atualizada: ${result.cardIds.length}/${limit}. Sua confirmação continua válida e você ainda pode editar até ${deadlineLabel}.`
+          : result.cardIds.length === limit
+            ? `10 cartas salvas. Se você não confirmar manualmente, estas 10 serão confirmadas automaticamente em ${deadlineLabel}.`
+            : `Seleção salva: ${result.cardIds.length}/${limit}. Você ainda pode editar até ${deadlineLabel}.`,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível salvar a seleção.');
     } finally {
@@ -180,7 +215,7 @@ export default function LegacySelectionScreen() {
   }
 
   async function confirmSelection() {
-    if (!campaign || !playerId || locked || !savedCardIds.length || working) return;
+    if (!campaign || !playerId || locked || submission || !savedCardIds.length || working) return;
     if (!confirmArmed) {
       setConfirmArmed(true);
       setNotice('');
@@ -201,8 +236,8 @@ export default function LegacySelectionScreen() {
       }
       setNotice(
         marketplaceCardsBeforeConfirm > 0
-          ? `Legado confirmado: ${result.selected_count} carta(s) protegida(s). ${marketplaceCardsBeforeConfirm} carta(s) escolhida(s) que estavam anunciadas foram retiradas da loja e devolvidas à Bag.`
-          : `Legado confirmado: ${result.selected_count} carta(s) protegida(s) para a transição 1.0.`,
+          ? `Legado confirmado provisoriamente: ${result.selected_count} carta(s). ${marketplaceCardsBeforeConfirm} carta(s) anunciada(s) foram devolvidas à Bag. Você ainda pode trocar suas escolhas até ${deadlineLabel}.`
+          : `Legado confirmado provisoriamente: ${result.selected_count} carta(s). Você ainda pode trocar suas escolhas até ${deadlineLabel}.`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível confirmar seu legado.');
@@ -232,27 +267,39 @@ export default function LegacySelectionScreen() {
 
       {campaign ? (
         <>
-          <View style={[styles.hero,{backgroundColor:colors.accentSoft,borderColor:locked ? '#65D894' : colors.accent}]}>
-            <View style={[styles.heroGlow,{backgroundColor:locked ? '#65D894' : colors.accent}]} />
+          <View style={[styles.hero,{backgroundColor:colors.accentSoft,borderColor:locked ? '#65D894' : provisionalConfirmed ? colors.yellow : colors.accent}]}>
+            <View style={[styles.heroGlow,{backgroundColor:locked ? '#65D894' : provisionalConfirmed ? colors.yellow : colors.accent}]} />
             <Image source={{uri:themeVisual.image}} resizeMode="contain" style={styles.heroPokemon}/>
             <View style={styles.heroCopy}>
               <Text style={[styles.kicker,{color:colors.yellow}]}>BETA LEGACY VAULT</Text>
-              <Text style={[styles.heroTitle,{color:colors.text}]}>{locked ? 'Seu legado está confirmado.' : `Preserve até ${limit} cartas.`}</Text>
+              <Text style={[styles.heroTitle,{color:colors.text}]}>
+                {locked
+                  ? 'Seu legado está travado.'
+                  : provisionalConfirmed
+                    ? 'Confirmado — ainda dá para editar.'
+                    : deadlinePassed
+                      ? 'Prazo de edição encerrado.'
+                      : `Preserve até ${limit} cartas.`}
+              </Text>
               <Text style={[styles.heroText,{color:colors.muted}]}>
                 {locked
                   ? autoFilledCount > 0
                     ? `Seu legado está fechado. ${autoFilledCount} vaga(s) foram completadas automaticamente com as cartas mais valiosas da sua Bag.`
                     : savedCardIds.length < limit
-                      ? `Suas ${savedCardIds.length} escolha(s) manuais estão protegidas. Na migração, o sistema completará as ${limit - savedCardIds.length} vaga(s) restantes com as cartas mais caras da sua coleção.`
-                      : 'A seleção está bloqueada. Uma cópia de cada carta confirmada está protegida para a migração.'
-                  : selectionOpen
-                    ? 'Escolha as cartas que você mais quer manter. Cartas anunciadas na sua loja também aparecem aqui. Se deixar vagas livres, a migração completa automaticamente com as cartas mais caras da sua coleção.'
-                    : 'A fase de escolha ainda não foi liberada. Se você não completar as 10 vagas quando a migração começar, o sistema escolherá as cartas mais caras disponíveis.'}
+                      ? `Suas ${savedCardIds.length} escolha(s) estão travadas. No freeze, as ${limit - savedCardIds.length} vaga(s) restantes serão completadas pelas cartas mais valiosas disponíveis.`
+                      : 'As 10 cartas estão travadas para a migração e não podem mais ser trocadas.'
+                  : provisionalConfirmed
+                    ? `Sua confirmação é provisória. Estas cartas estão protegidas, mas você pode trocar a seleção quantas vezes quiser até ${deadlineLabel}. No prazo elas serão travadas automaticamente.`
+                    : deadlinePassed
+                      ? 'O prazo terminou. O servidor está travando as seleções salvas para preparar o freeze.'
+                      : selectionOpen
+                        ? `Escolha e salve suas cartas até ${deadlineLabel}. Se chegar ao prazo com as ${limit} cartas salvas sem confirmar, essas ${limit} serão confirmadas automaticamente.`
+                        : 'A fase de escolha ainda não foi liberada.'}
               </Text>
               <View style={styles.heroStats}>
                 <View style={[styles.stat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.statValue,{color:colors.text}]}>{savedCardIds.length}/{limit}</Text><Text style={[styles.statLabel,{color:colors.muted}]}>ESCOLHIDAS</Text></View>
                 <View style={[styles.stat,{backgroundColor:colors.surface,borderColor:colors.border}]}><Text style={[styles.statValue,{color:colors.yellow}]}>{formatUsd(selectedValue)}</Text><Text style={[styles.statLabel,{color:colors.muted}]}>VALOR</Text></View>
-                <View style={[styles.stat,{backgroundColor:colors.surface,borderColor:locked ? '#2F9E68' : colors.border}]}><Text style={[styles.statValue,{color:locked ? '#65D894' : colors.text}]}>{locked ? 'TRAVADO' : selectionOpen ? 'ABERTO' : 'AGUARDE'}</Text><Text style={[styles.statLabel,{color:colors.muted}]}>STATUS</Text></View>
+                <View style={[styles.stat,{backgroundColor:colors.surface,borderColor:locked ? '#2F9E68' : colors.border}]}><Text style={[styles.statValue,{color:locked ? '#65D894' : provisionalConfirmed ? colors.yellow : colors.text}]}>{locked ? 'TRAVADO' : provisionalConfirmed ? 'CONFIRMADO' : deadlinePassed ? 'ENCERRADO' : selectionOpen ? 'ABERTO' : 'AGUARDE'}</Text><Text style={[styles.statLabel,{color:colors.muted}]}>STATUS</Text></View>
               </View>
             </View>
           </View>
@@ -262,7 +309,7 @@ export default function LegacySelectionScreen() {
             <View style={{flex:1}}>
               <Text style={[styles.rewardTitle,{color:colors.text}]}>Recompensa de veterano</Text>
               <Text style={[styles.rewardValue,{color:colors.yellow}]}>🪙 {campaign.reward_coins.toLocaleString('pt-BR')} + 💎 {campaign.reward_diamonds}</Text>
-              <Text style={[styles.rewardHint,{color:colors.muted}]}>A confirmação destas cartas não executa o reset. Ela apenas registra e protege sua escolha.</Text>
+              <Text style={[styles.rewardHint,{color:colors.muted}]}>Confirmar não executa o reset. Até {deadlineLabel}, a confirmação é provisória e você ainda pode trocar as cartas.</Text>
             </View>
           </View>
 
@@ -273,9 +320,9 @@ export default function LegacySelectionScreen() {
             <View style={{flex:1}}>
               <Text style={[styles.autoRuleTitle,{color:colors.text}]}>Preenchimento automático na migração</Text>
               <Text style={[styles.autoRuleText,{color:colors.muted}]}>
-                Se você tiver menos de {limit} cartas escolhidas, suas escolhas são mantidas primeiro e as vagas restantes são preenchidas pelas cartas com maior valor de mercado da sua coleção, incluindo cartas que estejam anunciadas na sua própria loja. Se alguma carta não tiver preço, o valor interno do jogo é usado como desempate.
+                Você pode editar até {deadlineLabel}. Se tiver {limit}/{limit} salvas sem confirmar quando o prazo terminar, essas {limit} serão confirmadas automaticamente. Se chegar ao freeze com menos de {limit}, suas escolhas são mantidas primeiro e as vagas restantes são completadas pelas cartas de maior valor da coleção.
               </Text>
-              {selectionOpen && !locked && recommendedEntries.length ? (
+              {editable && recommendedEntries.length ? (
                 <Pressable
                   onPress={useRecommendedSelection}
                   style={[styles.recommendedButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}
@@ -296,9 +343,17 @@ export default function LegacySelectionScreen() {
           <View style={styles.sectionHead}>
             <View>
               <Text style={[styles.sectionTitle,{color:colors.text}]}>Cartas preservadas</Text>
-              <Text style={[styles.sectionHint,{color:colors.muted}]}>{locked ? 'Seleção final confirmada.' : 'Você pode editar enquanto a fase estiver aberta.'}</Text>
+              <Text style={[styles.sectionHint,{color:colors.muted}]}>
+                {locked
+                  ? 'Seleção final travada.'
+                  : provisionalConfirmed
+                    ? `Confirmada, mas editável até ${deadlineLabel}.`
+                    : deadlinePassed
+                      ? 'Prazo encerrado.'
+                      : `Você pode editar até ${deadlineLabel}.`}
+              </Text>
             </View>
-            {!locked && selectionOpen ? (
+            {editable ? (
               <Pressable onPress={openPicker} style={[styles.editButton,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
                 <Ionicons name="albums" size={16} color={colors.accent}/>
                 <Text style={[styles.editText,{color:colors.accent}]}>{savedCardIds.length ? 'EDITAR' : 'ESCOLHER'}</Text>
@@ -329,20 +384,20 @@ export default function LegacySelectionScreen() {
             </View>
           )}
 
-          {!locked && selectionOpen && savedCardIds.length ? (
+          {!submission && editable && savedCardIds.length ? (
             <View style={[styles.confirmPanel,{backgroundColor:confirmArmed ? '#351A24' : colors.surface,borderColor:confirmArmed ? '#A84250' : colors.border}]}>
               <Ionicons name={confirmArmed ? 'warning' : 'lock-closed'} size={22} color={confirmArmed ? '#FF8A9A' : colors.yellow}/>
               <View style={{flex:1}}>
-                <Text style={[styles.confirmTitle,{color:colors.text}]}>{confirmArmed ? 'Confirmação permanente' : 'Pronto para fechar seu legado?'}</Text>
+                <Text style={[styles.confirmTitle,{color:colors.text}]}>{confirmArmed ? 'Confirmar seleção atual' : 'Quer confirmar agora?'}</Text>
                 <Text style={[styles.confirmHint,{color:colors.muted}]}>{confirmArmed
-                  ? `Depois deste botão suas escolhas manuais não poderão ser trocadas. Se houver menos de ${limit}, as vagas restantes serão preenchidas automaticamente pelas cartas mais caras somente na migração. ${selectedMarketplaceCards > 0 ? `${selectedMarketplaceCards} carta(s) escolhida(s) estão anunciadas e serão retiradas da loja automaticamente ao confirmar. ` : ''}O reset ainda NÃO será executado.`
-                  : selectedMarketplaceCards > 0
-                    ? `Revise a lista. ${selectedMarketplaceCards} carta(s) escolhida(s) estão na sua loja e sairão dos anúncios ao confirmar o Legado.`
-                    : 'Revise a lista. Vagas livres serão completadas automaticamente na migração.'}</Text>
+                  ? `A confirmação ficará registrada, mas você ainda poderá editar até ${deadlineLabel}. ${selectedMarketplaceCards > 0 ? `${selectedMarketplaceCards} carta(s) anunciada(s) serão retiradas da loja para proteger a seleção. ` : ''}No prazo, a seleção passa a ser definitiva automaticamente.`
+                  : savedCardIds.length === limit
+                    ? `Você também pode deixar as ${limit} salvas sem confirmar: em ${deadlineLabel}, o servidor confirmará essas ${limit} automaticamente.`
+                    : `Confirme se quiser proteger estas escolhas agora. Mesmo confirmado, ainda será possível editá-las até ${deadlineLabel}.`}</Text>
               </View>
               <Pressable disabled={working} onPress={() => { void confirmSelection(); }} style={[styles.confirmButton,{backgroundColor:confirmArmed ? '#C74658' : colors.yellow}]}>
                 {working ? <ActivityIndicator size="small" color={confirmArmed ? '#fff' : '#07111F'}/> : <Ionicons name={confirmArmed ? 'shield-checkmark' : 'lock-closed'} size={17} color={confirmArmed ? '#fff' : '#07111F'}/>}
-                <Text style={[styles.confirmButtonText,{color:confirmArmed ? '#fff' : '#07111F'}]}>{confirmArmed ? `SIM, CONFIRMAR ${savedCardIds.length}` : 'REVISAR E BLOQUEAR'}</Text>
+                <Text style={[styles.confirmButtonText,{color:confirmArmed ? '#fff' : '#07111F'}]}>{confirmArmed ? `SIM, CONFIRMAR ${savedCardIds.length}` : 'REVISAR E CONFIRMAR'}</Text>
               </Pressable>
             </View>
           ) : null}
@@ -352,7 +407,7 @@ export default function LegacySelectionScreen() {
       <CardPickerModal
         visible={pickerOpen}
         title="Escolha seu legado"
-        subtitle={`Selecione até ${limit} cartas únicas da Bag ou da sua loja. Cartas anunciadas continuam elegíveis e saem da loja automaticamente quando o Legado é confirmado.`}
+        subtitle={`Selecione até ${limit} cartas únicas da Bag ou da sua loja. Você pode trocar as salvas até ${deadlineLabel}. Com ${limit} salvas no prazo, a confirmação acontece automaticamente se você não confirmar antes.`}
         bag={bag}
         mode="quantity"
         selectedMap={draft}
