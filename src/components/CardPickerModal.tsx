@@ -2,11 +2,13 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import type { OwnedCardEntry } from '@/services/player';
 import { formatUsd } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { POKEMON_GAME_TYPES, PokemonTypeSymbolFilter, normalizePokemonGameType } from '@/components/PokemonTypeSymbolFilter';
+import { getScreenPreference, setScreenPreference } from '@/services/screenPreferences';
 
 type SortMode = 'value' | 'battle' | 'atk_desc' | 'atk_asc' | 'def_desc' | 'def_asc' | 'name' | 'quantity' | 'recent';
 type QuantityMap = Record<string, number>;
@@ -75,17 +77,47 @@ export function CardPickerModal({
   errorText = '',
 }: Props) {
   const { colors } = useAppTheme();
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const columns = width >= 1000 ? 4 : width >= 680 ? 3 : 2;
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortMode>(displayMode === 'battle' ? 'battle' : 'value');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [prefsReady, setPrefsReady] = useState(false);
 
   const availableTypes = useMemo<string[]>(() => [...POKEMON_GAME_TYPES], []);
 
   useEffect(() => {
     if (selectedType !== 'all' && !availableTypes.includes(selectedType)) setSelectedType('all');
   }, [availableTypes, selectedType]);
+
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    setPrefsReady(false);
+    const key = `card_picker_${displayMode}_${gameStyle ? 'game' : 'classic'}_${mode}`;
+    void getScreenPreference(key, {
+      sort: displayMode === 'battle' ? 'battle' as SortMode : 'value' as SortMode,
+      selectedType: 'all',
+    }).then((saved) => {
+      if (!active) return;
+      setSort(saved.sort ?? (displayMode === 'battle' ? 'battle' : 'value'));
+      setSelectedType(saved.selectedType ?? 'all');
+      setPrefsReady(true);
+    });
+    return () => { active = false; };
+  }, [displayMode, gameStyle, mode, visible]);
+
+  useEffect(() => {
+    if (!visible || !prefsReady) return;
+    const key = `card_picker_${displayMode}_${gameStyle ? 'game' : 'classic'}_${mode}`;
+    void setScreenPreference(key, { sort, selectedType });
+  }, [displayMode, gameStyle, mode, prefsReady, selectedType, sort, visible]);
+
+  function openFullDetails(cardId: string) {
+    onClose();
+    requestAnimationFrame(() => router.push(('/card/' + cardId) as never));
+  }
 
   const visibleCards = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -145,8 +177,10 @@ export function CardPickerModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <SafeAreaView style={[styles.sheet, { backgroundColor: colors.bg, borderColor: colors.border }]}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.kicker, { color: colors.yellow }]}>SELETOR DE CARTAS</Text>
@@ -241,6 +275,7 @@ export function CardPickerModal({
               onPress={() => selectSingle(item)}
               onMinus={() => changeQuantity(item, -1)}
               onPlus={() => changeQuantity(item, 1)}
+              onOpenDetails={() => item.cards?.id && openFullDetails(item.cards.id)}
             />
           )}
           ListEmptyComponent={<View style={styles.empty}><Ionicons name="search-outline" size={32} color={colors.muted} /><Text style={[styles.emptyText, { color: colors.muted }]}>Nenhuma carta encontrada.</Text></View>}
@@ -267,12 +302,13 @@ export function CardPickerModal({
             <Text style={styles.confirmText}>{working ? 'SALVANDO…' : confirmLabel}</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
-const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, displayMode, gameStyle, showCombatStats, onPress, onMinus, onPlus }: {
+const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, displayMode, gameStyle, showCombatStats, onPress, onMinus, onPlus, onOpenDetails }: {
   entry: OwnedCardEntry;
   mode: 'single' | 'quantity';
   selected: boolean;
@@ -283,6 +319,7 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
   onPress: () => void;
   onMinus: () => void;
   onPlus: () => void;
+  onOpenDetails: () => void;
 }) {
   const { colors } = useAppTheme();
   const card = entry.cards;
@@ -312,6 +349,10 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
       <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? (gameStyle ? `${card.rarity ?? 'Carta Pokémon'} • espécie/forma define os stats` : `ATQ BASE ${combat.maxDamage} • ⚡ custo ${combat.bestEnergy}`) : `${card.rarity ?? 'Sem raridade'} • ${locationLabel}`}</Text>
       {showCombatStats && displayMode !== 'battle' ? <Text numberOfLines={1} style={[styles.legacyCombatMeta,{color:colors.yellow}]}>ATK {combat.maxDamage} • DEF {combat.hp}</Text> : null}
       {displayMode === 'battle' ? <Text numberOfLines={1} style={[styles.battleMeta, { color: colors.muted }]}>{gameStyle ? 'HP • ATK • DEF • SP.ATK • SP.DEF • SPEED • 4 golpes com PP' : `⚡ mín ${combat.minEnergy} • ${combat.attackCount} ataques • ${combat.abilityCount} habilidades`}</Text> : null}
+      <Pressable onPress={onOpenDetails} style={[styles.detailButton,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+        <Ionicons name="open-outline" size={14} color={colors.accent}/>
+        <Text style={[styles.detailButtonText,{color:colors.text}]}>DETALHES</Text>
+      </Pressable>
       {mode === 'quantity' ? (
         <View style={styles.qtyRow}>
           <Pressable style={[styles.qtyButton, { backgroundColor: colors.surfaceAlt }]} onPress={onMinus}><Text style={[styles.qtySign, { color: colors.text }]}>−</Text></Pressable>
@@ -329,7 +370,8 @@ function SortChip({ label, active, onPress }: { label: string; active: boolean; 
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  modalBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.72)',justifyContent:'flex-end'},
+  sheet:{height:'94%',borderTopLeftRadius:24,borderTopRightRadius:24,borderWidth:1,borderBottomWidth:0,overflow:'hidden'},
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1 },
   kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
   title: { fontSize: 23, fontWeight: '900', marginTop: 2 },
@@ -358,6 +400,7 @@ const styles = StyleSheet.create({
   checkBadge: { position: 'absolute', right: 6, top: 6, width: 29, height: 29, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   cardName: { fontSize: 11, fontWeight: '900', marginTop: 7 },
   cardMeta: { fontSize: 8, marginTop: 2 },
+  detailButton:{minHeight:32,borderRadius:9,borderWidth:1,marginTop:6,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4},detailButtonText:{fontSize:7,fontWeight:'900'},
   battleMeta: { fontSize: 7, marginTop: 3, fontWeight: '800' },
   legacyCombatMeta:{fontSize:8,marginTop:3,fontWeight:'900'},
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
