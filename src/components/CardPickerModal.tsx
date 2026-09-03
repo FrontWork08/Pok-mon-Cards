@@ -24,6 +24,7 @@ type Props = {
   maxTotal?: number;
   displayMode?: 'market' | 'battle';
   enableCombatSort?: boolean;
+  gameStyle?: boolean;
   enableTypeFilter?: boolean;
   sourceOptions?: Array<{ id: string; label: string }>;
   sourceId?: string;
@@ -49,6 +50,7 @@ export function CardPickerModal({
   maxTotal,
   displayMode = 'market',
   enableCombatSort = false,
+  gameStyle = false,
   enableTypeFilter = false,
   sourceOptions = [],
   sourceId,
@@ -195,10 +197,10 @@ export function CardPickerModal({
             />
           ) : null}
           <View style={styles.sortRow}>
-            {displayMode === 'battle'
+            {displayMode === 'battle' && !gameStyle
               ? <SortChip label="Visão geral TCG" active={sort === 'battle'} onPress={() => setSort('battle')} />
-              : <SortChip label="Mais caras" active={sort === 'value'} onPress={() => setSort('value')} />}
-            {enableCombatSort ? (
+              : displayMode !== 'battle' ? <SortChip label="Mais caras" active={sort === 'value'} onPress={() => setSort('value')} /> : null}
+            {enableCombatSort && !gameStyle ? (
               <>
                 <SortChip label="MAIOR ATQ" active={sort === 'atk_desc'} onPress={() => setSort('atk_desc')} />
                 <SortChip label="MAIOR HP / DEF" active={sort === 'def_desc'} onPress={() => setSort('def_desc')} />
@@ -208,7 +210,8 @@ export function CardPickerModal({
             <SortChip label="Quantidade" active={sort === 'quantity'} onPress={() => setSort('quantity')} />
             <SortChip label="Recentes" active={sort === 'recent'} onPress={() => setSort('recent')} />
           </View>
-          {enableCombatSort ? <Text style={[styles.combatSortHint,{color:colors.muted}]}>ATQ = maior dano de um ataque • HP/DEF = vida da carta</Text> : null}
+          {enableCombatSort && !gameStyle ? <Text style={[styles.combatSortHint,{color:colors.muted}]}>ATQ = maior dano de um ataque • HP/DEF = vida da carta</Text> : null}
+          {gameStyle && displayMode === 'battle' ? <Text style={[styles.combatSortHint,{color:colors.muted}]}>A carta representa a espécie/forma. Stats, golpes e PP vêm do sistema Pokémon ao travar a escolha.</Text> : null}
           <Text style={[styles.result, { color: colors.muted }]}>{visibleCards.length} cartas disponíveis</Text>
         </View>
 
@@ -232,7 +235,8 @@ export function CardPickerModal({
               selected={mode === 'single' ? selectedId === item.cards?.id : Number(selectedMap[item.cards?.id ?? ''] ?? 0) > 0}
               quantity={Number(selectedMap[item.cards?.id ?? ''] ?? 0)}
               displayMode={displayMode}
-              showCombatStats={enableCombatSort}
+              gameStyle={gameStyle}
+              showCombatStats={enableCombatSort && !gameStyle}
               onPress={() => selectSingle(item)}
               onMinus={() => changeQuantity(item, -1)}
               onPlus={() => changeQuantity(item, 1)}
@@ -267,12 +271,13 @@ export function CardPickerModal({
   );
 }
 
-const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, displayMode, showCombatStats, onPress, onMinus, onPlus }: {
+const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, displayMode, gameStyle, showCombatStats, onPress, onMinus, onPlus }: {
   entry: OwnedCardEntry;
   mode: 'single' | 'quantity';
   selected: boolean;
   quantity: number;
   displayMode: 'market' | 'battle';
+  gameStyle: boolean;
   showCombatStats: boolean;
   onPress: () => void;
   onMinus: () => void;
@@ -299,13 +304,13 @@ const PickerCard = memo(function PickerCard({ entry, mode, selected, quantity, d
     >
       <View style={[styles.imageWrap, { backgroundColor: colors.surfaceAlt }]}>
         {card.image_small ? <Image source={{ uri: card.image_small }} style={styles.image} resizeMode="contain" /> : <Ionicons name="image-outline" size={30} color={colors.muted} />}
-        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{displayMode === 'battle' ? `HP ${combat.hp}` : card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
+        <View style={[styles.valueBadge, { backgroundColor: '#070707DD' }]}><Text style={[styles.valueBadgeText, { color: colors.yellow }]}>{displayMode === 'battle' ? (gameStyle ? 'MODO POKÉMON' : `HP ${combat.hp}`) : card.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View>
         {selected && mode === 'single' ? <View style={[styles.checkBadge, { backgroundColor: colors.yellow }]}><Ionicons name="checkmark" size={17} color="#07111F" /></View> : null}
       </View>
       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.pokemon_name}</Text>
-      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? `ATQ BASE ${combat.maxDamage} • ⚡ custo ${combat.bestEnergy}` : `${card.rarity ?? 'Sem raridade'} • ${locationLabel}`}</Text>
+      <Text numberOfLines={1} style={[styles.cardMeta, { color: colors.muted }]}>{displayMode === 'battle' ? (gameStyle ? `${card.rarity ?? 'Carta Pokémon'} • espécie/forma define os stats` : `ATQ BASE ${combat.maxDamage} • ⚡ custo ${combat.bestEnergy}`) : `${card.rarity ?? 'Sem raridade'} • ${locationLabel}`}</Text>
       {showCombatStats && displayMode !== 'battle' ? <Text numberOfLines={1} style={[styles.legacyCombatMeta,{color:colors.yellow}]}>ATK {combat.maxDamage} • DEF {combat.hp}</Text> : null}
-      {displayMode === 'battle' ? <Text numberOfLines={1} style={[styles.battleMeta, { color: colors.muted }]}>⚡ mín {combat.minEnergy} • {combat.attackCount} ataques • {combat.abilityCount} habilidades</Text> : null}
+      {displayMode === 'battle' ? <Text numberOfLines={1} style={[styles.battleMeta, { color: colors.muted }]}>{gameStyle ? 'HP • ATK • DEF • SP.ATK • SP.DEF • SPEED • 4 golpes com PP' : `⚡ mín ${combat.minEnergy} • ${combat.attackCount} ataques • ${combat.abilityCount} habilidades`}</Text> : null}
       {mode === 'quantity' ? (
         <View style={styles.qtyRow}>
           <Pressable style={[styles.qtyButton, { backgroundColor: colors.surfaceAlt }]} onPress={onMinus}><Text style={[styles.qtySign, { color: colors.text }]}>−</Text></Pressable>
