@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { getCardDetail, type CardDetailEntry } from '@/services/player';
@@ -236,50 +236,116 @@ export default function CardDetailScreen() {
             {economyStyle ? <View style={[styles.styleInfo,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name={(economyStyle.icon||'color-wand') as keyof typeof Ionicons.glyphMap} size={16} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.styleInfoTitle,{color:colors.text}]}>PERSONALIZAÇÃO ECONOMY 2.1</Text><Text style={[styles.styleInfoText,{color:colors.muted}]}>{economyStyle.name}{galaxyStyle?' • Galaxy Flow com nebulosa e partículas estelares':''} • puramente visual, sem alterar estatísticas ou valor de mercado.</Text></View></View> : null}
             {!entry.owned ? <View style={[styles.previewBadge,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name="eye" size={15} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.previewBadgeTitle,{color:colors.text}]}>PRÉVIA DA CARTA</Text><Text style={[styles.previewBadgeText,{color:colors.muted}]}>Você ainda não possui esta carta. Veja as estatísticas antes de tentar obtê-la em um booster.</Text></View></View> : null}
 
-            <View style={[styles.valueHero, { backgroundColor: colors.accentSoft, borderColor: colors.yellow }]}><View style={[styles.valueIcon, { backgroundColor: colors.surface }]}><Ionicons name="cash" size={24} color={colors.yellow} /></View><View style={{ flex: 1 }}><Text style={[styles.valueLabel, { color: colors.muted }]}>VALOR DE MERCADO EM USD</Text><Text style={[styles.valueNumber, { color: colors.yellow }]}>{marketPriceUsd == null ? 'US$ —' : formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint, { color: colors.muted }]}>{marketPriceUsd == null ? (isUnreleasedWithoutMarket ? 'Sem cotação — esta versão inglesa nunca foi lançada fisicamente.' : 'Preço TCGplayer indisponível para esta carta.') : 'Snapshot de mercado TCGplayer'}</Text></View></View>
-
-            <View style={[styles.battlePanel,{backgroundColor:colors.surfaceAlt,borderColor:colors.accent}]}>
-              <View style={styles.battlePanelHead}>
-                <View>
-                  <Text style={[styles.valueLabel,{color:colors.muted}]}>ESTATÍSTICAS DE BATALHA • REGRA V4</Text>
-                  <Text style={[styles.battlePower,{color:colors.yellow}]}>⚔ PWR {combat.battleRating} / 1000</Text>
-                </View>
-                <Ionicons name="flash" size={24} color={colors.accent}/>
-              </View>
-              <View style={styles.battleStatsGrid}>
-                <BattleStat label="HP" value={combat.hp} />
-                <BattleStat label="ATAQUE" value={combat.maxDamage} />
-                <BattleStat label="ENERGIA" value={combat.bestEnergy} />
-                <BattleStat label="EFICIÊNCIA" value={combat.efficiencyScore} suffix="/100" />
-                <BattleStat label="VELOCIDADE" value={combat.speedScore} suffix="/100" />
-                <BattleStat label="TÉCNICA" value={combat.techniqueScore} suffix="/100" />
-              </View>
-              <Text style={[styles.battleHint,{color:colors.muted}]}>
-                O PWR compara a força geral da carta. Na batalha real, fraqueza, resistência e o tempo para nocautear o oponente podem mudar completamente o resultado.
-              </Text>
+            <View style={styles.detailTabs}>
+              {([
+                ['card','Carta','card-outline'],
+                ['battle','Batalha','game-controller-outline'],
+                ['market','Mercado','trending-up-outline'],
+                ['collection','Coleção','albums-outline'],
+              ] as Array<[typeof detailTab,string,keyof typeof Ionicons.glyphMap]>).map(([tab,label,icon])=>{
+                const active=detailTab===tab;
+                return <Pressable key={tab} onPress={()=>setDetailTab(tab)} style={[styles.detailTab,{backgroundColor:active?colors.accentSoft:colors.surfaceAlt,borderColor:active?colors.accent:colors.border}]}>
+                  <Ionicons name={icon} size={16} color={active?colors.accent:colors.muted}/>
+                  <Text style={[styles.detailTabLabel,{color:active?colors.text:colors.muted}]}>{label.toUpperCase()}</Text>
+                </Pressable>;
+              })}
             </View>
 
-            {priceHistory.length ? <View style={[styles.historyPanel, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-              <View style={styles.historyHead}>
-                <View><Text style={[styles.valueLabel, { color: colors.muted }]}>HISTÓRICO DE PREÇO</Text><Text style={[styles.historyValue, { color: colors.text }]}>{formatUsd(priceHistory[priceHistory.length - 1].priceUsd)}</Text></View>
-                <Text style={[styles.historyDelta, { color: historyDelta >= 0 ? '#65D894' : '#FF8290' }]}>{historyDelta >= 0 ? '+' : ''}{formatUsd(historyDelta)}</Text>
-              </View>
-              <View style={styles.chart}>
-                {priceHistory.map((point, index) => {
-                  const height = 18 + ((point.priceUsd - historyMin) / historyRange) * 72;
-                  return <View key={point.recordedAt + '-' + index} style={styles.barSlot}><View style={[styles.bar, { height, backgroundColor: colors.accent }]} /></View>;
+            {detailTab==='card'?<>
+              <Text style={[styles.panelSectionTitle,{color:colors.text}]}>Informações da carta</Text>
+              <View style={styles.gameTypeRow}>
+                {(gameProfile?.types?.length ? gameProfile.types : (card.game_types?.length ? card.game_types : card.types ?? [])).map((type)=>{
+                  const visual=getPokemonTypeSymbol(String(type));
+                  return <View key={String(type)} style={[styles.gameTypeChip,{backgroundColor:visual.color}]}>
+                    <MaterialCommunityIcons name={visual.icon} size={17} color="#FFFFFF"/>
+                    <Text style={styles.gameTypeText}>{visual.label}</Text>
+                  </View>;
                 })}
               </View>
-              <View style={styles.historyDates}><Text style={[styles.historyDate, { color: colors.muted }]}>{new Date(priceHistory[0].recordedAt).toLocaleDateString('pt-BR')}</Text><Text style={[styles.historyDate, { color: colors.muted }]}>Mín. {formatUsd(historyMin)} • Máx. {formatUsd(historyMax)}</Text><Text style={[styles.historyDate, { color: colors.muted }]}>{new Date(priceHistory[priceHistory.length - 1].recordedAt).toLocaleDateString('pt-BR')}</Text></View>
-            </View> : null}
+              <View style={styles.statsGrid}>
+                <Info label="SET" value={card.set_name}/>
+                <Info label="NÚMERO" value={card.card_number??'—'}/>
+                <Info label="RARIDADE" value={card.rarity??'—'}/>
+                <Info label="ESPÉCIE / FORMA" value={gameProfile?formatGameIdentifier(gameProfile.identifier):card.pokemon_name}/>
+              </View>
+              <Text style={[styles.battleHint,{color:colors.muted}]}>Os tipos acima são os tipos reais da espécie/forma usados pelo motor game_v1. O tipo impresso do TCG continua preservado nos dados originais da carta.</Text>
+            </>:null}
 
-            <View style={styles.badges}>{(card.types ?? []).map((type) => <View key={type} style={[styles.badge, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Text style={[styles.badgeText, { color: colors.text }]}>{type}</Text></View>)}</View>
-            <View style={styles.statsGrid}><Info label="SET" value={card.set_name} /><Info label="NÚMERO" value={card.card_number ?? '—'} /><Info label="QUANTIDADE" value={entry.owned ? `×${entry.quantity}` : 'Ainda não possui'} /><Info label="VALOR TOTAL EM USD" value={totalMarketValueUsd == null ? '—' : formatUsd(totalMarketValueUsd)} /><Info label="VALOR NO JOGO" value={`🪙 ${unitValue.toLocaleString('pt-BR')}`} /><Info label="OBTIDO" value={entry.first_obtained_at ? new Date(entry.first_obtained_at).toLocaleDateString('pt-BR') : 'Ainda não está na Bag'} /></View>
-            <View style={styles.cardActions}>
-              {entry.owned ? <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: entry.favorite ? '#B73C59' : colors.yellow }]} onPress={toggleFavorite} disabled={saving}><Ionicons name={entry.favorite ? 'heart' : 'heart-outline'} size={19} color={entry.favorite ? '#fff' : '#07111F'} /><Text style={[styles.favoriteButtonText, entry.favorite && { color: '#fff' }]}>{saving ? 'SALVANDO...' : entry.favorite ? 'REMOVER FAVORITO' : 'FAVORITAR'}</Text></Pressable> : null}
-              <Pressable style={[styles.favoriteButton, styles.flexAction, { backgroundColor: wishlisted ? '#FFD447' : colors.accentSoft, borderWidth: 1, borderColor: wishlisted ? '#FFD447' : colors.accent }]} onPress={toggleWishlist} disabled={wishlistSaving}><Ionicons name={wishlisted ? 'star' : 'star-outline'} size={19} color={wishlisted ? '#07111F' : colors.accent} /><Text style={[styles.favoriteButtonText, { color: wishlisted ? '#07111F' : colors.text }]}>{wishlistSaving ? 'SALVANDO...' : wishlisted ? 'NO CARD CHASE' : 'QUERO ESTA CARTA'}</Text></Pressable>
-              {entry.owned ? <Pressable style={[styles.favoriteButton,styles.flexAction,{backgroundColor:colors.surfaceAlt,borderWidth:1,borderColor:stylePrimary}]} onPress={()=>{void openStylePicker();}}><Ionicons name="color-wand" size={19} color={stylePrimary===colors.border?colors.accent:stylePrimary}/><Text style={[styles.favoriteButtonText,{color:colors.text}]}>{economyStyle?'TROCAR TEMA':'PERSONALIZAR CARTA'}</Text></Pressable>:null}
-            </View>
+            {detailTab==='battle'?<>
+              {gameProfile?<View style={[styles.battlePanel,{backgroundColor:colors.surfaceAlt,borderColor:colors.accent}]}>
+                <View style={styles.battlePanelHead}>
+                  <View>
+                    <Text style={[styles.valueLabel,{color:colors.muted}]}>MOTOR DE BATALHA • GAME_V1 • NÍVEL {gameProfile.stats.level}</Text>
+                    <Text style={[styles.battlePower,{color:colors.yellow}]}>{formatGameIdentifier(gameProfile.identifier)}</Text>
+                  </View>
+                  <Ionicons name="game-controller" size={25} color={colors.accent}/>
+                </View>
+                <View style={styles.battleStatsGrid}>
+                  <BattleStat label="HP" value={gameProfile.stats.hp}/>
+                  <BattleStat label="ATAQUE" value={gameProfile.stats.attack}/>
+                  <BattleStat label="DEFESA" value={gameProfile.stats.defense}/>
+                  <BattleStat label="SP. ATK" value={gameProfile.stats.spAttack}/>
+                  <BattleStat label="SP. DEF" value={gameProfile.stats.spDefense}/>
+                  <BattleStat label="SPEED" value={gameProfile.stats.speed}/>
+                </View>
+                <View style={[styles.abilityCard,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+                  <Text style={[styles.valueLabel,{color:colors.muted}]}>HABILIDADE</Text>
+                  <Text style={[styles.abilityName,{color:colors.text}]}>{gameProfile.ability?formatGameIdentifier(gameProfile.ability):'Nenhuma'}</Text>
+                </View>
+                <Text style={[styles.panelSectionTitle,{color:colors.text}]}>Golpes usados no jogo</Text>
+                <View style={styles.moveList}>
+                  {gameProfile.moves.map((move)=>{
+                    const visual=getPokemonTypeSymbol(move.type);
+                    const effectParts=[
+                      move.ailment&&move.ailment!=='none' ? formatGameIdentifier(move.ailment)+(move.ailmentChance?(' '+move.ailmentChance+'%'):'') : '',
+                      move.drain<0 ? 'Recuo '+Math.abs(move.drain)+'%' : move.drain>0 ? 'Drena '+move.drain+'%' : '',
+                      move.healing>0 ? 'Cura '+move.healing+'%' : '',
+                      move.priority!==0 ? 'Prioridade '+(move.priority>0?'+':'')+move.priority : '',
+                    ].filter(Boolean);
+                    return <View key={move.id} style={[styles.moveCard,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+                      <View style={[styles.moveTypeIcon,{backgroundColor:visual.color}]}><MaterialCommunityIcons name={visual.icon} size={18} color="#FFFFFF"/></View>
+                      <View style={styles.moveBody}>
+                        <View style={styles.moveTitleRow}><Text style={[styles.moveName,{color:colors.text}]}>{formatGameIdentifier(move.identifier)}</Text><Text style={[styles.moveCategory,{color:visual.color}]}>{String(move.category).toUpperCase()}</Text></View>
+                        <Text style={[styles.moveMeta,{color:colors.yellow}]}>Poder {move.power??'—'} • PP {move.pp} • Precisão {move.accuracy==null?'—':move.accuracy+'%'}</Text>
+                        {effectParts.length?<Text style={[styles.moveEffect,{color:colors.muted}]}>{effectParts.join(' • ')}</Text>:null}
+                      </View>
+                    </View>;
+                  })}
+                </View>
+                <Text style={[styles.battleHint,{color:colors.muted}]}>Estas são exatamente as estatísticas e os golpes canônicos consultados pelo game_v1. Não há cartas de Energia neste sistema.</Text>
+              </View>:<View style={[styles.previewBadge,{backgroundColor:colors.surfaceAlt,borderColor:'#FF8A8A'}]}><Ionicons name="alert-circle" size={18} color="#FF8A8A"/><Text style={[styles.previewBadgeText,{color:colors.text,flex:1}]}>Esta carta não possui um perfil game_v1 disponível.</Text></View>}
+            </>:null}
+
+            {detailTab==='market'?<>
+              <View style={[styles.valueHero,{backgroundColor:colors.accentSoft,borderColor:colors.yellow}]}><View style={[styles.valueIcon,{backgroundColor:colors.surface}]}><Ionicons name="cash" size={24} color={colors.yellow}/></View><View style={{flex:1}}><Text style={[styles.valueLabel,{color:colors.muted}]}>VALOR DE MERCADO EM USD</Text><Text style={[styles.valueNumber,{color:colors.yellow}]}>{marketPriceUsd==null?'US$ —':formatUsd(marketPriceUsd)}</Text><Text style={[styles.valueHint,{color:colors.muted}]}>{marketPriceUsd==null?(isUnreleasedWithoutMarket?'Sem cotação — esta versão inglesa nunca foi lançada fisicamente.':'Preço de mercado indisponível para esta carta.'):'Snapshot atual do mercado'}</Text></View></View>
+              {priceHistory.length?<View style={[styles.historyPanel,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+                <View style={styles.historyHead}><View><Text style={[styles.valueLabel,{color:colors.muted}]}>HISTÓRICO DE PREÇO</Text><Text style={[styles.historyValue,{color:colors.text}]}>{formatUsd(priceHistory[priceHistory.length-1].priceUsd)}</Text></View><Text style={[styles.historyDelta,{color:historyDelta>=0?'#65D894':'#FF8290'}]}>{historyDelta>=0?'+':''}{formatUsd(historyDelta)}</Text></View>
+                <View style={styles.chart}>{priceHistory.map((point,index)=>{const height=18+((point.priceUsd-historyMin)/historyRange)*72;return <View key={point.recordedAt+'-'+index} style={styles.barSlot}><View style={[styles.bar,{height,backgroundColor:colors.accent}]}/></View>;})}</View>
+                <View style={styles.historyDates}><Text style={[styles.historyDate,{color:colors.muted}]}>{new Date(priceHistory[0].recordedAt).toLocaleDateString('pt-BR')}</Text><Text style={[styles.historyDate,{color:colors.muted}]}>Mín. {formatUsd(historyMin)} • Máx. {formatUsd(historyMax)}</Text><Text style={[styles.historyDate,{color:colors.muted}]}>{new Date(priceHistory[priceHistory.length-1].recordedAt).toLocaleDateString('pt-BR')}</Text></View>
+              </View>:<Text style={[styles.battleHint,{color:colors.muted}]}>Ainda não há histórico de preço suficiente para esta carta.</Text>}
+              <Pressable onPress={()=>router.push('/marketplace')} style={[styles.contextAction,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="storefront" size={19} color="#54C78D"/><View style={{flex:1}}><Text style={[styles.contextActionTitle,{color:colors.text}]}>Abrir Mercado de Treinadores</Text><Text style={[styles.contextActionText,{color:colors.muted}]}>Compare anúncios e procure oportunidades.</Text></View><Ionicons name="chevron-forward" size={18} color={colors.muted}/></Pressable>
+            </>:null}
+
+            {detailTab==='collection'?<>
+              <Text style={[styles.panelSectionTitle,{color:colors.text}]}>Sua coleção</Text>
+              <View style={styles.statsGrid}>
+                <Info label="QUANTIDADE" value={entry.owned?'×'+entry.quantity:'Ainda não possui'}/>
+                <Info label="VALOR TOTAL EM USD" value={totalMarketValueUsd==null?'—':formatUsd(totalMarketValueUsd)}/>
+                <Info label="VALOR NO JOGO" value={unitValue.toLocaleString('pt-BR')+' coins'}/>
+                <Info label="OBTIDO" value={entry.first_obtained_at?new Date(entry.first_obtained_at).toLocaleDateString('pt-BR'):'Ainda não está na Bag'}/>
+              </View>
+              <View style={styles.contextGrid}>
+                <Pressable onPress={()=>router.push('/decks')} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="albums" size={20} color="#5AA8FF"/><Text style={[styles.contextTileText,{color:colors.text}]}>DECKS</Text></Pressable>
+                <Pressable onPress={()=>router.push('/marketplace')} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="pricetag" size={20} color="#54C78D"/><Text style={[styles.contextTileText,{color:colors.text}]}>VENDER</Text></Pressable>
+                <Pressable onPress={()=>router.push('/(tabs)/trade')} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="swap-horizontal" size={20} color="#9B7BFF"/><Text style={[styles.contextTileText,{color:colors.text}]}>TROCAR</Text></Pressable>
+                <Pressable onPress={()=>router.push('/(tabs)/battles')} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="game-controller" size={20} color="#FF735C"/><Text style={[styles.contextTileText,{color:colors.text}]}>BATALHAR</Text></Pressable>
+              </View>
+              <View style={styles.cardActions}>
+                {entry.owned?<Pressable style={[styles.favoriteButton,styles.flexAction,{backgroundColor:entry.favorite?'#B73C59':colors.yellow}]} onPress={toggleFavorite} disabled={saving}><Ionicons name={entry.favorite?'heart':'heart-outline'} size={19} color={entry.favorite?'#fff':'#07111F'}/><Text style={[styles.favoriteButtonText,entry.favorite&&{color:'#fff'}]}>{saving?'SALVANDO...':entry.favorite?'REMOVER FAVORITO':'FAVORITAR'}</Text></Pressable>:null}
+                <Pressable style={[styles.favoriteButton,styles.flexAction,{backgroundColor:wishlisted?'#FFD447':colors.accentSoft,borderWidth:1,borderColor:wishlisted?'#FFD447':colors.accent}]} onPress={toggleWishlist} disabled={wishlistSaving}><Ionicons name={wishlisted?'star':'star-outline'} size={19} color={wishlisted?'#07111F':colors.accent}/><Text style={[styles.favoriteButtonText,{color:wishlisted?'#07111F':colors.text}]}>{wishlistSaving?'SALVANDO...':wishlisted?'NO CARD CHASE':'QUERO ESTA CARTA'}</Text></Pressable>
+                {entry.owned?<Pressable style={[styles.favoriteButton,styles.flexAction,{backgroundColor:colors.surfaceAlt,borderWidth:1,borderColor:stylePrimary}]} onPress={()=>{void openStylePicker();}}><Ionicons name="color-wand" size={19} color={stylePrimary===colors.border?colors.accent:stylePrimary}/><Text style={[styles.favoriteButtonText,{color:colors.text}]}>{economyStyle?'TROCAR TEMA':'PERSONALIZAR CARTA'}</Text></Pressable>:null}
+              </View>
+            </>:null}
           </View>
         </View> : null}
       </ScrollView>
