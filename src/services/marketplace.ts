@@ -155,6 +155,7 @@ async function action(args: Record<string, unknown>) {
       INVALID_SHOP_NAME:'O nome da loja deve ter entre 3 e 32 caracteres.',
       PREMIUM_SHOP_THEME_LOCKED:'Esse tema premium precisa ser comprado na Economy 2.1 antes de ser usado.',
       LEGACY_CARD_LOCKED:'A última cópia desta carta está protegida pelo seu Legado Beta e não pode sair da coleção antes da migração 1.0.',
+      CARD_LOCKED:'Esta carta está bloqueada 🔒. Desbloqueie no Passaporte antes de anunciar.',
     };
     const key=Object.keys(map).find((item)=>error.message.includes(item));
     throw new Error(key ? map[key] : error.message);
