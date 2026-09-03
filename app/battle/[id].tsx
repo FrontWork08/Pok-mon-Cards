@@ -33,6 +33,7 @@ export default function BattleScreen() {
   const [selectedAttackName, setSelectedAttackName] = useState<string | null>(null);
   const [attackState, setAttackState] = useState<any>(null);
   const [arenaResultRound, setArenaResultRound] = useState<any>(null);
+  const [arenaTurnResult, setArenaTurnResult] = useState<any>(null);
   const [draftPreviewCard, setDraftPreviewCard] = useState<any>(null);
   const [stakeCardId, setStakeCardId] = useState<string | null>(null);
   const [sourceDeck, setSourceDeck] = useState<string>('bag');
@@ -77,7 +78,7 @@ export default function BattleScreen() {
         if (battleData.mode === 'draft3' && battleData.status === 'revealing') {
           const nextAttackState = await getBattleAttackState(String(id)).catch(() => null);
           setAttackState(nextAttackState);
-          if (nextAttackState?.myAttackName) setSelectedAttackName(String(nextAttackState.myAttackName));
+          setSelectedAttackName(nextAttackState?.myAttackName ? String(nextAttackState.myAttackName) : null);
         } else {
           setAttackState(null);
           setSelectedAttackName(null);
@@ -188,10 +189,13 @@ export default function BattleScreen() {
   const choosingAttack = battle?.mode === 'draft3' && battle?.status === 'revealing';
   const myAttackLocked = Boolean(attackState?.myLocked);
   const opponentAttackLocked = Boolean(attackState?.opponentLocked);
+  const gameStyleBattle = battle?.engine_version === 'game_v1' || Boolean(attackState?.gameStyle);
   const attackOptions = Array.isArray(attackState?.attacks) ? attackState.attacks : [];
   const manualAttackOptions = attackOptions.length
     ? attackOptions
-    : [{ name: 'Sem ataque', damage: '0', text: 'Este Pokémon não possui ataque impresso.', convertedEnergyCost: 0, __noAttack: true }];
+    : gameStyleBattle
+      ? [{ identifier: 'struggle', name: 'Struggle', type: 'normal', category: 'physical', power: 50, damage: '50', pp: 999, maxPp: 999, accuracy: 100, priority: 0 }]
+      : [{ name: 'Sem ataque', damage: '0', text: 'Este Pokémon não possui ataque impresso.', convertedEnergyCost: 0, __noAttack: true }];
   const lockedPlayers = useMemo(() => new Set(events.filter((event) => ['card_locked', 'auto_locked'].includes(event.event_type) && Number(event.payload?.round) === currentRound).map((event) => event.payload?.playerId).filter(Boolean)), [currentRound, events]);
   const selfLocked = lockedPlayers.has(userId);
   const otherId = battle ? (battle.challenger_id === userId ? battle.opponent_id : battle.challenger_id) : '';
@@ -225,14 +229,14 @@ export default function BattleScreen() {
     pokedexNumber: attackState?.myPokedexNumber == null ? null : Number(attackState.myPokedexNumber),
     fallbackImage: attackState?.myCardImage ?? null,
     hp: attackState?.myHp == null ? null : Number(attackState.myHp),
-    maxHp: attackState?.myHp == null ? null : Number(attackState.myHp),
+    maxHp: attackState?.myMaxHp == null ? (attackState?.myHp == null ? null : Number(attackState.myHp)) : Number(attackState.myMaxHp),
   } : null;
   const attackArenaRival: PixelBattleFighter | null = choosingAttack ? {
     name: String(attackState?.opponentCardName ?? 'Pokémon rival'),
     pokedexNumber: attackState?.opponentPokedexNumber == null ? null : Number(attackState.opponentPokedexNumber),
     fallbackImage: attackState?.opponentCardImage ?? null,
     hp: attackState?.opponentHp == null ? null : Number(attackState.opponentHp),
-    maxHp: attackState?.opponentHp == null ? null : Number(attackState.opponentHp),
+    maxHp: attackState?.opponentMaxHp == null ? (attackState?.opponentHp == null ? null : Number(attackState.opponentHp)) : Number(attackState.opponentMaxHp),
   } : null;
 
   const resultArenaMy: PixelBattleFighter | null = resultRound && resultMyCard ? {
@@ -256,6 +260,37 @@ export default function BattleScreen() {
     damage: resultRivalCombat?.effectiveDamage == null ? resultRivalCombat?.totalDamageDealt ?? 0 : resultRivalCombat.effectiveDamage,
     firstPlayer: Boolean(resultRivalCombat?.firstPlayer),
     knockedOut: Boolean(resultRivalCombat?.knockedOut),
+  } : null;
+
+  const turnMyMove = arenaTurnResult
+    ? [arenaTurnResult.firstMove, arenaTurnResult.secondMove].find((move: any) => move?.playerId === userId)
+    : null;
+  const turnRivalMove = arenaTurnResult
+    ? [arenaTurnResult.firstMove, arenaTurnResult.secondMove].find((move: any) => move?.playerId === otherId)
+    : null;
+  const turnMyState = arenaTurnResult
+    ? (amChallenger ? arenaTurnResult.challenger : arenaTurnResult.opponent)
+    : null;
+  const turnRivalState = arenaTurnResult
+    ? (amChallenger ? arenaTurnResult.opponent : arenaTurnResult.challenger)
+    : null;
+  const liveArenaMy: PixelBattleFighter | null = attackArenaMy ? {
+    ...attackArenaMy,
+    hp: turnMyState?.remainingHp == null ? attackArenaMy.hp : Number(turnMyState.remainingHp),
+    maxHp: turnMyState?.hp == null ? attackArenaMy.maxHp : Number(turnMyState.hp),
+    attackName: turnMyMove?.move ?? null,
+    damage: Number(turnMyMove?.damage ?? 0),
+    firstPlayer: arenaTurnResult?.firstPlayerId === userId,
+    knockedOut: Boolean(turnMyState?.knockedOut),
+  } : null;
+  const liveArenaRival: PixelBattleFighter | null = attackArenaRival ? {
+    ...attackArenaRival,
+    hp: turnRivalState?.remainingHp == null ? attackArenaRival.hp : Number(turnRivalState.remainingHp),
+    maxHp: turnRivalState?.hp == null ? attackArenaRival.maxHp : Number(turnRivalState.hp),
+    attackName: turnRivalMove?.move ?? null,
+    damage: Number(turnRivalMove?.damage ?? 0),
+    firstPlayer: arenaTurnResult?.firstPlayerId === otherId,
+    knockedOut: Boolean(turnRivalState?.knockedOut),
   } : null;
 
   useEffect(() => {
@@ -324,7 +359,9 @@ export default function BattleScreen() {
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
       await loadBattleState();
     } catch (error) {
-      if (isFunctionErrorCode(error, 'BATTLE_RULE_REVIEW_REQUIRED')) {
+      if (isFunctionErrorCode(error, 'GAME_PROFILE_UNAVAILABLE')) {
+        setNotice('Não foi possível mapear esta carta para uma forma Pokémon segura. Escolha outra carta.');
+      } else if (isFunctionErrorCode(error, 'BATTLE_RULE_REVIEW_REQUIRED')) {
         setNotice('Essa carta recebeu uma regra nova ou alterada e está temporariamente bloqueada na rankeada até a validação do motor. Escolha outra carta.');
       } else {
         if (isFunctionErrorCode(error, 'NOT_YOUR_TURN', 'CARD_ALREADY_DRAFTED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) await loadBattleState().catch(() => null);
@@ -341,7 +378,10 @@ export default function BattleScreen() {
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
       if (result?.attackSelectionRequired) {
         setSelectedAttackName(null);
-        setNotice('Pokémons definidos. Agora escolha o ataque desta rodada.');
+        setArenaTurnResult(null);
+        setNotice(result?.engineVersion === 'game_v1'
+          ? 'Pokémon definidos. Agora escolha um golpe. HP, Speed e PP serão usados no confronto.'
+          : 'Pokémons definidos. Agora escolha o ataque desta rodada.');
       } else if (result?.resolved) {
         setNotice('As duas cartas foram travadas. Resultado revelado!');
       }
@@ -363,19 +403,35 @@ export default function BattleScreen() {
     try {
       setWorking(true);
       setNotice(null);
+      setArenaTurnResult(null);
       const result = await chooseBattleAttack(String(id), selectedAttackName);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
-      if (result?.resolved) {
+      if (result?.resolved?.engineVersion === 'game_v1') {
+        setArenaTurnResult(result.resolved);
+        if (result.resolved?.continueBattle) {
+          setNotice(`Turno ${Number(result.resolved?.turn ?? 0)} resolvido. Nenhum Pokémon caiu — escolha o próximo golpe.`);
+        } else if (result.resolved?.completed) {
+          setNotice('Nocaute! A batalha foi concluída.');
+        } else {
+          setNotice('Nocaute! A rodada foi resolvida.');
+        }
+      } else if (result?.resolved) {
         setNotice('Ataques definidos. Rodada resolvida!');
       } else {
-        setNotice('Ataque travado. Aguardando o adversário.');
+        setNotice(gameStyleBattle ? 'Golpe travado. Aguardando o adversário.' : 'Ataque travado. Aguardando o adversário.');
       }
       await loadBattleState();
     } catch (error) {
       if (isFunctionErrorCode(error, 'ALREADY_ATTACK_LOCKED', 'INVALID_STATUS', 'SELECTION_EXPIRED')) {
         await loadBattleState().catch(() => null);
       }
-      setNotice(error instanceof Error ? error.message : 'Não foi possível escolher o ataque.');
+      if (isFunctionErrorCode(error, 'MOVE_NO_PP')) {
+        setNotice('Esse golpe está sem PP. Escolha outro golpe.');
+      } else if (isFunctionErrorCode(error, 'INVALID_MOVE')) {
+        setNotice('Esse golpe não está disponível para este Pokémon.');
+      } else {
+        setNotice(error instanceof Error ? error.message : 'Não foi possível escolher o golpe.');
+      }
     } finally {
       setWorking(false);
     }
@@ -548,7 +604,9 @@ export default function BattleScreen() {
             {!selfLocked ? (
               <View style={[styles.sourcePanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {battle.mode === 'draft3' ? <Text style={[styles.sourceLabel, { color: colors.muted }]}>SUAS CARTAS DO DRAFT AINDA NÃO USADAS</Text> : <><View style={styles.sourceLabelRow}><Text style={[styles.sourceLabel, { color: colors.muted }]}>FONTE DAS CARTAS</Text><Pressable onPress={() => router.push('/decks')}><Text style={[styles.editDecks, { color: colors.accent }]}>EDITAR DECKS</Text></Pressable></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.deckChips}><DeckChip label="Bag inteira" active={sourceDeck === 'bag'} onPress={() => setSourceDeck('bag')} />{decks.map((deck) => <DeckChip key={deck.id} label={`${deck.is_default ? '★ ' : ''}${deck.name}`} active={sourceDeck === deck.id} onPress={() => setSourceDeck(deck.id)} />)}</ScrollView></>}
-                <Pressable style={[styles.openPicker, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={() => setPickerMode('battle')}><Ionicons name="search" size={22} color={colors.accent} /><View style={{ flex: 1 }}><Text style={[styles.openPickerTitle, { color: colors.text }]}>{selectedEntry?.cards ? `Selecionada: ${selectedEntry.cards.pokemon_name}` : 'Escolher carta de batalha'}</Text><Text style={[styles.openPickerMeta, { color: colors.muted }]}>{selectedEntry?.cards ? `HP ${getBattleCardPreview(selectedEntry.cards).hp} • ATQ ${getBattleCardPreview(selectedEntry.cards).maxDamage} • ⚡ ${getBattleCardPreview(selectedEntry.cards).bestEnergy} • toque para trocar` : `${pickerBag.length} cartas • compare HP, ataque, Energia e efeitos`}</Text></View><Ionicons name="chevron-forward" size={22} color={colors.accent} /></Pressable>
+                <Pressable style={[styles.openPicker, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={() => setPickerMode('battle')}><Ionicons name="search" size={22} color={colors.accent} /><View style={{ flex: 1 }}><Text style={[styles.openPickerTitle, { color: colors.text }]}>{selectedEntry?.cards ? `Selecionada: ${selectedEntry.cards.pokemon_name}` : 'Escolher carta de batalha'}</Text><Text style={[styles.openPickerMeta, { color: colors.muted }]}>{selectedEntry?.cards
+  ? gameStyleBattle ? 'Espécie/forma selecionada • stats Nintendo serão aplicados ao travar • toque para trocar' : `HP ${getBattleCardPreview(selectedEntry.cards).hp} • ATQ ${getBattleCardPreview(selectedEntry.cards).maxDamage} • ⚡ ${getBattleCardPreview(selectedEntry.cards).bestEnergy} • toque para trocar`
+  : gameStyleBattle ? `${pickerBag.length} cartas • escolha pela espécie/forma; sem Energia TCG` : `${pickerBag.length} cartas • compare HP, ataque, Energia e efeitos`}</Text></View><Ionicons name="chevron-forward" size={22} color={colors.accent} /></Pressable>
               </View>
             ) : <View style={[styles.lockedNotice, { backgroundColor: colors.surface, borderColor: colors.accent }]}><Ionicons name="lock-closed" size={20} color={colors.accent} /><Text style={[styles.lockedText, { color: colors.text }]}>Sua carta está travada. Aguardando o oponente ou o servidor resolver a rodada.</Text></View>}
           </>
@@ -556,11 +614,21 @@ export default function BattleScreen() {
 
         {battle.mode === 'draft3' && (attacking || Boolean(resultRound)) ? (
           <PixelBattleArena
-            my={attacking ? attackArenaMy : resultArenaMy}
-            rival={attacking ? attackArenaRival : resultArenaRival}
-            resultKey={!attacking && resultRound ? `${battle.id}:${resultRound.round_no}` : null}
-            winner={!attacking && resultRound ? (resultRound.winner_id === userId ? 'me' : 'rival') : null}
-            title={attacking ? `RODADA ${currentRound} • ARENA 2D` : `RODADA ${Number(resultRound?.round_no ?? 0)} • SIMULAÇÃO VISUAL`}
+            my={attacking ? liveArenaMy : resultArenaMy}
+            rival={attacking ? liveArenaRival : resultArenaRival}
+            resultKey={attacking && arenaTurnResult
+              ? `${battle.id}:${currentRound}:turn:${arenaTurnResult.turn}`
+              : !attacking && resultRound ? `${battle.id}:${resultRound.round_no}` : null}
+            winner={attacking && arenaTurnResult?.knockout
+              ? (arenaTurnResult.winnerId === userId ? 'me' : 'rival')
+              : !attacking && resultRound ? (resultRound.winner_id === userId ? 'me' : 'rival') : null}
+            turnOnly={Boolean(attacking && arenaTurnResult && !arenaTurnResult?.knockout)}
+            title={attacking
+              ? `RODADA ${currentRound} • TURNO ${Number(attackState?.turn ?? arenaTurnResult?.turn ?? 1)}`
+              : `RODADA ${Number(resultRound?.round_no ?? 0)} • RESULTADO`}
+            subtitle={gameStyleBattle
+              ? 'Estilo Pokémon • HP, Speed, tipo, precisão, crítico, status e PP'
+              : 'Compatibilidade TCG v6 para batalha iniciada antes da migração'}
           />
         ) : null}
 
@@ -578,14 +646,25 @@ export default function BattleScreen() {
               {attackState?.myCardImage ? <Image source={{ uri: attackState.myCardImage }} style={styles.chooseStakeThumb} resizeMode="contain" /> : <Ionicons name="flash" size={30} color={colors.accent} />}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.openPickerTitle, { color: colors.text }]}>{attackState?.myCardName ?? 'Seu Pokémon'}</Text>
-                <Text style={[styles.openPickerMeta, { color: colors.muted }]}>Energia virtual começa em 0 e sobe +1 por turno. O ataque escolhido é usado assim que houver Energia suficiente.</Text>
+                {gameStyleBattle ? (
+                  <>
+                    <Text style={[styles.openPickerMeta, { color: colors.yellow }]}>HP {Number(attackState?.myHp ?? 0)}/{Number(attackState?.myMaxHp ?? attackState?.myHp ?? 0)} • TURNO {Number(attackState?.turn ?? 1)}</Text>
+                    <Text style={[styles.openPickerMeta, { color: colors.muted }]}>
+                      {Array.isArray(attackState?.myTypes) ? attackState.myTypes.map((type: string) => String(type).toUpperCase()).join(' / ') : 'TIPO —'}
+                      {attackState?.myAbility ? ` • Habilidade: ${String(attackState.myAbility).replaceAll('-', ' ')}` : ''}
+                      {attackState?.myStatus ? ` • Status: ${String(attackState.myStatus).toUpperCase()}` : ''}
+                    </Text>
+                  </>
+                ) : <Text style={[styles.openPickerMeta, { color: colors.muted }]}>Compatibilidade TCG v6 desta batalha já iniciada.</Text>}
               </View>
             </View>
 
             <Text style={[styles.sourceLabel, { color: colors.muted }]}>ATAQUES DISPONÍVEIS</Text>
             <View style={{ gap: 9 }}>
               {manualAttackOptions.map((attack: any, index: number) => {
-                const rawName = attack?.__noAttack ? '__NO_ATTACK__' : String(attack?.name ?? '');
+                const rawName = gameStyleBattle
+                  ? String(attack?.identifier ?? attack?.name ?? 'struggle')
+                  : attack?.__noAttack ? '__NO_ATTACK__' : String(attack?.name ?? '');
                 const displayName = attack?.__noAttack ? 'Sem ataque' : String(attack?.name ?? 'Ataque');
                 const energy = Number(attack?.convertedEnergyCost ?? (Array.isArray(attack?.cost) ? attack.cost.length : 0));
                 const selected = selectedAttackName === rawName || (myAttackLocked && attackState?.myAttackName === rawName);
@@ -605,8 +684,21 @@ export default function BattleScreen() {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.openPickerTitle, { color: colors.text }]}>{displayName}</Text>
-                      <Text style={[styles.openPickerMeta, { color: colors.yellow }]}>⚡ {energy} Energia • Dano {String(attack?.damage || '—')}</Text>
-                      {attack?.text ? <Text style={[styles.openPickerMeta, { color: colors.muted }]}>{String(attack.text)}</Text> : null}
+                      {gameStyleBattle ? (
+                        <>
+                          <Text style={[styles.openPickerMeta, { color: colors.yellow }]}>
+                            {String(attack?.type ?? 'normal').toUpperCase()} • {String(attack?.category ?? 'physical').toUpperCase()} • Poder {String(attack?.power ?? '—')} • PP {Number(attack?.pp ?? 0)}/{Number(attack?.maxPp ?? attack?.pp ?? 0)}
+                          </Text>
+                          <Text style={[styles.openPickerMeta, { color: colors.muted }]}>
+                            Precisão {attack?.accuracy == null ? '—' : `${Number(attack.accuracy)}%`}{Number(attack?.priority ?? 0) !== 0 ? ` • Prioridade ${Number(attack.priority) > 0 ? '+' : ''}${Number(attack.priority)}` : ''}
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={[styles.openPickerMeta, { color: colors.yellow }]}>⚡ {energy} Energia • Dano {String(attack?.damage || '—')}</Text>
+                          {attack?.text ? <Text style={[styles.openPickerMeta, { color: colors.muted }]}>{String(attack.text)}</Text> : null}
+                        </>
+                      )}
                     </View>
                     <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={selected ? colors.yellow : colors.muted} />
                   </Pressable>
@@ -624,7 +716,7 @@ export default function BattleScreen() {
             {myAttackLocked ? (
               <View style={[styles.lockedNotice, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
                 <Ionicons name="lock-closed" size={20} color={colors.accent} />
-                <Text style={[styles.lockedText, { color: colors.text }]}>Seu ataque está travado: {attackState?.myAttackName === '__NO_ATTACK__' ? 'Sem ataque' : attackState?.myAttackName}. Aguardando o adversário.</Text>
+                <Text style={[styles.lockedText, { color: colors.text }]}>Seu {gameStyleBattle ? 'golpe' : 'ataque'} está travado: {attackState?.myAttackName === '__NO_ATTACK__' ? 'Sem ataque' : String(attackState?.myAttackName ?? '').replaceAll('-', ' ')}. Aguardando o adversário.</Text>
               </View>
             ) : (
               <Pressable
@@ -632,7 +724,7 @@ export default function BattleScreen() {
                 onPress={() => void confirmAttack()}
                 style={[styles.accept, { backgroundColor: colors.yellow }, (!selectedAttackName || working || remaining === 0) && styles.disabled]}
               >
-                <Text style={styles.acceptText}>{working ? 'CONFIRMANDO…' : 'USAR ESTE ATAQUE'}</Text>
+                <Text style={styles.acceptText}>{working ? 'CONFIRMANDO…' : gameStyleBattle ? 'USAR ESTE GOLPE' : 'USAR ESTE ATAQUE'}</Text>
               </Pressable>
             )}
           </View>
@@ -675,7 +767,7 @@ export default function BattleScreen() {
           </Pressable>
           <Pressable style={[styles.lockDock, { backgroundColor: selfLocked ? '#274E3B' : colors.yellow }, (!selectedId || working || selfLocked || remaining === 0) && styles.disabled]} onPress={lock} disabled={!selectedId || working || selfLocked || remaining === 0}>
             <Ionicons name="lock-closed" size={19} color={selfLocked ? '#B7E8CC' : '#07111F'} />
-            <View><Text style={[styles.dockSmall, { color: selfLocked ? '#9CCDB1' : '#564912' }]}>{selectedEntry?.cards ? `HP ${getBattleCardPreview(selectedEntry.cards).hp} • ATQ ${getBattleCardPreview(selectedEntry.cards).maxDamage} • ⚡ ${getBattleCardPreview(selectedEntry.cards).bestEnergy}` : 'SELEÇÃO SECRETA'}</Text><Text style={[styles.lockDockText, { color: selfLocked ? '#E2FFEE' : '#07111F' }]}>{selfLocked ? 'CARTA TRAVADA' : remaining === 0 ? 'RESOLVENDO…' : 'TRAVAR CARTA'}</Text></View>
+            <View><Text style={[styles.dockSmall, { color: selfLocked ? '#9CCDB1' : '#564912' }]}>{selectedEntry?.cards ? (gameStyleBattle ? 'STATS DO POKÉMON • NÍVEL 50 • SEM ENERGIA' : `HP ${getBattleCardPreview(selectedEntry.cards).hp} • ATQ ${getBattleCardPreview(selectedEntry.cards).maxDamage} • ⚡ ${getBattleCardPreview(selectedEntry.cards).bestEnergy}`) : 'SELEÇÃO SECRETA'}</Text><Text style={[styles.lockDockText, { color: selfLocked ? '#E2FFEE' : '#07111F' }]}>{selfLocked ? 'CARTA TRAVADA' : remaining === 0 ? 'RESOLVENDO…' : 'TRAVAR CARTA'}</Text></View>
           </Pressable>
         </View>
       ) : null}
@@ -687,7 +779,8 @@ export default function BattleScreen() {
         bag={pickerBag}
         mode="single"
         displayMode="battle"
-        enableCombatSort
+        enableCombatSort={!gameStyleBattle}
+        gameStyle={gameStyleBattle}
         enableTypeFilter
         sourceOptions={drafting || battle?.mode !== 'draft3' ? [{ id: 'bag', label: 'Bag inteira' }, ...decks.map((deck) => ({ id: String(deck.id), label: `${deck.is_default ? '★ ' : ''}${deck.name}` }))] : []}
         sourceId={sourceDeck}
