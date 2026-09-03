@@ -9,6 +9,7 @@ import { cleanupAbandonedTrades, createTrade, getMyTrades } from '@/services/tra
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
 import { StatusPill } from '@/components/StatusPill';
+import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
 
 const statusLabels: Record<string, string> = {
   pending: 'EM NEGOCIAÇÃO',
@@ -79,6 +80,7 @@ export default function TradeScreen() {
 
   return (
     <Screen title="Trade Center" subtitle="Negocie cards com segurança, histórico transparente e validação no servidor.">
+      <AreaIdentityStrip area="economy" />
       {cardId ? <View style={[styles.contextNotice,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Ionicons name="card" size={19} color={colors.accent}/><View style={{flex:1}}><Text style={[styles.contextNoticeTitle,{color:colors.text}]}>Carta carregada da coleção</Text><Text style={[styles.contextNoticeText,{color:colors.muted}]}>Escolha um treinador. A negociação abrirá com esta carta pré-selecionada.</Text></View></View> : null}
       {notice ? (
         <View style={[styles.notice,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="information-circle" size={20} color={colors.yellow} /><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Pressable onPress={() => setNotice(null)}><Ionicons name="close" size={18} color={colors.muted} /></Pressable></View>
