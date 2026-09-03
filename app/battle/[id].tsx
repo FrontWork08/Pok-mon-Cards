@@ -418,7 +418,8 @@ export default function BattleScreen() {
       } else if (result?.resolved) {
         setNotice('Ataques definidos. Rodada resolvida!');
       } else {
-        setNotice(gameStyleBattle ? 'Golpe travado. Aguardando o adversário.' : 'Ataque travado. Aguardando o adversário.');
+        setAttackState((current:any)=>current?{...current,myLocked:true,myAttackName:selectedAttackName}:current);
+        setNotice(gameStyleBattle ? 'Golpe confirmado. Aguardando o adversário.' : 'Ataque confirmado. Aguardando o adversário.');
       }
       await loadBattleState();
     } catch (error) {
@@ -636,11 +637,21 @@ export default function BattleScreen() {
 
         {attacking ? (
           <View style={[styles.sourcePanel, { backgroundColor: colors.surface, borderColor: colors.accent }]}>
-            <View style={styles.timerPanel}>
-              <Text style={[styles.roundLabel, { color: colors.muted }]}>RODADA {currentRound} • ESCOLHA DE ATAQUE</Text>
-              <Text style={[styles.timer, { color: remaining <= 5 ? '#FF566B' : colors.text }]}>{String(Math.floor(remaining / 60)).padStart(2, '0')}:{String(remaining % 60).padStart(2, '0')}</Text>
-              <Text style={[styles.timerHint, { color: colors.muted }]}>
-                {remaining === 0 ? 'Tempo encerrado. O servidor escolherá um ataque automaticamente…' : 'Escolha qual ataque seu Pokémon usará neste confronto.'}
+            <View style={[styles.timerPanel, myAttackLocked && { borderColor: '#4FB77F', backgroundColor: '#10251C' }]}>
+              <View style={styles.turnStateRow}>
+                <Ionicons name={myAttackLocked ? 'checkmark-circle' : 'game-controller'} size={20} color={myAttackLocked ? '#65D894' : colors.yellow}/>
+                <View style={{flex:1}}>
+                  <Text style={[styles.turnStateTitle,{color:myAttackLocked?'#65D894':colors.text}]}>{myAttackLocked ? 'GOLPE CONFIRMADO' : 'SEU TURNO'}</Text>
+                  <Text style={[styles.roundLabel,{color:colors.muted}]}>RODADA {currentRound} • TURNO {Number(attackState?.turn ?? 1)}</Text>
+                </View>
+                <Text style={[styles.timer,{color:myAttackLocked?'#65D894':remaining<=5?'#FF566B':colors.text}]}>{String(Math.floor(remaining / 60)).padStart(2,'0')}:{String(remaining%60).padStart(2,'0')}</Text>
+              </View>
+              <Text style={[styles.timerHint,{color:myAttackLocked?'#A9DCC0':colors.muted}]}>
+                {myAttackLocked
+                  ? 'Sua escolha foi registrada no servidor. Aguardando o adversário...'
+                  : remaining===0
+                    ? 'Tempo encerrado. O servidor escolherá um golpe automaticamente…'
+                    : 'Escolha um golpe abaixo e confirme antes do tempo acabar.'}
               </Text>
             </View>
 
@@ -716,17 +727,21 @@ export default function BattleScreen() {
             </View>
 
             {myAttackLocked ? (
-              <View style={[styles.lockedNotice, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
-                <Ionicons name="lock-closed" size={20} color={colors.accent} />
-                <Text style={[styles.lockedText, { color: colors.text }]}>Seu {gameStyleBattle ? 'golpe' : 'ataque'} está travado: {attackState?.myAttackName === '__NO_ATTACK__' ? 'Sem ataque' : String(attackState?.myAttackName ?? '').replaceAll('-', ' ')}. Aguardando o adversário.</Text>
+              <View style={[styles.lockedNotice,{backgroundColor:'#10251C',borderColor:'#4FB77F'}]}>
+                <Ionicons name="checkmark-circle" size={22} color="#65D894"/>
+                <View style={{flex:1}}>
+                  <Text style={[styles.lockedStateTitle,{color:'#65D894'}]}>ESCOLHA REGISTRADA</Text>
+                  <Text style={[styles.lockedText,{color:colors.text}]}>Golpe: {attackState?.myAttackName==='__NO_ATTACK__'?'Sem ataque':String(attackState?.myAttackName??'').replaceAll('-',' ')} • aguardando o adversário.</Text>
+                </View>
               </View>
             ) : (
               <Pressable
-                disabled={!selectedAttackName || working || remaining === 0}
-                onPress={() => void confirmAttack()}
-                style={[styles.accept, { backgroundColor: colors.yellow }, (!selectedAttackName || working || remaining === 0) && styles.disabled]}
+                disabled={!selectedAttackName||working||remaining===0}
+                onPress={()=>void confirmAttack()}
+                style={[styles.accept,{backgroundColor:colors.yellow},(!selectedAttackName||working||remaining===0)&&styles.disabled]}
               >
-                <Text style={styles.acceptText}>{working ? 'CONFIRMANDO…' : gameStyleBattle ? 'USAR ESTE GOLPE' : 'USAR ESTE ATAQUE'}</Text>
+                <Ionicons name="checkmark-circle-outline" size={19} color="#07111F"/>
+                <Text style={styles.acceptText}>{working?'CONFIRMANDO GOLPE…':gameStyleBattle?'CONFIRMAR GOLPE':'CONFIRMAR ATAQUE'}</Text>
               </Pressable>
             )}
           </View>
