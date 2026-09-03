@@ -74,7 +74,7 @@ export default function HomeScreen() {
       <View style={styles.continueHeader}><View><Text style={[styles.sectionKicker,{color:colors.yellow}]}>CONTINUAR DE ONDE PAROU</Text><Text style={[styles.continueTitle,{color:colors.text}]}>Sua próxima ação</Text></View><Pressable onPress={()=>router.push('/inbox')} style={[styles.activityButton,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="notifications-outline" size={17} color={colors.accent}/><Text style={[styles.activityButtonText,{color:colors.text}]}>ATIVIDADES</Text></Pressable></View>
       <View style={styles.continueList}>{continueItems.map(item=>{
         const accent=item.kind==='battle'?'#FF735C':item.kind==='trade'?'#54C78D':'#9B7BFF';
-        const icon:item['kind'] extends never ? never : keyof typeof Ionicons.glyphMap = item.kind==='battle'?'game-controller':item.kind==='trade'?'swap-horizontal':'notifications';
+        const icon = (item.kind==='battle'?'game-controller':item.kind==='trade'?'swap-horizontal':'notifications') as keyof typeof Ionicons.glyphMap;
         return <Pressable key={item.id} onPress={()=>router.push(item.route as never)} style={[styles.continueItem,{backgroundColor:colors.surfaceAlt,borderColor:`${accent}55`}]}><View style={[styles.continueIcon,{backgroundColor:`${accent}1C`}]}><Ionicons name={icon} size={20} color={accent}/></View><View style={styles.continueBody}><Text style={[styles.continueItemTitle,{color:colors.text}]}>{item.title}</Text><Text numberOfLines={2} style={[styles.continueItemText,{color:colors.muted}]}>{item.subtitle}</Text></View><Ionicons name="chevron-forward" size={18} color={colors.muted}/></Pressable>;
       })}</View>
     </View>:null}
