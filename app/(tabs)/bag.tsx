@@ -30,6 +30,7 @@ import { formatUsd, refreshOwnedMarketPrices } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
+import { getScreenPreference, setScreenPreference } from '@/services/screenPreferences';
 
 const PAGE_SIZE = 48;
 
@@ -61,6 +62,7 @@ export default function BagScreen() {
   const [generation, setGeneration] = useState<number | null>(null);
   const [sortMode, setSortMode] = useState<BagSortMode>('recent');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [filtersRestored, setFiltersRestored] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -81,6 +83,43 @@ export default function BagScreen() {
     generation,
     sortMode,
   }), [generation, quickFilter, rarityFilter, search, setQuery, sortMode, typeFilter]);
+
+  useEffect(() => {
+    let active = true;
+    void getScreenPreference('bag_filters_v1', {
+      setQuery: '',
+      quickFilter: 'all' as BagQuickFilter,
+      typeFilter: null as string | null,
+      rarityFilter: null as string | null,
+      generation: null as number | null,
+      sortMode: 'recent' as BagSortMode,
+      showAdvanced: false,
+    }).then((saved) => {
+      if (!active) return;
+      setSetQuery(saved.setQuery ?? '');
+      setQuickFilter(saved.quickFilter ?? 'all');
+      setTypeFilter(saved.typeFilter ?? null);
+      setRarityFilter(saved.rarityFilter ?? null);
+      setGeneration(saved.generation ?? null);
+      setSortMode(saved.sortMode ?? 'recent');
+      setShowAdvanced(Boolean(saved.showAdvanced));
+      setFiltersRestored(true);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!filtersRestored) return;
+    void setScreenPreference('bag_filters_v1', {
+      setQuery,
+      quickFilter,
+      typeFilter,
+      rarityFilter,
+      generation,
+      sortMode,
+      showAdvanced,
+    });
+  }, [filtersRestored, generation, quickFilter, rarityFilter, setQuery, showAdvanced, sortMode, typeFilter]);
 
   const loadOverview = useCallback(async () => {
     try {
@@ -158,9 +197,10 @@ export default function BagScreen() {
   }, [loadOverview]));
 
   useEffect(() => {
+    if (!filtersRestored) return;
     const timer = setTimeout(() => { void loadFirstPage(false); }, search.trim() ? 280 : 20);
     return () => clearTimeout(timer);
-  }, [loadFirstPage, reloadTick, search]);
+  }, [filtersRestored, loadFirstPage, reloadTick, search]);
 
   const refresh = useCallback(async () => {
     await Promise.all([loadOverview(), loadFirstPage(true)]);
