@@ -81,7 +81,7 @@ export function CardPickerModal({
   const [sort, setSort] = useState<SortMode>(displayMode === 'battle' ? 'battle' : 'value');
   const [selectedType, setSelectedType] = useState<string>('all');
 
-  const availableTypes = useMemo(() => [...POKEMON_GAME_TYPES], []);
+  const availableTypes = useMemo<string[]>(() => [...POKEMON_GAME_TYPES], []);
 
   useEffect(() => {
     if (selectedType !== 'all' && !availableTypes.includes(selectedType)) setSelectedType('all');
