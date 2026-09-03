@@ -6,12 +6,23 @@ import type { OwnedCardEntry } from '@/services/player';
 import { formatUsd } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
-import { PokemonTypeSymbolFilter } from '@/components/PokemonTypeSymbolFilter';
+import { POKEMON_GAME_TYPES, PokemonTypeSymbolFilter, normalizePokemonGameType } from '@/components/PokemonTypeSymbolFilter';
 
 type SortMode = 'value' | 'battle' | 'atk_desc' | 'atk_asc' | 'def_desc' | 'def_asc' | 'name' | 'quantity' | 'recent';
 type QuantityMap = Record<string, number>;
 
 export { getBattleCardPreview } from '@/services/battleStats';
+
+function getCardGameTypes(card: OwnedCardEntry['cards']) {
+  if (!card) return [] as string[];
+  const gameTypes = Array.isArray(card.game_types) ? card.game_types : [];
+  const source = gameTypes.length ? gameTypes : (Array.isArray(card.types) ? card.types : []);
+  return Array.from(new Set(
+    source
+      .map((type) => normalizePokemonGameType(String(type ?? '')))
+      .filter(Boolean),
+  ));
+}
 type Props = {
   visible: boolean;
   title: string;
@@ -70,17 +81,7 @@ export function CardPickerModal({
   const [sort, setSort] = useState<SortMode>(displayMode === 'battle' ? 'battle' : 'value');
   const [selectedType, setSelectedType] = useState<string>('all');
 
-  const availableTypes = useMemo(() => {
-    const values = new Set<string>();
-    bag.forEach((entry) => {
-      const types = Array.isArray(entry.cards?.types) ? entry.cards.types : [];
-      types.forEach((type) => {
-        const value = String(type ?? '').trim();
-        if (value) values.add(value);
-      });
-    });
-    return [...values].sort((a, b) => a.localeCompare(b));
-  }, [bag]);
+  const availableTypes = useMemo(() => [...POKEMON_GAME_TYPES], []);
 
   useEffect(() => {
     if (selectedType !== 'all' && !availableTypes.includes(selectedType)) setSelectedType('all');
@@ -91,8 +92,8 @@ export function CardPickerModal({
     const filtered = bag.filter((entry) => {
       const card = entry.cards;
       if (!card) return false;
-      const cardTypes = Array.isArray(card.types) ? card.types.map((type) => String(type).toLowerCase()) : [];
-      if (selectedType !== 'all' && !cardTypes.includes(selectedType.toLowerCase())) return false;
+      const cardTypes = getCardGameTypes(card);
+      if (selectedType !== 'all' && !cardTypes.includes(normalizePokemonGameType(selectedType))) return false;
       if (!term) return true;
       return card.pokemon_name.toLowerCase().includes(term)
         || card.set_name.toLowerCase().includes(term)
