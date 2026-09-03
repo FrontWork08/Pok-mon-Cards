@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerPageHeader } from '@/components/TrainerPageHeader';
+import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
 import { PokemonTypeSymbolFilter } from '@/components/PokemonTypeSymbolFilter';
 import { AuraFrame } from '@/components/AuraFrame';
 import {
@@ -229,6 +230,7 @@ export default function BagScreen() {
         subtitle="Sua Bag organizada como uma coleção de treinador: valor, combate, raridade e sets."
         icon="albums"
       />
+      <AreaIdentityStrip area="collection" />
 
       <View style={[styles.summary, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
         <View style={[styles.summaryGlow,{backgroundColor:colors.accent}]} />
