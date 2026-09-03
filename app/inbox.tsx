@@ -11,8 +11,10 @@ import {
   resolveNotificationRoute,
 } from '@/services/notifications';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { getActionableActivities, type ActionableActivity } from '@/services/activityCenter';
+import { StatusPill } from '@/components/StatusPill';
 
-type ActivityFilter = 'all' | 'action' | 'battle' | 'social' | 'economy';
+type ActivityFilter = 'all' | 'action' | 'battle' | 'social' | 'economy' | 'progress';
 
 const FILTERS: Array<{id:ActivityFilter;label:string;icon:keyof typeof Ionicons.glyphMap}> = [
   {id:'all',label:'TUDO',icon:'apps'},
@@ -20,6 +22,7 @@ const FILTERS: Array<{id:ActivityFilter;label:string;icon:keyof typeof Ionicons.
   {id:'battle',label:'BATALHA',icon:'game-controller'},
   {id:'social',label:'SOCIAL',icon:'people'},
   {id:'economy',label:'ECONOMIA',icon:'storefront'},
+  {id:'progress',label:'PROGRESSO',icon:'star'},
 ];
 
 function activityCategory(item:any): Exclude<ActivityFilter,'all'|'action'> {
@@ -41,6 +44,7 @@ export default function InboxScreen(){
   const{colors}=useAppTheme();
   const[conversations,setConversations]=useState<any[]>([]);
   const[notifications,setNotifications]=useState<any[]>([]);
+  const[actionable,setActionable]=useState<ActionableActivity[]>([]);
   const[filter,setFilter]=useState<ActivityFilter>('all');
   const[loading,setLoading]=useState(true);
   const[error,setError]=useState<string|null>(null);
@@ -48,8 +52,8 @@ export default function InboxScreen(){
   const load=useCallback(async()=>{
     try{
       setLoading(true);setError(null);
-      const[c,n]=await Promise.all([getConversationInbox(),getMyNotifications(60)]);
-      setConversations(c);setNotifications(n);
+      const[c,n,a]=await Promise.all([getConversationInbox(),getMyNotifications(60),getActionableActivities().catch(()=>[])]);
+      setConversations(c);setNotifications(n);setActionable(a);
     }catch(e){
       setError(e instanceof Error?e.message:'Não foi possível carregar a Central de Atividades.');
     }finally{setLoading(false);}
@@ -65,7 +69,7 @@ export default function InboxScreen(){
 
   const unreadMessages=useMemo(()=>conversations.reduce((s,x)=>s+Number(x.unread_count??0),0),[conversations]);
   const unreadAlerts=useMemo(()=>notifications.filter(x=>!x.read_at).length,[notifications]);
-  const actionCount=unreadMessages+unreadAlerts;
+  const actionCount=actionable.length+unreadMessages+unreadAlerts;
 
   const visibleConversations=useMemo(()=>{
     if(filter==='all'||filter==='social')return conversations;
@@ -76,6 +80,10 @@ export default function InboxScreen(){
   const visibleNotifications=useMemo(()=>{
     if(filter==='all')return notifications;
     if(filter==='action')return notifications.filter(item=>!item.read_at);
+    if(filter==='progress')return notifications.filter(item=>{
+      const type=String(item?.type??'').toLowerCase();
+      return type.includes('mission')||type.includes('pass')||type.includes('reward')||type.includes('rank')||type.includes('season');
+    });
     return notifications.filter(item=>activityCategory(item)===filter);
   },[filter,notifications]);
 
@@ -114,6 +122,19 @@ export default function InboxScreen(){
 
     {loading?<ActivityIndicator size="large" color={colors.yellow}/>:null}
 
+    {(filter==='all'||filter==='action'||filter==='battle'||filter==='social'||filter==='economy'||filter==='progress')&&actionable.filter(item=>filter==='all'||filter==='action'||item.category===filter).length?<>
+      <View style={styles.sectionHeader}><View><Text style={[styles.sectionTitle,{color:colors.text}]}>Precisa de atenção</Text><Text style={[styles.actionHint,{color:colors.muted}]}>Pendências reais dos sistemas, mesmo quando não houve push.</Text></View><Text style={[styles.count,{color:colors.yellow}]}>{actionable.filter(item=>filter==='all'||filter==='action'||item.category===filter).length}</Text></View>
+      <View style={styles.list}>{actionable.filter(item=>filter==='all'||filter==='action'||item.category===filter).map(item=>{
+        const accent=item.category==='battle'?'#FF735C':item.category==='economy'?'#54C78D':item.category==='progress'?'#F0C74E':'#9B7BFF';
+        const icon=(item.category==='battle'?'game-controller':item.category==='economy'?'swap-horizontal':item.category==='progress'?'star':'people') as keyof typeof Ionicons.glyphMap;
+        return <Pressable key={item.id} onPress={()=>router.push(item.route as never)} style={[styles.actionRow,{backgroundColor:colors.surface,borderColor:accent}]}>
+          <View style={[styles.alertIcon,{backgroundColor:`${accent}1C`}]}><Ionicons name={icon} size={20} color={accent}/></View>
+          <View style={styles.body}><View style={styles.activityTop}><Text style={[styles.alertTitle,{color:colors.text}]}>{item.title}</Text><StatusPill status={item.status} label={item.status==='needs_action'?'PRECISA DE AÇÃO':item.status==='ready'?'PRONTO':'AGUARDANDO'}/></View><Text numberOfLines={2} style={[styles.alertText,{color:colors.muted}]}>{item.body}</Text></View>
+          <Ionicons name="chevron-forward" size={18} color={colors.muted}/>
+        </Pressable>;
+      })}</View>
+    </>:null}
+
     {visibleConversations.length?<><View style={styles.sectionHeader}><Text style={[styles.sectionTitle,{color:colors.text}]}>Conversas</Text><Text style={[styles.count,{color:colors.muted}]}>{visibleConversations.length}</Text></View>
       <View style={styles.list}>{visibleConversations.map(item=><Pressable key={item.conversation_id} onPress={()=>router.push(`/chat/${item.friend_id}`)} style={[styles.row,{backgroundColor:colors.surface,borderColor:Number(item.unread_count)>0?colors.accent:colors.border}]}>
         <View style={[styles.avatar,{backgroundColor:colors.accentSoft}]}><Text style={[styles.avatarText,{color:colors.accent}]}>{String(item.friend_username??'?').slice(0,1).toUpperCase()}</Text></View>
@@ -142,9 +163,9 @@ const styles=StyleSheet.create({
   error:{flexDirection:'row',alignItems:'center',gap:8,padding:12,borderRadius:14,backgroundColor:'#351A24',borderWidth:1,borderColor:'#683243'},errorText:{flex:1,color:'#FFD7DD',fontSize:11,fontWeight:'700'},
   summary:{flexDirection:'row',gap:9,flexWrap:'wrap'},summaryCard:{flex:1,minWidth:135,borderRadius:18,padding:13,borderWidth:1},summaryValue:{fontSize:25,fontWeight:'900',marginTop:5},summaryLabel:{fontSize:9.5,fontWeight:'800',marginTop:1},
   filters:{flexDirection:'row',gap:7,flexWrap:'wrap'},filterChip:{minHeight:34,borderRadius:999,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},filterText:{fontSize:7.5,fontWeight:'900'},
-  sectionHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:4},sectionTitle:{fontSize:18,fontWeight:'900'},count:{fontSize:9,fontWeight:'900'},
+  sectionHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:4,gap:8},sectionTitle:{fontSize:18,fontWeight:'900'},actionHint:{fontSize:7.5,marginTop:2,fontWeight:'700'},count:{fontSize:9,fontWeight:'900'},
   list:{gap:8},row:{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderRadius:17,borderWidth:1},avatar:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},avatarText:{fontSize:18,fontWeight:'900'},body:{flex:1,minWidth:0},topline:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},name:{fontSize:13,fontWeight:'900'},time:{fontSize:8},preview:{fontSize:10,marginTop:4},
   badge:{minWidth:25,height:25,borderRadius:13,paddingHorizontal:6,alignItems:'center',justifyContent:'center',backgroundColor:'#D84B64'},badgeText:{color:'#fff',fontSize:9,fontWeight:'900'},
   empty:{padding:24,borderRadius:18,borderWidth:1,alignItems:'center',gap:7},emptyTitle:{fontSize:15,fontWeight:'900'},emptyText:{fontSize:10,textAlign:'center'},
-  alertRow:{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderRadius:17,borderWidth:1},alertIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},activityTop:{flexDirection:'row',alignItems:'center',gap:7},alertTitle:{fontSize:12,fontWeight:'900',flexShrink:1},alertText:{fontSize:10,lineHeight:15,marginTop:3},alertTime:{fontSize:8,marginTop:5},newPill:{borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:2},newPillText:{fontSize:6,fontWeight:'900'},
+  actionRow:{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderRadius:17,borderWidth:1.2},alertRow:{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderRadius:17,borderWidth:1},alertIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},activityTop:{flexDirection:'row',alignItems:'center',gap:7},alertTitle:{fontSize:12,fontWeight:'900',flexShrink:1},alertText:{fontSize:10,lineHeight:15,marginTop:3},alertTime:{fontSize:8,marginTop:5},newPill:{borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:2},newPillText:{fontSize:6,fontWeight:'900'},
 });
