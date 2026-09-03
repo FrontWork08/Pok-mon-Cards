@@ -37,7 +37,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Central de Atividades', description:'Mensagens, convites e avisos que precisam de atenção', href:'/inbox', icon:'notifications', group:'social' },
   { label:'Passe de Batalha', description:'50 níveis, recompensas grátis, VIP e missões', href:'/battle-pass', icon:'ribbon', group:'progress' },
   { label:'Carreira do Treinador', description:'Jornada, identidade, Pokédex e histórico da conta', href:'/career', icon:'compass', group:'progress' },
-  { label:'Temporada & Jornada', description:'Ranque, streak, eventos e recompensas', href:'/season', icon:'flame', group:'progress' },
+  { label:'Temporada & Eventos', description:'Ranque, streak e efeitos temporários do jogo', href:'/season', icon:'flame', group:'progress' },
   { label:'Card Chase', description:'Wishlist e alertas de cartas desejadas', href:'/wishlist', icon:'star', group:'collection' },
   { label:'Vitrine do Perfil', description:'Escolha suas 6 cartas de destaque', href:'/showcase', icon:'sparkles', group:'collection' },
   { label:'Conquistas e Títulos', description:'Progresso e títulos equipáveis', href:'/achievements', icon:'medal', group:'progress' },
