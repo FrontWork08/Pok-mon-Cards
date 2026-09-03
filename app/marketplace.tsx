@@ -133,16 +133,20 @@ export default function MarketplaceScreen() {
     void loadInventory(inventorySearch,inventory.length);
   },[inventory.length,inventoryLoading,inventoryLoadingMore,inventorySearch,inventoryTotal,loadInventory]);
 
-  const openInventoryPreview=useCallback((entry:OwnedCardEntry)=>{
+  const openInventoryPreview=useCallback(async(entry:OwnedCardEntry)=>{
     if(!entry.cards)return;
-    setPreviewSellEntry(entry);
-    setCardPreview({
-      owned:true,
-      quantity:Number(entry.quantity??0),
-      favorite:Boolean(entry.favorite),
-      first_obtained_at:entry.first_obtained_at,
-      cards:entry.cards,
-    });
+    try{
+      setPreviewSellEntry(entry);
+      setCardPreview(null);
+      setCardPreviewLoading(true);
+      const detail=await getCardDetail(entry.cards.id);
+      setCardPreview(detail);
+    }catch(e){
+      setPreviewSellEntry(null);
+      setError(e instanceof Error?e.message:'Não foi possível abrir os detalhes desta carta.');
+    }finally{
+      setCardPreviewLoading(false);
+    }
   },[]);
 
   const openListingPreview=useCallback(async(item:MarketplaceListing)=>{
