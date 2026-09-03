@@ -15,6 +15,7 @@ import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import { setBattleSpectatorEnabled } from '@/services/adminLaunchTools';
+import { playBattleSound } from '@/services/soundEffects';
 
 export default function BattleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,6 +53,7 @@ export default function BattleScreen() {
   const battleLoadRef = useRef<(silent?: boolean) => Promise<void>>(async () => undefined);
   const realtimeRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playerPairKey = useRef('');
+  const previousBattleStatus = useRef<string|null>(null);
 
   const loadBattleState = useCallback(async (silent = false) => {
     if (!id) return;
@@ -308,7 +310,16 @@ export default function BattleScreen() {
       Animated.spring(revealAnim, { toValue: 1, speed: 11, bounciness: 7, useNativeDriver: true }),
     ]).start();
     if (settings?.battle_vibration ?? true) Vibration.vibrate([0, 60, 35, 110]);
-  }, [latestRound?.round_no, revealAnim, settings?.battle_vibration]);
+    if ((settings?.battle_sounds ?? true) && battle?.status!=='completed') void playBattleSound('round');
+  }, [battle?.status, latestRound?.round_no, revealAnim, settings?.battle_sounds, settings?.battle_vibration]);
+
+  useEffect(()=>{
+    const current=String(battle?.status??'');
+    const previous=previousBattleStatus.current;
+    previousBattleStatus.current=current||null;
+    if(!current||!previous||previous===current||current!=='completed'||!(settings?.battle_sounds??true))return;
+    void playBattleSound(battle?.winner_id===userId?'victory':'defeat');
+  },[battle?.status,battle?.winner_id,settings?.battle_sounds,userId]);
 
   useEffect(() => {
     const roundNo = Number(latestRound?.round_no ?? 0);
@@ -344,6 +355,7 @@ export default function BattleScreen() {
       setWorking(true); setNotice(null);
       await respondToBattle(String(id), accept, accept && battle?.stake_type === 'card' ? stakeCardId : null);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(70);
+      if (settings?.battle_sounds ?? true) void playBattleSound('confirm');
       await loadBattleState();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível responder ao desafio.');
@@ -358,6 +370,7 @@ export default function BattleScreen() {
       await pickBattleDraftCard(String(id), selectedId);
       setSelectedId(null); setPickerMode(null);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
+      if (settings?.battle_sounds ?? true) void playBattleSound('confirm');
       await loadBattleState();
     } catch (error) {
       if (isFunctionErrorCode(error, 'GAME_PROFILE_UNAVAILABLE')) {
@@ -377,6 +390,7 @@ export default function BattleScreen() {
       setWorking(true); setNotice(null);
       const result = await lockBattleCard(String(id), selectedId);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
+      if (settings?.battle_sounds ?? true) void playBattleSound('confirm');
       if (result?.attackSelectionRequired) {
         setSelectedAttackName(null);
         setArenaTurnResult(null);
@@ -407,6 +421,7 @@ export default function BattleScreen() {
       setArenaTurnResult(null);
       const result = await chooseBattleAttack(String(id), selectedAttackName);
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
+      if (settings?.battle_sounds ?? true) void playBattleSound('confirm');
       if (result?.resolved?.engineVersion === 'game_v1') {
         setArenaTurnResult(result.resolved);
         if (result.resolved?.continueBattle) {
@@ -458,6 +473,7 @@ export default function BattleScreen() {
           : 'Você desistiu da batalha. A vitória foi concedida ao adversário.',
       );
       if (settings?.battle_vibration ?? true) Vibration.vibrate(80);
+      if (settings?.battle_sounds ?? true) void playBattleSound('defeat');
       await loadBattleState();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível desistir da batalha.');
