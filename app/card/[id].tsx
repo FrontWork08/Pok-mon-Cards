@@ -22,6 +22,7 @@ import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { useWallet } from '@/wallet/WalletProvider';
 import { formatGameIdentifier, getCardGameProfile, type CardGameProfile } from '@/services/cardGameProfile';
 import { getPokemonTypeSymbol } from '@/components/PokemonTypeSymbolFilter';
+import { getCardPassport, setCardMetadata, type CardPassport } from '@/services/cardPassport';
 
 function economyStylePalette(id:string,accent:string,yellow:string){
   const key=id.toLowerCase();
@@ -47,7 +48,9 @@ export default function CardDetailScreen() {
   const [wishlisted, setWishlisted] = useState(false);
   const [priceHistory, setPriceHistory] = useState<CardPricePoint[]>([]);
   const [gameProfile, setGameProfile] = useState<CardGameProfile | null>(null);
-  const [detailTab, setDetailTab] = useState<'card' | 'battle' | 'market' | 'collection'>('card');
+  const [passport,setPassport]=useState<CardPassport|null>(null);
+  const [passportWorking,setPassportWorking]=useState(false);
+  const [detailTab, setDetailTab] = useState<'card' | 'battle' | 'market' | 'collection' | 'passport'>('card');
   const [economyStyle, setEconomyStyle] = useState<{id:string;name:string;icon:string;rarity:string}|null>(null);
   const [stylePickerOpen,setStylePickerOpen]=useState(false);
   const [styleOptions,setStyleOptions]=useState<VisualStyleOption[]>([]);
@@ -60,18 +63,20 @@ export default function CardDetailScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [owned, wanted, history, style, game] = await Promise.all([
+      const [owned, wanted, history, style, game, passportData] = await Promise.all([
         getCardDetail(String(id)),
         isCardWishlisted(String(id)),
         getCardPriceHistory(String(id), 30),
         getMyCardEconomyStyle(String(id)).catch(()=>null),
         getCardGameProfile(String(id)).catch(()=>null),
+        getCardPassport(String(id)).catch(()=>null),
       ]);
       setEntry(owned);
       setWishlisted(wanted);
       setPriceHistory(history);
       setEconomyStyle(style);
       setGameProfile(game);
+      setPassport(passportData);
     }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível carregar este card.'); }
     finally { setLoading(false); }
@@ -84,6 +89,18 @@ export default function CardDetailScreen() {
     try { setSaving(true); await setCardFavorite(entry.cards.id, next); setEntry((current) => current ? { ...current, favorite: next } : current); }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível atualizar o favorito.'); }
     finally { setSaving(false); }
+  }
+
+  async function toggleCardLock(){
+    if(!entry?.owned||!entry.cards||passportWorking)return;
+    try{
+      setPassportWorking(true);
+      const next=!Boolean(passport?.ownership.locked);
+      await setCardMetadata(entry.cards.id,{locked:next});
+      setPassport(current=>current?{...current,ownership:{...current.ownership,locked:next}}:current);
+    }catch(err){
+      setError(err instanceof Error?err.message:'Não foi possível alterar a proteção da carta.');
+    }finally{setPassportWorking(false);}
   }
 
   async function toggleWishlist() {
@@ -242,6 +259,7 @@ export default function CardDetailScreen() {
                 ['battle','Batalha','game-controller-outline'],
                 ['market','Mercado','trending-up-outline'],
                 ['collection','Coleção','albums-outline'],
+                ['passport','Passaporte','document-text-outline'],
               ] as Array<[typeof detailTab,string,keyof typeof Ionicons.glyphMap]>).map(([tab,label,icon])=>{
                 const active=detailTab===tab;
                 return <Pressable key={tab} onPress={()=>setDetailTab(tab)} style={[styles.detailTab,{backgroundColor:active?colors.accentSoft:colors.surfaceAlt,borderColor:active?colors.accent:colors.border}]}>
@@ -326,6 +344,33 @@ export default function CardDetailScreen() {
               <Pressable onPress={()=>router.push('/marketplace')} style={[styles.contextAction,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="storefront" size={19} color="#54C78D"/><View style={{flex:1}}><Text style={[styles.contextActionTitle,{color:colors.text}]}>Abrir Mercado de Treinadores</Text><Text style={[styles.contextActionText,{color:colors.muted}]}>Compare anúncios e procure oportunidades.</Text></View><Ionicons name="chevron-forward" size={18} color={colors.muted}/></Pressable>
             </>:null}
 
+            {detailTab==='passport'?<>
+              <View style={[styles.passportHero,{backgroundColor:colors.surfaceAlt,borderColor:passport?.ownership.locked?colors.yellow:colors.accent}]}>
+                <View style={[styles.passportIcon,{backgroundColor:passport?.ownership.locked?'#F0C74E1C':colors.accentSoft}]}><Ionicons name={passport?.ownership.locked?'lock-closed':'document-text'} size={25} color={passport?.ownership.locked?colors.yellow:colors.accent}/></View>
+                <View style={{flex:1,minWidth:0}}><Text style={[styles.valueLabel,{color:colors.muted}]}>PASSAPORTE DA CARTA</Text><Text style={[styles.passportTitle,{color:colors.text}]}>{passport?.ownership.owned?'História desta carta na sua coleção':'Carta ainda não adquirida'}</Text><Text style={[styles.passportText,{color:colors.muted}]}>Origem rastreada, uso em batalha e proteção contra ações destrutivas.</Text></View>
+              </View>
+              {passport?.ownership.owned?<>
+                <View style={styles.statsGrid}>
+                  <Info label="DESDE" value={passport.ownership.firstObtainedAt?new Date(passport.ownership.firstObtainedAt).toLocaleDateString('pt-BR'):'—'}/>
+                  <Info label="TREINADORES RASTREADOS" value={String(passport.ownership.trackedTrainerCount)}/>
+                  <Info label="RODADAS EM BATALHA" value={String(passport.battle.rounds)}/>
+                  <Info label="VITÓRIAS / KOs" value={passport.battle.wins+' / '+passport.battle.knockouts}/>
+                </View>
+                <Pressable disabled={passportWorking} onPress={()=>void toggleCardLock()} style={[styles.lockCard,{backgroundColor:passport.ownership.locked?'#352B11':colors.surfaceAlt,borderColor:passport.ownership.locked?colors.yellow:colors.border}]}>
+                  <Ionicons name={passport.ownership.locked?'lock-closed':'lock-open-outline'} size={22} color={passport.ownership.locked?colors.yellow:colors.accent}/>
+                  <View style={{flex:1}}><Text style={[styles.lockTitle,{color:colors.text}]}>{passport.ownership.locked?'CARTA BLOQUEADA 🔒':'PROTEGER ESTA CARTA'}</Text><Text style={[styles.lockText,{color:colors.muted}]}>{passport.ownership.locked?'Não pode ser listada, trocada, vendida como duplicada nem usada como aposta até ser desbloqueada.':'Bloqueie para evitar venda, troca ou aposta acidental. Uso normal em batalhas continua permitido.'}</Text></View>
+                  <Text style={[styles.lockAction,{color:passport.ownership.locked?colors.yellow:colors.accent}]}>{passportWorking?'...':passport.ownership.locked?'DESBLOQUEAR':'BLOQUEAR'}</Text>
+                </Pressable>
+                {passport.ownership.tags.length?<View style={styles.passportTags}>{passport.ownership.tags.map(tag=><View key={tag} style={[styles.passportTag,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.passportTagText,{color:colors.text}]}>{tag.replaceAll('_',' ').toUpperCase()}</Text></View>)}</View>:null}
+                <Text style={[styles.panelSectionTitle,{color:colors.text}]}>Linha do tempo</Text>
+                {passport.timeline.length?<View style={styles.timeline}>{passport.timeline.map((item,index)=>{
+                  const icon=(item.kind==='pack'?'cube':item.kind==='diamond_pack'?'diamond':item.kind==='market_purchase'?'storefront':'swap-horizontal') as keyof typeof Ionicons.glyphMap;
+                  const label=item.kind==='pack'?'Obtida em booster':item.kind==='diamond_pack'?'Obtida em pack de Diamante':item.kind==='market_purchase'?'Comprada no Marketplace':item.kind==='trade_receive'?'Recebida em troca':item.kind.replaceAll('_',' ');
+                  return <View key={item.kind+'-'+item.sourceId+'-'+index} style={[styles.timelineRow,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><View style={[styles.timelineIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name={icon} size={17} color={colors.accent}/></View><View style={{flex:1}}><Text style={[styles.timelineTitle,{color:colors.text}]}>{label}</Text><Text style={[styles.timelineMeta,{color:colors.muted}]}>{new Date(item.createdAt).toLocaleString('pt-BR')} • ×{item.quantity}</Text></View></View>;
+                })}</View>:<Text style={[styles.battleHint,{color:colors.muted}]}>A carta já existe na coleção, mas sua origem pode ser anterior ao histórico detalhado disponível.</Text>}
+              </>:<Text style={[styles.battleHint,{color:colors.muted}]}>O Passaporte começa a registrar a história quando esta carta entra na sua coleção.</Text>}
+            </>:null}
+
             {detailTab==='collection'?<>
               <Text style={[styles.panelSectionTitle,{color:colors.text}]}>Sua coleção</Text>
               <View style={styles.statsGrid}>
@@ -391,7 +436,7 @@ function BattleStat({ label, value, suffix = '' }: { label: string; value: numbe
 
 function Info({ label, value }: { label: string; value: string }) { const { colors } = useAppTheme(); return <View style={[styles.infoCard, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}><Text style={[styles.infoLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.infoValue, { color: colors.text }]} numberOfLines={2}>{value}</Text></View>; }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create({passportHero:{borderRadius:17,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:9,marginTop:12},passportIcon:{width:46,height:46,borderRadius:14,alignItems:'center',justifyContent:'center'},passportTitle:{fontSize:13,fontWeight:'900',marginTop:2},passportText:{fontSize:7.8,lineHeight:12,marginTop:2},lockCard:{borderRadius:16,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:9,marginTop:12},lockTitle:{fontSize:10,fontWeight:'900'},lockText:{fontSize:7.5,lineHeight:11,marginTop:2},lockAction:{fontSize:7,fontWeight:'900'},passportTags:{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:10},passportTag:{borderRadius:999,borderWidth:1,paddingHorizontal:8,paddingVertical:5},passportTagText:{fontSize:6.5,fontWeight:'900'},timeline:{gap:6},timelineRow:{borderRadius:13,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},timelineIcon:{width:34,height:34,borderRadius:10,alignItems:'center',justifyContent:'center'},timelineTitle:{fontSize:9,fontWeight:'900'},timelineMeta:{fontSize:6.8,marginTop:2},
   detailTabs:{marginTop:14,flexDirection:'row',flexWrap:'wrap',gap:6},
   detailTab:{flexGrow:1,minWidth:105,minHeight:42,borderRadius:13,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
   detailTabLabel:{fontSize:7.5,fontWeight:'900',letterSpacing:.45},
