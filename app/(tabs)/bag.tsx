@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -26,6 +27,7 @@ import {
   type BagSortMode,
 } from '@/services/bag';
 import type { OwnedCardEntry } from '@/services/player';
+import { setCardFavorite } from '@/services/playerActions';
 import { formatUsd, refreshOwnedMarketPrices } from '@/services/market';
 import { getBattleCardPreview } from '@/services/battleStats';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -73,6 +75,8 @@ export default function BagScreen() {
   const priceRefreshAttemptedRef = useRef(new Set<string>());
   const listRef = useRef<FlatList<OwnedCardEntry> | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [quickCard,setQuickCard]=useState<OwnedCardEntry|null>(null);
+  const [quickActionWorking,setQuickActionWorking]=useState(false);
 
   const filters = useMemo(() => ({
     search,
@@ -303,7 +307,7 @@ export default function BagScreen() {
         data={cards}
         numColumns={columns}
         keyExtractor={(entry) => entry.cards?.id ?? entry.first_obtained_at}
-        renderItem={({ item }) => <CardTile entry={item} width={cardWidth} onOpen={(id) => router.push(`/card/${id}`)} />}
+        renderItem={({ item }) => <CardTile entry={item} width={cardWidth} onOpen={(id) => router.push(`/card/${id}`)} onQuickActions={setQuickCard} />}
         ListHeaderComponent={header}
         ListEmptyComponent={!loading ? <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="albums-outline" size={30} color={colors.accent} /><Text style={[styles.emptyTitle, { color: colors.text }]}>{Number(overview?.totalCards ?? 0) === 0 ? 'Sua Bag está vazia' : 'Nada neste filtro'}</Text></View> : null}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footerLoader} size="small" color={colors.yellow} /> : <View style={styles.footerSpace} />}
@@ -335,11 +339,46 @@ export default function BagScreen() {
           <Ionicons name="arrow-up" size={25} color="#fff"/>
         </Pressable>
       ) : null}
+
+      <Modal visible={Boolean(quickCard)} transparent animationType="fade" onRequestClose={()=>setQuickCard(null)}>
+        <View style={styles.quickBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={()=>setQuickCard(null)}/>
+          <View style={[styles.quickSheet,{backgroundColor:colors.bg,borderColor:colors.border}]}>
+            <View style={styles.quickSheetHead}>
+              {quickCard?.cards?.image_small?<Image source={{uri:quickCard.cards.image_small}} style={styles.quickThumb} resizeMode="contain"/>:null}
+              <View style={{flex:1,minWidth:0}}><Text style={[styles.quickKicker,{color:colors.yellow}]}>AÇÕES RÁPIDAS</Text><Text numberOfLines={1} style={[styles.quickTitle,{color:colors.text}]}>{quickCard?.cards?.pokemon_name??'Carta'}</Text><Text numberOfLines={1} style={[styles.quickSub,{color:colors.muted}]}>{quickCard?.cards?.set_name??''}</Text></View>
+              <Pressable onPress={()=>setQuickCard(null)}><Ionicons name="close" size={23} color={colors.muted}/></Pressable>
+            </View>
+            <View style={styles.quickActions}>
+              <QuickBagAction icon="open-outline" label="Detalhes" accent={colors.accent} onPress={()=>{const id=quickCard?.cards?.id;setQuickCard(null);if(id)router.push(('/card/'+id) as never);}}/>
+              <QuickBagAction icon="albums" label="Decks" accent="#5AA8FF" onPress={()=>{setQuickCard(null);router.push('/decks');}}/>
+              <QuickBagAction icon="pricetag" label="Vender" accent="#54C78D" onPress={()=>{const id=quickCard?.cards?.id;setQuickCard(null);if(id)router.push(('/marketplace?sellCardId='+encodeURIComponent(id)) as never);}}/>
+              <QuickBagAction icon="swap-horizontal" label="Trocar" accent="#9B7BFF" onPress={()=>{const id=quickCard?.cards?.id;setQuickCard(null);if(id)router.push(('/(tabs)/trade?cardId='+encodeURIComponent(id)) as never);}}/>
+              <QuickBagAction icon="game-controller" label="Batalhar" accent="#FF735C" onPress={()=>{setQuickCard(null);router.push('/(tabs)/battles');}}/>
+              <QuickBagAction icon={quickCard?.favorite?'heart-dislike':'heart'} label={quickCard?.favorite?'Desfavoritar':'Favoritar'} accent="#E95B72" disabled={quickActionWorking} onPress={async()=>{
+                const card=quickCard;
+                if(!card?.cards||quickActionWorking)return;
+                try{
+                  setQuickActionWorking(true);
+                  const next=!card.favorite;
+                  await setCardFavorite(card.cards.id,next);
+                  setCards((current)=>current.map((entry)=>entry.cards?.id===card.cards?.id?{...entry,favorite:next}:entry));
+                  setQuickCard((current)=>current?{...current,favorite:next}:current);
+                  void loadOverview();
+                }catch(e){
+                  setError(e instanceof Error?e.message:'Não foi possível atualizar o favorito.');
+                }finally{setQuickActionWorking(false);}
+              }}/>
+            </View>
+            <Text style={[styles.quickHelp,{color:colors.muted}]}>Você também pode tocar normalmente na carta para abrir o Card Detail completo.</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: OwnedCardEntry; width: number; onOpen: (id: string) => void }) {
+const CardTile = memo(function CardTile({ entry, width, onOpen, onQuickActions }: { entry: OwnedCardEntry; width: number; onOpen: (id: string) => void; onQuickActions:(entry:OwnedCardEntry)=>void }) {
   const { colors, isLight } = useAppTheme();
   const card = entry.cards;
   if (!card) return null;
@@ -396,7 +435,7 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
         <Text style={[styles.combatPwr,{color:theme?palette!.secondary:colors.yellow}]}>⚔ PWR {combat.battleRating}</Text>
         <Text style={[styles.combatMeta,{color:colors.muted}]}>HP {combat.hp} • ⚡ {combat.bestEnergy} • VEL {combat.speedScore}</Text>
       </View>
-      <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={[styles.totalValue, { color: theme?palette!.secondary:colors.yellow }]}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : card.market_price_source === 'unreleased:no_english_market' ? 'Não lançada' : 'Sem preço'}</Text></View>
+      <View style={styles.cardFooter}><Text style={[styles.cardMeta, { color: colors.muted }]} numberOfLines={1}>{card.rarity ?? 'Sem raridade'}</Text><Text style={[styles.totalValue, { color: theme?palette!.secondary:colors.yellow }]}>{card.market_price_usd != null ? `Σ ${formatUsd(Number(card.market_price_usd) * Number(entry.quantity ?? 0))}` : card.market_price_source === 'unreleased:no_english_market' ? 'Não lançada' : 'Sem preço'}</Text><Pressable accessibilityLabel="Ações rápidas da carta" onPress={(event)=>{event.stopPropagation();onQuickActions(entry);}} style={[styles.cardMore,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="ellipsis-horizontal" size={15} color={colors.muted}/></Pressable></View>
     </Pressable>
   );
 
@@ -416,11 +455,13 @@ const CardTile = memo(function CardTile({ entry, width, onOpen }: { entry: Owned
   );
 });
 
+function QuickBagAction({icon,label,accent,onPress,disabled=false}:{icon:keyof typeof Ionicons.glyphMap;label:string;accent:string;onPress:()=>void;disabled?:boolean}){const{colors}=useAppTheme();return <Pressable disabled={disabled} onPress={onPress} style={[styles.quickActionItem,{backgroundColor:colors.surfaceAlt,borderColor:accent},disabled&&{opacity:.55}]}><View style={[styles.quickActionIcon,{backgroundColor:accent+'1C'}]}><Ionicons name={icon} size={20} color={accent}/></View><Text style={[styles.quickActionLabel,{color:colors.text}]}>{label.toUpperCase()}</Text></Pressable>}
+
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) { const { colors } = useAppTheme(); return <View style={styles.filterGroup}><Text style={[styles.filterTitle, { color: colors.muted }]}>{title}</Text><View style={styles.smallChips}>{children}</View></View>; }
 function SmallChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) { const { colors } = useAppTheme(); return <Pressable onPress={onPress} style={[styles.smallChip, { backgroundColor: active ? colors.accentSoft : colors.surfaceAlt, borderColor: active ? colors.accent : colors.border }]}><Text style={[styles.smallChipText, { color: active ? colors.text : colors.muted }]}>{label}</Text></Pressable>; }
 function FilterChip({ active, label, icon, onPress }: { active: boolean; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }) { const { colors } = useAppTheme(); return <Pressable onPress={onPress} style={[styles.filterChip, { backgroundColor: active ? colors.yellow : colors.surface, borderColor: active ? colors.yellow : colors.border }]}><Ionicons name={icon} size={14} color={active ? '#07111F' : colors.muted} /><Text style={[styles.filterText, { color: active ? '#07111F' : colors.muted }]}>{label}</Text></Pressable>; }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create({quickBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.72)',justifyContent:'flex-end'},quickSheet:{borderTopLeftRadius:24,borderTopRightRadius:24,borderWidth:1,borderBottomWidth:0,padding:14,paddingBottom:24,gap:12},quickSheetHead:{flexDirection:'row',alignItems:'center',gap:10},quickThumb:{width:48,height:65,borderRadius:6},quickKicker:{fontSize:7,fontWeight:'900',letterSpacing:.8},quickTitle:{fontSize:16,fontWeight:'900',marginTop:2},quickSub:{fontSize:8,marginTop:2},quickActions:{flexDirection:'row',flexWrap:'wrap',gap:8},quickActionItem:{flexGrow:1,flexBasis:135,minWidth:125,minHeight:60,borderRadius:14,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:7},quickActionIcon:{width:36,height:36,borderRadius:11,alignItems:'center',justifyContent:'center'},quickActionLabel:{fontSize:7.5,fontWeight:'900'},quickHelp:{fontSize:8,lineHeight:12,textAlign:'center'},cardMore:{width:27,height:27,borderRadius:9,borderWidth:1,alignItems:'center',justifyContent:'center',marginLeft:4},
   safe: { flex: 1, overflow: 'hidden' },
   scrollTopButton:{position:'absolute',right:18,bottom:18,width:52,height:52,borderRadius:26,borderWidth:1.5,alignItems:'center',justifyContent:'center',elevation:12,shadowColor:'#000',shadowOpacity:.28,shadowRadius:10,shadowOffset:{width:0,height:5}},
   content: { width: '100%', maxWidth: 1220, alignSelf: 'center', paddingTop: 9, paddingBottom: 30 },
