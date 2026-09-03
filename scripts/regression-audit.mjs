@@ -372,7 +372,7 @@ if (existsSync('app/sell-duplicates.tsx') && existsSync('src/services/cardSales.
   const salesService = read('src/services/cardSales.ts');
   assert(salesUi.includes('VENDER TODAS AS REPETIDAS'), 'Regressão: tela de repetidas perdeu a venda em lote.');
   assert(salesUi.includes('sellAllDuplicateCards'), 'Regressão: botão de venda em lote não está conectado ao serviço.');
-  assert(salesService.includes("rpc('server_idempotent_sell_all_duplicate_cards')") || salesService.includes("rpc('sell_all_duplicate_cards')"), 'Regressão: serviço perdeu a RPC protegida de venda de todas as repetidas.');
+  assert(salesService.includes('server_idempotent_sell_all_duplicate_cards') || salesService.includes("rpc('sell_all_duplicate_cards')"), 'Regressão: serviço perdeu a RPC protegida de venda de todas as repetidas.');
 }
 
 if (existsSync('supabase/migrations/20260831135024_bulk_duplicate_sales.sql')) {
