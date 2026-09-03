@@ -13,6 +13,7 @@ export type ReleaseCampaign = {
   title: string;
   target_version: string;
   release_date: string;
+  legacy_edit_deadline: string | null;
   phase: ReleaseCampaignPhase;
   body: string;
   active: boolean;
@@ -40,7 +41,7 @@ export async function getActiveReleaseCampaign(playerId: string): Promise<{
   const { data: campaign, error: campaignError } = await supabase
     .from('release_campaigns')
     .select(
-      'id,code,title,target_version,release_date,phase,body,active,reward_coins,reward_diamonds,legacy_card_limit,legacy_selection_enabled,economy_frozen,force_update,download_url',
+      'id,code,title,target_version,release_date,legacy_edit_deadline,phase,body,active,reward_coins,reward_diamonds,legacy_card_limit,legacy_selection_enabled,economy_frozen,force_update,download_url',
     )
     .eq('active', true)
     .order('release_date', { ascending: true })
@@ -103,6 +104,8 @@ export type LegacySelectionSubmission = {
   selected_count: number;
   auto_filled_count: number;
   confirmed_at: string;
+  locked_at: string | null;
+  lock_source: 'deadline' | 'freeze' | null;
 };
 
 export type LegacySelectionState = {
@@ -114,7 +117,8 @@ export type LegacySelectionState = {
 function legacySelectionError(error: any): Error {
   const message = String(error?.message ?? error ?? '');
   if (message.includes('LEGACY_SELECTION_CLOSED')) return new Error('A escolha das cartas de legado ainda não está aberta.');
-  if (message.includes('LEGACY_SELECTION_LOCKED')) return new Error('Seu legado já foi confirmado e não pode mais ser alterado.');
+  if (message.includes('LEGACY_SELECTION_LOCKED')) return new Error('Seu Legado já foi travado e não pode mais ser alterado.');
+  if (message.includes('LEGACY_EDIT_DEADLINE_PASSED')) return new Error('O prazo para editar o Legado terminou. As cartas salvas agora estão sendo travadas para o freeze.');
   if (message.includes('LEGACY_LIMIT_REACHED')) return new Error('Você atingiu o limite de cartas que podem ser preservadas.');
   if (message.includes('LEGACY_CARD_NOT_OWNED')) return new Error('Uma das cartas escolhidas não está mais na sua Bag nem em uma oferta ativa da sua loja.');
   if (message.includes('LEGACY_SELECT_AT_LEAST_ONE')) return new Error('Escolha pelo menos uma carta antes de confirmar seu legado.');
@@ -135,7 +139,7 @@ export async function getLegacySelection(
       .order('selected_at', { ascending: true }),
     supabase
       .from('release_campaign_legacy_submissions')
-      .select('campaign_id,player_id,selected_count,auto_filled_count,confirmed_at')
+      .select('campaign_id,player_id,selected_count,auto_filled_count,confirmed_at,locked_at,lock_source')
       .eq('campaign_id', campaignId)
       .eq('player_id', playerId)
       .maybeSingle(),
@@ -183,17 +187,16 @@ export async function confirmLegacySelection(
   campaignId: string,
   playerId: string,
 ): Promise<LegacySelectionSubmission> {
-  try {
-    const { data, error } = await supabase
-      .from('release_campaign_legacy_submissions')
-      .insert({
-        campaign_id: campaignId,
-        player_id: playerId,
-        selected_count: 1,
-      })
-      .select('campaign_id,player_id,selected_count,auto_filled_count,confirmed_at')
-      .single();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!auth.user?.id || auth.user.id !== playerId) {
+    throw new Error('Sua sessão mudou. Entre novamente antes de confirmar o Legado.');
+  }
 
+  try {
+    const { data, error } = await supabase.rpc('confirm_my_legacy_selection', {
+      p_campaign_id: campaignId,
+    });
     if (error) throw error;
     return data as LegacySelectionSubmission;
   } catch (error) {
