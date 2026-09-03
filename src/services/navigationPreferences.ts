@@ -10,13 +10,13 @@ const STORAGE_KEY = 'trainer_navigation_preferences_v1';
 let webMemory: TrainerNavigationPreferences = { favorites: [], recents: [] };
 
 function sanitize(value: any): TrainerNavigationPreferences {
-  const favorites = Array.isArray(value?.favorites)
-    ? value.favorites.filter((item: unknown): item is string => typeof item === 'string').slice(0, 4)
+  const favorites: string[] = Array.isArray(value?.favorites)
+    ? value.favorites.filter((item: unknown) => typeof item === 'string').map(String).slice(0, 4)
     : [];
-  const recents = Array.isArray(value?.recents)
-    ? value.recents.filter((item: unknown): item is string => typeof item === 'string').slice(0, 5)
+  const recents: string[] = Array.isArray(value?.recents)
+    ? value.recents.filter((item: unknown) => typeof item === 'string').map(String).slice(0, 5)
     : [];
-  return { favorites: [...new Set(favorites)], recents: [...new Set(recents)] };
+  return { favorites: Array.from(new Set<string>(favorites)), recents: Array.from(new Set<string>(recents)) };
 }
 
 async function readRaw() {
