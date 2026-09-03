@@ -1295,6 +1295,13 @@ if (existsSync('supabase/migrations/20260903175115_harden_career_acl_and_enrich_
   assert(hardenCareer.includes("e.event_type='capture'") && hardenCareer.includes('batch.story_rank<=5'), 'Regressão social: histórias de ginásio ou limite anti-spam de boosters da guilda foi removido.');
 }
 
+if (existsSync('supabase/migrations/20260903175516_optimize_trainer_journey_summary.sql')) {
+  const journeyPerf = read('supabase/migrations/20260903175516_optimize_trainer_journey_summary.sql');
+  assert(journeyPerf.includes('owned as materialized') && journeyPerf.includes('metrics as materialized'), 'Regressão de performance: resumo da Jornada deixou de consolidar métricas em uma passagem.');
+  assert(journeyPerf.includes('get_trainer_journey_summary') && journeyPerf.includes('currentStep'), 'Regressão da Home: resumo otimizado da Jornada perdeu o próximo passo.');
+  assert(journeyPerf.includes('revoke all on function public.get_trainer_journey_summary() from public,anon'), 'Regressão de segurança: resumo otimizado da Jornada voltou a ficar executável por anon.');
+}
+
 if (failures.length) {
   console.error('\n❌ Auditoria de regressão falhou:');
   failures.forEach((failure) => console.error(' - ' + failure));
