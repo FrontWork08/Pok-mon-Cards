@@ -17,6 +17,7 @@ import {
 } from '@/services/navigationPreferences';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
+import { getMyFeatureFlags } from '@/services/playerExperience';
 
 type MenuGroupId = 'collection' | 'competitive' | 'social' | 'progress' | 'economy' | 'system';
 type MenuItem = { label:string; description:string; href:string; icon:keyof typeof Ionicons.glyphMap; group:MenuGroupId; adminOnly?:boolean };
@@ -73,6 +74,10 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 const EMPTY_PREFERENCES: TrainerNavigationPreferences = { favorites:[], recents:[] };
+const FEATURE_BY_HREF:Record<string,string>={
+  '/battle-lab':'battle_lab',
+  '/trainer-insights':'trainer_insights',
+};
 const normalizeSearch = (value:string) => value.trim().toLocaleLowerCase('pt-BR');
 
 export function TrainerNavigation() {
@@ -89,8 +94,13 @@ export function TrainerNavigation() {
   const[search,setSearch]=useState('');
   const[expanded,setExpanded]=useState<MenuGroupId|null>(null);
   const[preferences,setPreferences]=useState<TrainerNavigationPreferences>(EMPTY_PREFERENCES);
+  const[featureFlags,setFeatureFlags]=useState<Record<string,boolean>>({});
 
-  const visibleItems=useMemo(()=>MENU_ITEMS.filter(item=>!item.adminOnly||isAdmin),[isAdmin]);
+  const visibleItems=useMemo(()=>MENU_ITEMS.filter(item=>{
+    if(item.adminOnly&&!isAdmin)return false;
+    const flag=FEATURE_BY_HREF[item.href];
+    return !flag||featureFlags[flag]!==false;
+  }),[featureFlags,isAdmin]);
   const itemByHref=useMemo(()=>new Map(visibleItems.map(item=>[item.href,item])),[visibleItems]);
   const searchResults=useMemo(()=>{
     const term=normalizeSearch(search);
@@ -108,13 +118,14 @@ export function TrainerNavigation() {
   },[itemByHref,preferences]);
 
   useEffect(()=>{
-    if(!userId){setIsAdmin(false);setUnread(0);setRankSnapshot(null);setPreferences(EMPTY_PREFERENCES);return;}
+    if(!userId){setIsAdmin(false);setUnread(0);setRankSnapshot(null);setPreferences(EMPTY_PREFERENCES);setFeatureFlags({});return;}
     Promise.all([
       isCurrentUserAdmin().catch(()=>false),
       getUnreadConversationCount().catch(()=>0),
       getMyRankSnapshot().catch(()=>null),
       getTrainerNavigationPreferences().catch(()=>EMPTY_PREFERENCES),
-    ]).then(([admin,count,snapshot,prefs])=>{setIsAdmin(admin);setUnread(count);setRankSnapshot(snapshot);setPreferences(prefs);});
+      getMyFeatureFlags().catch(()=>({})),
+    ]).then(([admin,count,snapshot,prefs,flags])=>{setIsAdmin(admin);setUnread(count);setRankSnapshot(snapshot);setPreferences(prefs);setFeatureFlags(flags);});
   },[userId]);
 
   useEffect(()=>{
@@ -122,7 +133,8 @@ export function TrainerNavigation() {
     void Promise.all([
       getUnreadConversationCount().catch(()=>0),
       getTrainerNavigationPreferences().catch(()=>EMPTY_PREFERENCES),
-    ]).then(([count,prefs])=>{setUnread(count);setPreferences(prefs);});
+      getMyFeatureFlags().catch(()=>({})),
+    ]).then(([count,prefs,flags])=>{setUnread(count);setPreferences(prefs);setFeatureFlags(flags);});
   },[open,userId]);
 
   if(!userId)return null;
