@@ -255,8 +255,10 @@ if (existsSync('src/components/PokemonTypeSymbolFilter.tsx')) {
   const typeFilterUi = read('src/components/PokemonTypeSymbolFilter.tsx');
   assert(typeFilterUi.includes('POKEMON_TYPE_SYMBOLS'), 'Regressão de UX: mapa central de símbolos de tipo foi removido.');
   assert(typeFilterUi.includes("water: { label: 'ÁGUA', icon: 'water'"), 'Regressão de UX: símbolo de Água foi removido.');
-  assert(typeFilterUi.includes("fire: { label: 'FOGO', icon: 'flame'"), 'Regressão de UX: símbolo de Fogo foi removido.');
-  assert(typeFilterUi.includes("lightning: { label: 'ELÉTRICO', icon: 'flash'"), 'Regressão de UX: símbolo Elétrico foi removido.');
+  assert(typeFilterUi.includes("fire: { label: 'FOGO', icon: 'fire'"), 'Regressão de UX: símbolo vetorial de Fogo foi removido.');
+  assert(typeFilterUi.includes("electric: { label: 'ELÉTRICO', icon: 'lightning-bolt'"), 'Regressão de UX: símbolo vetorial Elétrico foi removido.');
+  assert(typeFilterUi.includes('MaterialCommunityIcons'), 'Regressão de UX: filtros de tipo voltaram a usar símbolos não vetoriais.');
+  assert(typeFilterUi.includes('color="#FFFFFF"'), 'Regressão de UX: símbolos de tipo deixaram de usar glifo branco sobre círculo sólido.');
   assert(typeFilterUi.includes('PokemonTypeSymbolFilter'), 'Regressão de UX: componente compartilhado de tipo foi removido.');
 }
 
