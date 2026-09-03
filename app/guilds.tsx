@@ -11,6 +11,7 @@ import { GuildHeadquartersShowcase } from '@/components/GuildHeadquartersShowcas
 import type { Pack, OpenedCard } from '@/services/packs';
 import {
   getGuildHub,
+  getMyGuildStoryFeed,
   claimGuildWeeklyReward,
   claimGuildCollectiveBooster,
   inviteToGuild,
@@ -23,6 +24,7 @@ import {
   type Guild,
   type GuildMember,
   type GuildHub,
+  type GuildStory,
   type GuildWeeklyReward,
 } from '@/services/guilds';
 import { findPlayers, getPlayerAvatarMap, getProfileAvatarUrl, type PlayerAvatarMeta } from '@/services/player';
@@ -49,6 +51,7 @@ export default function GuildsScreen() {
   const [results, setResults] = useState<any[]>([]);
   const [collectiveOpen, setCollectiveOpen] = useState(false);
   const [avatars, setAvatars] = useState<Record<string, PlayerAvatarMeta>>({});
+  const [stories,setStories]=useState<GuildStory[]>([]);
   const loadedOnce = useRef(false);
 
   const load = useCallback(async (silent = false) => {
@@ -64,6 +67,11 @@ export default function GuildsScreen() {
       const memberIds = next.guilds.flatMap((guild) => guild.members.map((member) => member.id));
       void getPlayerAvatarMap(memberIds).then(setAvatars).catch(() => null);
       void getEconomySinkHub().then(setEconomyHub).catch(() => null);
+      if(next.myMembership){
+        void getMyGuildStoryFeed(12).then(setStories).catch(()=>setStories([]));
+      }else{
+        setStories([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível carregar as guildas.');
     } finally {
@@ -202,6 +210,19 @@ export default function GuildsScreen() {
           compact
         />
       ) : null}
+
+      {selected && myMembership?.guildId===selected.id && stories.length ? <View style={[styles.storyPanel,{backgroundColor:colors.surface,borderColor:selected.color}]}>
+        <View style={styles.storyHead}><View><Text style={[styles.storyKicker,{color:selected.color}]}>HISTÓRIAS RECENTES</Text><Text style={[styles.storyTitle,{color:colors.text}]}>O que sua guilda viveu</Text><Text style={[styles.storyHint,{color:colors.muted}]}>Vitórias, boosters e novos membros dos últimos dias.</Text></View><Ionicons name="time" size={22} color={selected.color}/></View>
+        <View style={styles.storyList}>{stories.slice(0,8).map((story,index)=>{
+          const accent=story.type==='battle_win'?'#FF735C':story.type==='pack_open'?'#5AA8FF':selected.color;
+          const icon=(story.type==='battle_win'?'trophy':story.type==='pack_open'?'cube':'person-add') as keyof typeof Ionicons.glyphMap;
+          const time=story.createdAt?new Date(story.createdAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+          return <View key={story.type+'-'+story.createdAt+'-'+index} style={[styles.storyRow,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+            <View style={[styles.storyIcon,{backgroundColor:accent+'1C'}]}><Ionicons name={icon} size={17} color={accent}/></View>
+            <View style={{flex:1,minWidth:0}}><Text style={[styles.storyText,{color:colors.text}]}><Text style={{fontWeight:'900'}}>@{story.actor}</Text> {story.text}</Text><Text style={[styles.storyTime,{color:colors.muted}]}>{time}</Text></View>
+          </View>;
+        })}</View>
+      </View> : null}
 
       {notice ? <Pressable onPress={() => setNotice(null)} style={[styles.notice, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}><Ionicons name="checkmark-circle" size={19} color={colors.yellow} /><Text style={[styles.noticeText, { color: colors.text }]}>{notice}</Text><Ionicons name="close" size={18} color={colors.muted} /></Pressable> : null}
       {error ? <Pressable onPress={() => setError(null)} style={styles.error}><Ionicons name="alert-circle" size={19} color="#FF9FAF" /><Text style={styles.errorText}>{error}</Text><Ionicons name="close" size={18} color="#FF9FAF" /></Pressable> : null}
@@ -410,7 +431,7 @@ function GuildDetail({
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create({storyPanel:{borderRadius:20,borderWidth:1,padding:13,gap:9},storyHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},storyKicker:{fontSize:7,fontWeight:'900',letterSpacing:.9},storyTitle:{fontSize:16,fontWeight:'900',marginTop:2},storyHint:{fontSize:7.5,marginTop:2},storyList:{gap:6},storyRow:{borderRadius:13,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},storyIcon:{width:34,height:34,borderRadius:10,alignItems:'center',justifyContent:'center'},storyText:{fontSize:8.5,lineHeight:12},storyTime:{fontSize:6.5,marginTop:2},
   topRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   guildHero:{minHeight:180,borderRadius:28,borderWidth:1,padding:17,overflow:'hidden',position:'relative'},
   guildAuraContent:{minHeight:90,position:'relative',justifyContent:'center'},
