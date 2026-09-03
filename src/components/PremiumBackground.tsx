@@ -30,9 +30,11 @@ function CaptureOrb({ top, right, left, size, color, opacity }: {
 }
 
 export const PremiumBackground = memo(function PremiumBackground() {
-  const { colors, isLight, themeName } = useAppTheme();
+  const { colors, isLight, themeName, effectsReduced } = useAppTheme();
   const patternIcon = THEME_ICONS[themeName as keyof typeof THEME_ICONS] ?? 'paw';
   const visual = getThemeVisual(themeName);
+  if(effectsReduced)return <View pointerEvents="none" style={[styles.layer,{backgroundColor:colors.bg}]}><View style={[styles.reducedGlow,{backgroundColor:colors.accent,opacity:isLight?.035:.055}]}/></View>;
+
   const webTexture = Platform.OS === 'web' ? ({
     backgroundImage:
       `radial-gradient(circle at 88% 10%, ${colors.accent}20 0 54px, transparent 55px),` +
@@ -83,4 +85,5 @@ const styles = StyleSheet.create({
   landMassTwo: { position:'absolute', width:390, height:210, borderRadius:160, bottom:'5%', left:-270, transform:[{ rotate:'17deg' }] },
   routeLine: { position:'absolute', width:'65%', height:190, borderWidth:2, borderRadius:150, top:'31%', left:'46%', transform:[{ rotate:'-17deg' }] },
   routeLineTwo: { position:'absolute', width:'58%', height:170, borderWidth:2, borderRadius:150, top:'70%', left:'-24%', transform:[{ rotate:'11deg' }] },
+  reducedGlow:{position:'absolute',right:-80,top:-80,width:260,height:260,borderRadius:999},
 });
