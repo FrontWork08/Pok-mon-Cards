@@ -268,6 +268,31 @@ if (existsSync('app/trade/[id].tsx')) {
 if (existsSync('app/legacy-selection.tsx')) {
   const legacySelection = read('app/legacy-selection.tsx');
   assert(legacySelection.includes('enableTypeFilter'), 'Regressão de UX: seletor do Legado perdeu filtro simbólico por tipo.');
+  assert(legacySelection.includes('provisionalConfirmed'), 'Regressão do Legado: confirmação voltou a bloquear imediatamente antes do prazo.');
+  assert(legacySelection.includes('campaign?.legacy_edit_deadline'), 'Regressão do Legado: tela deixou de respeitar o prazo de edição.');
+  assert(legacySelection.includes("submission?.locked_at"), 'Regressão do Legado: tela deixou de diferenciar confirmação provisória de trava final.');
+  assert(legacySelection.includes('REVISAR E CONFIRMAR'), 'Regressão de UX: confirmação do Legado voltou a dizer que bloqueia antes do prazo.');
+}
+
+if (existsSync('src/services/releaseCampaign.ts')) {
+  const releaseCampaignService = read('src/services/releaseCampaign.ts');
+  assert(releaseCampaignService.includes('legacy_edit_deadline: string | null'), 'Regressão do Legado: campanha perdeu o prazo explícito de edição.');
+  assert(releaseCampaignService.includes("rpc('confirm_my_legacy_selection'"), 'Regressão do Legado: confirmação provisória deixou de usar a RPC protegida.');
+  assert(releaseCampaignService.includes('locked_at: string | null'), 'Regressão do Legado: cliente perdeu o estado de trava final.');
+  assert(releaseCampaignService.includes('LEGACY_EDIT_DEADLINE_PASSED'), 'Regressão de UX: cliente perdeu a mensagem de prazo encerrado.');
+}
+
+if (existsSync('supabase/migrations/20260903023019_legacy_editable_until_day_before_freeze.sql')) {
+  const legacyDeadlineDb = read('supabase/migrations/20260903023019_legacy_editable_until_day_before_freeze.sql');
+  assert(legacyDeadlineDb.includes("time zone 'America/Sao_Paulo'"), 'Regressão do Legado: prazo deixou de usar o horário de Brasília.');
+  assert(legacyDeadlineDb.includes("time '23:59:59.999999'"), 'Regressão do Legado: edição não vai mais até o fim do dia anterior ao freeze.');
+  assert(legacyDeadlineDb.includes('private.auto_lock_due_legacy_selections()'), 'Regressão do Legado: confirmação automática no prazo foi removida.');
+  assert(legacyDeadlineDb.includes("c.selected_count=v_campaign.legacy_card_limit"), 'Regressão do Legado: 10 cartas salvas sem confirmação não são mais confirmadas automaticamente.');
+  assert(legacyDeadlineDb.includes("v_legacy:=private.auto_lock_due_legacy_selections()"), 'Regressão do Legado: background tick deixou de executar a trava automática.');
+  assert(legacyDeadlineDb.includes("and sub.locked_at is not null"), 'Regressão do Legado: confirmação provisória voltou a impedir edição antes da trava final.');
+  assert(legacyDeadlineDb.includes("perform public.confirm_my_legacy_selection(p_campaign_id)"), 'Regressão do Legado: editar uma seleção já confirmada deixou de manter a confirmação provisória.');
+  assert(legacyDeadlineDb.includes("or sub.locked_at is null"), 'Regressão do freeze: submissões provisórias podem chegar ao freeze sem trava final.');
+  assert(legacyDeadlineDb.includes("revoke all on function private.auto_lock_due_legacy_selections()"), 'Regressão de segurança: job privado do Legado ficou executável pelo cliente.');
 }
 
 if (existsSync('src/components/CardPickerModal.tsx')) {
