@@ -10,6 +10,7 @@ export type AchievementDefinition = {
   category: 'special' | 'battle' | 'collection' | 'social' | 'rank';
   target: number;
   sort_order: number;
+  secret: boolean;
 };
 
 export type PlayerAchievement = {
@@ -46,7 +47,7 @@ export async function getMyAchievements() {
 
   const { data, error } = await supabase
     .from('player_achievements')
-    .select('player_id,achievement_id,progress,unlocked_at,achievement:achievement_definitions!player_achievements_achievement_id_fkey(id,name,title,description,icon,category,target,sort_order)')
+    .select('player_id,achievement_id,progress,unlocked_at,achievement:achievement_definitions!player_achievements_achievement_id_fkey(id,name,title,description,icon,category,target,sort_order,secret)')
     .eq('player_id', userData.user.id)
     .order('achievement_id', { ascending: true });
   if (error) throw error;
