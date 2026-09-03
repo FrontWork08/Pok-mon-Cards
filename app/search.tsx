@@ -134,7 +134,7 @@ const styles=StyleSheet.create({
   resultSummary:{flexDirection:'row',alignItems:'baseline',gap:6},resultCount:{fontSize:22,fontWeight:'900'},resultLabel:{fontSize:9,fontWeight:'800'},
   sectionTitle:{marginTop:4,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},sectionTitleLeft:{flexDirection:'row',alignItems:'center',gap:6},sectionTitleText:{fontSize:17,fontWeight:'900'},sectionCount:{fontSize:9,fontWeight:'900'},
   list:{gap:7},functionRow:{minHeight:60,borderRadius:16,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:9},functionIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},body:{flex:1,minWidth:0},title:{fontSize:11.5,fontWeight:'900'},meta:{fontSize:8.5,lineHeight:12,marginTop:2},price:{fontSize:9,fontWeight:'900',marginTop:3},
-  setImage:{width:42,height:42,borderRadius:9},cardGrid:{flexDirection:'row',flexWrap:'wrap',gap:7},cardResult:{width:'48.8%',minWidth:255,minHeight:102,borderRadius:16,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},cardImage:{width:60,height:82,borderRadius:6},
+  setImage:{width:42,height:42,borderRadius:9},cardGrid:{flexDirection:'row',flexWrap:'wrap',gap:7},cardResult:{flexGrow:1,flexBasis:260,minWidth:0,minHeight:102,borderRadius:16,borderWidth:1,padding:8,flexDirection:'row',alignItems:'center',gap:8},cardImage:{width:60,height:82,borderRadius:6},
   personRow:{minHeight:62,borderRadius:16,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:10},
   guildRow:{minHeight:64,borderRadius:16,borderWidth:1,padding:9,flexDirection:'row',alignItems:'center',gap:10},guildIcon:{width:43,height:43,borderRadius:14,alignItems:'center',justifyContent:'center'},
 });
