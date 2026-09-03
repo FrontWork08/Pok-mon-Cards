@@ -10,7 +10,10 @@ export type TradeCardInput = {
 async function invokeTradeAction(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('trade-action', { body });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da troca.');
-  if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível concluir a ação da troca.');
+  if (data?.error) {
+    if(String(data.error).includes('CARD_LOCKED')) throw new Error('Esta carta está bloqueada 🔒. Desbloqueie no Passaporte antes de colocar na troca.');
+    throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível concluir a ação da troca.');
+  }
   return data?.data;
 }
 
