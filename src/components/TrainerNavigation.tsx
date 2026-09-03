@@ -133,11 +133,11 @@ export function TrainerNavigation() {
     const activity=item.href==='/inbox'&&unread>0;
     return <View key={item.href} style={[
       compact?styles.quickItem:styles.item,
-      {backgroundColor:active?${group.color}18:colors.surface,borderColor:active?group.color:colors.border},
+      {backgroundColor:active?group.color+'18':colors.surface,borderColor:active?group.color:colors.border},
     ]}>
       <Pressable accessibilityRole="button" accessibilityLabel={item.label} onPress={()=>navigate(item.href)} style={({pressed})=>[styles.itemMain,pressed&&styles.pressed]}>
         <View style={[styles.itemAccent,{backgroundColor:group.color}]}/>
-        <View style={[styles.itemIcon,{backgroundColor:${group.color}18}]}><Ionicons name={item.icon} size={compact?18:20} color={item.adminOnly?'#FF5CCF':group.color}/></View>
+        <View style={[styles.itemIcon,{backgroundColor:group.color+'18'}]}><Ionicons name={item.icon} size={compact?18:20} color={item.adminOnly?'#FF5CCF':group.color}/></View>
         <View style={styles.itemText}><Text numberOfLines={1} style={[styles.itemLabel,{color:colors.text}]}>{item.label}</Text>{!compact?<Text numberOfLines={1} style={[styles.itemDescription,{color:colors.muted}]}>{item.description}</Text>:null}</View>
         {activity?<View style={styles.badge}><Text style={styles.badgeText}>{Math.min(unread,99)}</Text></View>:null}
         <Ionicons name="chevron-forward" size={16} color={colors.muted}/>
@@ -186,9 +186,9 @@ export function TrainerNavigation() {
                   const isExpanded=expanded===group.id;
                   return <View key={group.id} style={[styles.groupCard,{backgroundColor:colors.surface,borderColor:isExpanded?group.color:colors.border}]}>
                     <Pressable onPress={()=>setExpanded(isExpanded?null:group.id)} style={({pressed})=>[styles.groupHeader,pressed&&styles.pressed]}>
-                      <View style={[styles.groupIcon,{backgroundColor:${group.color}1C}]}><Ionicons name={group.icon} size={21} color={group.color}/></View>
+                      <View style={[styles.groupIcon,{backgroundColor:group.color+'1C'}]}><Ionicons name={group.icon} size={21} color={group.color}/></View>
                       <View style={styles.groupText}><Text style={[styles.groupLabel,{color:colors.text}]}>{group.label}</Text><Text style={[styles.groupSubtitle,{color:colors.muted}]}>{group.subtitle}</Text></View>
-                      <View style={[styles.groupCount,{borderColor:${group.color}66}]}><Text style={[styles.groupCountText,{color:group.color}]}>{groupItems.length}</Text></View>
+                      <View style={[styles.groupCount,{borderColor:group.color+'66'}]}><Text style={[styles.groupCountText,{color:group.color}]}>{groupItems.length}</Text></View>
                       <Ionicons name={isExpanded?'chevron-up':'chevron-down'} size={18} color={colors.muted}/>
                     </Pressable>
                     {isExpanded?<View style={[styles.groupBody,{borderTopColor:colors.border}]}>{groupItems.map(item=>renderMenuItem(item))}</View>:null}
