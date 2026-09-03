@@ -1280,6 +1280,21 @@ if (existsSync('supabase/migrations/20260903174648_public_trainer_identity_summa
   assert(!identityDb.includes("'coins'") && !identityDb.includes("'diamonds'"), 'Regressão de privacidade: resumo público da identidade passou a expor saldo.');
 }
 
+if (existsSync('supabase/migrations/20260903175115_harden_career_acl_and_enrich_guild_stories.sql')) {
+  const hardenCareer = read('supabase/migrations/20260903175115_harden_career_acl_and_enrich_guild_stories.sql');
+  for (const signature of [
+    'public.get_trainer_career()',
+    'public.claim_trainer_journey_step(text)',
+    'public.get_trainer_journey_summary()',
+    'public.claim_all_trainer_journey_rewards()',
+    'public.get_my_guild_story_feed(integer)',
+    'public.get_public_trainer_identity(uuid)',
+  ]) {
+    assert(hardenCareer.includes(`revoke all on function ${signature} from public,anon`), `Regressão de segurança: ${signature} voltou a ficar executável por anon.`);
+  }
+  assert(hardenCareer.includes("e.event_type='capture'") && hardenCareer.includes('batch.story_rank<=5'), 'Regressão social: histórias de ginásio ou limite anti-spam de boosters da guilda foi removido.');
+}
+
 if (failures.length) {
   console.error('\n❌ Auditoria de regressão falhou:');
   failures.forEach((failure) => console.error(' - ' + failure));
