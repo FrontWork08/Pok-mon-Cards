@@ -123,6 +123,7 @@ export default function MarketplaceScreen() {
   },[]);
   useEffect(()=>{
     if(!pickerOpen)return;
+    inventoryRequestSeq.current+=1;
     const timer=setTimeout(()=>{void loadInventory(inventorySearch,0);},320);
     return()=>clearTimeout(timer);
   },[pickerOpen,inventorySearch,loadInventory]);
@@ -340,6 +341,133 @@ export default function MarketplaceScreen() {
   </SafeAreaView>;
 }
 
+
+function MarketplaceCardPreviewModal({
+  detail,
+  loading,
+  sellEntry,
+  onClose,
+  onSelectForSale,
+}:{
+  detail:CardDetailEntry|null;
+  loading:boolean;
+  sellEntry:OwnedCardEntry|null;
+  onClose:()=>void;
+  onSelectForSale:()=>void;
+}){
+  const {colors}=useAppTheme();
+  const card=detail?.cards??null;
+  const stats=card?getBattleCardPreview(card):null;
+  const tcg=(card?.tcg_data??{}) as any;
+  const attacks=Array.isArray(tcg?.attacks)?tcg.attacks:[];
+  const abilities=Array.isArray(tcg?.abilities)?tcg.abilities:[];
+  const weaknesses=Array.isArray(tcg?.weaknesses)?tcg.weaknesses:[];
+  const resistances=Array.isArray(tcg?.resistances)?tcg.resistances:[];
+  const types=Array.isArray(card?.types)?card.types:[];
+  const visible=loading||Boolean(card);
+
+  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <SafeAreaView style={[styles.previewSafe,{backgroundColor:colors.bg}]}>
+      <PremiumBackground/>
+      <View style={[styles.previewHeader,{borderBottomColor:colors.border}]}>
+        <View style={{flex:1}}>
+          <Text style={[styles.previewKicker,{color:colors.yellow}]}>VISUALIZAÇÃO DA CARTA</Text>
+          <Text numberOfLines={1} style={[styles.previewTitle,{color:colors.text}]}>{card?.pokemon_name??'Carregando…'}</Text>
+        </View>
+        <Pressable onPress={onClose} style={[styles.previewClose,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+          <Ionicons name="close" size={23} color={colors.text}/>
+        </Pressable>
+      </View>
+
+      {loading&&!card ? <View style={styles.previewLoading}><ActivityIndicator size="large" color={colors.yellow}/><Text style={[styles.previewLoadingText,{color:colors.muted}]}>Carregando carta e estatísticas…</Text></View> : null}
+
+      {card&&stats ? <ScrollView contentContainerStyle={styles.previewContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.previewHero}>
+          {card.image_large||card.image_small
+            ? <Image source={{uri:card.image_large??card.image_small??''}} resizeMode="contain" style={styles.previewCardImage}/>
+            : <View style={[styles.previewCardImage,{backgroundColor:colors.surface}]}/>}
+          <View style={styles.previewIdentity}>
+            <Text style={[styles.previewName,{color:colors.text}]}>{card.pokemon_name}</Text>
+            <Text style={[styles.previewMeta,{color:colors.muted}]}>{card.set_name} {card.card_number?'• #'+card.card_number:''}</Text>
+            <Text style={[styles.previewMeta,{color:colors.muted}]}>{card.rarity??'Sem raridade'}</Text>
+            <View style={styles.previewTypeRow}>{types.map((type)=><View key={String(type)} style={[styles.previewTypeChip,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}><Text style={[styles.previewTypeText,{color:colors.text}]}>{String(type).toUpperCase()}</Text></View>)}</View>
+            <View style={[styles.previewPriceBox,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+              <Text style={[styles.previewPriceLabel,{color:colors.muted}]}>VALOR DE MERCADO</Text>
+              <Text style={[styles.previewPriceValue,{color:'#65D894'}]}>{formatUsd(Number(card.market_price_usd??0))}</Text>
+              {detail?.owned?<Text style={[styles.previewOwned,{color:colors.muted}]}>Você possui {detail.quantity} cópia(s) na Bag.</Text>:null}
+            </View>
+          </View>
+        </View>
+
+        <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Estatísticas de batalha</Text>
+        <View style={styles.previewStatsGrid}>
+          <PreviewStat label="HP / DEF" value={String(stats.hp)} icon="heart" colors={colors}/>
+          <PreviewStat label="MAIOR ATQ" value={String(stats.maxDamage)} icon="flash" colors={colors}/>
+          <PreviewStat label="ENERGIA MÍN." value={String(stats.minEnergy)} icon="battery-half" colors={colors}/>
+          <PreviewStat label="RECUO" value={String(stats.retreatCost)} icon="walk" colors={colors}/>
+          <PreviewStat label="ATAQUES" value={String(stats.attackCount)} icon="fitness" colors={colors}/>
+          <PreviewStat label="HABILIDADES" value={String(stats.abilityCount)} icon="sparkles" colors={colors}/>
+        </View>
+
+        <View style={[styles.previewRating,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+          <View style={{flex:1}}>
+            <Text style={[styles.previewPriceLabel,{color:colors.muted}]}>ÍNDICE DE BATALHA</Text>
+            <Text style={[styles.previewRatingValue,{color:colors.yellow}]}>{stats.battleRating}</Text>
+          </View>
+          <View style={{alignItems:'flex-end'}}>
+            <Text style={[styles.previewMiniStat,{color:colors.muted}]}>Dano/Energia: {stats.damagePerEnergy}</Text>
+            <Text style={[styles.previewMiniStat,{color:colors.muted}]}>Eficiência: {stats.efficiencyScore}</Text>
+            <Text style={[styles.previewMiniStat,{color:colors.muted}]}>Velocidade: {stats.speedScore}</Text>
+          </View>
+        </View>
+
+        <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Ataques</Text>
+        {attacks.length ? attacks.map((attack:any,index:number)=>{
+          const cost=Array.isArray(attack?.cost)?attack.cost.join(' • '):String(attack?.convertedEnergyCost??'—');
+          return <View key={'atk-'+index+'-'+String(attack?.name??'')} style={[styles.previewMove,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+            <View style={styles.previewMoveHead}>
+              <Text style={[styles.previewMoveName,{color:colors.text}]}>{String(attack?.name??('Ataque '+(index+1)))}</Text>
+              <Text style={[styles.previewDamage,{color:colors.yellow}]}>{String(attack?.damage||'—')}</Text>
+            </View>
+            <Text style={[styles.previewMoveCost,{color:colors.accent}]}>⚡ {cost||'—'}</Text>
+            {attack?.text?<Text style={[styles.previewMoveText,{color:colors.muted}]}>{String(attack.text)}</Text>:null}
+          </View>;
+        }):<Text style={[styles.previewEmptyText,{color:colors.muted}]}>Nenhum ataque impresso encontrado nesta carta.</Text>}
+
+        {abilities.length ? <>
+          <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Habilidades</Text>
+          {abilities.map((ability:any,index:number)=><View key={'ability-'+index+'-'+String(ability?.name??'')} style={[styles.previewMove,{backgroundColor:colors.surface,borderColor:colors.accent}]}>
+            <Text style={[styles.previewMoveName,{color:colors.accent}]}>{String(ability?.name??('Habilidade '+(index+1)))}</Text>
+            {ability?.type?<Text style={[styles.previewMoveCost,{color:colors.muted}]}>{String(ability.type)}</Text>:null}
+            {ability?.text?<Text style={[styles.previewMoveText,{color:colors.muted}]}>{String(ability.text)}</Text>:null}
+          </View>)}
+        </>:null}
+
+        {(weaknesses.length||resistances.length)?<>
+          <Text style={[styles.previewSectionTitle,{color:colors.text}]}>Fraqueza e resistência</Text>
+          <View style={[styles.previewDefenseRow,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+            <Text style={[styles.previewDefenseText,{color:colors.muted}]}>Fraqueza: {weaknesses.length?weaknesses.map((value:any)=>String(value?.type??'?')+' '+String(value?.value??'')).join(' • '):'—'}</Text>
+            <Text style={[styles.previewDefenseText,{color:colors.muted}]}>Resistência: {resistances.length?resistances.map((value:any)=>String(value?.type??'?')+' '+String(value?.value??'')).join(' • '):'—'}</Text>
+          </View>
+        </>:null}
+
+        {sellEntry ? <Pressable onPress={onSelectForSale} style={[styles.previewSellButton,{backgroundColor:colors.yellow}]}>
+          <Ionicons name="pricetag" size={20} color="#07111F"/>
+          <Text style={styles.previewSellText}>ESCOLHER ESTA CARTA PARA VENDER</Text>
+        </Pressable> : null}
+      </ScrollView> : null}
+    </SafeAreaView>
+  </Modal>;
+}
+
+function PreviewStat({label,value,icon,colors}:{label:string;value:string;icon:keyof typeof Ionicons.glyphMap;colors:any}){
+  return <View style={[styles.previewStat,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+    <Ionicons name={icon} size={17} color={colors.accent}/>
+    <Text style={[styles.previewStatValue,{color:colors.text}]}>{value}</Text>
+    <Text style={[styles.previewStatLabel,{color:colors.muted}]}>{label}</Text>
+  </View>;
+}
+
 function ListingCard({item,myId,working,onBuy,onOffer,onPreview}:{item:MarketplaceListing;myId:string;working:boolean;onBuy:(item:MarketplaceListing)=>void;onOffer:(item:MarketplaceListing)=>void;onPreview:(item:MarketplaceListing)=>void}){
   const {colors}=useAppTheme();
   const themeColor=
@@ -431,4 +559,5 @@ const styles=StyleSheet.create({
   listingSurface:{marginBottom:9},listing:{borderRadius:19,borderWidth:1,padding:12,gap:10,position:'relative',overflow:'hidden'},listingThemeGlow:{position:'absolute',right:-70,top:-85,width:190,height:190,borderRadius:999},listingThemeEdge:{position:'absolute',left:0,right:0,top:0,height:2},sellerRow:{flexDirection:'row',alignItems:'center',gap:9},premiumInnerPanel:{borderWidth:1,borderRadius:15,padding:9,backgroundColor:'rgba(255,255,255,.025)'},premiumCardPanel:{borderWidth:1,borderRadius:16,padding:9,backgroundColor:'rgba(255,255,255,.018)'},shopTitleRow:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},shopName:{fontSize:13,fontWeight:'900'},sellerName:{fontSize:8,marginTop:2},premiumBadge:{borderRadius:999,paddingHorizontal:6,paddingVertical:3,flexDirection:'row',alignItems:'center',gap:3},premiumText:{fontSize:6,fontWeight:'900'},boostBadge:{borderRadius:999,paddingHorizontal:7,paddingVertical:5,flexDirection:'row',alignItems:'center',gap:4},boostText:{color:'#FFD447',fontSize:6,fontWeight:'900'},cardRow:{flexDirection:'row',alignItems:'center',gap:11},cardImage:{width:65,height:87,borderRadius:7},cardName:{fontSize:16,fontWeight:'900'},cardMeta:{fontSize:9,marginTop:3},price:{fontSize:15,fontWeight:'900',marginTop:8},buyButton:{minHeight:45,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},ownOfferButton:{borderWidth:1.2,overflow:'hidden'},buyText:{color:'#07111F',fontSize:9,fontWeight:'900'},
   footer:{gap:8,marginTop:12},myRow:{borderRadius:14,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:8},myName:{flex:1,fontSize:11,fontWeight:'900'},status:{fontSize:8,fontWeight:'900'},removeButton:{width:32,height:32,borderRadius:10,backgroundColor:'#351A24',alignItems:'center',justifyContent:'center'},empty:{borderRadius:18,borderWidth:1,padding:24,alignItems:'center',gap:8},emptyText:{fontSize:10,lineHeight:15},
   pickerSafe:{flex:1},pickerHeader:{padding:14,flexDirection:'row',alignItems:'center',gap:10},pickerList:{padding:14,gap:8},inventoryRow:{borderRadius:15,borderWidth:1,padding:8,gap:8},inventoryPreviewTap:{flexDirection:'row',alignItems:'center',gap:10},inventoryImage:{width:49,height:66,borderRadius:6},inventoryName:{fontSize:13,fontWeight:'900'},inventoryMeta:{fontSize:9,marginTop:3},inventoryPreviewHint:{fontSize:6.5,fontWeight:'900',letterSpacing:.45,marginTop:5},inventorySelect:{minHeight:38,borderRadius:11,borderWidth:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},inventorySelectText:{fontSize:8,fontWeight:'900'},inventoryCount:{fontSize:8,fontWeight:'800',paddingHorizontal:16,paddingTop:8},cardPreviewHint:{fontSize:6.5,fontWeight:'900',letterSpacing:.4,marginTop:7},
+  previewSafe:{flex:1},previewHeader:{minHeight:70,paddingHorizontal:15,paddingVertical:10,borderBottomWidth:1,flexDirection:'row',alignItems:'center',gap:10,zIndex:3},previewKicker:{fontSize:7,fontWeight:'900',letterSpacing:1.2},previewTitle:{fontSize:19,fontWeight:'900',marginTop:3},previewClose:{width:42,height:42,borderRadius:13,borderWidth:1,alignItems:'center',justifyContent:'center'},previewLoading:{flex:1,alignItems:'center',justifyContent:'center',gap:10},previewLoadingText:{fontSize:10,fontWeight:'800'},previewContent:{width:'100%',maxWidth:760,alignSelf:'center',padding:16,paddingBottom:60,gap:12},previewHero:{flexDirection:'row',flexWrap:'wrap',gap:16,alignItems:'center',justifyContent:'center'},previewCardImage:{width:250,height:350,borderRadius:13},previewIdentity:{flex:1,minWidth:220,maxWidth:390},previewName:{fontSize:26,fontWeight:'900'},previewMeta:{fontSize:10,fontWeight:'700',marginTop:4},previewTypeRow:{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:10},previewTypeChip:{borderRadius:999,borderWidth:1,paddingHorizontal:9,paddingVertical:5},previewTypeText:{fontSize:7,fontWeight:'900'},previewPriceBox:{borderRadius:14,borderWidth:1,padding:12,marginTop:12},previewPriceLabel:{fontSize:7,fontWeight:'900',letterSpacing:.8},previewPriceValue:{fontSize:19,fontWeight:'900',marginTop:4},previewOwned:{fontSize:8,fontWeight:'700',marginTop:4},previewSectionTitle:{fontSize:17,fontWeight:'900',marginTop:7},previewStatsGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},previewStat:{flexGrow:1,flexBasis:105,minWidth:105,borderRadius:13,borderWidth:1,padding:10,alignItems:'center',gap:3},previewStatValue:{fontSize:18,fontWeight:'900'},previewStatLabel:{fontSize:6.5,fontWeight:'900',letterSpacing:.45,textAlign:'center'},previewRating:{borderRadius:14,borderWidth:1,padding:12,flexDirection:'row',alignItems:'center',gap:10},previewRatingValue:{fontSize:26,fontWeight:'900',marginTop:2},previewMiniStat:{fontSize:8,fontWeight:'800',marginVertical:1},previewMove:{borderRadius:14,borderWidth:1,padding:11,gap:5},previewMoveHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},previewMoveName:{fontSize:14,fontWeight:'900',flex:1},previewDamage:{fontSize:17,fontWeight:'900'},previewMoveCost:{fontSize:8,fontWeight:'900'},previewMoveText:{fontSize:9,lineHeight:14,fontWeight:'700'},previewEmptyText:{fontSize:9,lineHeight:14},previewDefenseRow:{borderRadius:14,borderWidth:1,padding:11,gap:6},previewDefenseText:{fontSize:9,fontWeight:'800'},previewSellButton:{minHeight:52,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,marginTop:6},previewSellText:{color:'#07111F',fontSize:9,fontWeight:'900',textAlign:'center'},
 });
