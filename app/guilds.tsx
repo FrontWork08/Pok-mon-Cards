@@ -216,8 +216,8 @@ export default function GuildsScreen() {
       {selected && myMembership?.guildId===selected.id && stories.length ? <View style={[styles.storyPanel,{backgroundColor:colors.surface,borderColor:selected.color}]}>
         <View style={styles.storyHead}><View><Text style={[styles.storyKicker,{color:selected.color}]}>HISTÓRIAS RECENTES</Text><Text style={[styles.storyTitle,{color:colors.text}]}>O que sua guilda viveu</Text><Text style={[styles.storyHint,{color:colors.muted}]}>Vitórias, boosters e novos membros dos últimos dias.</Text></View><Ionicons name="time" size={22} color={selected.color}/></View>
         <View style={styles.storyList}>{stories.slice(0,8).map((story,index)=>{
-          const accent=story.type==='battle_win'?'#FF735C':story.type==='pack_open'?'#5AA8FF':selected.color;
-          const icon=(story.type==='battle_win'?'trophy':story.type==='pack_open'?'cube':'person-add') as keyof typeof Ionicons.glyphMap;
+          const accent=story.type==='battle_win'?'#FF735C':story.type==='gym_capture'?'#F0C74E':story.type==='pack_open'?'#5AA8FF':selected.color;
+          const icon=(story.type==='battle_win'?'trophy':story.type==='gym_capture'?'flag':story.type==='pack_open'?'cube':'person-add') as keyof typeof Ionicons.glyphMap;
           const time=story.createdAt?new Date(story.createdAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
           return <View key={story.type+'-'+story.createdAt+'-'+index} style={[styles.storyRow,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
             <View style={[styles.storyIcon,{backgroundColor:accent+'1C'}]}><Ionicons name={icon} size={17} color={accent}/></View>
