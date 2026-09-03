@@ -36,7 +36,7 @@ function isEmptyPendingTrade(trade: any) {
 }
 
 export default function TradeBuilderScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, cardId } = useLocalSearchParams<{ id: string; cardId?: string }>();
   const router = useRouter();
   const { colors } = useAppTheme();
   const [trade, setTrade] = useState<any>(null);
@@ -53,6 +53,7 @@ export default function TradeBuilderScreen() {
   const pickerOpenRef = useRef(false);
   const tradeRef = useRef<any>(null);
   const leavingRef = useRef(false);
+  const contextCardHandledRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -73,13 +74,24 @@ export default function TradeBuilderScreen() {
       const { data: players } = await supabase.from('players').select('id,username').in('id', participantIds);
       setNames(Object.fromEntries((players ?? []).map((player) => [player.id, player.username])));
 
-      setSelected(selectionFromTrade(tradeData, uid));
+      const savedSelection = selectionFromTrade(tradeData, uid);
+      const contextId = cardId ? String(cardId) : '';
+      const contextEntry = contextId ? (bagData ?? []).find((entry)=>entry.cards?.id===contextId&&Number(entry.quantity??0)>0) : null;
+      if (contextEntry && !contextCardHandledRef.current && Object.keys(savedSelection).length===0) {
+        contextCardHandledRef.current = true;
+        setSelected({ [contextId]: 1 });
+        pickerOpenRef.current = true;
+        setPickerOpen(true);
+        setNotice('Carta pré-selecionada. Revise a quantidade, adicione outras se quiser e toque em SALVAR OFERTA.');
+      } else {
+        setSelected(savedSelection);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível carregar a troca.');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [cardId, id]);
 
   useFocusEffect(useCallback(() => {
     void load();
