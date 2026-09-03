@@ -20,6 +20,7 @@ import { PackContentsModal } from '@/components/PackContentsModal';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerPageHeader } from '@/components/TrainerPageHeader';
+import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
 import {
   exchangeCoinsForDiamonds,
   getFavoritePackIds,
@@ -266,6 +267,7 @@ export default function PacksScreen() {
         subtitle="Explore eras, compare raridade e abra boosters com economia registrada pelo servidor."
         icon="cube"
       />
+      <AreaIdentityStrip area="packs" />
 
       <View style={[styles.balanceRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View>
