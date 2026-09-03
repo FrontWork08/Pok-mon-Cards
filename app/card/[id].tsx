@@ -336,8 +336,8 @@ export default function CardDetailScreen() {
               </View>
               <View style={styles.contextGrid}>
                 <Pressable onPress={()=>router.push('/decks')} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="albums" size={20} color="#5AA8FF"/><Text style={[styles.contextTileText,{color:colors.text}]}>DECKS</Text></Pressable>
-                <Pressable onPress={()=>router.push('/marketplace')} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="pricetag" size={20} color="#54C78D"/><Text style={[styles.contextTileText,{color:colors.text}]}>VENDER</Text></Pressable>
-                <Pressable onPress={()=>router.push('/(tabs)/trade')} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="swap-horizontal" size={20} color="#9B7BFF"/><Text style={[styles.contextTileText,{color:colors.text}]}>TROCAR</Text></Pressable>
+                <Pressable onPress={()=>router.push(('/marketplace?sellCardId='+encodeURIComponent(card.id)) as never)} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="pricetag" size={20} color="#54C78D"/><Text style={[styles.contextTileText,{color:colors.text}]}>VENDER</Text></Pressable>
+                <Pressable onPress={()=>router.push(('/(tabs)/trade?cardId='+encodeURIComponent(card.id)) as never)} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="swap-horizontal" size={20} color="#9B7BFF"/><Text style={[styles.contextTileText,{color:colors.text}]}>TROCAR</Text></Pressable>
                 <Pressable onPress={()=>router.push('/(tabs)/battles')} style={[styles.contextTile,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="game-controller" size={20} color="#FF735C"/><Text style={[styles.contextTileText,{color:colors.text}]}>BATALHAR</Text></Pressable>
               </View>
               <View style={styles.cardActions}>
