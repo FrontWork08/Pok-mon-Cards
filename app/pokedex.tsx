@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -24,6 +24,7 @@ import {
   type PokedexEntry,
 } from '@/services/pokedex';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { getScreenPreference, setScreenPreference } from '@/services/screenPreferences';
 
 export default function PokedexScreen() {
   const router = useRouter();
@@ -34,8 +35,24 @@ export default function PokedexScreen() {
   const [discovered, setDiscovered] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
   const [generation, setGeneration] = useState<number | null>(null);
+  const [filterRestored, setFilterRestored] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getScreenPreference('pokedex_filters_v1', { generation: null as number | null }).then((saved) => {
+      if (!active) return;
+      setGeneration(saved.generation ?? null);
+      setFilterRestored(true);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!filterRestored) return;
+    void setScreenPreference('pokedex_filters_v1', { generation });
+  }, [filterRestored, generation]);
 
   const load = useCallback(async () => {
     try {
