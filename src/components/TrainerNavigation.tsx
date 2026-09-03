@@ -37,6 +37,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Central de Atividades', description:'Mensagens, convites e avisos que precisam de atenção', href:'/inbox', icon:'notifications', group:'social' },
   { label:'Passe de Batalha', description:'50 níveis, recompensas grátis, VIP e missões', href:'/battle-pass', icon:'ribbon', group:'progress' },
   { label:'Carreira do Treinador', description:'Jornada, identidade, Pokédex e histórico da conta', href:'/career', icon:'compass', group:'progress' },
+  { label:'Museu da Conta', description:'Primeiros momentos, melhores pulls e memórias da conta', href:'/account-museum', icon:'library', group:'progress' },
   { label:'Temporada & Eventos', description:'Ranque, streak e efeitos temporários do jogo', href:'/season', icon:'flame', group:'progress' },
   { label:'Card Chase', description:'Wishlist e alertas de cartas desejadas', href:'/wishlist', icon:'star', group:'collection' },
   { label:'Vitrine do Perfil', description:'Escolha suas 6 cartas de destaque', href:'/showcase', icon:'sparkles', group:'collection' },
@@ -49,6 +50,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Cosméticos', description:'Molduras, fundos e temas desbloqueáveis', href:'/cosmetics', icon:'color-wand', group:'economy' },
   { label:'Mercado de Treinadores', description:'Lojas e ofertas em tempo real', href:'/marketplace', icon:'storefront', group:'economy' },
   { label:'Economia', description:'Conversões e visão geral da economia', href:'/economy', icon:'cash', group:'economy' },
+  { label:'Histórico Financeiro', description:'Coins e Diamantes com saldo antes e depois', href:'/financial-history', icon:'receipt', group:'economy' },
   { label:'Vender Repetidas', description:'Venda cópias extras da sua coleção', href:'/sell-duplicates', icon:'pricetag', group:'economy' },
   { label:'Resgatar Código', description:'Recompensas únicas por conta', href:'/codes', icon:'ticket', group:'economy' },
   { label:'Amigos e Chat', description:'Amizades, presença e conversas', href:'/friends', icon:'people', group:'social' },
@@ -60,6 +62,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Histórico de Packs', description:'Reveja seus melhores pulls', href:'/history', icon:'time', group:'collection' },
   { label:'Guia do Treinador', description:'Ciclo do jogo e glossário de stats', href:'/trainer-guide', icon:'help-circle', group:'system' },
   { label:'Configurações', description:'Aparência, batalha, notificações e privacidade', href:'/settings', icon:'settings', group:'system' },
+  { label:'Health Check', description:'Saúde dos sistemas e erros recentes', href:'/admin-health', icon:'pulse', group:'system', adminOnly:true },
   { label:'Admin Center', description:'Economia, usuários e sistema', href:'/admin', icon:'shield-checkmark', group:'system', adminOnly:true },
 ];
 
