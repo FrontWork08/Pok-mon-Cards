@@ -576,7 +576,7 @@ export default function BattleScreen() {
                   {card?.image_small ? <Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.draftImage} /> : <View style={[styles.draftImage, { backgroundColor: colors.bg }]} />}
                   <Text numberOfLines={1} style={[styles.draftCardName, { color: colors.text }]}>{card?.pokemon_name ?? item.card_id}</Text>
                   <Text style={[styles.draftOwner, { color: colors.muted }]}>{item.player_id === userId ? 'VOCÊ' : `@${players[item.player_id]?.username ?? 'RIVAL'}`} • #{item.global_pick_no}</Text>
-                  <Text numberOfLines={1} style={[styles.draftStats, { color: colors.yellow }]}>HP {combat.hp} • ATQ {combat.maxDamage} • ⚡ {combat.bestEnergy}</Text>
+                  <Text numberOfLines={1} style={[styles.draftStats, { color: colors.yellow }]}>{gameStyleBattle ? 'MODO POKÉMON • stats da espécie/forma' : `HP ${combat.hp} • ATQ ${combat.maxDamage} • ⚡ ${combat.bestEnergy}`}</Text>
                   <View style={styles.draftViewHint}><Ionicons name="expand-outline" size={11} color={colors.accent}/><Text style={[styles.draftViewHintText,{color:colors.accent}]}>TOQUE PARA AMPLIAR</Text></View>
                 </Pressable>
               ); })}
@@ -593,12 +593,14 @@ export default function BattleScreen() {
 
         {selecting ? (
           <>
-            <View style={styles.timerPanel}><Text style={[styles.roundLabel, { color: colors.muted }]}>RODADA {currentRound}</Text><Text style={[styles.timer, { color: remaining <= 5 ? '#FF566B' : colors.text }]}>{String(Math.floor(remaining / 60)).padStart(2, '0')}:{String(remaining % 60).padStart(2, '0')}</Text><Text style={[styles.timerHint, { color: colors.muted }]}>{remaining === 0 ? 'Tempo encerrado. O servidor está resolvendo a rodada automaticamente…' : 'Escolha em segredo. Se o tempo zerar, o servidor escolhe automaticamente.'}</Text><Text style={[styles.rulesText, { color: colors.accent }]}>Regra v6 TCG: duelo por turnos com 1 Energia virtual por turno. O primeiro jogador não ataca no primeiro turno; custo de Energia, dano variável, Fraqueza, Resistência, descarte, recarga, Condições Especiais, Abilities, efeitos entre turnos, ataques copiados e rerrolagens suportadas entram no resultado. Preço e raridade não contam.</Text></View>
+            <View style={styles.timerPanel}><Text style={[styles.roundLabel, { color: colors.muted }]}>RODADA {currentRound}</Text><Text style={[styles.timer, { color: remaining <= 5 ? '#FF566B' : colors.text }]}>{String(Math.floor(remaining / 60)).padStart(2, '0')}:{String(remaining % 60).padStart(2, '0')}</Text><Text style={[styles.timerHint, { color: colors.muted }]}>{remaining === 0 ? 'Tempo encerrado. O servidor está resolvendo a rodada automaticamente…' : 'Escolha em segredo. Se o tempo zerar, o servidor escolhe automaticamente.'}</Text><Text style={[styles.rulesText, { color: colors.accent }]}>{gameStyleBattle
+  ? 'Regra v7 Pokémon: nível 50, HP, ATK, DEF, SP.ATK, SP.DEF e SPEED da espécie/forma. Golpes usam Poder, Precisão e PP; Speed/Prioridade definem a ordem; STAB, tipos, crítico, status e habilidades entram no resultado. Não existe Energia TCG e preço/raridade não contam.'
+  : 'Compatibilidade v6 TCG desta batalha iniciada antes da migração: Energia virtual, ataques impressos, Fraqueza, Resistência e efeitos TCG continuam preservados até ela terminar.'}</Text></View>
 
             <View style={styles.arena}>
-              <MysterySlot label="SUA CARTA" locked={selfLocked} card={selectedEntry?.cards ?? null} showCard={Boolean(selectedEntry)} accent={colors.accent} />
+              <MysterySlot label="SUA CARTA" locked={selfLocked} card={selectedEntry?.cards ?? null} showCard={Boolean(selectedEntry)} accent={colors.accent} gameStyle={gameStyleBattle} />
               <View style={styles.arenaVs}><Ionicons name="flash" size={27} color={colors.yellow} /><Text style={[styles.arenaVsText, { color: colors.accent }]}>MYSTERY</Text></View>
-              <MysterySlot label="CARTA INIMIGA" locked={opponentLocked} card={null} showCard={false} accent={colors.accent} />
+              <MysterySlot label="CARTA INIMIGA" locked={opponentLocked} card={null} showCard={false} accent={colors.accent} gameStyle={gameStyleBattle} />
             </View>
 
             {!selfLocked ? (
@@ -792,7 +794,7 @@ export default function BattleScreen() {
         confirmLabel={drafting ? "ESCOLHER NO DRAFT" : "USAR ESTA CARTA"}
         working={working}
       />
-      <DraftCardPreviewModal card={draftPreviewCard} visible={Boolean(draftPreviewCard)} onClose={() => setDraftPreviewCard(null)} />
+      <DraftCardPreviewModal card={draftPreviewCard} visible={Boolean(draftPreviewCard)} gameStyle={gameStyleBattle} onClose={() => setDraftPreviewCard(null)} />
 
       <CardPickerModal
         visible={pickerMode === 'stake'}
@@ -811,7 +813,7 @@ export default function BattleScreen() {
   );
 }
 
-function DraftCardPreviewModal({ card, visible, onClose }: { card: any; visible: boolean; onClose: () => void }) {
+function DraftCardPreviewModal({ card, visible, gameStyle, onClose }: { card: any; visible: boolean; gameStyle: boolean; onClose: () => void }) {
   const { colors } = useAppTheme();
   if (!card) return null;
   const combat = getBattleCardPreview(card);
@@ -832,13 +834,22 @@ function DraftCardPreviewModal({ card, visible, onClose }: { card: any; visible:
           </View>
           <ScrollView contentContainerStyle={styles.draftPreviewScroll} showsVerticalScrollIndicator={false}>
             {card.image_large || card.image_small ? <Image source={{ uri: card.image_large ?? card.image_small }} resizeMode="contain" style={styles.draftPreviewImage}/> : <View style={[styles.draftPreviewImage,{backgroundColor:colors.surfaceAlt,alignItems:'center',justifyContent:'center'}]}><Ionicons name="image-outline" size={54} color={colors.muted}/></View>}
-            <View style={styles.draftPreviewStats}>
-              <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>HP / DEFESA</Text><Text style={[styles.draftPreviewStatValue,{color:colors.text}]}>{combat.hp}</Text></View>
-              <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>MAIOR ATAQUE</Text><Text style={[styles.draftPreviewStatValue,{color:colors.yellow}]}>{combat.maxDamage}</Text></View>
-              <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>ENERGIA MÍN.</Text><Text style={[styles.draftPreviewStatValue,{color:colors.accent}]}>⚡ {combat.bestEnergy}</Text></View>
-            </View>
-            {abilities.length ? <View style={styles.draftPreviewSection}><Text style={[styles.draftPreviewSectionTitle,{color:colors.muted}]}>HABILIDADES</Text>{abilities.map((ability:any,index:number)=><View key={`${ability?.name ?? 'ability'}:${index}`} style={[styles.draftPreviewMove,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewMoveName,{color:colors.text}]}>{String(ability?.name ?? 'Habilidade')}</Text>{ability?.text?<Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>{String(ability.text)}</Text>:null}</View>)}</View> : null}
-            <View style={styles.draftPreviewSection}><Text style={[styles.draftPreviewSectionTitle,{color:colors.muted}]}>ATAQUES</Text>{attacks.length ? attacks.map((attack:any,index:number)=><View key={`${attack?.name ?? 'attack'}:${index}`} style={[styles.draftPreviewMove,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><View style={styles.draftPreviewMoveHeader}><Text style={[styles.draftPreviewMoveName,{color:colors.text}]}>{String(attack?.name ?? 'Ataque')}</Text><Text style={[styles.draftPreviewMoveDamage,{color:colors.yellow}]}>{String(attack?.damage || '—')} dano</Text></View><Text style={[styles.draftPreviewMoveEnergy,{color:colors.accent}]}>⚡ {Number(attack?.convertedEnergyCost ?? (Array.isArray(attack?.cost) ? attack.cost.length : 0))} Energia</Text>{attack?.text?<Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>{String(attack.text)}</Text>:null}</View>) : <Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>Esta carta não possui ataque impresso.</Text>}</View>
+            {gameStyle ? (
+              <View style={[styles.draftPreviewSection,{backgroundColor:colors.surfaceAlt,borderRadius:14,padding:12}]}>
+                <Text style={[styles.draftPreviewSectionTitle,{color:colors.yellow}]}>BATALHA ESTILO POKÉMON</Text>
+                <Text style={[styles.draftPreviewMoveText,{color:colors.text}]}>Esta carta representa a espécie ou forma mostrada. Ao travar a escolha, o servidor aplica HP, ATK, DEF, SP.ATK, SP.DEF, SPEED, habilidade e até 4 golpes com PP usando os dados do Pokémon — não os ataques ou a Energia impressos na carta.</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.draftPreviewStats}>
+                  <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>HP / DEFESA</Text><Text style={[styles.draftPreviewStatValue,{color:colors.text}]}>{combat.hp}</Text></View>
+                  <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>MAIOR ATAQUE</Text><Text style={[styles.draftPreviewStatValue,{color:colors.yellow}]}>{combat.maxDamage}</Text></View>
+                  <View style={[styles.draftPreviewStat,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewStatLabel,{color:colors.muted}]}>ENERGIA MÍN.</Text><Text style={[styles.draftPreviewStatValue,{color:colors.accent}]}>⚡ {combat.bestEnergy}</Text></View>
+                </View>
+                {abilities.length ? <View style={styles.draftPreviewSection}><Text style={[styles.draftPreviewSectionTitle,{color:colors.muted}]}>HABILIDADES</Text>{abilities.map((ability:any,index:number)=><View key={`${ability?.name ?? 'ability'}:${index}`} style={[styles.draftPreviewMove,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Text style={[styles.draftPreviewMoveName,{color:colors.text}]}>{String(ability?.name ?? 'Habilidade')}</Text>{ability?.text?<Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>{String(ability.text)}</Text>:null}</View>)}</View> : null}
+                <View style={styles.draftPreviewSection}><Text style={[styles.draftPreviewSectionTitle,{color:colors.muted}]}>ATAQUES</Text>{attacks.length ? attacks.map((attack:any,index:number)=><View key={`${attack?.name ?? 'attack'}:${index}`} style={[styles.draftPreviewMove,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><View style={styles.draftPreviewMoveHeader}><Text style={[styles.draftPreviewMoveName,{color:colors.text}]}>{String(attack?.name ?? 'Ataque')}</Text><Text style={[styles.draftPreviewMoveDamage,{color:colors.yellow}]}>{String(attack?.damage || '—')} dano</Text></View><Text style={[styles.draftPreviewMoveEnergy,{color:colors.accent}]}>⚡ {Number(attack?.convertedEnergyCost ?? (Array.isArray(attack?.cost) ? attack.cost.length : 0))} Energia</Text>{attack?.text?<Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>{String(attack.text)}</Text>:null}</View>) : <Text style={[styles.draftPreviewMoveText,{color:colors.muted}]}>Esta carta não possui ataque impresso.</Text>}</View>
+              </>
+            )}
           </ScrollView>
           <Pressable style={[styles.draftPreviewDone,{backgroundColor:colors.yellow}]} onPress={onClose}><Text style={styles.draftPreviewDoneText}>VOLTAR AO DRAFT</Text></Pressable>
         </Pressable>
@@ -878,10 +889,10 @@ function StakePreview({ item, label }: { item: any; label: string }) {
   return <View style={[styles.stakePreview, { borderColor: colors.border }]}>{card?.image_small ? <Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.stakeImage} /> : <View style={[styles.stakeImage, { backgroundColor: colors.surface }]} />}<View style={{ flex: 1 }}><Text style={[styles.stakePreviewLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.stakeName, { color: colors.text }]}>{card?.pokemon_name ?? 'Carta'}</Text><Text style={[styles.stakeMeta, { color: colors.muted }]}>{card?.rarity ?? 'Sem raridade'}</Text><Text style={[styles.stakeValue, { color: colors.yellow }]}>Valor fixo {card?.market_price_usd != null ? formatUsd(Number(card.market_price_usd)) : 'US$ —'}</Text></View></View>;
 }
 
-function MysterySlot({ label, locked, card, showCard, accent }: { label: string; locked: boolean; card: any; showCard: boolean; accent: string }) {
+function MysterySlot({ label, locked, card, showCard, accent, gameStyle }: { label: string; locked: boolean; card: any; showCard: boolean; accent: string; gameStyle: boolean }) {
   const { colors } = useAppTheme();
   const combat = getBattleCardPreview(card);
-  return <View style={styles.slot}><Text style={[styles.slotLabel, { color: colors.muted }]}>{label}</Text>{showCard && card?.image_small ? <View style={[styles.slotCardWrap, { borderColor: locked ? accent : colors.border }]}><Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.slotCard} /><View style={styles.slotValue}><Text style={[styles.slotValueText, { color: colors.yellow }]}>HP {combat.hp} • ATQ {combat.maxDamage} • ⚡ {combat.bestEnergy}</Text></View></View> : <View style={[styles.hiddenCard, { borderColor: locked ? accent : colors.border, backgroundColor: colors.surfaceAlt }]}><View style={[styles.questionCircle, { borderColor: accent }]}><Text style={[styles.question, { color: accent }]}>?</Text></View><Text style={[styles.hiddenState, { color: locked ? accent : colors.muted }]}>{locked ? 'TRAVADA' : 'AGUARDANDO'}</Text></View>}</View>;
+  return <View style={styles.slot}><Text style={[styles.slotLabel, { color: colors.muted }]}>{label}</Text>{showCard && card?.image_small ? <View style={[styles.slotCardWrap, { borderColor: locked ? accent : colors.border }]}><Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.slotCard} /><View style={styles.slotValue}><Text style={[styles.slotValueText, { color: colors.yellow }]}>{gameStyle ? 'STATS DA ESPÉCIE/FORMA • NÍVEL 50' : `HP ${combat.hp} • ATQ ${combat.maxDamage} • ⚡ ${combat.bestEnergy}`}</Text></View></View> : <View style={[styles.hiddenCard, { borderColor: locked ? accent : colors.border, backgroundColor: colors.surfaceAlt }]}><View style={[styles.questionCircle, { borderColor: accent }]}><Text style={[styles.question, { color: accent }]}>?</Text></View><Text style={[styles.hiddenState, { color: locked ? accent : colors.muted }]}>{locked ? 'TRAVADA' : 'AGUARDANDO'}</Text></View>}</View>;
 }
 
 function RoundRow({ round, challengerName, opponentName, userId, challengerId, revealAnim }: { round: any; challengerName?: string; opponentName?: string; userId: string; challengerId: string; revealAnim?: Animated.Value }) {
@@ -901,16 +912,18 @@ function RoundRow({ round, challengerName, opponentName, userId, challengerId, r
 function MiniRoundCard({ label, card, duel }: { label: string; card: any; duel?: any }) {
   const { colors } = useAppTheme();
   const combat = getBattleCardPreview(card);
-  const isV5 = Boolean(duel?.virtualEnergy) || Number(duel?.rulesVersion ?? 0) >= 5;
+  const rulesVersion = Number(duel?.rulesVersion ?? 0);
+  const isGame = duel?.engineVersion === 'game_v1' || rulesVersion >= 7;
+  const isV5 = Boolean(duel?.virtualEnergy) || rulesVersion >= 5;
   const advantage = duel?.advantage === 'weakness'
     ? `SUPER EFETIVO ×${Number(duel?.weaknessMultiplier ?? 2)}`
     : duel?.advantage === 'resisted'
       ? `RESISTIDO −${Number(duel?.resistance ?? 0)}`
       : 'NEUTRO';
-  const v5State = duel?.knockedOut
+  const hpState = duel?.knockedOut
     ? 'NOCAUTEADO'
     : `HP ${Number(duel?.remainingHp ?? combat.hp)}/${Number(duel?.hp ?? combat.hp)}`;
-  return <View style={styles.miniCard}>{card?.image_small ? <Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.miniImage} /> : <View style={[styles.miniImage, { backgroundColor: colors.surface }]} />}<View style={{ flex: 1 }}><Text style={[styles.miniLabel, { color: colors.muted }]}>{label}</Text><Text numberOfLines={1} style={[styles.miniName, { color: colors.text }]}>{card?.pokemon_name ?? 'Carta'}</Text>{duel ? <><Text numberOfLines={1} style={[styles.miniValue, { color: colors.yellow }]}>{duel.attackName ?? 'Ataque'} • {Number(duel.effectiveDamage ?? combat.maxDamage)} dano</Text><Text numberOfLines={1} style={[styles.miniCombatMeta,{color:duel.advantage==='weakness'?'#65D894':duel.advantage==='resisted'?'#FFB16A':colors.muted}]}>{isV5 ? `${v5State} • ⚡ ${Number(duel?.energyAtEnd ?? 0)}${duel?.firstPlayer ? ' • 1º' : ''} • ${advantage}` : `KO ${Number(duel.turnsToKnockout ?? 0)}t • ${advantage}`}</Text></> : <Text style={[styles.miniValue, { color: colors.yellow }]}>HP {combat.hp} • ATQ {combat.maxDamage} • ⚡ {combat.bestEnergy}</Text>}</View></View>;
+  return <View style={styles.miniCard}>{card?.image_small ? <Image source={{ uri: card.image_small }} resizeMode="contain" style={styles.miniImage} /> : <View style={[styles.miniImage, { backgroundColor: colors.surface }]} />}<View style={{ flex: 1 }}><Text style={[styles.miniLabel, { color: colors.muted }]}>{label}</Text><Text numberOfLines={1} style={[styles.miniName, { color: colors.text }]}>{card?.pokemon_name ?? 'Carta'}</Text>{duel ? (isGame ? <><Text numberOfLines={1} style={[styles.miniValue, { color: colors.yellow }]}>{hpState} • {Number(duel?.turns ?? 0)} turno(s)</Text><Text numberOfLines={1} style={[styles.miniCombatMeta,{color:colors.muted}]}>{Array.isArray(duel?.types) ? duel.types.map((type:string)=>String(type).toUpperCase()).join('/') : 'POKÉMON'}{duel?.status ? ` • ${String(duel.status).toUpperCase()}` : ''}{duel?.ability ? ` • ${String(duel.ability).replaceAll('-', ' ')}` : ''}</Text></> : <><Text numberOfLines={1} style={[styles.miniValue, { color: colors.yellow }]}>{duel.attackName ?? 'Ataque'} • {Number(duel.effectiveDamage ?? combat.maxDamage)} dano</Text><Text numberOfLines={1} style={[styles.miniCombatMeta,{color:duel.advantage==='weakness'?'#65D894':duel.advantage==='resisted'?'#FFB16A':colors.muted}]}>{isV5 ? `${hpState} • ⚡ ${Number(duel?.energyAtEnd ?? 0)}${duel?.firstPlayer ? ' • 1º' : ''} • ${advantage}` : `KO ${Number(duel.turnsToKnockout ?? 0)}t • ${advantage}`}</Text></>) : <Text style={[styles.miniValue, { color: colors.yellow }]}>Carta pronta para batalha</Text>}</View></View>;
 }
 
 const styles = StyleSheet.create({
