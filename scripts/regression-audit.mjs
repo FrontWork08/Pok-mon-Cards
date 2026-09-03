@@ -1159,9 +1159,11 @@ if (existsSync('supabase/migrations/20260903105822_trainer_cup_entry_fee_full_co
   assert(tournamentPoolDb.includes('diamonds=diamonds+v_reward_diamonds'), 'Regressão da Copa Trainer: prêmio em Diamantes separado foi removido.');
 }
 
-if (existsSync('supabase/migrations/20260903110025_fix_trainer_cup_public_rpc_wrappers.sql')) {
-  const tournamentRpcDb = read('supabase/migrations/20260903110025_fix_trainer_cup_public_rpc_wrappers.sql');
-  assert(tournamentRpcDb.includes('security definer'), 'Regressão da Copa Trainer: wrappers públicos perderam acesso seguro às funções internas.');
+if (existsSync('supabase/migrations/20260903110359_harden_trainer_cup_rpc_wrappers_invoker.sql')) {
+  const tournamentRpcDb = read('supabase/migrations/20260903110359_harden_trainer_cup_rpc_wrappers_invoker.sql');
+  assert(tournamentRpcDb.includes('security invoker'), 'Regressão de segurança: wrappers públicos da Copa Trainer voltaram a SECURITY DEFINER.');
   assert(tournamentRpcDb.includes('revoke all on function public.join_tournament() from public,anon'), 'Regressão de segurança: inscrição da Copa Trainer voltou a ficar exposta a anon/public.');
   assert(tournamentRpcDb.includes('grant execute on function public.join_tournament() to authenticated,service_role'), 'Regressão da Copa Trainer: jogadores autenticados perderam acesso à inscrição.');
+  assert(tournamentRpcDb.includes('revoke all on function private.join_tournament() from public,anon'), 'Regressão de segurança: helper privado de inscrição ficou exposto a anon/public.');
+  assert(tournamentRpcDb.includes('grant execute on function private.join_tournament() to authenticated,service_role'), 'Regressão da Copa Trainer: wrapper público deixou de conseguir chamar o helper privado seguro.');
 }
