@@ -76,7 +76,7 @@ export default function MarketplaceScreen() {
   const [compareProfiles,setCompareProfiles]=useState<Record<string,CardGameProfile|null>>({});
   const [compareLoading,setCompareLoading]=useState<string|null>(null);
   const [previewGameProfile,setPreviewGameProfile]=useState<CardGameProfile|null>(null);
-  const [sellCardHandled,setSellCardHandled]=useState(false);
+  const [sellCardHandled,setSellCardHandled]=useState<string|null>(null);
   const loadedOnce=useRef(false);
   const realtimeRefreshTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const inventoryRequestSeq=useRef(0);
@@ -95,9 +95,10 @@ export default function MarketplaceScreen() {
   useFocusEffect(useCallback(()=>{if(!loadedOnce.current)setLoading(true);void load();},[load]));
 
   useEffect(()=>{
-    if(!sellCardId||sellCardHandled)return;
-    setSellCardHandled(true);
-    void getOwnedCard(String(sellCardId))
+    const contextCardId=sellCardId?String(sellCardId):'';
+    if(!contextCardId||sellCardHandled===contextCardId)return;
+    setSellCardHandled(contextCardId);
+    void getOwnedCard(contextCardId)
       .then((entry)=>{
         setSelectedCard(entry);
         setQuantity('1');
