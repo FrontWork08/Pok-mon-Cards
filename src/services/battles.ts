@@ -10,6 +10,7 @@ async function invoke(body: Record<string, unknown>) {
   if (error) throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da batalha.');
   if (data?.error) {
     if(String(data.error).includes('CARD_LOCKED')) throw new Error('Esta carta está bloqueada 🔒 e não pode ser usada como aposta. Ela continua liberada para batalhas normais.');
+    if(String(data.error).includes('CARD_NOT_ALLOWED_BY_FORMAT')) throw new Error('Esta carta não atende às regras do formato escolhido para esta batalha.');
     throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível concluir a ação da batalha.');
   }
   return data?.data;
@@ -60,7 +61,7 @@ export async function forfeitBattle(battleId: string) {
 export async function getBattle(battleId: string) {
   const { data, error } = await supabase
     .from('battles')
-    .select('id,challenger_id,opponent_id,mode,stake_type,wager_coins,status,rounds_to_win,active_round,selection_seconds,selection_deadline,draft_turn_id,draft_pick_count,draft_seconds,challenger_score,opponent_score,winner_id,reward_eligible,rematch_of,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,forfeited_by,forfeit_rating_neutral,forfeited_at,is_bot_match,engine_version,created_at,updated_at,completed_at')
+    .select('id,challenger_id,opponent_id,mode,format_id,stake_type,wager_coins,status,rounds_to_win,active_round,selection_seconds,selection_deadline,draft_turn_id,draft_pick_count,draft_seconds,challenger_score,opponent_score,winner_id,reward_eligible,rematch_of,challenger_rating_before,challenger_rating_after,opponent_rating_before,opponent_rating_after,forfeited_by,forfeit_rating_neutral,forfeited_at,is_bot_match,engine_version,spectator_enabled,created_at,updated_at,completed_at')
     .eq('id', battleId)
     .single();
   if (error) throw error;
