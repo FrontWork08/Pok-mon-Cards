@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { findPlayers } from '@/services/player';
 import { getMySocial, type SocialPlayer } from '@/services/social';
-import { createTrade, getMyTrades } from '@/services/trades';
+import { cleanupAbandonedTrades, createTrade, getMyTrades } from '@/services/trades';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
 
@@ -31,6 +31,9 @@ export default function TradeScreen() {
 
   const load = useCallback(async () => {
     try {
+      // Empty negotiations created by this player are disposable drafts.
+      // Clean them before rendering the Trade Center so they never pile up as "EM NEGOCIAÇÃO".
+      await cleanupAbandonedTrades().catch(() => 0);
       const [tradeData, social] = await Promise.all([getMyTrades(), getMySocial()]);
       setTrades(tradeData ?? []);
       setFriends(social.friends);
