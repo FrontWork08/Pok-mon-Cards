@@ -1141,7 +1141,7 @@ const styles = StyleSheet.create({
   pickerError:{minHeight:180,borderWidth:1,borderRadius:16,alignItems:'center',justifyContent:'center',gap:10,padding:16},
   retryButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:13,alignItems:'center',justifyContent:'center'},
   retryText:{fontSize:8,fontWeight:'900',letterSpacing:.4},
-  cardScroll:{flexGrow:0},
+  cardScroll:{flex:1,minHeight:140},
   cardGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,paddingBottom:4},
   virtualCardGrid:{paddingBottom:6},
   virtualCardRow:{gap:8,marginBottom:8},
