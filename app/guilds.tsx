@@ -34,6 +34,7 @@ import { formatUsd } from '@/services/market';
 import { getEconomySinkHub, type EconomySinkHub } from '@/services/economy';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
+import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
 
 export default function GuildsScreen() {
   const router = useRouter();
@@ -175,6 +176,7 @@ export default function GuildsScreen() {
 
   return (
     <Screen title="Guild HQ" subtitle="Sua base coletiva para missões, ranking, chat, recompensas e Guild Wars.">
+      <AreaIdentityStrip area="social" />
       <View style={styles.topRow}>
         <Pressable style={[styles.back, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.text} /><Text style={[styles.backText, { color: colors.text }]}>Voltar</Text></Pressable>
         <Pressable style={[styles.refresh, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]} onPress={() => void load()}><Ionicons name="refresh" size={17} color={colors.yellow} /><Text style={[styles.refreshText, { color: colors.yellow }]}>ATUALIZAR</Text></Pressable>
