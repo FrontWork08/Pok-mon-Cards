@@ -8,6 +8,7 @@ import { getMySocial, type SocialPlayer } from '@/services/social';
 import { cleanupAbandonedTrades, createTrade, getMyTrades } from '@/services/trades';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getThemeVisual } from '@/theme/themeCatalog';
+import { StatusPill } from '@/components/StatusPill';
 
 const statusLabels: Record<string, string> = {
   pending: 'EM NEGOCIAÇÃO',
@@ -148,7 +149,7 @@ export default function TradeScreen() {
             <Pressable key={trade.id} style={[styles.tradeRow,{backgroundColor:colors.surface,borderColor:colors.border}]} onPress={() => router.push(`/trade/${trade.id}`)}>
               <View style={[styles.tradeIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="swap-horizontal" size={20} color={colors.accent} /></View>
               <View style={styles.tradeInfo}><Text style={[styles.tradeId,{color:colors.text}]}>Troca #{trade.id.slice(0, 8)}</Text><Text style={[styles.tradeMeta,{color:colors.muted}]}>{trade.trade_cards?.length ?? 0} itens • atualizada {new Date(trade.updated_at).toLocaleDateString('pt-BR')}</Text></View>
-              <View style={[styles.statusBadge,{backgroundColor:colors.surfaceAlt}, trade.status === 'completed' && styles.statusCompleted, trade.status === 'cancelled' && styles.statusCancelled]}><Text style={[styles.statusText,{color:colors.text}]}>{statusLabels[trade.status] ?? String(trade.status).toUpperCase()}</Text></View>
+              <StatusPill status={trade.status} label={statusLabels[trade.status] ?? String(trade.status).toUpperCase()} />
               <Ionicons name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
           ))}
