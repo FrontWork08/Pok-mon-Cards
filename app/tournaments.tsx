@@ -13,10 +13,12 @@ import {
   type TournamentMatch,
 } from '@/services/tournaments';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { useWallet } from '@/wallet/WalletProvider';
 
 export default function TournamentsScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
+  const wallet = useWallet();
   const [hub, setHub] = useState<TournamentHub | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -44,13 +46,21 @@ export default function TournamentsScreen() {
       setWorking(true);
       setError(null);
       if (hub.joined) {
-        await leaveTournament();
-        setNotice('Inscrição removida.');
+        const result = await leaveTournament();
+        setNotice(
+          result.refundedCoins > 0
+            ? `Inscrição removida. 🪙 ${result.refundedCoins.toLocaleString('pt-BR')} foram devolvidas.`
+            : 'Inscrição removida.'
+        );
       } else {
-        await joinTournament();
-        setNotice('Você entrou na Copa Trainer.');
+        const result = await joinTournament();
+        setNotice(
+          result.feeCharged > 0
+            ? `Inscrição confirmada. 🪙 ${result.feeCharged.toLocaleString('pt-BR')} entraram no pot da Copa.`
+            : 'Você entrou na Copa Trainer.'
+        );
       }
-      await load(true);
+      await Promise.all([load(true), wallet.refresh()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível atualizar sua inscrição.');
     } finally {
@@ -84,10 +94,24 @@ export default function TournamentsScreen() {
               <Text style={[styles.kicker, { color: colors.yellow }]}>{hub.status.toUpperCase()}</Text>
               <Text style={[styles.title, { color: colors.text }]}>{hub.name}</Text>
               <Text style={[styles.meta, { color: colors.muted }]}>
-                {entries}/{hub.maxPlayers} inscritos • prêmio 🪙 {hub.rewardCoins.toLocaleString('pt-BR')} + 💎 {hub.rewardDiamonds}
+                {entries}/{hub.maxPlayers} inscritos • pot 🪙 {hub.prizePoolCoins.toLocaleString('pt-BR')} + 💎 {hub.rewardDiamonds}
               </Text>
             </View>
           </View>
+
+          <View style={styles.moneyGrid}>
+            <View style={[styles.moneyCard,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+              <Text style={[styles.moneyLabel,{color:colors.muted}]}>TAXA DE INSCRIÇÃO</Text>
+              <Text style={[styles.moneyValue,{color:colors.yellow}]}>🪙 {hub.entryFeeCoins.toLocaleString('pt-BR')}</Text>
+            </View>
+            <View style={[styles.moneyCard,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}>
+              <Text style={[styles.moneyLabel,{color:colors.muted}]}>POT ATUAL</Text>
+              <Text style={[styles.moneyValue,{color:'#65D894'}]}>🪙 {hub.prizePoolCoins.toLocaleString('pt-BR')}</Text>
+            </View>
+          </View>
+          <Text style={[styles.poolRule,{color:colors.muted}]}>
+            100% das Coins das inscrições vão para o campeão. Os 💎 {hub.rewardDiamonds} Diamantes são prêmio separado e não entram no pot.
+          </Text>
 
           {hub.status === 'registration' ? (
             <Pressable
@@ -96,13 +120,17 @@ export default function TournamentsScreen() {
               style={[styles.primary, { backgroundColor: hub.joined ? '#351A24' : colors.yellow }]}
             >
               {working ? <ActivityIndicator color={hub.joined ? '#fff' : '#07111F'} /> : <Ionicons name={hub.joined ? 'exit-outline' : 'enter-outline'} size={18} color={hub.joined ? '#FF9FAF' : '#07111F'} />}
-              <Text style={[styles.primaryText, hub.joined && { color: '#FFB5C0' }]}>{hub.joined ? 'SAIR DO TORNEIO' : 'ENTRAR NO TORNEIO'}</Text>
+              <Text style={[styles.primaryText, hub.joined && { color: '#FFB5C0' }]}>
+                {hub.joined
+                  ? `SAIR E RECEBER 🪙 ${hub.entryFeeCoins.toLocaleString('pt-BR')}`
+                  : `PAGAR 🪙 ${hub.entryFeeCoins.toLocaleString('pt-BR')} E ENTRAR`}
+              </Text>
             </Pressable>
           ) : null}
 
           {hub.status === 'registration' ? (
             <Text style={[styles.deadline, { color: colors.muted }]}>
-              Inscrições até {new Date(hub.registrationEndsAt).toLocaleString('pt-BR')} • o bracket começa automaticamente ao fechar 8.
+              Inscrições até {new Date(hub.registrationEndsAt).toLocaleString('pt-BR')} • reembolso integral ao sair antes do início • o bracket começa automaticamente ao fechar 8.
             </Text>
           ) : null}
         </View>
@@ -159,7 +187,12 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
   title: { fontSize: 25, fontWeight: '900', marginTop: 2 },
   meta: { fontSize: 9, marginTop: 3 },
-  primary: { minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  moneyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  moneyCard: { flexGrow: 1, flexBasis: 145, minWidth: 135, borderRadius: 14, borderWidth: 1, padding: 11 },
+  moneyLabel: { fontSize: 7, fontWeight: '900', letterSpacing: .8 },
+  moneyValue: { fontSize: 17, fontWeight: '900', marginTop: 4 },
+  poolRule: { fontSize: 8.5, lineHeight: 13, fontWeight: '700' },
+  primary: { minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 10 },
   primaryText: { color: '#07111F', fontSize: 9, fontWeight: '900' },
   deadline: { fontSize: 8, textAlign: 'center' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
