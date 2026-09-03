@@ -20,6 +20,8 @@ type Props = {
   resultKey?: string | number | null;
   winner?: 'me' | 'rival' | null;
   title?: string;
+  subtitle?: string;
+  turnOnly?: boolean;
 };
 
 const USE_NATIVE_DRIVER = true;
@@ -48,7 +50,7 @@ function damageLabel(fighter: PixelBattleFighter | null) {
   return damage > 0 ? `${Math.round(damage)} de dano` : 'sem dano';
 }
 
-export function PixelBattleArena({ my, rival, resultKey = null, winner = null, title = 'ARENA 2D • PROTÓTIPO' }: Props) {
+export function PixelBattleArena({ my, rival, resultKey = null, winner = null, title = 'ARENA 2D', subtitle = 'Batalha por turnos • HP, golpes, PP, tipos e velocidade', turnOnly = false }: Props) {
   const myIdle = useRef(new Animated.Value(0)).current;
   const rivalIdle = useRef(new Animated.Value(0)).current;
   const myAction = useRef(new Animated.Value(0)).current;
@@ -92,7 +94,7 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
     myAction.setValue(0); rivalAction.setValue(0); myHit.setValue(0); rivalHit.setValue(0);
     myOpacity.setValue(1); rivalOpacity.setValue(1); flash.setValue(0);
 
-    if (resultKey == null || !my || !rival || !winner) {
+    if (resultKey == null || !my || !rival || (!winner && !turnOnly)) {
       setMessage('Os Pokémon estão prontos.');
       return;
     }
@@ -142,6 +144,10 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
     runStrike(first, 220);
     runStrike(second, 1180);
     later(() => {
+      if (turnOnly || !winner) {
+        setMessage('Turno concluído. Escolha o próximo golpe.');
+        return;
+      }
       const loserOpacity = winner === 'me' ? rivalOpacity : myOpacity;
       Animated.timing(loserOpacity, { toValue: .28, duration: 420, useNativeDriver: USE_NATIVE_DRIVER }).start();
       setMessage(`${winner === 'me' ? my.name : rival.name} venceu o confronto.`);
@@ -151,7 +157,7 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
       cancelled = true;
       timers.forEach(clearTimeout);
     };
-  }, [flash, my, myAction, myHit, myOpacity, replayNonce, resultKey, rival, rivalAction, rivalHit, rivalOpacity, winner]);
+  }, [flash, my, myAction, myHit, myOpacity, replayNonce, resultKey, rival, rivalAction, rivalHit, rivalOpacity, turnOnly, winner]);
 
   const myHp = hpPercent(my);
   const rivalHp = hpPercent(rival);
@@ -167,7 +173,7 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
       <View style={styles.header}>
         <View>
           <Text style={styles.kicker}>{title}</Text>
-          <Text style={styles.subtitle}>Movimento criado no app • resultado continua vindo do motor TCG v6</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
         {resultKey != null ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Repetir animação da batalha" onPress={() => setReplayNonce((value) => value + 1)} style={styles.replay}>
