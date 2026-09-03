@@ -38,6 +38,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Passe de Batalha', description:'50 níveis, recompensas grátis, VIP e missões', href:'/battle-pass', icon:'ribbon', group:'progress' },
   { label:'Carreira do Treinador', description:'Jornada, identidade, Pokédex e histórico da conta', href:'/career', icon:'compass', group:'progress' },
   { label:'Museu da Conta', description:'Primeiros momentos, melhores pulls e memórias da conta', href:'/account-museum', icon:'library', group:'progress' },
+  { label:'Insights do Treinador', description:'Estatísticas e recomendações da sua coleção', href:'/trainer-insights', icon:'bulb', group:'progress' },
   { label:'Temporada & Eventos', description:'Ranque, streak e efeitos temporários do jogo', href:'/season', icon:'flame', group:'progress' },
   { label:'Card Chase', description:'Wishlist e alertas de cartas desejadas', href:'/wishlist', icon:'star', group:'collection' },
   { label:'Vitrine do Perfil', description:'Escolha suas 6 cartas de destaque', href:'/showcase', icon:'sparkles', group:'collection' },
@@ -46,6 +47,8 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Guildas Pokémon', description:'Equipe, missões e ranking coletivo', href:'/guilds', icon:'shield', group:'social' },
   { label:'Guild Wars', description:'Confrontos semanais entre guildas', href:'/guild-wars', icon:'flash', group:'competitive' },
   { label:'Copa Trainer', description:'Torneio com bracket e prêmio acumulado', href:'/tournaments', icon:'trophy', group:'competitive' },
+  { label:'Battle Lab', description:'Simule confrontos sem afetar ELO ou inventário', href:'/battle-lab', icon:'flask', group:'competitive' },
+  { label:'Hall da Fama', description:'Campeões de temporadas, Copa e recordes', href:'/hall-of-fame', icon:'ribbon', group:'competitive' },
   { label:'Trainer Shop', description:'Cosméticos e itens compráveis', href:'/store', icon:'bag-handle', group:'economy' },
   { label:'Cosméticos', description:'Molduras, fundos e temas desbloqueáveis', href:'/cosmetics', icon:'color-wand', group:'economy' },
   { label:'Mercado de Treinadores', description:'Lojas e ofertas em tempo real', href:'/marketplace', icon:'storefront', group:'economy' },
@@ -63,6 +66,9 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Guia do Treinador', description:'Ciclo do jogo e glossário de stats', href:'/trainer-guide', icon:'help-circle', group:'system' },
   { label:'Configurações', description:'Aparência, batalha, notificações e privacidade', href:'/settings', icon:'settings', group:'system' },
   { label:'Health Check', description:'Saúde dos sistemas e erros recentes', href:'/admin-health', icon:'pulse', group:'system', adminOnly:true },
+  { label:'Controle Anti-inflação', description:'Snapshots e guardrails da economia', href:'/admin-economy-control', icon:'analytics', group:'system', adminOnly:true },
+  { label:'Freeze Simulator', description:'Prévia segura do freeze/reset 1.0', href:'/admin-freeze-simulator', icon:'snow', group:'system', adminOnly:true },
+  { label:'Battle Lab Admin', description:'Matriz massiva de confrontos sem writes', href:'/admin-battle-lab', icon:'grid', group:'system', adminOnly:true },
   { label:'Admin Center', description:'Economia, usuários e sistema', href:'/admin', icon:'shield-checkmark', group:'system', adminOnly:true },
 ];
 
