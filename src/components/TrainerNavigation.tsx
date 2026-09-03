@@ -33,6 +33,7 @@ const GROUPS: MenuGroup[] = [
 
 const MENU_ITEMS: MenuItem[] = [
   { label:'Início', description:'Voltar para o painel do treinador', href:'/(tabs)', icon:'home', group:'system' },
+  { label:'Busca Global', description:'Encontre cartas, treinadores, guildas e funções', href:'/search', icon:'search', group:'system' },
   { label:'Central de Atividades', description:'Mensagens, convites e avisos que precisam de atenção', href:'/inbox', icon:'notifications', group:'social' },
   { label:'Passe de Batalha', description:'50 níveis, recompensas grátis, VIP e missões', href:'/battle-pass', icon:'ribbon', group:'progress' },
   { label:'Temporada & Jornada', description:'Ranque, streak, eventos e recompensas', href:'/season', icon:'flame', group:'progress' },
