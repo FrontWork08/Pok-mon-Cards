@@ -8,7 +8,10 @@ export type BattleMode = 'quick' | 'mystery' | 'draft3';
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('battle-action', { body });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da batalha.');
-  if (data?.error) throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível concluir a ação da batalha.');
+  if (data?.error) {
+    if(String(data.error).includes('CARD_LOCKED')) throw new Error('Esta carta está bloqueada 🔒 e não pode ser usada como aposta. Ela continua liberada para batalhas normais.');
+    throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível concluir a ação da batalha.');
+  }
   return data?.data;
 }
 
