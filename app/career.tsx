@@ -17,6 +17,7 @@ import {
 import { claimCollectionMilestone } from '@/services/retention';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { AreaIdentityStrip } from '@/components/AreaIdentityStrip';
 
 const PHASES:Array<{id:JourneyPhase;title:string;subtitle:string;icon:keyof typeof Ionicons.glyphMap;color:string}>=[
   {id:'inicio',title:'Primeiros Passos',subtitle:'O caminho ideal para aprender o jogo sem tutorial longo.',icon:'footsteps',color:'#5AA8FF'},
@@ -121,6 +122,7 @@ export default function TrainerCareerScreen(){
   }
 
   return <Screen title="Carreira do Treinador" subtitle="Sua evolução inteira em um só lugar: coleção, batalha, social, Pokédex e temporadas.">
+    <AreaIdentityStrip area="progress" />
     {notice?<Pressable onPress={()=>setNotice(null)} style={[styles.notice,{backgroundColor:colors.surface,borderColor:'#D96575'}]}><Ionicons name="alert-circle" size={18} color="#FF9EAA"/><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Ionicons name="close" size={16} color={colors.muted}/></Pressable>:null}
     {loading&&!career?<ActivityIndicator size="large" color={colors.yellow}/>:null}
 
