@@ -1125,3 +1125,43 @@ if (existsSync('supabase/migrations/20260903031023_fix_legacy_selection_private_
   assert(legacyPermissionFix.includes('security invoker'), 'Regressão de segurança: save_my_legacy_selection deixou de executar com as permissões do próprio usuário.');
   assert(!legacyPermissionFix.includes("grant execute on function private.legacy_card_is_available(uuid,text)\nto authenticated"), 'Regressão de segurança: helper amplo de disponibilidade foi exposto ao cliente.');
 }
+
+
+if (existsSync('app/tournaments.tsx')) {
+  const tournamentUi = read('app/tournaments.tsx');
+  assert(tournamentUi.includes('hub.entryFeeCoins'), 'Regressão da Copa Trainer: taxa de inscrição deixou de aparecer na tela.');
+  assert(tournamentUi.includes('hub.prizePoolCoins'), 'Regressão da Copa Trainer: pot acumulado deixou de aparecer na tela.');
+  assert(tournamentUi.includes('100% das Coins das inscrições vão para o campeão'), 'Regressão da Copa Trainer: regra de pot integral deixou de ser explicada.');
+  assert(tournamentUi.includes('wallet.refresh()'), 'Regressão da Copa Trainer: saldo não atualiza após pagar/reembolsar inscrição.');
+  assert(tournamentUi.includes('PAGAR 🪙') && tournamentUi.includes('SAIR E RECEBER 🪙'), 'Regressão de UX: botões da Copa Trainer deixaram de mostrar cobrança/reembolso.');
+}
+
+if (existsSync('src/services/tournaments.ts')) {
+  const tournamentService = read('src/services/tournaments.ts');
+  assert(tournamentService.includes('entryFeeCoins: number'), 'Regressão da Copa Trainer: serviço perdeu a taxa de inscrição.');
+  assert(tournamentService.includes('prizePoolCoins: number'), 'Regressão da Copa Trainer: serviço perdeu o pot de Coins.');
+  assert(tournamentService.includes('NOT_ENOUGH_COINS'), 'Regressão da Copa Trainer: falta de Coins deixou de ter erro amigável.');
+  assert(tournamentService.includes('refundedCoins'), 'Regressão da Copa Trainer: cliente perdeu o valor de reembolso.');
+}
+
+if (existsSync('supabase/migrations/20260903105822_trainer_cup_entry_fee_full_coin_prize_pool.sql')) {
+  const tournamentPoolDb = read('supabase/migrations/20260903105822_trainer_cup_entry_fee_full_coin_prize_pool.sql');
+  assert(tournamentPoolDb.includes('entry_fee_coins bigint'), 'Regressão da Copa Trainer: torneio perdeu a taxa de inscrição persistida.');
+  assert(tournamentPoolDb.includes('entry_fee_coins_paid bigint'), 'Regressão da Copa Trainer: pagamento individual da inscrição deixou de ser auditável.');
+  assert(tournamentPoolDb.includes('entry_fee_coins set default 10000'), 'Regressão da Copa Trainer: taxa padrão deixou de ser 10.000 Coins.');
+  assert(tournamentPoolDb.includes('reward_coins set default 0'), 'Regressão da Copa Trainer: prêmio fixo em Coins voltou a existir fora do pot.');
+  assert(tournamentPoolDb.includes("event_type in ('entry_fee','refund','champion_prize')"), 'Regressão de auditoria: eventos financeiros da Copa Trainer foram removidos.');
+  assert(tournamentPoolDb.includes('trg_refund_tournament_fees_on_cancel'), 'Regressão da Copa Trainer: cancelamento deixou de devolver as inscrições.');
+  assert(tournamentPoolDb.includes("raise exception 'NOT_ENOUGH_COINS'"), 'Regressão da Copa Trainer: inscrição pode voltar a aceitar saldo insuficiente.');
+  assert(tournamentPoolDb.includes('set reward_coins=reward_coins+v_fee'), 'Regressão da Copa Trainer: taxa deixou de entrar integralmente no pot.');
+  assert(tournamentPoolDb.includes('set reward_coins=greatest(0,reward_coins-v_fee)'), 'Regressão da Copa Trainer: saída deixou de reduzir o pot após reembolso.');
+  assert(tournamentPoolDb.includes("'full_registration_pool'"), 'Regressão da Copa Trainer: campeão deixou de receber o pot integral das inscrições.');
+  assert(tournamentPoolDb.includes('diamonds=diamonds+v_reward_diamonds'), 'Regressão da Copa Trainer: prêmio em Diamantes separado foi removido.');
+}
+
+if (existsSync('supabase/migrations/20260903110025_fix_trainer_cup_public_rpc_wrappers.sql')) {
+  const tournamentRpcDb = read('supabase/migrations/20260903110025_fix_trainer_cup_public_rpc_wrappers.sql');
+  assert(tournamentRpcDb.includes('security definer'), 'Regressão da Copa Trainer: wrappers públicos perderam acesso seguro às funções internas.');
+  assert(tournamentRpcDb.includes('revoke all on function public.join_tournament() from public,anon'), 'Regressão de segurança: inscrição da Copa Trainer voltou a ficar exposta a anon/public.');
+  assert(tournamentRpcDb.includes('grant execute on function public.join_tournament() to authenticated,service_role'), 'Regressão da Copa Trainer: jogadores autenticados perderam acesso à inscrição.');
+}
