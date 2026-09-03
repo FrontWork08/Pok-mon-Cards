@@ -295,6 +295,14 @@ if (existsSync('supabase/migrations/20260903023019_legacy_editable_until_day_bef
   assert(legacyDeadlineDb.includes("revoke all on function private.auto_lock_due_legacy_selections()"), 'Regressão de segurança: job privado do Legado ficou executável pelo cliente.');
 }
 
+if (existsSync('supabase/migrations/20260903023545_harden_provisional_legacy_confirmation.sql')) {
+  const legacyConfirmHardening = read('supabase/migrations/20260903023545_harden_provisional_legacy_confirmation.sql');
+  assert(legacyConfirmHardening.includes('security invoker'), 'Regressão de segurança: confirmação provisória do Legado voltou a SECURITY DEFINER.');
+  assert(legacyConfirmHardening.includes('grant update(selected_count,auto_filled_count,confirmed_at)'), 'Regressão de segurança: atualização provisória do Legado perdeu o grant mínimo por coluna.');
+  assert(legacyConfirmHardening.includes('release_campaign_legacy_submissions.locked_at is null'), 'Regressão do Legado: submissão final travada pode voltar a ser alterada.');
+  assert(legacyConfirmHardening.includes('LEGACY_EDIT_DEADLINE_PASSED'), 'Regressão do Legado: confirmação deixou de respeitar o prazo final.');
+}
+
 if (existsSync('src/components/CardPickerModal.tsx')) {
   const picker = read('src/components/CardPickerModal.tsx');
   assert(picker.includes('Visão geral TCG'), 'Regressão de UX: seletor de batalha deixou de apresentar visão TCG.');
