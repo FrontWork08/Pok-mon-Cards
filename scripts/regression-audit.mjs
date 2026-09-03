@@ -372,7 +372,7 @@ if (existsSync('app/sell-duplicates.tsx') && existsSync('src/services/cardSales.
   const salesService = read('src/services/cardSales.ts');
   assert(salesUi.includes('VENDER TODAS AS REPETIDAS'), 'Regressão: tela de repetidas perdeu a venda em lote.');
   assert(salesUi.includes('sellAllDuplicateCards'), 'Regressão: botão de venda em lote não está conectado ao serviço.');
-  assert(salesService.includes("rpc('sell_all_duplicate_cards')"), 'Regressão: serviço perdeu a RPC de venda de todas as repetidas.');
+  assert(salesService.includes("rpc('server_idempotent_sell_all_duplicate_cards')") || salesService.includes("rpc('sell_all_duplicate_cards')"), 'Regressão: serviço perdeu a RPC protegida de venda de todas as repetidas.');
 }
 
 if (existsSync('supabase/migrations/20260831135024_bulk_duplicate_sales.sql')) {
@@ -381,6 +381,25 @@ if (existsSync('supabase/migrations/20260831135024_bulk_duplicate_sales.sql')) {
   assert(bulkSales.includes('DUPLICATE_SALES_PAUSED_DURING_FREE_EVENT'), 'Regressão: venda em lote precisa respeitar bloqueio durante boosters grátis.');
   assert(bulkSales.includes('private.duplicate_sale_coin_value'), 'Regressão: venda em lote deixou de usar a cotação econômica oficial.');
   assert(bulkSales.includes('grant execute on function public.sell_all_duplicate_cards() to authenticated'), 'Regressão de segurança: venda em lote deve ficar restrita a autenticados.');
+}
+
+if (existsSync('src/services/soundEffects.ts') && existsSync('app/battle/[id].tsx')) {
+  const sounds = read('src/services/soundEffects.ts');
+  const battleUi = read('app/battle/[id].tsx');
+  assert(sounds.includes('playBattleSound') && sounds.includes('CLICK_WAV_BASE64'), 'Regressão: efeitos sonoros leves de batalha foram removidos.');
+  assert(battleUi.includes("settings?.battle_sounds") && battleUi.includes('playBattleSound'), 'Regressão: preferência de sons deixou de controlar a batalha.');
+}
+
+if (existsSync('src/services/marketplace.ts') && existsSync('src/services/packs.ts')) {
+  const marketService = read('src/services/marketplace.ts');
+  const packService = read('src/services/packs.ts');
+  assert(marketService.includes('server_idempotent_marketplace_action'), 'Regressão de segurança: Marketplace perdeu idempotência.');
+  assert(packService.includes('operationId') && packService.includes("functions.invoke('open-pack'"), 'Regressão de segurança: abertura de pack perdeu operationId estável.');
+}
+
+if (existsSync('supabase/migrations/20260903195204_schedule_weekly_trainer_summary.sql')) {
+  const weekly = read('supabase/migrations/20260903195204_schedule_weekly_trainer_summary.sql');
+  assert(weekly.includes('trainer-weekly-summary') && weekly.includes('weekKey'), 'Regressão: resumo semanal deixou de ter agendamento/deduplicação.');
 }
 
 if (existsSync('app/store.tsx') && existsSync('src/services/store.ts')) {
