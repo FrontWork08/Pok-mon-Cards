@@ -7,6 +7,7 @@ import { getMarketOffers } from '@/services/marketplace';
 import { getTournamentHub } from '@/services/tournaments';
 import { getMissions } from '@/services/missions';
 import { getBattlePass } from '@/services/battlePass';
+import { getTrainerJourneySummary } from '@/services/career';
 
 export type ActionableActivityCategory = 'battle'|'social'|'economy'|'progress';
 
@@ -26,7 +27,7 @@ export async function getActionableActivities():Promise<ActionableActivity[]>{
   const userId=auth.user?.id??'';
   if(!userId)return[];
 
-  const [battleResult,tradesResult,socialResult,guildResult,offersResult,tournamentResult,missionsResult,passResult] = await Promise.allSettled([
+  const [battleResult,tradesResult,socialResult,guildResult,offersResult,tournamentResult,missionsResult,passResult,journeyResult] = await Promise.allSettled([
     getMyActiveBattle(),
     getMyTrades(),
     getMySocial(),
@@ -35,6 +36,7 @@ export async function getActionableActivities():Promise<ActionableActivity[]>{
     getTournamentHub(),
     getMissions(),
     getBattlePass(),
+    getTrainerJourneySummary(),
   ]);
 
   const items:ActionableActivity[]=[];
@@ -193,6 +195,19 @@ export async function getActionableActivities():Promise<ActionableActivity[]>{
         createdAt:now,
       });
     }
+  }
+
+  if(journeyResult.status==='fulfilled'&&journeyResult.value.claimable>0){
+    items.push({
+      id:'trainer-journey-claimable',
+      category:'progress',
+      title:journeyResult.value.claimable+' etapa(s) da Jornada pronta(s)',
+      body:'Sua evolução já foi validada pelo servidor. Colete as recompensas na Carreira do Treinador.',
+      route:'/career',
+      status:'ready',
+      priority:89,
+      createdAt:now,
+    });
   }
 
   const unique=new Map<string,ActionableActivity>();
