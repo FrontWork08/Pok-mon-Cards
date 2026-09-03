@@ -7,7 +7,6 @@ import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { getCardDetail, type CardDetailEntry } from '@/services/player';
 import { setCardFavorite } from '@/services/playerActions';
 import { formatUsd } from '@/services/market';
-import { getBattleCardPreview } from '@/services/battleStats';
 import { getCardPriceHistory, type CardPricePoint } from '@/services/marketplace';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { isCardWishlisted, setCardWishlist } from '@/services/retention';
@@ -21,6 +20,8 @@ import {
 import { AuraFrame } from '@/components/AuraFrame';
 import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { useWallet } from '@/wallet/WalletProvider';
+import { formatGameIdentifier, getCardGameProfile, type CardGameProfile } from '@/services/cardGameProfile';
+import { getPokemonTypeSymbol } from '@/components/PokemonTypeSymbolFilter';
 
 function economyStylePalette(id:string,accent:string,yellow:string){
   const key=id.toLowerCase();
@@ -45,6 +46,8 @@ export default function CardDetailScreen() {
   const [wishlistSaving, setWishlistSaving] = useState(false);
   const [wishlisted, setWishlisted] = useState(false);
   const [priceHistory, setPriceHistory] = useState<CardPricePoint[]>([]);
+  const [gameProfile, setGameProfile] = useState<CardGameProfile | null>(null);
+  const [detailTab, setDetailTab] = useState<'card' | 'battle' | 'market' | 'collection'>('card');
   const [economyStyle, setEconomyStyle] = useState<{id:string;name:string;icon:string;rarity:string}|null>(null);
   const [stylePickerOpen,setStylePickerOpen]=useState(false);
   const [styleOptions,setStyleOptions]=useState<VisualStyleOption[]>([]);
@@ -57,16 +60,18 @@ export default function CardDetailScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [owned, wanted, history, style] = await Promise.all([
+      const [owned, wanted, history, style, game] = await Promise.all([
         getCardDetail(String(id)),
         isCardWishlisted(String(id)),
         getCardPriceHistory(String(id), 30),
         getMyCardEconomyStyle(String(id)).catch(()=>null),
+        getCardGameProfile(String(id)).catch(()=>null),
       ]);
       setEntry(owned);
       setWishlisted(wanted);
       setPriceHistory(history);
       setEconomyStyle(style);
+      setGameProfile(game);
     }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível carregar este card.'); }
     finally { setLoading(false); }
@@ -141,7 +146,6 @@ export default function CardDetailScreen() {
   }
 
   const card = entry?.cards;
-  const combat = getBattleCardPreview(card ?? null);
   const unitValue = Number(card?.game_value ?? 0);
   const marketPriceUsd = card?.market_price_usd == null ? null : Number(card.market_price_usd);
   const isUnreleasedWithoutMarket = card?.market_price_source === 'unreleased:no_english_market';
