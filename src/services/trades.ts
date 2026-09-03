@@ -73,6 +73,14 @@ export async function cancelTrade(tradeId: string) {
   return invokeTradeAction({ action: 'cancel', tradeId });
 }
 
+export async function abandonTrade(tradeId: string) {
+  return invokeTradeAction({ action: 'abandon', tradeId });
+}
+
+export async function cleanupAbandonedTrades() {
+  return Number(await invokeTradeAction({ action: 'cleanup_abandoned' }) ?? 0);
+}
+
 
 export function subscribeToTrade(
   tradeId: string,
