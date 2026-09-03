@@ -22,7 +22,7 @@ export async function getAdminRecentErrors(limit=100):Promise<AdminError[]>{
 export async function reportClientError(source:string,error:unknown,context:Record<string,unknown>={}){
   const message=error instanceof Error?error.message:String(error);
   const code=(error as any)?.code?String((error as any).code):null;
-  await supabase.rpc('report_client_error',{p_source:source,p_code:code,p_message:message,p_context:context}).catch(()=>null);
+  try { await supabase.rpc('report_client_error',{p_source:source,p_code:code,p_message:message,p_context:context}); } catch {}
 }
 export async function getAccountMuseum():Promise<AccountMuseum>{
   const{data,error}=await supabase.rpc('get_account_museum'); if(error)throw error; return data as AccountMuseum;
