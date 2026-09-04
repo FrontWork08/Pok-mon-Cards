@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PremiumBackground } from '@/components/PremiumBackground';
 import { TrainerPageHeader } from '@/components/TrainerPageHeader';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { SMOOTH_SCROLL_VIEW_PROPS } from '@/performance/scrollPerformance';
 
 export function Screen({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle?: string }>) {
   const { colors } = useAppTheme();
@@ -11,13 +12,13 @@ export function Screen({ title, subtitle, children }: PropsWithChildren<{ title:
     <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <ScrollView
+        {...SMOOTH_SCROLL_VIEW_PROPS}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
           Platform.OS !== 'web' && styles.contentMobile,
           { paddingTop: 9 },
         ]}
-        showsVerticalScrollIndicator={false}
       >
         <View style={styles.inner}>
           <TrainerPageHeader title={title} subtitle={subtitle} />
