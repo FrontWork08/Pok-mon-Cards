@@ -9,7 +9,8 @@ export type TrainerStoreCategory =
   | 'booster_fx'
   | 'title'
   | 'trophy'
-  | 'guild_decor';
+  | 'guild_decor'
+  | 'consumable';
 
 export type TrainerStoreItem = {
   id:string;
@@ -86,7 +87,7 @@ function storeError(message:string){
     ['ITEM_NOT_AVAILABLE','Este item não está disponível agora.'],
     ['ITEM_NOT_FOR_SALE','Este item é exclusivo de evento, conquista ou leilão.'],
     ['ITEM_NOT_IN_LUXURY_ROTATION','Este item de luxo não está na sua rotação semanal atual.'],
-    ['ITEM_ALREADY_OWNED','Você já possui este item.'],
+    ['ITEM_ALREADY_OWNED','Você atingiu o limite de compras deste item.'],
     ['NOT_ENOUGH_COINS','Você não tem Coins suficientes para esta compra.'],
     ['ITEM_NOT_OWNED','Você ainda não possui este item.'],
     ['ITEM_NOT_EQUIPPABLE','Este item é aplicado em uma tela específica, como Carta ou Deck.'],
@@ -94,7 +95,7 @@ function storeError(message:string){
     ['GIFT_RECIPIENT_NOT_FRIEND','Você só pode presentear pessoas da sua lista de amigos.'],
     ['GIFT_RECIPIENT_NOT_AVAILABLE','Esse amigo não está disponível para receber presentes agora.'],
     ['ITEM_NOT_GIFTABLE','Este item não pode ser enviado como presente.'],
-    ['GIFT_RECIPIENT_ALREADY_OWNS','Esse amigo já possui a quantidade máxima deste item.'],
+    ['GIFT_RECIPIENT_ALREADY_OWNS','Esse amigo atingiu o limite deste item.'],
   ];
   return new Error(known.find(([key])=>message.includes(key))?.[1]??message);
 }
@@ -102,7 +103,7 @@ function storeError(message:string){
 export async function buyTrainerStoreItem(itemId:string){
   const {data,error}=await supabase.rpc('purchase_economy_item',{p_item_id:itemId});
   if(error) throw storeError(error.message);
-  return data as {ok:boolean;itemId:string;category:string;coins:number;ownedQuantity:number};
+  return data as {ok:boolean;itemId:string;category:string;coins:number;ownedQuantity:number;lucky2xRemaining?:number};
 }
 
 export async function equipTrainerStoreItem(itemId:string){
