@@ -1,0 +1,77 @@
+name: Final Game Boy client state fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/final-game-v1-client-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Patch battle client and regression audit
+        shell: python
+        run: |
+          from pathlib import Path
+
+          battle = Path('app/battle/[id].tsx')
+          text = battle.read_text()
+          replacements = [
+              (
+                  "if (battleData.mode === 'draft3' && battleData.status === 'revealing') {",
+                  "if ((battleData.engine_version === 'game_v1' || battleData.mode === 'draft3') && battleData.status === 'revealing') {",
+              ),
+              (
+                  "const choosingAttack = battle?.mode === 'draft3' && battle?.status === 'revealing';",
+                  "const choosingAttack = battle?.status === 'revealing' && (battle?.engine_version === 'game_v1' || battle?.mode === 'draft3');",
+              ),
+              (
+                  "if (!roundNo || battle?.mode !== 'draft3') return;",
+                  "if (!roundNo || (battle?.engine_version !== 'game_v1' && battle?.mode !== 'draft3')) return;",
+              ),
+              (
+                  "const attacking = battle.status === 'revealing' && battle.mode === 'draft3';",
+                  "const attacking = battle.status === 'revealing' && (battle.engine_version === 'game_v1' || battle.mode === 'draft3');",
+              ),
+              (
+                  "{battle.mode === 'draft3' && (attacking || Boolean(resultRound)) ? (",
+                  "{(battle.engine_version === 'game_v1' || battle.mode === 'draft3') && (attacking || Boolean(resultRound)) ? (",
+              ),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'Missing battle patch point: {old}')
+              text = text.replace(old, new, 1)
+          battle.write_text(text)
+
+          audit = Path('scripts/full-game-audit.mjs')
+          a = audit.read_text()
+          marker = "for (const file of requiredSurfaces) assert(existsSync(file), `Superfície principal ausente: ${file}`);"
+          addition = marker + "\n\n// 6) Game Boy battles must expose manual attack selection in every game_v1 mode.\nconst battleScreenText = readFileSync('app/battle/[id].tsx', 'utf8');\nassert(battleScreenText.includes(\"battleData.engine_version === 'game_v1' || battleData.mode === 'draft3'\"), 'Batalha Game Boy: carregamento do estado de ataque voltou a ficar restrito ao Draft 3.');\nassert(battleScreenText.includes(\"battle.status === 'revealing' && (battle.engine_version === 'game_v1' || battle.mode === 'draft3')\"), 'Batalha Game Boy: UI de golpes voltou a ficar restrita ao Draft 3.');\nassert(existsSync('supabase/migrations/20260904193000_game_v1_manual_attacks_all_battle_modes.sql'), 'Migração Game Boy de ataques manuais ausente.');"
+          if marker not in a:
+              raise SystemExit('Missing full-game audit marker')
+          if 'Game Boy battles must expose manual attack selection' not in a:
+              a = a.replace(marker, addition, 1)
+          audit.write_text(a)
+
+          Path('.github/workflows/final-game-v1-client-fix.yml').unlink()
+      - name: Install
+        run: npm ci
+      - name: Verify
+        run: npm run verify
+      - name: Commit fix
+        run: |
+          git config user.name "trainer-collection-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/battle/'[id].tsx' scripts/full-game-audit.mjs .github/workflows/final-game-v1-client-fix.yml
+          git commit -m "Fix Game Boy attack phase in all battle modes"
+          git push
