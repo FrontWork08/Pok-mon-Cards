@@ -1,0 +1,21 @@
+name: Run Owner Card Admin Patch
+on:
+  push:
+    paths:
+      - .github/workflows/run-owner-card-admin-patch.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/patch-owner-card-admin.py
+      - run: rm scripts/patch-owner-card-admin.py .github/workflows/run-owner-card-admin-patch.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add owner-only card grants and new admin permissions"
+          git pull --rebase origin main
+          git push
