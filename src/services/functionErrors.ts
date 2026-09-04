@@ -17,7 +17,8 @@ const messages: Record<string, string> = {
   BATTLE_INVITES_DISABLED: 'Este treinador desativou convites de batalha.',
   INVITE_ALREADY_PENDING: 'Já existe um desafio recente aguardando resposta entre vocês.',
   NOT_FRIENDS: 'Vocês precisam ser amigos para iniciar uma batalha.',
-  NOT_ENOUGH_COINS: 'Um dos jogadores não possui moedas suficientes para esta aposta.',
+  NOT_ENOUGH_COINS: 'Você não possui Coins suficientes para concluir esta ação.',
+  NOT_ENOUGH_DIAMONDS: 'Você não possui Diamantes suficientes para concluir esta ação.',
   INVALID_WAGER: 'O valor escolhido para a aposta não é válido.',
   STAKE_CARD_REQUIRED: 'Escolha uma carta para a aposta antes de continuar.',
   STAKE_CARD_NOT_OWNED: 'A carta escolhida para a aposta não está mais disponível.',
@@ -26,6 +27,8 @@ const messages: Record<string, string> = {
   NOT_PARTICIPANT: 'Você não participa desta troca.',
   INSUFFICIENT_CARD_QUANTITY: 'Uma das cartas selecionadas não está mais disponível na quantidade informada.',
   PACK_NOT_FOUND: 'Este booster não está mais disponível.',
+  AUTO_OPEN_GAMEPASS_REQUIRED: 'A Gamepass Auto Booster não está ativa nesta conta.',
+  INVALID_AUTO_OPEN_QUANTITY: 'Escolha entre 1 e 50 boosters por vez.',
   LEGACY_CARD_LOCKED: 'Esta é a última cópia de uma carta confirmada no seu Legado Beta. Ela está protegida até a migração 1.0.',
 };
 
