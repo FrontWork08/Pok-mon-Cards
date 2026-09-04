@@ -125,6 +125,15 @@ assert(battleScreenText.includes("battleData.engine_version === 'game_v1' || bat
 assert(battleScreenText.includes("battle.status === 'revealing' && (battle.engine_version === 'game_v1' || battle.mode === 'draft3')"), 'Batalha Game Boy: UI de golpes voltou a ficar restrita ao Draft 3.');
 assert(existsSync('supabase/migrations/20260904193000_game_v1_manual_attacks_all_battle_modes.sql'), 'Migração Game Boy de ataques manuais ausente.');
 
+// 7) Trainer Cup must stay coin-only: entry fees form the full prize pool, never Diamonds.
+const trainerCupMigration = 'supabase/migrations/20260904194500_trainer_cup_coin_only_prize.sql';
+assert(existsSync(trainerCupMigration), 'Copa Trainer: migração de prêmio somente em Coins ausente.');
+if (existsSync(trainerCupMigration)) {
+  const tournamentText = readFileSync(trainerCupMigration, 'utf8').toLowerCase();
+  assert(tournamentText.includes('reward_diamonds=0') || tournamentText.includes('reward_diamonds = 0'), 'Copa Trainer: proteção contra prêmio em Diamantes ausente.');
+  assert(tournamentText.includes("'champion_prize'"), 'Copa Trainer: pagamento do pot de Coins ao campeão não está preservado.');
+}
+
 if (failures.length) {
   console.error(`\n❌ Auditoria completa encontrou ${failures.length} problema(s):`);
   for (const failure of failures) console.error(` - ${failure}`);
