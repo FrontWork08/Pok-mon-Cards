@@ -23,6 +23,11 @@ const MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
   { id: 'mystery', label: 'Mystery BO3', detail: 'Melhor de 3' },
   { id: 'draft3', label: 'Draft 3', detail: 'Escolha alternada' },
 ];
+const RANKED_MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
+  ...MODES,
+  { id: 'team3', label: 'Equipe 3×3', detail: 'Game Boy • troca no turno' },
+];
+const battleRoute = (id: string, mode?: BattleMode | string | null) => mode === 'team3' ? `/team-battle/${id}` : `/battle/${id}`;
 const STAKES: Array<{ id: BattleStakeType; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { id: 'none', label: 'Casual', icon: 'happy' },
   { id: 'coins', label: 'Coins', icon: 'cash' },
@@ -78,7 +83,7 @@ export default function BattlesHubScreen() {
     return subscribeMyMatchmaking(profile.id, (state) => {
       setQueueState(state);
       if (state.status === 'matched' && state.matched_battle_id) {
-        router.push(`/battle/${state.matched_battle_id}`);
+        router.push(battleRoute(state.matched_battle_id, state.mode_choice));
       }
     });
   }, [profile?.id, router]);
@@ -96,12 +101,12 @@ export default function BattlesHubScreen() {
         if (disposed) return;
         if (result.status === 'matched' && result.battleId) {
           setNotice(result.botMatch ? 'Fila preenchida por um Treinador IA de ELO próximo.' : 'Partida encontrada!');
-          router.push(`/battle/${result.battleId}`);
+          router.push(battleRoute(result.battleId, result.mode ?? queueState.mode_choice));
         }
       } catch (e) {
         if (isFunctionErrorCode(e, 'ACTIVE_BATTLE_EXISTS')) {
           const currentBattle = await getMyActiveBattle().catch(() => null);
-          if (!disposed && currentBattle?.id) router.push(`/battle/${currentBattle.id}`);
+          if (!disposed && currentBattle?.id) router.push(battleRoute(currentBattle.id, currentBattle.mode));
         }
       } finally {
         inFlight = false;
@@ -134,13 +139,13 @@ export default function BattlesHubScreen() {
       const currentBattle = await getMyActiveBattle().catch(() => null);
       if (currentBattle?.id) {
         setNotice('Você já tem uma batalha ativa. Abrindo a partida...');
-        router.push(`/battle/${currentBattle.id}`);
+        router.push(battleRoute(currentBattle.id, currentBattle.mode));
         return;
       }
 
       const result = await joinMatchmaking(rankedMode);
       if (result.status === 'matched' && result.battleId) {
-        router.push(`/battle/${result.battleId}`);
+        router.push(battleRoute(result.battleId, result.mode ?? rankedMode));
         return;
       }
       setQueueState(await getMyMatchmakingState());
@@ -150,7 +155,7 @@ export default function BattlesHubScreen() {
         const currentBattle = await getMyActiveBattle().catch(() => null);
         if (currentBattle?.id) {
           setNotice('Você já tem uma batalha ativa. Abrindo a partida...');
-          router.push(`/battle/${currentBattle.id}`);
+          router.push(battleRoute(currentBattle.id, currentBattle.mode));
           return;
         }
       }
@@ -291,7 +296,7 @@ export default function BattlesHubScreen() {
         {queueState?.status === 'waiting' ? <View style={styles.searchingDot}><ActivityIndicator size="small" color="#07111F"/></View> : null}
       </View>
       <View style={styles.rankedModes}>
-        {MODES.map((item)=><Pressable
+        {RANKED_MODES.map((item)=><Pressable
           key={`ranked-${item.id}`}
           disabled={queueState?.status === 'waiting'}
           onPress={()=>setRankedMode(item.id)}
