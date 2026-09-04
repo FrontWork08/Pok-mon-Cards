@@ -10,8 +10,21 @@ async function actorId(){
 export type EconomySnapshot={
   id:number;capturedAt:string;health:any;distribution:any;market:any;guardrails?:any;
 };
+export type AdminBattleLabStats={
+  level:number;hp:number;attack:number;defense:number;spAttack:number;spDefense:number;speed:number;
+};
 export type AdminBattleLabCard={
-  id:string;name:string;image:string|null;setName:string|null;rarity:string|null;gameTypes:string[];marketPriceUsd:number|null;gameValue:number|null;
+  id:string;
+  name:string;
+  image:string|null;
+  imageLarge:string|null;
+  setName:string|null;
+  rarity:string|null;
+  gameTypes:string[];
+  marketPriceUsd:number|null;
+  gameValue:number|null;
+  ability:string|null;
+  stats:AdminBattleLabStats|null;
 };
 export async function captureEconomySnapshot(){
   const id=await actorId();
