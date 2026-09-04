@@ -13,8 +13,8 @@ export type MatchmakingState = {
   updated_at: string;
 };
 
-async function invoke(body: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke('battle-action', { body });
+async function invoke(body: Record<string, unknown>, functionName = 'battle-action') {
+  const { data, error } = await supabase.functions.invoke(functionName, { body });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível atualizar o matchmaking.');
   if (data?.error) {
     const value = data.error;
@@ -29,7 +29,8 @@ async function invoke(body: Record<string, unknown>) {
 }
 
 export async function joinMatchmaking(mode: BattleMode) {
-  return invoke({ action: 'matchmaking_join', mode }) as Promise<{
+  const functionName = mode === 'team3' ? 'team-battle-action' : 'battle-action';
+  return invoke({ action: 'matchmaking_join', mode }, functionName) as Promise<{
     status: 'waiting'|'matched';
     battleId?: string;
     mode?: BattleMode;
@@ -37,6 +38,7 @@ export async function joinMatchmaking(mode: BattleMode) {
     botMatch?: boolean;
     botRating?: number;
     botFallbackAfterSeconds?: number;
+    route?: string;
   }>;
 }
 
