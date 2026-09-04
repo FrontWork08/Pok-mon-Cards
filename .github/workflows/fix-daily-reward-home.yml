@@ -14,70 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Patch home reward and tournament summary
+      - name: Apply fixes
+        run: python scripts/temp-fix-daily-home.py
+      - name: Remove temporary files
+        run: rm .github/workflows/fix-daily-reward-home.yml scripts/temp-fix-daily-home.py
+      - name: Commit fix
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          home = Path('src/services/home.ts')
-          s = home.read_text()
-          replacements = [
-            ("    last_daily_claim_at:string|null;\n", "    last_daily_claim_at:string|null;\n    daily_claimed_today:boolean;\n    daily_streak:number;\n    daily_cycle_day:number;\n"),
-            ("      last_daily_claim_at:value.profile?.last_daily_claim_at ?? null,\n", "      last_daily_claim_at:value.profile?.last_daily_claim_at ?? null,\n      daily_claimed_today:Boolean(value.profile?.daily_claimed_today),\n      daily_streak:Number(value.profile?.daily_streak ?? 0),\n      daily_cycle_day:Number(value.profile?.daily_cycle_day ?? 0),\n"),
-            ("    prizePoolCoins:number;\n", "    entryFeeCoins:number;\n    prizePoolCoins:number;\n"),
-            ("      maxPlayers:tournament.maxPlayers,\n      prizePoolCoins:tournament.prizePoolCoins,\n", "      maxPlayers:tournament.maxPlayers,\n      entryFeeCoins:tournament.entryFeeCoins,\n      prizePoolCoins:tournament.prizePoolCoins,\n"),
-          ]
-          for old,new in replacements:
-            if old not in s:
-              raise SystemExit(f'home.ts patch anchor missing: {old!r}')
-            s=s.replace(old,new,1)
-          home.write_text(s)
-
-          screen = Path('app/(tabs)/index.tsx')
-          s = screen.read_text()
-          replacements = [
-            ("import { claimDailyReward } from '@/services/playerActions';", "import { claimDailyLogin } from '@/services/retention';"),
-            ("const canClaimDaily=useMemo(()=>!profile?.last_daily_claim_at||Date.now()-new Date(profile.last_daily_claim_at).getTime()>=24*60*60*1000,[profile?.last_daily_claim_at]);", "const canClaimDaily=useMemo(()=>!Boolean(profile?.daily_claimed_today),[profile?.daily_claimed_today]);"),
-            ("async function claimDaily(){if(!canClaimDaily||claiming)return;try{setClaiming(true);const reward=await claimDailyReward();setNotice(`Recompensa recebida: +${reward.rewardCoins} moedas e +${reward.rewardXp} XP.`);await load();}catch(err){setNotice(err instanceof Error?err.message:'Não foi possível receber a recompensa.');}finally{setClaiming(false);}}", "async function claimDaily(){if(!canClaimDaily||claiming)return;try{setClaiming(true);const reward=await claimDailyLogin();const diamondText=Number(reward.diamonds??0)>0?` + 💎 ${Number(reward.diamonds)}`:'';setNotice(reward.claimed?`Sequência diária ${reward.streak}: +🪙 ${Number(reward.coins).toLocaleString('pt-BR')}${diamondText}`:'A recompensa de hoje já foi coletada.');await load();}catch(err){setNotice(err instanceof Error?err.message:'Não foi possível receber a recompensa.');}finally{setClaiming(false);}}"),
-            ("{claiming?'RECEBENDO...':canClaimDaily?'RECOMPENSA DIÁRIA':'VOLTE AMANHÃ'}", "{claiming?'RECEBENDO...':canClaimDaily?'RECOMPENSA DIÁRIA':'COLETADO HOJE'}"),
-            ("{progressSnapshot.tournament?`${progressSnapshot.tournament.entries}/${progressSnapshot.tournament.maxPlayers} jogadores • 🪙 ${progressSnapshot.tournament.prizePoolCoins.toLocaleString('pt-BR')}`:'Nenhum torneio ativo'}", "{progressSnapshot.tournament?`${progressSnapshot.tournament.entries}/${progressSnapshot.tournament.maxPlayers} • Entrada 🪙 ${progressSnapshot.tournament.entryFeeCoins.toLocaleString('pt-BR')} • Pot 🪙 ${progressSnapshot.tournament.prizePoolCoins.toLocaleString('pt-BR')}`:'Nenhum torneio ativo'}"),
-          ]
-          for old,new in replacements:
-            if old not in s:
-              raise SystemExit(f'index.tsx patch anchor missing: {old[:100]!r}')
-            s=s.replace(old,new,1)
-          screen.write_text(s)
-
-          audit = Path('scripts/full-game-audit.mjs')
-          s = audit.read_text()
-          marker = "if (failures.length) {"
-          if marker not in s:
-            raise SystemExit('full-game-audit marker missing')
-          checks = """
-// 7) Home daily reward must share the 7-day streak state; no independent legacy claim path.
-const homeScreenText = readFileSync('app/(tabs)/index.tsx', 'utf8');
-const homeServiceText = readFileSync('src/services/home.ts', 'utf8');
-assert(homeScreenText.includes("claimDailyLogin"), 'Recompensa diária da Home deixou de usar o streak unificado.');
-assert(!homeScreenText.includes("claimDailyReward"), 'Recompensa diária legada voltou a ser acionável pela Home.');
-assert(homeScreenText.includes("daily_claimed_today"), 'Home voltou a usar janela de 24h em vez do dia calendário do streak.');
-assert(homeServiceText.includes("entryFeeCoins:tournament.entryFeeCoins"), 'Resumo da Copa Trainer perdeu a taxa de inscrição.');
-assert(homeScreenText.includes("Entrada 🪙") && homeScreenText.includes("Pot 🪙"), 'Home voltou a confundir taxa da Copa com o pot atual.');
-assert(existsSync('supabase/migrations/20260904181351_unify_daily_reward_paths.sql'), 'Migração de unificação da recompensa diária ausente.');
-assert(existsSync('supabase/migrations/20260904181655_home_daily_streak_status.sql'), 'Migração de status diário da Home ausente.');
-
-"""
-          if 'Home daily reward must share the 7-day streak state' not in s:
-            s=s.replace(marker,checks+marker,1)
-          audit.write_text(s)
-          PY
-      - name: Remove temporary workflow
-        run: rm .github/workflows/fix-daily-reward-home.yml
-      - name: Commit fixes
-        run: |
-          git config user.name "Trainer Collection Bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add app src scripts .github/workflows/fix-daily-reward-home.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/'(tabs)'/index.tsx src/services/home.ts scripts/full-game-audit.mjs .github/workflows/fix-daily-reward-home.yml scripts/temp-fix-daily-home.py
           git commit -m "Fix duplicate daily reward and tournament home summary"
           git push
