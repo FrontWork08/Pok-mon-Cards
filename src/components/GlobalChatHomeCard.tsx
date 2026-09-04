@@ -9,6 +9,7 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import { getProfileAvatarUrl } from '@/services/player';
 
+// The equipped cosmetic owns the message shell; the app theme only remains a fallback.
 function timeLabel(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
