@@ -20,15 +20,18 @@ function walk(dir) {
 
 for (const path of [...walk('app'), ...walk('src')].filter((value) => value.endsWith('.tsx'))) {
   const source = readFileSync(path, 'utf8');
-  let cursor = 0;
-  while ((cursor = source.indexOf('<FlatList', cursor)) >= 0) {
-    const window = source.slice(cursor, cursor + 9000);
-    const shared = window.includes('VIRTUAL_LIST_PERF_PROPS');
-    const missing = shared ? [] : requiredFlatListProps.filter((prop) => !window.includes(prop));
+  const matcher = /<FlatList(?=\s|>)/g;
+  let match;
+  while ((match = matcher.exec(source)) !== null) {
+    const start = match.index;
+    const tagEnd = source.indexOf('/>', start);
+    const safeEnd = tagEnd >= 0 ? Math.min(tagEnd + 2, start + 12000) : start + 12000;
+    const openingWindow = source.slice(start, safeEnd);
+    const shared = openingWindow.includes('VIRTUAL_LIST_PERF_PROPS');
+    const missing = shared ? [] : requiredFlatListProps.filter((prop) => !openingWindow.includes(prop));
     if (missing.length) {
       failures.push(`${path}: FlatList sem padrão de performance (${missing.join(', ')}).`);
     }
-    cursor += 9;
   }
 }
 
@@ -60,4 +63,4 @@ if (failures.length) {
 }
 
 console.log('✅ Auditoria de scroll/performance passou.');
-console.log('   Listas longas continuam virtualizadas e novos seletores não podem regredir para renderização completa.');
+console.log('   Todas as FlatLists usam o padrão global, e seletores pesados permanecem virtualizados.');
