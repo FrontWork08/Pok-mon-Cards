@@ -119,6 +119,12 @@ const requiredSurfaces = [
 ];
 for (const file of requiredSurfaces) assert(existsSync(file), `Superfície principal ausente: ${file}`);
 
+// 6) Game Boy battles must expose manual attack selection in every game_v1 mode.
+const battleScreenText = readFileSync('app/battle/[id].tsx', 'utf8');
+assert(battleScreenText.includes("battleData.engine_version === 'game_v1' || battleData.mode === 'draft3'"), 'Batalha Game Boy: carregamento do estado de ataque voltou a ficar restrito ao Draft 3.');
+assert(battleScreenText.includes("battle.status === 'revealing' && (battle.engine_version === 'game_v1' || battle.mode === 'draft3')"), 'Batalha Game Boy: UI de golpes voltou a ficar restrita ao Draft 3.');
+assert(existsSync('supabase/migrations/20260904193000_game_v1_manual_attacks_all_battle_modes.sql'), 'Migração Game Boy de ataques manuais ausente.');
+
 if (failures.length) {
   console.error(`\n❌ Auditoria completa encontrou ${failures.length} problema(s):`);
   for (const failure of failures) console.error(` - ${failure}`);

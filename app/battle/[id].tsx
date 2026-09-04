@@ -78,7 +78,7 @@ export default function BattleScreen() {
         setStakes(stakeData ?? []);
         setDraftCards(draftData ?? []);
 
-        if (battleData.mode === 'draft3' && battleData.status === 'revealing') {
+        if ((battleData.engine_version === 'game_v1' || battleData.mode === 'draft3') && battleData.status === 'revealing') {
           const nextAttackState = await getBattleAttackState(String(id)).catch(() => null);
           setAttackState(nextAttackState);
           setSelectedAttackName(nextAttackState?.myAttackName ? String(nextAttackState.myAttackName) : null);
@@ -189,7 +189,7 @@ export default function BattleScreen() {
 
   const currentRound = Number(battle?.active_round ?? 1);
   const isDrafting = battle?.status === 'drafting';
-  const choosingAttack = battle?.mode === 'draft3' && battle?.status === 'revealing';
+  const choosingAttack = battle?.status === 'revealing' && (battle?.engine_version === 'game_v1' || battle?.mode === 'draft3');
   const myAttackLocked = Boolean(attackState?.myLocked);
   const opponentAttackLocked = Boolean(attackState?.opponentLocked);
   const gameStyleBattle = battle?.engine_version === 'game_v1' || Boolean(attackState?.gameStyle);
@@ -323,7 +323,7 @@ export default function BattleScreen() {
 
   useEffect(() => {
     const roundNo = Number(latestRound?.round_no ?? 0);
-    if (!roundNo || battle?.mode !== 'draft3') return;
+    if (!roundNo || (battle?.engine_version !== 'game_v1' && battle?.mode !== 'draft3')) return;
     setArenaResultRound(latestRound);
     if (arenaResultTimer.current) clearTimeout(arenaResultTimer.current);
     arenaResultTimer.current = setTimeout(() => {
@@ -533,7 +533,7 @@ export default function BattleScreen() {
   const winnerName = players[battle.winner_id]?.username;
   const selecting = battle.status === 'selecting';
   const drafting = battle.status === 'drafting';
-  const attacking = battle.status === 'revealing' && battle.mode === 'draft3';
+  const attacking = battle.status === 'revealing' && (battle.engine_version === 'game_v1' || battle.mode === 'draft3');
   const invited = battle.status === 'invited';
   const completed = battle.status === 'completed';
 
@@ -651,7 +651,7 @@ export default function BattleScreen() {
           </>
         ) : null}
 
-        {battle.mode === 'draft3' && (attacking || Boolean(resultRound)) ? (
+        {(battle.engine_version === 'game_v1' || battle.mode === 'draft3') && (attacking || Boolean(resultRound)) ? (
           <PixelBattleArena
             my={attacking ? liveArenaMy : resultArenaMy}
             rival={attacking ? liveArenaRival : resultArenaRival}
