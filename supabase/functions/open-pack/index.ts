@@ -59,9 +59,7 @@ function getSecretKey() {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -89,6 +87,7 @@ Deno.serve(async (req: Request) => {
   const operationId = typeof body.operationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.operationId)
     ? body.operationId
     : crypto.randomUUID();
+
   if (body.kind === "legendary_diamond") {
     const { data, error } = await admin.rpc("server_idempotent_open_legendary_pack", {
       p_player_id: user.id,
@@ -104,6 +103,33 @@ Deno.serve(async (req: Request) => {
     }
     return json(data);
   }
+
+  if (body.kind === "auto_open") {
+    const packId = typeof body.packId === "string" ? body.packId : "";
+    const quantity = Number(body.quantity);
+    if (!packId) return json({ error: "packId is required" }, 400);
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 50) {
+      return json({ error: "INVALID_AUTO_OPEN_QUANTITY" }, 400);
+    }
+
+    const { data, error } = await admin.rpc("server_idempotent_auto_open_packs", {
+      p_player_id: user.id,
+      p_pack_id: packId,
+      p_quantity: quantity,
+      p_operation_id: operationId,
+    });
+    if (error) {
+      const message = error.message ?? "Could not auto-open packs";
+      const status =
+        message.includes("AUTO_OPEN_GAMEPASS_REQUIRED") ? 403 :
+        message.includes("INVALID_AUTO_OPEN_QUANTITY") ? 400 :
+        message.includes("NOT_ENOUGH_COINS") || message.includes("NOT_ENOUGH_DIAMONDS") ? 409 :
+        message.includes("PACK_NOT_FOUND") ? 404 : 500;
+      return json({ error: message }, status);
+    }
+    return json(await addMarketPrices(admin, data));
+  }
+
   const packId = body.packId;
   if (!packId) return json({ error: "packId is required" }, 400);
 
