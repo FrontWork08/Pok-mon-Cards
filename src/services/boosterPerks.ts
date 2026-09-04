@@ -36,14 +36,19 @@ export async function getBoosterPerks(): Promise<BoosterPerks> {
   };
 }
 
-let pendingAutoOpenOperation: string | null = null;
+let pendingAutoOpenOperation: { key: string; id: string } | null = null;
 
 export async function autoOpenPacks(packId: string, quantity: number): Promise<AutoOpenResult> {
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 50) {
     throw new Error('Escolha entre 1 e 50 boosters por abertura automática.');
   }
-  const operationId = pendingAutoOpenOperation ?? createOperationId();
-  pendingAutoOpenOperation = operationId;
+
+  const requestKey = `${packId}:${quantity}`;
+  const operationId = pendingAutoOpenOperation?.key === requestKey
+    ? pendingAutoOpenOperation.id
+    : createOperationId();
+  pendingAutoOpenOperation = { key: requestKey, id: operationId };
+
   const { data, error } = await supabase.functions.invoke('open-pack', {
     body: { kind: 'auto_open', packId, quantity, operationId },
   });
@@ -60,6 +65,7 @@ export async function autoOpenPacks(packId: string, quantity: number): Promise<A
     }
     throw await normalizeFunctionError(new Error(raw), 'Não foi possível concluir a abertura automática.');
   }
+
   pendingAutoOpenOperation = null;
   return {
     batchId: String(data?.batchId ?? operationId),
