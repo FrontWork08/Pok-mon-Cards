@@ -5,7 +5,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
 import { AuraFrame } from '@/components/AuraFrame';
-import { createDeck, deleteDeck, getMyDecks, setDefaultDeck } from '@/services/decks';
+import { copyDeck, createDeck, deleteDeck, getMyDecks, setDefaultDeck } from '@/services/decks';
+import { getMyGamepasses, hasGamepass } from '@/services/gamepasses';
 import { formatUsd } from '@/services/market';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -13,23 +14,41 @@ export default function DecksScreen() {
   const router = useRouter();
   const { colors, isLight } = useAppTheme();
   const [decks, setDecks] = useState<any[]>([]);
+  const [deckPro, setDeckPro] = useState(false);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try { setLoading(true); setDecks(await getMyDecks()); }
+    try {
+      setLoading(true);
+      const [deckRows, passes] = await Promise.all([getMyDecks(), getMyGamepasses().catch(()=>null)]);
+      setDecks(deckRows);
+      setDeckPro(hasGamepass(passes, 'deck_pro'));
+    }
     catch (err) { setNotice(err instanceof Error ? err.message : 'Não foi possível carregar os decks.'); }
     finally { setLoading(false); }
   }, []);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   async function create() {
     const trimmed = name.trim();
     if (!trimmed) return;
     try { setWorking(true); const id = await createDeck(trimmed); setName(''); router.push(`/deck/${id}`); }
     catch (err) { setNotice(err instanceof Error ? err.message : 'Não foi possível criar o deck.'); }
+    finally { setWorking(false); }
+  }
+
+  async function duplicate(deckId:string) {
+    if (!deckPro) { router.push('/gamepasses'); return; }
+    try {
+      setWorking(true);
+      const id = await copyDeck(deckId);
+      setNotice('Deck copiado com o Deck Pro. A cópia já está pronta para editar.');
+      await load();
+      router.push(`/deck/${id}`);
+    } catch (err) { setNotice(err instanceof Error ? err.message : 'Não foi possível copiar o deck.'); }
     finally { setWorking(false); }
   }
 
@@ -51,8 +70,9 @@ export default function DecksScreen() {
       {notice ? <Pressable style={[styles.notice,{backgroundColor:colors.surface,borderColor:colors.border}]} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={19} color={colors.yellow} /><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text></Pressable> : null}
 
       <View style={[styles.createBox,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
-        <View style={styles.createCopy}><Text style={[styles.kicker,{color:colors.yellow}]}>NOVO DECK</Text><Text style={[styles.createTitle,{color:colors.text}]}>Prepare sua próxima batalha</Text></View>
+        <View style={styles.createCopy}><View style={styles.proTitleRow}><Text style={[styles.kicker,{color:colors.yellow}]}>NOVO DECK</Text><Pressable onPress={()=>router.push('/gamepasses')} style={[styles.proBadge,{borderColor:deckPro?'#59D49A':colors.border}]}><Ionicons name={deckPro?'checkmark-circle':'lock-closed'} size={11} color={deckPro?'#59D49A':colors.muted}/><Text style={[styles.proBadgeText,{color:deckPro?'#79E6AE':colors.muted}]}>DECK PRO {deckPro?'ATIVO':'OPCIONAL'}</Text></Pressable></View><Text style={[styles.createTitle,{color:colors.text}]}>Prepare sua próxima batalha</Text></View>
         <View style={styles.createRow}><TextInput value={name} onChangeText={setName} onSubmitEditing={create} placeholder="Ex.: Fantasmas" placeholderTextColor={colors.muted} style={[styles.input,{backgroundColor:colors.surface,borderColor:colors.border,color:colors.text}]} /><Pressable style={[styles.createButton,{backgroundColor:colors.yellow}, (!name.trim() || working) && styles.disabled]} onPress={create} disabled={!name.trim() || working}><Ionicons name="add" size={19} color="#07111F" /><Text style={styles.createButtonText}>CRIAR</Text></Pressable></View>
+        <Text style={[styles.proHint,{color:colors.muted}]}>{deckPro?'Deck Pro ativo: use COPIAR em qualquer deck para duplicar cartas e estilo em um toque.':'Deck Pro não limita seus decks atuais. Ele adiciona ferramentas rápidas como copiar decks sem remontar carta por carta.'}</Text>
       </View>
 
       {loading ? <ActivityIndicator size="large" color={colors.yellow} /> : null}
@@ -89,7 +109,13 @@ export default function DecksScreen() {
               <View style={styles.deckInfo}><View style={styles.nameRow}><Text style={[styles.deckName,{color:colors.text}]}>{deck.name}</Text>{deck.is_default ? <View style={[styles.defaultBadge,{backgroundColor:colors.yellow}]}><Ionicons name="star" size={11} color="#07111F" /><Text style={styles.defaultText}>PRINCIPAL</Text></View> : null}{deckStyle?<View style={[styles.deckStyleBadge,{backgroundColor:colors.accentSoft,borderColor:deckBorder}]}><Ionicons name={(deckStyle.icon||'albums') as keyof typeof Ionicons.glyphMap} size={11} color={deckBorder}/><Text style={[styles.deckStyleText,{color:deckBorder}]}>{String(deckStyle.name).toUpperCase()}</Text></View>:null}</View><Text style={[styles.deckMeta,{color:colors.muted}]}>{total} cartas • {formatUsd(marketValue)} • toque para editar</Text></View>
               <Ionicons name="chevron-forward" size={20} color={galaxyDeck?'#55E6FF':colors.muted} />
             </Pressable>
-            <View style={[styles.deckActions,{borderTopColor:colors.border}]}>{!deck.is_default ? <Pressable style={[styles.secondary,{backgroundColor:colors.surfaceAlt}]} onPress={() => makeDefault(deck.id)} disabled={working}><Ionicons name="star-outline" size={15} color={colors.yellow} /><Text style={[styles.secondaryText,{color:colors.text}]}>TORNAR PRINCIPAL</Text></Pressable> : <View />}{!deck.is_default ? <Pressable style={styles.deleteButton} onPress={() => remove(deck.id)} disabled={working}><Ionicons name="trash-outline" size={16} color="#FF98A8" /></Pressable> : null}</View>
+            <View style={[styles.deckActions,{borderTopColor:colors.border}]}>
+              <View style={styles.deckActionGroup}>
+                {!deck.is_default ? <Pressable style={[styles.secondary,{backgroundColor:colors.surfaceAlt}]} onPress={() => makeDefault(deck.id)} disabled={working}><Ionicons name="star-outline" size={15} color={colors.yellow} /><Text style={[styles.secondaryText,{color:colors.text}]}>PRINCIPAL</Text></Pressable> : null}
+                <Pressable style={[styles.secondary,{backgroundColor:deckPro?'#15392A':colors.surfaceAlt}]} onPress={()=>void duplicate(deck.id)} disabled={working}><Ionicons name={deckPro?'copy':'lock-closed'} size={15} color={deckPro?'#59D49A':colors.muted}/><Text style={[styles.secondaryText,{color:deckPro?'#79E6AE':colors.muted}]}>{deckPro?'COPIAR':'DECK PRO'}</Text></Pressable>
+              </View>
+              {!deck.is_default ? <Pressable style={styles.deleteButton} onPress={() => remove(deck.id)} disabled={working}><Ionicons name="trash-outline" size={16} color="#FF98A8" /></Pressable> : null}
+            </View>
           </View></AuraFrame>;
         })}
       </View>
@@ -101,6 +127,6 @@ export default function DecksScreen() {
 
 const styles = StyleSheet.create({
   backRow:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:7},backText:{fontSize:12,fontWeight:'800'},notice:{flexDirection:'row',gap:8,padding:11,borderRadius:14,borderWidth:1},noticeText:{flex:1,fontSize:11,fontWeight:'700'},
-  createBox:{gap:11,padding:17,borderRadius:21,borderWidth:1},createCopy:{gap:2},kicker:{fontSize:9,fontWeight:'900',letterSpacing:1.3},createTitle:{fontSize:19,fontWeight:'900'},createRow:{flexDirection:'row',gap:8,flexWrap:'wrap'},input:{flex:1,minWidth:200,height:48,borderRadius:13,borderWidth:1,paddingHorizontal:13},createButton:{height:48,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,paddingHorizontal:16,borderRadius:13},createButtonText:{color:'#07111F',fontSize:9,fontWeight:'900'},disabled:{opacity:.45},
-  list:{gap:14},deck:{borderRadius:19,borderWidth:1,overflow:'hidden'},deckMain:{flexDirection:'row',alignItems:'center',gap:12,padding:13},preview:{width:96,height:80,flexDirection:'row',alignItems:'center',justifyContent:'center',borderRadius:13,overflow:'hidden'},previewCard:{width:48,height:67,borderRadius:5},deckInfo:{flex:1},nameRow:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'},deckName:{fontSize:16,fontWeight:'900'},deckMeta:{fontSize:10,marginTop:4},defaultBadge:{flexDirection:'row',alignItems:'center',gap:4,paddingHorizontal:7,paddingVertical:4,borderRadius:999},defaultText:{color:'#07111F',fontSize:7,fontWeight:'900'},deckStyleBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},deckStyleText:{fontSize:6,fontWeight:'900'},deckActions:{minHeight:44,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:13,paddingVertical:8,borderTopWidth:1},secondary:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:10,paddingVertical:8,borderRadius:10},secondaryText:{fontSize:8,fontWeight:'900'},deleteButton:{width:34,height:34,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:'#351A24'},empty:{alignItems:'center',gap:7,padding:28,borderRadius:19,borderWidth:1},emptyTitle:{fontSize:16,fontWeight:'900'},emptyText:{fontSize:11,textAlign:'center',maxWidth:420},
+  createBox:{gap:11,padding:17,borderRadius:21,borderWidth:1},createCopy:{gap:2},proTitleRow:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'},kicker:{fontSize:9,fontWeight:'900',letterSpacing:1.3},proBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',gap:4,alignItems:'center'},proBadgeText:{fontSize:6.5,fontWeight:'900'},createTitle:{fontSize:19,fontWeight:'900'},createRow:{flexDirection:'row',gap:8,flexWrap:'wrap'},input:{flex:1,minWidth:200,height:48,borderRadius:13,borderWidth:1,paddingHorizontal:13},createButton:{height:48,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,paddingHorizontal:16,borderRadius:13},createButtonText:{color:'#07111F',fontSize:9,fontWeight:'900'},proHint:{fontSize:8,lineHeight:12},disabled:{opacity:.45},
+  list:{gap:14},deck:{borderRadius:19,borderWidth:1,overflow:'hidden'},deckMain:{flexDirection:'row',alignItems:'center',gap:12,padding:13},preview:{width:96,height:80,flexDirection:'row',alignItems:'center',justifyContent:'center',borderRadius:13,overflow:'hidden'},previewCard:{width:48,height:67,borderRadius:5},deckInfo:{flex:1},nameRow:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'},deckName:{fontSize:16,fontWeight:'900'},deckMeta:{fontSize:10,marginTop:4},defaultBadge:{flexDirection:'row',alignItems:'center',gap:4,paddingHorizontal:7,paddingVertical:4,borderRadius:999},defaultText:{color:'#07111F',fontSize:7,fontWeight:'900'},deckStyleBadge:{borderRadius:999,borderWidth:1,paddingHorizontal:6,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:4},deckStyleText:{fontSize:6,fontWeight:'900'},deckActions:{minHeight:44,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:13,paddingVertical:8,borderTopWidth:1},deckActionGroup:{flexDirection:'row',gap:6,flexWrap:'wrap'},secondary:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:10,paddingVertical:8,borderRadius:10},secondaryText:{fontSize:8,fontWeight:'900'},deleteButton:{width:34,height:34,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:'#351A24'},empty:{alignItems:'center',gap:7,padding:28,borderRadius:19,borderWidth:1},emptyTitle:{fontSize:16,fontWeight:'900'},emptyText:{fontSize:11,textAlign:'center',maxWidth:420},
 });
