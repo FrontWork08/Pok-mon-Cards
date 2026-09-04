@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
  * Revalidated as part of the full-game release audit on 2026-09-04.
  * Production release retriggered after the home mission reward shortcut fix.
  * Revalidated after daily-reward and Trainer Cup home bug fixes.
+ * Revalidated after Team 3x3 deck, filter, sorting and surrender controls.
  */
 export const VIRTUAL_LIST_PERF_PROPS = {
   initialNumToRender: 8,
