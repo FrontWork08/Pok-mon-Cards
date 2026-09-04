@@ -93,6 +93,8 @@ for (const file of sourceFiles) {
     for (const match of text.matchAll(regex)) {
       const target = match[1];
       if (target.startsWith('//')) continue;
+      // '/player/' + id and similar prefixes are intentionally dynamic, not static destinations.
+      if (target !== '/' && target.endsWith('/')) continue;
       assert(matchesRoute(target), `Rota inexistente: '${target}' referenciada em ${file}.`);
     }
   }
@@ -104,14 +106,16 @@ for (const file of sourceFiles) {
   assert(!/SUPABASE_(?:SERVICE_ROLE_KEY|SECRET_KEYS?|SECRET_KEY)/i.test(text), `Segurança: segredo privilegiado do Supabase referenciado no cliente: ${file}.`);
 }
 
-// 5) Basic repository contracts for the major game surfaces.
+// 5) Basic repository contracts for the major player-facing surfaces.
 const requiredSurfaces = [
-  'app/(tabs)/index.tsx', 'app/(tabs)/packs.tsx', 'app/(tabs)/bag.tsx', 'app/(tabs)/trade.tsx', 'app/(tabs)/battles.tsx',
-  'app/profile/[id].tsx', 'app/store.tsx', 'app/marketplace.tsx', 'app/guild.tsx', 'app/decks.tsx', 'app/battle-pass.tsx',
-  'app/team-battle/[id].tsx', 'app/battle/[id].tsx', 'app/auto-open.tsx', 'app/codes.tsx', 'app/friends.tsx',
-  'src/services/auth.ts', 'src/services/bag.ts', 'src/services/battles.ts', 'src/services/teamBattles.ts', 'src/services/trades.ts',
+  'app/(tabs)/index.tsx', 'app/(tabs)/packs.tsx', 'app/(tabs)/bag.tsx', 'app/(tabs)/trade.tsx', 'app/(tabs)/battles.tsx', 'app/(tabs)/profile.tsx',
+  'app/player/[id].tsx', 'app/store.tsx', 'app/marketplace.tsx', 'app/market-offers.tsx', 'app/guilds.tsx', 'app/guild-wars.tsx', 'app/decks.tsx', 'app/deck/[id].tsx',
+  'app/battle-pass.tsx', 'app/tournaments.tsx', 'app/team-battle/[id].tsx', 'app/battle/[id].tsx', 'app/auto-open.tsx', 'app/auto-open-plus.tsx', 'app/pack-queue.tsx',
+  'app/gamepasses.tsx', 'app/codes.tsx', 'app/friends.tsx', 'app/chat/[id].tsx', 'app/inbox.tsx', 'app/economy.tsx', 'app/collector-pass.tsx', 'app/bag-pro.tsx',
+  'app/marketplace-pro.tsx', 'app/museum-pro.tsx', 'app/replay-pro.tsx',
+  'src/services/auth.ts', 'src/services/bag.ts', 'src/services/battles.ts', 'src/services/teamBattles.ts', 'src/services/trades.ts', 'src/services/decks.ts',
   'supabase/functions/open-pack/index.ts', 'supabase/functions/battle-action/index.ts', 'supabase/functions/team-battle-action/index.ts',
-  'supabase/functions/trade-action/index.ts', 'supabase/functions/player-action/index.ts', 'supabase/functions/deck-action/index.ts',
+  'supabase/functions/trade-action/index.ts', 'supabase/functions/player-action/index.ts', 'supabase/functions/deck-action/index.ts', 'supabase/functions/admin-action/index.ts',
 ];
 for (const file of requiredSurfaces) assert(existsSync(file), `Superfície principal ausente: ${file}`);
 
