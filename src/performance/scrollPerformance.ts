@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
  * virtualization so drag/scroll performance does not regress on Android.
  * Revalidated as part of the full-game release audit on 2026-09-04.
  * Production release retriggered after the home mission reward shortcut fix.
+ * Revalidated after daily-reward and Trainer Cup home bug fixes.
  */
 export const VIRTUAL_LIST_PERF_PROPS = {
   initialNumToRender: 8,
