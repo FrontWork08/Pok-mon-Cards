@@ -20,6 +20,7 @@ import {
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
+import { BattleStyleArenaOverlay } from '@/components/BattleStyleArenaOverlay';
 
 function hpValues(member?: TeamBattleMember | null) {
   const item = (member ?? {}) as Record<string, unknown>;
@@ -279,6 +280,7 @@ export default function TeamBattleScreen() {
         {state?.status === 'revealing' ? (
           <>
             <View style={[styles.arena, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <BattleStyleArenaOverlay turn={Number((state as any)?.turn ?? 1)} activeSlot={state?.myActiveSlot} />
               <View style={styles.fighterSide}>
                 <Text style={[styles.fighterOwner, { color: colors.muted }]}>ADVERSÁRIO</Text>
                 <Text style={[styles.fighterName, { color: colors.text }]}>{opponentName}</Text>
