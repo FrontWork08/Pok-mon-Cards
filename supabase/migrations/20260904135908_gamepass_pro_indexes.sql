@@ -1,0 +1,14 @@
+create index if not exists bag_pro_presets_player_updated_idx on public.bag_pro_presets(player_id,updated_at desc);
+create index if not exists bag_pro_folders_player_updated_idx on public.bag_pro_folders(player_id,updated_at desc);
+create index if not exists bag_pro_folder_cards_player_idx on public.bag_pro_folder_cards(player_id);
+create index if not exists bag_pro_folder_cards_folder_player_idx on public.bag_pro_folder_cards(folder_id,player_id);
+create index if not exists bag_pro_folder_cards_card_idx on public.bag_pro_folder_cards(card_id);
+create index if not exists marketplace_pro_watches_card_idx on public.marketplace_pro_watches(card_id);
+create index if not exists collector_pro_goals_player_updated_idx on public.collector_pro_goals(player_id,updated_at desc);
+create index if not exists guild_pro_roles_player_idx on public.guild_pro_member_roles(player_id);
+create index if not exists guild_pro_roles_assigned_by_idx on public.guild_pro_member_roles(assigned_by);
+create index if not exists guild_pro_settings_updated_by_idx on public.guild_pro_settings(updated_by);
+create index if not exists guild_pro_audit_guild_created_idx on public.guild_pro_audit_log(guild_id,created_at desc);
+create index if not exists guild_pro_audit_actor_idx on public.guild_pro_audit_log(actor_id);
+create index if not exists guild_pro_audit_target_idx on public.guild_pro_audit_log(target_id);
+create index if not exists replay_pro_favorites_battle_idx on public.replay_pro_favorites(battle_id);
