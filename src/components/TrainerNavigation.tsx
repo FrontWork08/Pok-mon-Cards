@@ -48,6 +48,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label:'Ranking de Coleções', description:'Coleções com maior valor de mercado', href:'/collection-ranking', icon:'podium', group:'collection' },
   { label:'Guildas Pokémon', description:'Equipe, missões e ranking coletivo', href:'/guilds', icon:'shield', group:'social' },
   { label:'Guild Wars', description:'Confrontos semanais entre guildas', href:'/guild-wars', icon:'flash', group:'competitive' },
+  { label:'Equipe 3×3', description:'Batalha casual com 1 ativo, 2 reservas e trocas em campo', href:'/team-battles', icon:'swap-horizontal', group:'competitive' },
   { label:'Copa Trainer', description:'Torneio com bracket e prêmio acumulado', href:'/tournaments', icon:'trophy', group:'competitive' },
   { label:'Battle Lab', description:'Simule confrontos sem afetar ELO ou inventário', href:'/battle-lab', icon:'flask', group:'competitive' },
   { label:'Hall da Fama', description:'Campeões de temporadas, Copa e recordes', href:'/hall-of-fame', icon:'ribbon', group:'competitive' },
