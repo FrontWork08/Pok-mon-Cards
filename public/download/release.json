@@ -3,7 +3,7 @@
   "packageName": "com.frontwork.pokemoncards",
   "version": "1.0.1",
   "buildVersion": "9",
-  "downloadUrl": "https://expo.dev/artifacts/eas/md_SarWrIo9PISqWY7T_-vj443GyZMZp4UzwWhy8_Gc.apk",
+  "downloadUrl": "https://github.com/FrontWork08/Pok-mon-Cards/releases/download/android-v1.0.1/Trainer-Collection-v1.0.1.apk",
   "sha256": "3eb232d5dcb7ad96ae1c6b352c20beeb5f3a121958c1ad10d351b0c317cc2f40",
   "sizeBytes": 104172842,
   "publishedAt": "2026-08-30T04:27:36.930Z",
@@ -23,5 +23,7 @@
       "v3": false,
       "v4": false
     }
-  }
+  },
+  "downloadFileName": "Trainer-Collection-v1.0.1.apk",
+  "downloadProvider": "GitHub Release"
 }
