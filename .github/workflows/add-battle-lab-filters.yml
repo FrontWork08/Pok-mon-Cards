@@ -1,0 +1,93 @@
+name: Add Battle Lab Pokemon filters
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/add-battle-lab-filters.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Add Battle Lab filters
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p=Path(path)
+              text=p.read_text()
+              if text.count(old) < count:
+                  raise SystemExit(f'{path}: anchor not found: {old[:140]!r}')
+              p.write_text(text.replace(old,new,count))
+
+          p='app/admin-battle-lab.tsx'
+          replace(p,
+            "const PAGE_SIZE=80;",
+            "const PAGE_SIZE=80;\nconst BATTLE_TYPES=['fire','water','grass','electric','psychic','fighting','dark','steel','dragon','fairy','normal','flying','poison','ground','bug','rock','ghost','ice'] as const;")
+          replace(p,
+            "  const[search,setSearch]=useState('');\n  const[catalog,setCatalog]=useState<AdminBattleLabCard[]>([]);",
+            "  const[search,setSearch]=useState('');\n  const[typeFilter,setTypeFilter]=useState('');\n  const[setFilter,setSetFilter]=useState('');\n  const[rarityFilter,setRarityFilter]=useState('');\n  const[filtersOpen,setFiltersOpen]=useState(false);\n  const[catalog,setCatalog]=useState<AdminBattleLabCard[]>([]);")
+          replace(p,
+            "  const selectedCards=useMemo(()=>ids.map(id=>selected[id]).filter(Boolean),[ids,selected]);",
+            "  const selectedCards=useMemo(()=>ids.map(id=>selected[id]).filter(Boolean),[ids,selected]);\n  const activeFilterCount=useMemo(()=>[typeFilter,setFilter.trim(),rarityFilter.trim()].filter(Boolean).length,[rarityFilter,setFilter,typeFilter]);")
+          replace(p,
+            "      const page=await getAdminBattleLabCatalog(search,offset,PAGE_SIZE);",
+            "      const page=await getAdminBattleLabCatalog(search,offset,PAGE_SIZE,{type:typeFilter,set:setFilter,rarity:rarityFilter});")
+          replace(p,
+            "  },[catalog.length,search]);",
+            "  },[catalog.length,rarityFilter,search,setFilter,typeFilter]);")
+          replace(p,
+            "  },[picker,search]);",
+            "  },[picker,rarityFilter,search,setFilter,typeFilter]);")
+          replace(p,
+            "  function toggleCard(card:AdminBattleLabCard){",
+            "  function clearCatalogFilters(){\n    setTypeFilter('');\n    setSetFilter('');\n    setRarityFilter('');\n  }\n\n  function toggleCard(card:AdminBattleLabCard){")
+          replace(p,
+            "          <View style={[styles.searchBox,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name=\"search\" size={18} color={colors.muted}/><TextInput value={search} onChangeText={setSearch} placeholder=\"Buscar Pokémon, set ou ID...\" placeholderTextColor={colors.muted} style={[styles.searchInput,{color:colors.text}]}/>{search?<Pressable onPress={()=>setSearch('')} hitSlop={8}><Ionicons name=\"close-circle\" size={17} color={colors.muted}/></Pressable>:null}</View>\n\n          <View style={styles.modalActions}",
+            "          <View style={[styles.searchBox,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name=\"search\" size={18} color={colors.muted}/><TextInput value={search} onChangeText={setSearch} placeholder=\"Buscar Pokémon, set ou ID...\" placeholderTextColor={colors.muted} style={[styles.searchInput,{color:colors.text}]}/>{search?<Pressable onPress={()=>setSearch('')} hitSlop={8}><Ionicons name=\"close-circle\" size={17} color={colors.muted}/></Pressable>:null}</View>\n\n          <View style={styles.filterToolbar}>\n            <Pressable onPress={()=>setFiltersOpen(value=>!value)} style={[styles.filterToggle,{backgroundColor:activeFilterCount?colors.accentSoft:colors.surface,borderColor:activeFilterCount?colors.accent:colors.border}]}>\n              <Ionicons name=\"options\" size={16} color={activeFilterCount?colors.yellow:colors.accent}/>\n              <Text style={[styles.filterToggleText,{color:colors.text}]}>FILTROS{activeFilterCount?` (${activeFilterCount})`:''}</Text>\n              <Ionicons name={filtersOpen?'chevron-up':'chevron-down'} size={14} color={colors.muted}/>\n            </Pressable>\n            {activeFilterCount?<Pressable onPress={clearCatalogFilters} style={[styles.clearFilters,{borderColor:'#D96575'}]}><Ionicons name=\"refresh\" size={14} color=\"#FF8290\"/><Text style={styles.clearFiltersText}>LIMPAR FILTROS</Text></Pressable>:null}\n          </View>\n\n          {filtersOpen?<View style={[styles.filterPanel,{backgroundColor:colors.surface,borderColor:colors.border}]}>\n            <Text style={[styles.filterLabel,{color:colors.muted}]}>TIPO DO POKÉMON</Text>\n            <View style={styles.typeChips}>\n              <Pressable onPress={()=>setTypeFilter('')} style={[styles.typeChip,{backgroundColor:!typeFilter?colors.yellow:colors.surfaceAlt,borderColor:!typeFilter?colors.yellow:colors.border}]}><Text style={[styles.typeChipText,{color:!typeFilter?'#07111F':colors.text}]}>TODOS</Text></Pressable>\n              {BATTLE_TYPES.map(type=><Pressable key={type} onPress={()=>setTypeFilter(current=>current===type?'':type)} style={[styles.typeChip,{backgroundColor:typeFilter===type?colors.accentSoft:colors.surfaceAlt,borderColor:typeFilter===type?colors.accent:colors.border}]}><Text style={[styles.typeChipText,{color:typeFilter===type?colors.yellow:colors.text}]}>{type.toUpperCase()}</Text></Pressable>)}\n            </View>\n            <View style={styles.filterInputs}>\n              <View style={styles.filterField}><Text style={[styles.filterLabel,{color:colors.muted}]}>SET</Text><TextInput value={setFilter} onChangeText={setSetFilter} placeholder=\"Ex.: Base Set\" placeholderTextColor={colors.muted} style={[styles.filterInput,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>\n              <View style={styles.filterField}><Text style={[styles.filterLabel,{color:colors.muted}]}>RARIDADE</Text><TextInput value={rarityFilter} onChangeText={setRarityFilter} placeholder=\"Ex.: Rare, Promo\" placeholderTextColor={colors.muted} style={[styles.filterInput,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>\n            </View>\n            <Text style={[styles.filterHelp,{color:colors.muted}]}>Os filtros são aplicados no catálogo completo do servidor e podem ser combinados com a busca.</Text>\n          </View>:null}\n\n          <View style={styles.modalActions}")
+          replace(p,
+            "  searchBox:{height:46,borderRadius:13,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},searchInput:{flex:1,fontSize:10,paddingVertical:0},modalActions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},",
+            "  searchBox:{height:46,borderRadius:13,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},searchInput:{flex:1,fontSize:10,paddingVertical:0},filterToolbar:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'},filterToggle:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},filterToggleText:{fontSize:7,fontWeight:'900'},clearFilters:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:4},clearFiltersText:{fontSize:6.5,fontWeight:'900',color:'#FF8290'},filterPanel:{borderRadius:13,borderWidth:1,padding:9,gap:8},filterLabel:{fontSize:6.2,fontWeight:'900',letterSpacing:.7},typeChips:{flexDirection:'row',flexWrap:'wrap',gap:5},typeChip:{minHeight:27,borderRadius:999,borderWidth:1,paddingHorizontal:8,alignItems:'center',justifyContent:'center'},typeChipText:{fontSize:5.9,fontWeight:'900'},filterInputs:{flexDirection:'row',gap:7,flexWrap:'wrap'},filterField:{flexGrow:1,flexBasis:145,gap:4},filterInput:{height:38,borderRadius:10,borderWidth:1,paddingHorizontal:8,fontSize:8.5},filterHelp:{fontSize:6.2,lineHeight:9.5},modalActions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},")
+
+          audit=Path('scripts/battle-lab-filter-audit.mjs')
+          audit.write_text("""import { readFile } from 'node:fs/promises';\n\nconst app=await readFile('app/admin-battle-lab.tsx','utf8');\nconst svc=await readFile('src/services/adminLaunchTools.ts','utf8');\nconst requiredApp=['BATTLE_TYPES','typeFilter','setFilter','rarityFilter','filtersOpen','activeFilterCount','clearCatalogFilters','VIRTUAL_LIST_PERF_PROPS',\"getAdminBattleLabCatalog(search,offset,PAGE_SIZE,{type:typeFilter,set:setFilter,rarity:rarityFilter})\",'Os filtros são aplicados no catálogo completo do servidor'];\nconst requiredSvc=['AdminBattleLabCatalogFilters','p_type:filters.type||null','p_set:filters.set||null','p_rarity:filters.rarity||null'];\nconst missing=[...requiredApp.filter(x=>!app.includes(x)).map(x=>'app:'+x),...requiredSvc.filter(x=>!svc.includes(x)).map(x=>'service:'+x)];\nif(missing.length){console.error('❌ Battle Lab filter audit failed:',missing);process.exit(1);}\nconsole.log('✅ Battle Lab filter audit: busca + tipo + set + raridade usam paginação server-side e lista virtualizada.');\n""")
+
+          pkg=Path('package.json')
+          text=pkg.read_text()
+          old='node scripts/trainer-identity-audit.mjs\"'
+          new='node scripts/trainer-identity-audit.mjs && node scripts/battle-lab-filter-audit.mjs\"'
+          if old not in text: raise SystemExit('package.json verify anchor missing')
+          pkg.write_text(text.replace(old,new,1))
+
+          migration=Path('supabase/migrations/202609042206_battle_lab_catalog_filters.sql')
+          migration.write_text("""drop function if exists public.get_admin_battle_lab_catalog(text,integer,integer);\n\ncreate function public.get_admin_battle_lab_catalog(\n  p_search text default null,\n  p_offset integer default 0,\n  p_limit integer default 80,\n  p_type text default null,\n  p_set text default null,\n  p_rarity text default null\n) returns jsonb\nlanguage plpgsql\nstable\nsecurity definer\nset search_path=''\nas $function$\ndeclare\n  v_actor uuid:=(select auth.uid());\n  v_q text:=nullif(btrim(coalesce(p_search,'')),'');\n  v_type text:=lower(nullif(btrim(coalesce(p_type,'')),''));\n  v_set text:=nullif(btrim(coalesce(p_set,'')),'');\n  v_rarity text:=nullif(btrim(coalesce(p_rarity,'')),'');\n  v_offset integer:=greatest(0,coalesce(p_offset,0));\n  v_limit integer:=greatest(1,least(coalesce(p_limit,80),120));\nbegin\n  if v_actor is null or not private.admin_has_permission(v_actor,'battle_lab_manage') then raise exception 'FORBIDDEN'; end if;\n  return jsonb_build_object(\n    'items',coalesce((select jsonb_agg(jsonb_build_object('id',x.id,'name',x.pokemon_name,'image',x.image_small,'imageLarge',x.image_large,'setName',x.set_name,'rarity',x.rarity,'gameTypes',coalesce(x.game_types,'{}'::text[]),'marketPriceUsd',x.market_price_usd,'gameValue',x.game_value,'ability',prof.profile->>'ability','stats',stats.level50) order by x.pokemon_name,x.set_name,x.id) from (select id,pokemon_name,image_small,image_large,set_name,rarity,game_types,market_price_usd,game_value from public.cards where pokemon_name is not null and (v_q is null or pokemon_name ilike '%'||v_q||'%' or id ilike '%'||v_q||'%' or set_name ilike '%'||v_q||'%') and (v_type is null or v_type=any(coalesce(game_types,'{}'::text[]))) and (v_set is null or set_name ilike '%'||v_set||'%') and (v_rarity is null or rarity ilike '%'||v_rarity||'%') and private.battle_game_profile_for_card(id) is not null order by pokemon_name,set_name,id offset v_offset limit v_limit) x cross join lateral (select private.battle_game_profile_for_card(x.id) profile) prof cross join lateral (select private.battle_game_level50_stats(prof.profile) level50) stats),'[]'::jsonb),\n    'total',(select count(*) from public.cards c where c.pokemon_name is not null and (v_q is null or c.pokemon_name ilike '%'||v_q||'%' or c.id ilike '%'||v_q||'%' or c.set_name ilike '%'||v_q||'%') and (v_type is null or v_type=any(coalesce(c.game_types,'{}'::text[]))) and (v_set is null or c.set_name ilike '%'||v_set||'%') and (v_rarity is null or c.rarity ilike '%'||v_rarity||'%') and private.battle_game_profile_for_card(c.id) is not null),\n    'offset',v_offset,'limit',v_limit,'filters',jsonb_build_object('search',v_q,'type',v_type,'set',v_set,'rarity',v_rarity)\n  );\nend;\n$function$;\n\nrevoke all on function public.get_admin_battle_lab_catalog(text,integer,integer,text,text,text) from public, anon;\ngrant execute on function public.get_admin_battle_lab_catalog(text,integer,integer,text,text,text) to authenticated, service_role;\n""")
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify project and Battle Lab filters
+        run: npm run verify
+
+      - name: Commit tested filters
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/admin-battle-lab.tsx src/services/adminLaunchTools.ts scripts/battle-lab-filter-audit.mjs package.json supabase/migrations/202609042206_battle_lab_catalog_filters.sql
+          git diff --cached --check
+          git commit -m 'feat: add Pokemon filters to Battle Lab'
+          git push
