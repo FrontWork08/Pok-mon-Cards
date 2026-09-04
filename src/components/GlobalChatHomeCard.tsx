@@ -6,6 +6,7 @@ import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { getGlobalChatMessages, sendGlobalChatMessage, subscribeGlobalChat, type GlobalChatMessage } from '@/services/globalChat';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
+import { getProfileAvatarUrl } from '@/services/player';
 
 function timeLabel(value: string) {
   const date = new Date(value);
@@ -102,6 +103,9 @@ export function GlobalChatHomeCard() {
                 <Pressable onPress={() => router.push(`/player/${message.playerId}`)} style={styles.avatarPress}>
                   <TrainerAvatar
                     icon={message.profileIcon}
+                    avatarUrl={getProfileAvatarUrl(message.avatarPath, message.avatarUpdatedAt)}
+                    frameId={message.frameId}
+                    backgroundId={message.backgroundId}
                     size={31}
                     color={mine ? colors.yellow : colors.accent}
                     backgroundColor={colors.surfaceAlt}

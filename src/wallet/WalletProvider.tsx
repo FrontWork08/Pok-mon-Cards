@@ -7,6 +7,8 @@ type WalletState = {
   profileIcon: string | null;
   avatarPath: string | null;
   avatarUpdatedAt: string | null;
+  frameId: string | null;
+  backgroundId: string | null;
   coins: number;
   diamonds: number;
   loading: boolean;
@@ -21,6 +23,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
   const [profileIcon, setProfileIcon] = useState<string | null>(null);
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
+  const [frameId, setFrameId] = useState<string | null>(null);
+  const [backgroundId, setBackgroundId] = useState<string | null>(null);
   const [coins, setCoins] = useState(0);
   const [diamonds, setDiamonds] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -34,6 +38,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
       setProfileIcon(null);
       setAvatarPath(null);
       setAvatarUpdatedAt(null);
+      setFrameId(null);
+      setBackgroundId(null);
       setCoins(0);
       setDiamonds(0);
       setLoading(false);
@@ -41,7 +47,7 @@ export function WalletProvider({ children }: PropsWithChildren) {
     }
     const { data, error } = await supabase
       .from('players')
-      .select('username,profile_icon,avatar_path,avatar_updated_at,coins,diamonds')
+      .select('username,profile_icon,avatar_path,avatar_updated_at,equipped_frame_id,equipped_background_id,coins,diamonds')
       .eq('id', id)
       .single();
     if (!error && data) {
@@ -49,6 +55,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
       setProfileIcon(data.profile_icon ?? null);
       setAvatarPath(data.avatar_path ?? null);
       setAvatarUpdatedAt(data.avatar_updated_at ?? null);
+      setFrameId(data.equipped_frame_id ?? null);
+      setBackgroundId(data.equipped_background_id ?? null);
       setCoins(Number(data.coins ?? 0));
       setDiamonds(Number(data.diamonds ?? 0));
     }
@@ -70,6 +78,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
         setProfileIcon(null);
         setAvatarPath(null);
         setAvatarUpdatedAt(null);
+      setFrameId(null);
+      setBackgroundId(null);
         setCoins(0);
         setDiamonds(0);
         setLoading(false);
@@ -96,6 +106,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
             profile_icon?: string;
             avatar_path?: string | null;
             avatar_updated_at?: string | null;
+            equipped_frame_id?: string | null;
+            equipped_background_id?: string | null;
             coins?: number | string;
             diamonds?: number | string;
           };
@@ -103,6 +115,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
           if (row.profile_icon != null) setProfileIcon(row.profile_icon);
           if ('avatar_path' in row) setAvatarPath(row.avatar_path ?? null);
           if ('avatar_updated_at' in row) setAvatarUpdatedAt(row.avatar_updated_at ?? null);
+          if ('equipped_frame_id' in row) setFrameId(row.equipped_frame_id ?? null);
+          if ('equipped_background_id' in row) setBackgroundId(row.equipped_background_id ?? null);
           if (row.coins != null) setCoins(Number(row.coins));
           if (row.diamonds != null) setDiamonds(Number(row.diamonds));
         },
@@ -112,8 +126,8 @@ export function WalletProvider({ children }: PropsWithChildren) {
   }, [userId]);
 
   const value = useMemo(
-    () => ({ userId, username, profileIcon, avatarPath, avatarUpdatedAt, coins, diamonds, loading, refresh }),
-    [userId, username, profileIcon, avatarPath, avatarUpdatedAt, coins, diamonds, loading, refresh],
+    () => ({ userId, username, profileIcon, avatarPath, avatarUpdatedAt, frameId, backgroundId, coins, diamonds, loading, refresh }),
+    [userId, username, profileIcon, avatarPath, avatarUpdatedAt, frameId, backgroundId, coins, diamonds, loading, refresh],
   );
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 }

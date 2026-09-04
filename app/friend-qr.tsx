@@ -72,6 +72,8 @@ export default function FriendQrScreen() {
             <TrainerAvatar
               icon={profile.profile_icon}
               avatarUrl={avatarUrl}
+              frameId={profile.equipped_frame_id}
+              backgroundId={profile.equipped_background_id}
               color={colors.accent}
               backgroundColor={colors.surfaceAlt}
               size={58}

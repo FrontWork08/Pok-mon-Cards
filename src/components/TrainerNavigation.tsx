@@ -90,7 +90,7 @@ export function TrainerNavigation() {
   const router=useRouter();
   const pathname=usePathname();
   const {colors}=useAppTheme();
-  const {userId,username,profileIcon,avatarPath,avatarUpdatedAt}=useWallet();
+  const {userId,username,profileIcon,avatarPath,avatarUpdatedAt,frameId,backgroundId}=useWallet();
   const avatarUrl=getProfileAvatarUrl(avatarPath,avatarUpdatedAt);
   const insets=useSafeAreaInsets();
   const[open,setOpen]=useState(false);
@@ -180,7 +180,7 @@ export function TrainerNavigation() {
     <View style={styles.row}>
       <Pressable accessibilityLabel="Abrir menu do treinador" onPress={()=>setOpen(true)} style={[styles.menuButton,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="menu" size={24} color={colors.text}/>{unread>0?<View style={styles.unreadDot}/>:null}</Pressable>
       <View style={styles.currency}><CurrencyBar compact/></View>
-      <Pressable accessibilityLabel="Abrir perfil" onPress={()=>router.replace('/(tabs)/profile')}><TrainerAvatar icon={profileIcon} avatarUrl={avatarUrl} color={colors.accent} backgroundColor={colors.surface} size={40}/></Pressable>
+      <Pressable accessibilityLabel="Abrir perfil" onPress={()=>router.replace('/(tabs)/profile')}><TrainerAvatar icon={profileIcon} avatarUrl={avatarUrl} frameId={frameId} backgroundId={backgroundId} color={colors.accent} backgroundColor={colors.surface} size={40}/></Pressable>
     </View>
     {rankSnapshot?<View style={styles.rankStrip}>
       <Pressable onPress={()=>router.replace('/(tabs)/battles')} style={[styles.rankPill,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="trophy" size={14} color={colors.yellow}/><Text style={[styles.rankPillText,{color:colors.text}]}>RANQUEADA #{rankSnapshot.battle.rank}</Text><Text style={[styles.rankPillSub,{color:colors.muted}]}>ELO {rankSnapshot.battle.rating}</Text></Pressable>
@@ -192,7 +192,7 @@ export function TrainerNavigation() {
         <Pressable style={StyleSheet.absoluteFill} onPress={()=>setOpen(false)}/>
         <View style={[styles.drawer,{backgroundColor:colors.bg,borderColor:colors.border}]}>
           <View style={[styles.drawerHeader,{borderBottomColor:colors.border,paddingTop:Math.max(insets.top,16)}]}>
-            <TrainerAvatar icon={profileIcon} avatarUrl={avatarUrl} color={colors.accent} backgroundColor={colors.surface} size={48}/>
+            <TrainerAvatar icon={profileIcon} avatarUrl={avatarUrl} frameId={frameId} backgroundId={backgroundId} color={colors.accent} backgroundColor={colors.surface} size={48}/>
             <View style={styles.headerText}><Text style={[styles.kicker,{color:colors.yellow}]}>MENU DO TREINADOR</Text><Text numberOfLines={1} style={[styles.username,{color:colors.text}]}>@{username??'Treinador'}</Text></View>
             <Pressable accessibilityLabel="Fechar menu" onPress={()=>setOpen(false)} style={styles.close}><Ionicons name="close" size={24} color={colors.muted}/></Pressable>
           </View>

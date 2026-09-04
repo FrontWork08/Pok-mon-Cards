@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
+import { getPlayerAvatarMap } from '@/services/player';
 
 let notificationHandlerConfigured = false;
 
@@ -93,14 +94,17 @@ async function getNativeNotifications() {
   return Notifications;
 }
 
-export async function getConversationInbox() {
+export async function getConversationInbox(withIdentity = true) {
   const { data, error } = await supabase.rpc('get_my_conversation_summaries');
   if (error) throw error;
-  return data ?? [];
+  const rows = data ?? [];
+  if (!withIdentity || !rows.length) return rows;
+  const identityMap: Record<string, any> = await getPlayerAvatarMap(rows.map((item: any) => String(item.friend_id ?? ''))).catch(() => ({} as Record<string, any>));
+  return rows.map((item: any) => ({ ...item, friend_identity: identityMap[String(item.friend_id ?? '')] ?? null }));
 }
 
 export async function getUnreadConversationCount() {
-  const rows = await getConversationInbox();
+  const rows = await getConversationInbox(false);
   return rows.reduce((sum: number, item: any) => sum + Number(item.unread_count ?? 0), 0);
 }
 

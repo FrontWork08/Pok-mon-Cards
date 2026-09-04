@@ -13,6 +13,8 @@ import {
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getActionableActivities, type ActionableActivity } from '@/services/activityCenter';
 import { StatusPill } from '@/components/StatusPill';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { getProfileAvatarUrl } from '@/services/player';
 
 type ActivityFilter = 'all' | 'action' | 'battle' | 'social' | 'economy' | 'progress';
 
@@ -137,7 +139,7 @@ export default function InboxScreen(){
 
     {visibleConversations.length?<><View style={styles.sectionHeader}><Text style={[styles.sectionTitle,{color:colors.text}]}>Conversas</Text><Text style={[styles.count,{color:colors.muted}]}>{visibleConversations.length}</Text></View>
       <View style={styles.list}>{visibleConversations.map(item=><Pressable key={item.conversation_id} onPress={()=>router.push(`/chat/${item.friend_id}`)} style={[styles.row,{backgroundColor:colors.surface,borderColor:Number(item.unread_count)>0?colors.accent:colors.border}]}>
-        <View style={[styles.avatar,{backgroundColor:colors.accentSoft}]}><Text style={[styles.avatarText,{color:colors.accent}]}>{String(item.friend_username??'?').slice(0,1).toUpperCase()}</Text></View>
+        <TrainerAvatar icon={item.friend_identity?.profileIcon} avatarUrl={getProfileAvatarUrl(item.friend_identity?.avatarPath,item.friend_identity?.avatarUpdatedAt)} frameId={item.friend_identity?.frameId} backgroundId={item.friend_identity?.backgroundId} color={colors.accent} backgroundColor={colors.accentSoft} size={43}/>
         <View style={styles.body}><View style={styles.topline}><Text style={[styles.name,{color:colors.text}]}>@{item.friend_username}</Text>{item.last_created_at?<Text style={[styles.time,{color:colors.muted}]}>{new Date(item.last_created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</Text>:null}</View><Text numberOfLines={1} style={[styles.preview,{color:colors.muted}]}>{item.last_body??'Conversa iniciada'}</Text></View>
         {Number(item.unread_count)>0?<View style={styles.badge}><Text style={styles.badgeText}>{item.unread_count}</Text></View>:<Ionicons name="chevron-forward" size={19} color={colors.muted}/>}
       </Pressable>)}</View>

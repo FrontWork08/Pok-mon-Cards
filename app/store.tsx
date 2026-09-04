@@ -445,6 +445,8 @@ export default function TrainerStoreScreen(){
                   <TrainerAvatar
                     icon={friend.profile_icon}
                     avatarUrl={getProfileAvatarUrl(friend.avatar_path??null,friend.avatar_updated_at??null)}
+                    frameId={friend.equipped_frame_id}
+                    backgroundId={friend.equipped_background_id}
                     color={selected?colors.yellow:colors.accent}
                     backgroundColor={colors.surface}
                     size={42}

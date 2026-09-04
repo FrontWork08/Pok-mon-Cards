@@ -12,7 +12,7 @@ import { AuraFrame } from '@/components/AuraFrame';
 import { GalaxyFlowOverlay } from '@/components/GalaxyFlowOverlay';
 import { MarketplaceListingSurface } from '@/components/MarketplaceListingSurface';
 import { getMyBagPage } from '@/services/bag';
-import { getCardDetail, getOwnedCard, type CardDetailEntry, type OwnedCardEntry } from '@/services/player';
+import { getCardDetail, getOwnedCard, getProfileAvatarUrl, type CardDetailEntry, type OwnedCardEntry } from '@/services/player';
 import { buyListing, cancelListing, createListing, createMarketOffer, getMarketplaceHub, saveMyShop, subscribeMarketplace, type MarketplaceHub, type MarketplaceListing, type ShopTheme } from '@/services/marketplace';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
@@ -640,7 +640,7 @@ function ListingCard({item,myId,working,comparing,onBuy,onOffer,onPreview,onComp
           premiumTheme&&styles.premiumInnerPanel,
           premiumTheme&&{borderColor:`${themeColor}38`},
         ]}>
-          <TrainerAvatar icon={item.sellerIcon} size={38} color={themeColor} backgroundColor={premiumTheme?`${themeColor}18`:colors.surfaceAlt}/>
+          <TrainerAvatar icon={item.sellerIcon} avatarUrl={getProfileAvatarUrl(item.sellerAvatarPath,item.sellerAvatarUpdatedAt)} frameId={item.sellerFrameId} backgroundId={item.sellerBackgroundId} size={38} color={themeColor} backgroundColor={premiumTheme?`${themeColor}18`:colors.surfaceAlt}/>
           <View style={{flex:1}}>
             <View style={styles.shopTitleRow}><Text style={[styles.shopName,{color:colors.text}]}>{item.shopName}</Text>{shopBoosted?<View style={[styles.premiumBadge,{backgroundColor:colors.accentSoft}]}><Ionicons name="sparkles" size={11} color={colors.yellow}/><Text style={[styles.premiumText,{color:colors.yellow}]}>LOJA EM DESTAQUE</Text></View>:null}</View>
             <Text style={[styles.sellerName,{color:colors.muted}]}>@{item.sellerName}{item.guild?` • ${item.guild.name}`:''}</Text>

@@ -3,7 +3,8 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View 
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
-import { findPlayers } from '@/services/player';
+import { findPlayers, getProfileAvatarUrl } from '@/services/player';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { getMySocial, type SocialPlayer } from '@/services/social';
 import { cleanupAbandonedTrades, createTrade, getMyTrades } from '@/services/trades';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -107,7 +108,7 @@ export default function TradeScreen() {
           <View style={styles.friendGrid}>
             {friends.slice(0, 6).map((friend) => (
               <Pressable key={friend.id} style={[styles.friendCard,{backgroundColor:colors.surface,borderColor:colors.border}]} onPress={() => startTrade(friend.id)} disabled={creatingId !== null}>
-                <View style={[styles.avatar,{backgroundColor:colors.accentSoft}]}><Text style={[styles.avatarText,{color:colors.text}]}>{friend.username.slice(0, 1).toUpperCase()}</Text></View>
+                <TrainerAvatar icon={friend.profile_icon} avatarUrl={getProfileAvatarUrl(friend.avatar_path,friend.avatar_updated_at)} frameId={friend.equipped_frame_id} backgroundId={friend.equipped_background_id} color={colors.accent} backgroundColor={colors.accentSoft} size={40}/>
                 <View style={{ flex: 1 }}><Text style={[styles.friendName,{color:colors.text}]}>@{friend.username}</Text><Text style={[styles.friendMeta,{color:colors.muted}]}>Nível {friend.level}</Text></View>
                 <Ionicons name="swap-horizontal" size={19} color={colors.yellow} />
               </Pressable>
@@ -130,7 +131,7 @@ export default function TradeScreen() {
         <View style={styles.results}>
           {players.map((player) => (
             <View key={player.id} style={[styles.playerRow,{backgroundColor:colors.surface,borderColor:colors.border}]}>
-              <View style={[styles.avatar,{backgroundColor:colors.accentSoft}]}><Text style={[styles.avatarText,{color:colors.text}]}>{player.username.slice(0, 1).toUpperCase()}</Text></View>
+              <TrainerAvatar icon={player.profile_icon} avatarUrl={getProfileAvatarUrl(player.avatar_path,player.avatar_updated_at)} frameId={player.equipped_frame_id} backgroundId={player.equipped_background_id} color={colors.accent} backgroundColor={colors.accentSoft} size={40}/>
               <View style={styles.playerInfo}><Text style={[styles.playerName,{color:colors.text}]}>@{player.username}</Text><Text style={[styles.playerLevel,{color:colors.muted}]}>Treinador nível {player.level}</Text></View>
               <Pressable style={[styles.tradeButton,{backgroundColor:colors.yellow}]} onPress={() => startTrade(player.id)} disabled={creatingId !== null}><Text style={styles.tradeButtonText}>{creatingId === player.id ? 'CRIANDO...' : 'TROCAR'}</Text></Pressable>
             </View>

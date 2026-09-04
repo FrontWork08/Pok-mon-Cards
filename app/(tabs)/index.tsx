@@ -13,11 +13,13 @@ import { UpdateLogHomeCard } from '@/components/UpdateLogHomeCard';
 import { getThemeVisual } from '@/theme/themeCatalog';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { getTrainerJourneySummary, type TrainerJourneySummary } from '@/services/career';
+import { useWallet } from '@/wallet/WalletProvider';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, isLight, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
+  const {frameId,backgroundId}=useWallet();
   const [profile,setProfile]=useState<any>(null);const[stats,setStats]=useState({totalCards:0,species:0,completedTrades:0});const[battlePass,setBattlePass]=useState<BattlePassState|null>(null);const[continueItems,setContinueItems]=useState<HomeContinueItem[]>([]);const[progressSnapshot,setProgressSnapshot]=useState<HomeProgressSnapshot|null>(null);const[journeySummary,setJourneySummary]=useState<TrainerJourneySummary|null>(null);const[loading,setLoading]=useState(true);const[claiming,setClaiming]=useState(false);const[notice,setNotice]=useState<string|null>(null);const loadedOnce=useRef(false);
   const load=useCallback(async()=>{try{if(!loadedOnce.current)setLoading(true);const[dashboard,pass,continueData,progressData,journeyData]=await Promise.all([getHomeDashboard(),getBattlePass().catch(()=>null),getHomeContinueItems().catch(()=>[]),getHomeProgressSnapshot().catch(()=>null),getTrainerJourneySummary().catch(()=>null)]);setProfile(dashboard.profile);setStats(dashboard.stats);setBattlePass(pass);setContinueItems(continueData);setProgressSnapshot(progressData);setJourneySummary(journeyData);loadedOnce.current=true;}finally{setLoading(false);}},[]);
   useFocusEffect(useCallback(()=>{void load();},[load]));
@@ -48,6 +50,8 @@ export default function HomeScreen() {
           <TrainerAvatar
             icon={profile?.profile_icon}
             avatarUrl={avatarUrl}
+            frameId={frameId}
+            backgroundId={backgroundId}
             color={colors.yellow}
             backgroundColor={colors.surface}
             size={56}

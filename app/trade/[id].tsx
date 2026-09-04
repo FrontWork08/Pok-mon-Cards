@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { CardPickerModal } from '@/components/CardPickerModal';
-import { getMyBag, type OwnedCardEntry } from '@/services/player';
+import { getMyBag, getPlayerAvatarMap, getProfileAvatarUrl, type OwnedCardEntry, type PlayerAvatarMeta } from '@/services/player';
+import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { abandonTrade, cancelTrade, confirmTrade, getTrade, setTradeCards, subscribeToTrade } from '@/services/trades';
 import { supabase } from '@/lib/supabase';
 import { formatUsd } from '@/services/market';
@@ -44,6 +45,7 @@ export default function TradeBuilderScreen() {
   const [selected, setSelected] = useState<SelectedMap>({});
   const [userId, setUserId] = useState('');
   const [names, setNames] = useState<Record<string, string>>({});
+  const [identities, setIdentities] = useState<Record<string, PlayerAvatarMeta>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -71,8 +73,12 @@ export default function TradeBuilderScreen() {
       setBag(bagData ?? []);
 
       const participantIds = [tradeData.sender_id, tradeData.receiver_id];
-      const { data: players } = await supabase.from('players').select('id,username').in('id', participantIds);
+      const [{ data: players }, identityMap] = await Promise.all([
+        supabase.from('players').select('id,username').in('id', participantIds),
+        getPlayerAvatarMap(participantIds).catch(() => ({})),
+      ]);
       setNames(Object.fromEntries((players ?? []).map((player) => [player.id, player.username])));
+      setIdentities(identityMap);
 
       const savedSelection = selectionFromTrade(tradeData, uid);
       const contextId = cardId ? String(cardId) : '';
@@ -295,9 +301,9 @@ export default function TradeBuilderScreen() {
         {notice ? <Pressable style={[styles.notice, { backgroundColor: colors.surface, borderColor: colors.yellow }]} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={20} color={colors.yellow} /><Text style={[styles.noticeText, { color: colors.text }]}>{notice}</Text><Ionicons name="close" size={18} color={colors.muted} /></Pressable> : null}
 
         <View style={[styles.participants, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Participant label="VOCÊ" name={names[userId] ?? 'Treinador'} confirmed={myConfirmed} />
+          <Participant label="VOCÊ" name={names[userId] ?? 'Treinador'} confirmed={myConfirmed} identity={identities[userId]} />
           <View style={[styles.swapCircle, { backgroundColor: colors.accentSoft }]}><Ionicons name="swap-horizontal" size={23} color={colors.yellow} /></View>
-          <Participant label="OUTRO TREINADOR" name={names[otherId] ?? 'Treinador'} confirmed={otherConfirmed} />
+          <Participant label="OUTRO TREINADOR" name={names[otherId] ?? 'Treinador'} confirmed={otherConfirmed} identity={identities[otherId]} />
         </View>
 
         {pending ? (
@@ -365,9 +371,9 @@ export default function TradeBuilderScreen() {
   );
 }
 
-function Participant({ label, name, confirmed }: { label: string; name: string; confirmed: boolean }) {
+function Participant({ label, name, confirmed, identity }: { label: string; name: string; confirmed: boolean; identity?: PlayerAvatarMeta }) {
   const { colors } = useAppTheme();
-  return <View style={styles.participant}><View style={[styles.avatar, { backgroundColor: colors.surfaceAlt }]}><Text style={[styles.avatarText, { color: colors.text }]}>{name.slice(0, 1).toUpperCase()}</Text></View><View><Text style={[styles.participantLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.participantName, { color: colors.text }]}>@{name}</Text><Text style={[styles.confirmState, { color: confirmed ? '#65D894' : colors.muted }]}>{confirmed ? '✓ Confirmado' : 'Aguardando confirmação'}</Text></View></View>;
+  return <View style={styles.participant}><TrainerAvatar icon={identity?.profileIcon} avatarUrl={getProfileAvatarUrl(identity?.avatarPath,identity?.avatarUpdatedAt)} frameId={identity?.frameId} backgroundId={identity?.backgroundId} color={colors.accent} backgroundColor={colors.surfaceAlt} size={46}/><View><Text style={[styles.participantLabel, { color: colors.muted }]}>{label}</Text><Text style={[styles.participantName, { color: colors.text }]}>@{name}</Text><Text style={[styles.confirmState, { color: confirmed ? '#65D894' : colors.muted }]}>{confirmed ? '✓ Confirmado' : 'Aguardando confirmação'}</Text></View></View>;
 }
 
 function ValueCard({ label, value, count, accent }: { label: string; value: number; count: number; accent: string }) {

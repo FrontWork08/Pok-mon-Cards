@@ -17,6 +17,10 @@ export type MarketplaceListing = {
   buyerId: string | null;
   sellerName: string;
   sellerIcon: string;
+  sellerAvatarPath: string | null;
+  sellerAvatarUpdatedAt: string | null;
+  sellerFrameId: string | null;
+  sellerBackgroundId: string | null;
   shopName: string;
   shopTheme: ShopTheme;
   guild: { id: string; name: string; color: string } | null;
@@ -69,6 +73,10 @@ function normalizeListing(row: any, shops: Map<string, any>, guilds: Map<string,
     buyerId: row.buyer_id ? String(row.buyer_id) : null,
     sellerName: String(seller?.username ?? 'Treinador'),
     sellerIcon: String(seller?.profile_icon ?? 'pokeball'),
+    sellerAvatarPath: seller?.avatar_path ? String(seller.avatar_path) : null,
+    sellerAvatarUpdatedAt: seller?.avatar_updated_at ? String(seller.avatar_updated_at) : null,
+    sellerFrameId: seller?.equipped_frame_id ? String(seller.equipped_frame_id) : null,
+    sellerBackgroundId: seller?.equipped_background_id ? String(seller.equipped_background_id) : null,
     shopName: String(shop?.name ?? `${seller?.username ?? 'Trainer'} Card Shop`),
     shopTheme: (shop?.theme_style ?? 'guild') as ShopTheme,
     guild: guild ? { id:String(guild.id), name:String(guild.name), color:String(guild.color) } : null,
@@ -97,7 +105,7 @@ export async function getMarketplaceHub(): Promise<MarketplaceHub> {
   const fields =
     'id,seller_id,buyer_id,card_id,quantity,unit_price_coins,status,created_at,boosted_until,boost_tier,' +
     'cards(id,pokemon_name,rarity,image_small,image_large,market_price_usd),' +
-    'seller:players!market_listings_seller_id_fkey(id,username,profile_icon)';
+    'seller:players!market_listings_seller_id_fkey(id,username,profile_icon,avatar_path,avatar_updated_at,equipped_frame_id,equipped_background_id)';
   const [activeResult, mineResult] = await Promise.all([
     supabase.from('market_listings').select(fields).eq('status','active').order('boosted_until',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).limit(100),
     supabase.from('market_listings').select(fields).eq('seller_id',myId).order('created_at',{ascending:false}).limit(100),

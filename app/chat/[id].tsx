@@ -45,7 +45,7 @@ export default function ChatScreen() {
         setLoading(true);
         const [{ data: auth }, { data: player }, cid] = await Promise.all([
           supabase.auth.getUser(),
-          supabase.from('players').select('id,username,level,battle_rating,profile_icon,avatar_path,avatar_updated_at').eq('id', friendId).single(),
+          supabase.from('players').select('id,username,level,battle_rating,profile_icon,avatar_path,avatar_updated_at,equipped_frame_id,equipped_background_id').eq('id', friendId).single(),
           getOrCreateConversation(friendId),
         ]);
         setUserId(auth.user?.id ?? '');
@@ -124,6 +124,8 @@ export default function ChatScreen() {
           <TrainerAvatar
             icon={friend?.profile_icon}
             avatarUrl={getProfileAvatarUrl(friend?.avatar_path, friend?.avatar_updated_at)}
+            frameId={friend?.equipped_frame_id}
+            backgroundId={friend?.equipped_background_id}
             color={colors.accent}
             backgroundColor={colors.accentSoft}
             size={38}

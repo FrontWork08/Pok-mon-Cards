@@ -23,6 +23,8 @@ export type GlobalPlayerResult = {
   profileIcon: string | null;
   avatarPath: string | null;
   avatarUpdatedAt: string | null;
+  frameId: string | null;
+  backgroundId: string | null;
 };
 
 export type GlobalGuildResult = {
@@ -105,6 +107,8 @@ export async function globalSearch(query: string) {
     profileIcon: row.profile_icon ? String(row.profile_icon) : null,
     avatarPath: row.avatar_path ? String(row.avatar_path) : null,
     avatarUpdatedAt: row.avatar_updated_at ? String(row.avatar_updated_at) : null,
+    frameId: row.equipped_frame_id ? String(row.equipped_frame_id) : null,
+    backgroundId: row.equipped_background_id ? String(row.equipped_background_id) : null,
   }));
 
   const lower = term.toLocaleLowerCase('pt-BR');

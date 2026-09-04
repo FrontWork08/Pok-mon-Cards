@@ -125,6 +125,8 @@ export function GuildChatPanel({
                   <TrainerAvatar
                     icon={avatars[message.playerId]?.profileIcon}
                     avatarUrl={getProfileAvatarUrl(avatars[message.playerId]?.avatarPath, avatars[message.playerId]?.avatarUpdatedAt)}
+                    frameId={avatars[message.playerId]?.frameId}
+                    backgroundId={avatars[message.playerId]?.backgroundId}
                     color={guildColor}
                     backgroundColor={guildColor + '24'}
                     size={31}
