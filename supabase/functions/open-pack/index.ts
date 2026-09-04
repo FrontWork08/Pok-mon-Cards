@@ -107,22 +107,37 @@ Deno.serve(async (req: Request) => {
   if (body.kind === "auto_open") {
     const packId = typeof body.packId === "string" ? body.packId : "";
     const quantity = Number(body.quantity);
+    const stopAfterValueUsd = body.stopAfterValueUsd == null || body.stopAfterValueUsd === ""
+      ? null
+      : Number(body.stopAfterValueUsd);
+    const stopAfterTier = body.stopAfterTier == null || body.stopAfterTier === ""
+      ? null
+      : Number(body.stopAfterTier);
+
     if (!packId) return json({ error: "packId is required" }, 400);
-    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 50) {
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100) {
       return json({ error: "INVALID_AUTO_OPEN_QUANTITY" }, 400);
     }
+    if (stopAfterValueUsd != null && (!Number.isFinite(stopAfterValueUsd) || stopAfterValueUsd < 0)) {
+      return json({ error: "INVALID_STOP_VALUE" }, 400);
+    }
+    if (stopAfterTier != null && (!Number.isSafeInteger(stopAfterTier) || stopAfterTier < 3 || stopAfterTier > 10)) {
+      return json({ error: "INVALID_STOP_TIER" }, 400);
+    }
 
-    const { data, error } = await admin.rpc("server_idempotent_auto_open_packs", {
+    const { data, error } = await admin.rpc("server_idempotent_auto_open_packs_v2", {
       p_player_id: user.id,
       p_pack_id: packId,
       p_quantity: quantity,
       p_operation_id: operationId,
+      p_stop_min_value: stopAfterValueUsd,
+      p_stop_min_tier: stopAfterTier,
     });
     if (error) {
       const message = error.message ?? "Could not auto-open packs";
       const status =
-        message.includes("AUTO_OPEN_GAMEPASS_REQUIRED") ? 403 :
-        message.includes("INVALID_AUTO_OPEN_QUANTITY") ? 400 :
+        message.includes("AUTO_OPEN_GAMEPASS_REQUIRED") || message.includes("AUTO_OPEN_PLUS_REQUIRED") ? 403 :
+        message.includes("INVALID_AUTO_OPEN_QUANTITY") || message.includes("INVALID_STOP_VALUE") || message.includes("INVALID_STOP_TIER") ? 400 :
         message.includes("NOT_ENOUGH_COINS") || message.includes("NOT_ENOUGH_DIAMONDS") ? 409 :
         message.includes("PACK_NOT_FOUND") ? 404 : 500;
       return json({ error: message }, status);
