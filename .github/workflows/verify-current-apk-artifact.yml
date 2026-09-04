@@ -61,28 +61,17 @@ jobs:
           const releasePath = 'public/download/release.json';
           const trustedPath = 'public/download/trusted-signing-cert.json';
           const release = JSON.parse(fs.readFileSync(releasePath, 'utf8'));
-          const certMatch = output.match(/Signer #1 certificate SHA-256 digest:\s*([0-9a-f:]+)/i);
+          const certMatch = output.match(/(?:Signer #1|V\d(?:\.\d+)? Signer):?\s*certificate SHA-256 digest:\s*([0-9a-f:]+)/i);
           if (!certMatch) throw new Error('Could not read signing certificate SHA-256 from apksigner');
           const certSha256 = certMatch[1].replace(/:/g, '').toLowerCase();
           if (!/^[0-9a-f]{64}$/.test(certSha256)) throw new Error('Invalid signing certificate SHA-256');
-          const subjectMatch = output.match(/Signer #1 certificate DN:\s*(.+)/i);
+          const subjectMatch = output.match(/(?:Signer #1|V\d(?:\.\d+)? Signer):?\s*certificate DN:\s*(.+)/i);
           const certSubject = subjectMatch ? subjectMatch[1].trim() : null;
           const scheme = (n) => new RegExp(`Verified using v${n} scheme[^:]*:\\s*(true|false)`, 'i').exec(output)?.[1]?.toLowerCase() === 'true';
 
-          if (fs.existsSync(trustedPath)) {
-            const trusted = JSON.parse(fs.readFileSync(trustedPath, 'utf8'));
-            const trustedSha = String(trusted.certificateSha256 || '').replace(/:/g, '').toLowerCase();
-            if (trustedSha !== certSha256) throw new Error('Signing certificate does not match pinned official certificate');
-          } else {
-            fs.writeFileSync(trustedPath, JSON.stringify({
-              appName: 'Trainer Collection',
-              packageName: 'com.frontwork.pokemoncards',
-              certificateSha256: certSha256,
-              certificateSubject: certSubject,
-              pinnedAt: new Date().toISOString(),
-              source: 'Official v1.0.1 build artifact verified with Android apksigner'
-            }, null, 2) + '\n');
-          }
+          const trusted = JSON.parse(fs.readFileSync(trustedPath, 'utf8'));
+          const trustedSha = String(trusted.certificateSha256 || '').replace(/:/g, '').toLowerCase();
+          if (trustedSha !== certSha256) throw new Error('Signing certificate does not match pinned official certificate');
 
           release.packageName = 'com.frontwork.pokemoncards';
           release.verification = {
@@ -98,12 +87,28 @@ jobs:
           fs.writeFileSync(releasePath, JSON.stringify(release, null, 2) + '\n');
           NODE
 
+      - name: Fix permanent APK signer parser
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/android-apk.mjs')
+          s = p.read_text()
+          old_cert = "output.match(/Signer #1 certificate SHA-256 digest:\\s*([0-9a-f:]+)/i)"
+          new_cert = "output.match(/(?:Signer #1|V\\d(?:\\.\\d+)? Signer):?\\s*certificate SHA-256 digest:\\s*([0-9a-f:]+)/i)"
+          old_dn = "output.match(/Signer #1 certificate DN:\\s*(.+)/i)"
+          new_dn = "output.match(/(?:Signer #1|V\\d(?:\\.\\d+)? Signer):?\\s*certificate DN:\\s*(.+)/i)"
+          if old_cert not in s or old_dn not in s:
+              raise SystemExit('Expected signer parser anchors not found')
+          p.write_text(s.replace(old_cert, new_cert, 1).replace(old_dn, new_dn, 1))
+          PY
+
       - name: Remove temporary workflow and commit security evidence
         shell: bash
         run: |
           rm .github/workflows/verify-current-apk-artifact.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/download/release.json public/download/trusted-signing-cert.json .github/workflows/verify-current-apk-artifact.yml
-          git commit -m "security: pin verified Android signing certificate"
+          git add public/download/release.json public/download/trusted-signing-cert.json scripts/android-apk.mjs .github/workflows/verify-current-apk-artifact.yml
+          git commit -m "security: verify APK signature and harden signer parser"
           git push
