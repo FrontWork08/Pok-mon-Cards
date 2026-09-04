@@ -1,10 +1,15 @@
 import { supabase } from '@/lib/supabase';
+import { getPlayerAvatarMap, type PlayerAvatarMeta } from '@/services/player';
 
 export type GlobalChatMessage = {
   id: string;
   playerId: string;
   username: string;
   profileIcon: string;
+  avatarPath: string | null;
+  avatarUpdatedAt: string | null;
+  frameId: string | null;
+  backgroundId: string | null;
   titleId: string | null;
   title: string | null;
   titleIcon: string | null;
@@ -12,18 +17,28 @@ export type GlobalChatMessage = {
   createdAt: string;
 };
 
-function mapRow(row: any): GlobalChatMessage {
+function mapRow(row: any, identity?: PlayerAvatarMeta | null): GlobalChatMessage {
   return {
     id: String(row.id),
-    playerId: String(row.player_id),
-    username: String(row.sender_username ?? 'Trainer'),
-    profileIcon: String(row.sender_profile_icon ?? 'pokeball'),
-    titleId: row.sender_title_id == null ? null : String(row.sender_title_id),
-    title: row.sender_title == null ? null : String(row.sender_title),
-    titleIcon: row.sender_title_icon == null ? null : String(row.sender_title_icon),
+    playerId: String(row.player_id ?? row.playerId),
+    username: String(row.sender_username ?? row.username ?? 'Trainer'),
+    profileIcon: String(identity?.profileIcon ?? row.sender_profile_icon ?? row.profileIcon ?? 'pokeball'),
+    avatarPath: identity?.avatarPath ?? null,
+    avatarUpdatedAt: identity?.avatarUpdatedAt ?? null,
+    frameId: identity?.frameId ?? null,
+    backgroundId: identity?.backgroundId ?? null,
+    titleId: row.sender_title_id == null && row.titleId == null ? null : String(row.sender_title_id ?? row.titleId),
+    title: row.sender_title == null && row.title == null ? null : String(row.sender_title ?? row.title),
+    titleIcon: row.sender_title_icon == null && row.titleIcon == null ? null : String(row.sender_title_icon ?? row.titleIcon),
     body: String(row.body ?? ''),
-    createdAt: String(row.created_at),
+    createdAt: String(row.created_at ?? row.createdAt),
   };
+}
+
+async function hydrateRows(rows: any[]): Promise<GlobalChatMessage[]> {
+  if (!rows.length) return [];
+  const identityMap = await getPlayerAvatarMap(rows.map((row) => String(row.player_id ?? row.playerId ?? ''))).catch(() => ({}));
+  return rows.map((row) => mapRow(row, identityMap[String(row.player_id ?? row.playerId ?? '')]));
 }
 
 export async function getGlobalChatMessages(limit = 8): Promise<GlobalChatMessage[]> {
@@ -35,7 +50,8 @@ export async function getGlobalChatMessages(limit = 8): Promise<GlobalChatMessag
     .order('created_at', { ascending: false })
     .limit(safeLimit);
   if (error) throw error;
-  return (data ?? []).map(mapRow).reverse();
+  const hydrated = await hydrateRows(data ?? []);
+  return hydrated.reverse();
 }
 
 export async function sendGlobalChatMessage(body: string): Promise<GlobalChatMessage> {
@@ -50,18 +66,8 @@ export async function sendGlobalChatMessage(body: string): Promise<GlobalChatMes
     }
     throw error;
   }
-  const row = data as any;
-  return {
-    id: String(row.id),
-    playerId: String(row.playerId),
-    username: String(row.username ?? 'Trainer'),
-    profileIcon: String(row.profileIcon ?? 'pokeball'),
-    titleId: row.titleId == null ? null : String(row.titleId),
-    title: row.title == null ? null : String(row.title),
-    titleIcon: row.titleIcon == null ? null : String(row.titleIcon),
-    body: String(row.body ?? ''),
-    createdAt: String(row.createdAt),
-  };
+  const [message] = await hydrateRows([data as any]);
+  return message;
 }
 
 export function subscribeGlobalChat(onMessage: (message: GlobalChatMessage) => void) {
@@ -73,7 +79,9 @@ export function subscribeGlobalChat(onMessage: (message: GlobalChatMessage) => v
       (payload) => {
         const row = payload.new as any;
         if (row?.deleted_at) return;
-        onMessage(mapRow(row));
+        void hydrateRows([row]).then(([message]) => {
+          if (message) onMessage(message);
+        }).catch(() => onMessage(mapRow(row)));
       },
     )
     .subscribe();
