@@ -16,6 +16,7 @@ on:
       - scripts/project-audit.mjs
       - scripts/regression-audit.mjs
       - scripts/apk-security-audit.mjs
+      - scripts/trainer-identity-audit.mjs
       - .github/workflows/eas-update.yml
 
 permissions:
