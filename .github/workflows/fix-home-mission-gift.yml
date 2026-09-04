@@ -1,0 +1,46 @@
+name: Fix home mission gift route
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-home-mission-gift.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix mission reward shortcut
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/(tabs)/index.tsx')
+          text = path.read_text()
+          old = "<Pressable onPress={()=>router.push(progressSnapshot.mission?.route as never || '/missions')} style={[styles.todayCard,{backgroundColor:colors.surfaceAlt,borderColor:progressSnapshot.claimableMissions?colors.yellow:colors.border}]}>"
+          new = "<Pressable onPress={()=>router.push((progressSnapshot.claimableMissions > 0 ? '/missions' : (progressSnapshot.mission?.route || '/missions')) as never)} style={[styles.todayCard,{backgroundColor:colors.surfaceAlt,borderColor:progressSnapshot.claimableMissions?colors.yellow:colors.border}]}>"
+          if old not in text:
+              raise SystemExit('Expected home mission shortcut not found')
+          path.write_text(text.replace(old, new, 1))
+
+          audit = Path('scripts/regression-audit.mjs')
+          audit_text = audit.read_text()
+          marker = "if (existsSync('app/battle/[id].tsx')) {"
+          guard = "if (existsSync('app/(tabs)/index.tsx')) {\n  const home = read('app/(tabs)/index.tsx');\n  assert(home.includes(\"progressSnapshot.claimableMissions > 0 ? '/missions'\"), 'Regressão de UX: presente de missão pronta voltou a abrir a atividade em vez da Central de Missões.');\n}\n\n"
+          if guard not in audit_text:
+              if marker not in audit_text:
+                  raise SystemExit('Regression audit insertion point not found')
+              audit.write_text(audit_text.replace(marker, guard + marker, 1))
+          PY
+      - name: Remove temporary workflow
+        run: rm .github/workflows/fix-home-mission-gift.yml
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/'(tabs)'/index.tsx scripts/regression-audit.mjs .github/workflows/fix-home-mission-gift.yml
+          git commit -m "Fix mission reward shortcut on home"
+          git push
