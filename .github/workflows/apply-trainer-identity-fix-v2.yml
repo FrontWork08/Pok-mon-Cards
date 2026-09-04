@@ -1,0 +1,34 @@
+name: Apply trainer identity fix v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-trainer-identity-fix-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply trainer identity patch
+        run: python scripts/apply-trainer-identity-fix.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify TypeScript and regressions
+        run: npm run verify
+      - name: Commit tested fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app src package.json
+          git commit -m "fix: show trainer photos and equipped themes everywhere"
+          git push
