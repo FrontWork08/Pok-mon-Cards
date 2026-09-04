@@ -1,0 +1,46 @@
+name: Apply trainer identity fix v3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-trainer-identity-fix-v3.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply trainer identity patch
+        run: python scripts/apply-trainer-identity-fix.py
+      - name: Type identity-map fallbacks explicitly
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/services/notifications.ts')
+          s=p.read_text()
+          old="  const identityMap = await getPlayerAvatarMap(rows.map((item: any) => String(item.friend_id ?? ''))).catch(() => ({}));"
+          new="  const identityMap: Record<string, any> = await getPlayerAvatarMap(rows.map((item: any) => String(item.friend_id ?? ''))).catch(() => ({} as Record<string, any>));"
+          if old not in s: raise SystemExit('notifications identity fallback anchor missing')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify TypeScript and every regression audit
+        run: npm run verify
+      - name: Commit tested identity fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app src package.json
+          git commit -m "fix: show trainer photos and equipped themes everywhere"
+          git push
