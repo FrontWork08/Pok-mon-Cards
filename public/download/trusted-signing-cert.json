@@ -1,0 +1,9 @@
+{
+  "appName": "Trainer Collection",
+  "packageName": "com.frontwork.pokemoncards",
+  "certificateSha256": "7b4e0052f1bdf07e0c33abc4176de96f9cf7a64a8f325ae7c5dcbb2083cc2843",
+  "certificateSubject": "CN=, OU=, O=, L=, ST=, C=",
+  "pinnedAt": "2026-09-04T18:49:31.693Z",
+  "source": "Official v1.0.1 build artifact verified with Android apksigner",
+  "verificationScheme": "APK Signature Scheme v2"
+}
