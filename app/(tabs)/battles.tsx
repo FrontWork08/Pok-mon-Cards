@@ -226,11 +226,11 @@ export default function BattlesHubScreen() {
     }
   }
 
-  async function rematch(id: string) {
+  async function rematch(id: string, battleMode?: BattleMode) {
     try {
       setWorking(id);
       const next = await rematchBattle(id);
-      router.push(`/battle/${next}`);
+      router.push(battleRoute(next, battleMode));
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Não foi possível criar a revanche.');
     } finally {
@@ -305,7 +305,7 @@ export default function BattlesHubScreen() {
       </View>
       {queueState?.status === 'waiting' ? (
         <View style={styles.queueFooter}>
-          <View style={styles.grow}><Text style={[styles.queueLabel,{color:colors.yellow}]}>BUSCANDO PARTIDA...</Text><Text style={[styles.sub,{color:colors.muted}]}>Modo: {queueState.mode_choice === 'draft3' ? 'Draft 3' : queueState.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'} • jogador real primeiro • IA após 18s</Text></View>
+          <View style={styles.grow}><Text style={[styles.queueLabel,{color:colors.yellow}]}>BUSCANDO PARTIDA...</Text><Text style={[styles.sub,{color:colors.muted}]}>Modo: {queueState.mode_choice === 'team3' ? 'Equipe 3×3' : queueState.mode_choice === 'draft3' ? 'Draft 3' : queueState.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'} • jogador real primeiro • IA após 18s</Text></View>
           <Pressable disabled={working==='matchmaking'} onPress={()=>void stopRankedSearch()} style={[styles.cancelQueue,{borderColor:'#683243'}]}><Ionicons name="close" size={16} color="#FF8290"/><Text style={styles.cancelQueueText}>CANCELAR</Text></Pressable>
         </View>
       ) : (
@@ -453,7 +453,7 @@ export default function BattlesHubScreen() {
       return (
         <CompactTrainerBanner key={item.id} frameId={other?.equipped_frame_id} backgroundId={other?.equipped_background_id} fallbackColor={colors.accent}>
           <View style={[styles.battleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Pressable style={styles.battleBody} onPress={() => router.push(`/battle/${item.id}`)}>
+            <Pressable style={styles.battleBody} onPress={() => router.push(battleRoute(item.id, item.mode))}>
               <View style={[styles.resultIcon, { backgroundColor: won ? '#163426' : item.status === 'completed' ? '#391D26' : colors.surfaceAlt }]}><Ionicons name={won ? 'trophy' : item.status === 'completed' ? 'close-circle' : 'hourglass'} size={21} color={won ? '#63D99A' : item.status === 'completed' ? '#FF8290' : colors.muted}/></View>
               <TrainerAvatar icon={other?.profile_icon} avatarUrl={getProfileAvatarUrl(other?.avatar_path,other?.avatar_updated_at)} color={colors.accent} backgroundColor={colors.accentSoft} size={38}/>
               <View style={styles.grow}>
@@ -465,14 +465,14 @@ export default function BattlesHubScreen() {
                     label={item.status === 'completed' ? (won ? 'VITÓRIA' : 'DERROTA') : item.status === 'invited' ? 'CONVITE' : item.status === 'drafting' ? 'DRAFT' : item.status === 'selecting' ? 'ESCOLHENDO' : item.status === 'revealing' ? 'SEU TURNO' : String(item.status).toUpperCase()}
                   />
                 </View>
-                <Text style={[styles.sub, { color: colors.muted }]}>{item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.is_bot_match ? 'Treinador IA' : item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : item.stake_type === 'card' ? '🎴 valendo carta' : 'Casual'} • {item.challenger_score}–{item.opponent_score}</Text>
+                <Text style={[styles.sub, { color: colors.muted }]}>{item.mode === 'team3' ? 'Equipe 3×3' : item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.is_bot_match ? 'Treinador IA' : item.stake_type === 'coins' ? `🪙 ${item.wager_coins}` : item.stake_type === 'card' ? '🎴 valendo carta' : 'Casual'} • {item.challenger_score}–{item.opponent_score}</Text>
                 <Text style={[styles.sub, { color: item.reward_eligible === false ? '#E6A15A' : colors.muted }]}>{item.completed_at ? new Date(item.completed_at).toLocaleString('pt-BR') : new Date(item.created_at).toLocaleString('pt-BR')}{item.status === 'completed' ? ` • ELO ${delta >= 0 ? '+' : ''}${delta}` : ''}{item.reward_eligible === false ? ' • sem XP/ELO anti-farm' : ''}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.muted}/>
             </Pressable>
             {item.status === 'completed' ? <View style={styles.historyActions}>
               <Pressable style={[styles.rematch, { borderColor: colors.yellow }]} onPress={() => router.push(('/battle-replay/'+item.id) as never)}><Ionicons name="play-back" size={15} color={colors.yellow}/><Text style={[styles.rematchText, { color: colors.yellow }]}>REPLAY</Text></Pressable>
-              {!item.is_bot_match ? <Pressable style={[styles.rematch, { borderColor: colors.accent }]} onPress={() => rematch(item.id)} disabled={working === item.id}><Ionicons name="refresh" size={15} color={colors.accent}/><Text style={[styles.rematchText, { color: colors.accent }]}>{working === item.id ? 'CRIANDO...' : 'REVANCHE'}</Text></Pressable> : null}
+              {!item.is_bot_match ? <Pressable style={[styles.rematch, { borderColor: colors.accent }]} onPress={() => rematch(item.id, item.mode)} disabled={working === item.id}><Ionicons name="refresh" size={15} color={colors.accent}/><Text style={[styles.rematchText, { color: colors.accent }]}>{working === item.id ? 'CRIANDO...' : 'REVANCHE'}</Text></Pressable> : null}
             </View> : null}
           </View>
         </CompactTrainerBanner>
