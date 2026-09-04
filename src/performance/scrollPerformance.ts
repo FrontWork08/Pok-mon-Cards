@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
  * Shared list defaults for every long selector/list in Trainer Collection.
  * This is the project-wide standard: new and existing long options use
  * virtualization so drag/scroll performance does not regress on Android.
+ * Revalidated as part of the full-game release audit on 2026-09-04.
  */
 export const VIRTUAL_LIST_PERF_PROPS = {
   initialNumToRender: 8,
