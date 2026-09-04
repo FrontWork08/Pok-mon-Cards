@@ -16,17 +16,44 @@ async function invoke(body: Record<string, unknown>) {
   return data?.data;
 }
 
+async function invokeTeam(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke('team-battle-action', { body });
+  if (error) throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da batalha 3×3.');
+  if (data?.error) {
+    const value = data.error;
+    const message = typeof value === 'string' ? value : typeof value?.message === 'string' ? value.message : 'Não foi possível concluir a ação da batalha 3×3.';
+    throw new Error(message);
+  }
+  return data?.data;
+}
+
+async function getBattleMode(battleId: string): Promise<BattleMode | null> {
+  const { data, error } = await supabase.from('battles').select('mode').eq('id', battleId).maybeSingle();
+  if (error) throw error;
+  return (data?.mode as BattleMode | undefined) ?? null;
+}
+
 export async function createBattle(opponentId: string, mode: BattleMode = 'quick', stakeType: BattleStakeType = 'none', wagerCoins = 0, stakeCardId?: string | null, rematchOf?: string | null) {
+  if (mode === 'team3') {
+    if (stakeType !== 'none') throw new Error('A Equipe 3×3 ranqueada não aceita aposta de Coins ou cartas.');
+    const data = await invokeTeam({ action: 'create', opponentId, rematchOf: rematchOf ?? null });
+    return data.battleId as string;
+  }
   const data = await invoke({ action: 'create', opponentId, mode, stakeType, wagerCoins, stakeCardId: stakeCardId ?? null, rematchOf: rematchOf ?? null });
   return data.battleId as string;
 }
 
 export async function respondToBattle(battleId: string, accept: boolean, stakeCardId?: string | null) {
+  const mode = await getBattleMode(battleId);
+  if (mode === 'team3') return invokeTeam({ action: 'respond', battleId, accept });
   return invoke({ action: 'respond', battleId, accept, stakeCardId: stakeCardId ?? null });
 }
 
 export async function rematchBattle(battleId: string) {
-  const data = await invoke({ action: 'rematch', battleId });
+  const mode = await getBattleMode(battleId);
+  const data = mode === 'team3'
+    ? await invokeTeam({ action: 'rematch', battleId })
+    : await invoke({ action: 'rematch', battleId });
   return data.battleId as string;
 }
 
@@ -51,10 +78,12 @@ export async function resolveBattleTimeout(battleId: string) {
 }
 
 export async function cancelBattle(battleId: string) {
+  if (await getBattleMode(battleId) === 'team3') return invokeTeam({ action: 'cancel', battleId });
   return invoke({ action: 'cancel', battleId });
 }
 
 export async function forfeitBattle(battleId: string) {
+  if (await getBattleMode(battleId) === 'team3') return invokeTeam({ action: 'forfeit', battleId });
   return invoke({ action: 'forfeit', battleId });
 }
 
