@@ -177,10 +177,11 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      const [accessState, status, economyState, grants, events, guildState, codes, runtime, announcements, testerState, releaseState] = await Promise.all([
-        getMyAdminAccess(),
+      const accessState = await getMyAdminAccess();
+      const canUseEconomyControl = accessState.isOwner || accessState.permissions.includes('economy_control');
+      const [status, economyState, grants, events, guildState, codes, runtime, announcements, testerState, releaseState] = await Promise.all([
         getAdminOverview(),
-        refreshAdminEconomyAdvisor(),
+        canUseEconomyControl ? refreshAdminEconomyAdvisor() : Promise.resolve(null),
         getCurrencyAdjustmentHistory(),
         getAdminEvents(),
         getGuildHub(),
@@ -194,7 +195,7 @@ export default function AdminScreen() {
       setAdminAccessState(accessState);
       setOverview(status);
       setEconomyAdvisor(economyState);
-      setEconomyHealth(economyState.health);
+      setEconomyHealth(economyState?.health ?? null);
       setHistory(grants);
       setActiveEvent(events.find((event) => event.event_type === 'free_boosters') ?? null);
       setGameEvents(events.filter((event) => event.event_type !== 'free_boosters'));
@@ -358,6 +359,10 @@ export default function AdminScreen() {
 
   async function refreshEconomyAdvisor() {
     if (economyAdvisorLoading) return;
+    if (!hasAdminPermission('economy_control')) {
+      setError('Sua conta de admin não possui permissão para o Controle da Economia.');
+      return;
+    }
     try {
       setEconomyAdvisorLoading(true);
       setError(null);

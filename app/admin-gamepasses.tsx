@@ -32,7 +32,7 @@ export default function AdminGamepassesScreen() {
       setLoading(true);
       setError(null);
       const access = await getMyAdminAccess();
-      if (!access.isOwner) throw new Error('Somente o dono do jogo pode ativar Gamepasses pagas.');
+      if (!access.isOwner && !access.permissions.includes('gamepasses_manage')) throw new Error('Sua conta de admin não possui permissão para gerenciar Gamepasses.');
       const [playerRows, grantRows, passState] = await Promise.all([
         getAdminPlayers(), listGamepasses(), getMyGamepasses(),
       ]);
@@ -87,12 +87,12 @@ export default function AdminGamepassesScreen() {
   }
 
   return (
-    <Screen title="Gamepasses Manuais" subtitle="Central do dono para registrar compras reais e ativar ou revogar qualquer Gamepass.">
+    <Screen title="Gamepasses Manuais" subtitle="Central autorizada para registrar compras reais e ativar ou revogar Gamepasses.">
       <Pressable style={styles.back} onPress={()=>goBackOrHome(router)}><Ionicons name="arrow-back" size={18} color={colors.muted}/><Text style={[styles.backText,{color:colors.muted}]}>Voltar</Text></Pressable>
 
       <View style={[styles.hero,{backgroundColor:colors.surface,borderColor:colors.yellow}]}>
         <View style={[styles.heroIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="key" size={28} color={colors.yellow}/></View>
-        <View style={{flex:1}}><Text style={[styles.kicker,{color:colors.yellow}]}>VENDAS / GAMEPASSES</Text><Text style={[styles.title,{color:colors.text}]}>Ativação manual pelo dono</Text><Text style={[styles.helper,{color:colors.muted}]}>Coins e Diamantes nunca compram estas Gamepasses. Selecione o treinador e o passe depois de confirmar o pagamento fora do aplicativo.</Text></View>
+        <View style={{flex:1}}><Text style={[styles.kicker,{color:colors.yellow}]}>VENDAS / GAMEPASSES</Text><Text style={[styles.title,{color:colors.text}]}>Ativação manual autorizada</Text><Text style={[styles.helper,{color:colors.muted}]}>Coins e Diamantes nunca compram estas Gamepasses. Selecione o treinador e o passe depois de confirmar o pagamento fora do aplicativo.</Text></View>
       </View>
 
       {notice?<Pressable onPress={()=>setNotice(null)} style={[styles.notice,{backgroundColor:'#15392A',borderColor:'#59D49A'}]}><Ionicons name="checkmark-circle" size={18} color="#59D49A"/><Text style={styles.noticeText}>{notice}</Text></Pressable>:null}

@@ -302,7 +302,13 @@ export type AdminPermission =
   | 'announcements_manage'
   | 'events_manage'
   | 'maintenance_manage'
-  | 'guilds_manage';
+  | 'guilds_manage'
+  | 'gamepasses_manage'
+  | 'battle_lab_manage'
+  | 'economy_control'
+  | 'feature_flags_manage'
+  | 'feedback_manage'
+  | 'system_health_view';
 
 export const ADMIN_PERMISSION_OPTIONS: Array<{
   id: AdminPermission;
@@ -319,6 +325,12 @@ export const ADMIN_PERMISSION_OPTIONS: Array<{
   { id: 'events_manage', label: 'Eventos', description: 'Gerenciar Admin Abuse e eventos ao vivo.' },
   { id: 'maintenance_manage', label: 'Manutenção', description: 'Pausar e liberar o aplicativo.' },
   { id: 'guilds_manage', label: 'Guildas', description: 'Alterar liderança administrativa das guildas.' },
+  { id: 'gamepasses_manage', label: 'Gamepasses', description: 'Ativar e revogar Gamepasses manuais depois de confirmar a venda.' },
+  { id: 'battle_lab_manage', label: 'Battle Lab', description: 'Usar catálogo e simulações administrativas de batalha.' },
+  { id: 'economy_control', label: 'Controle da economia', description: 'Abrir diagnósticos, histórico e ferramentas avançadas da economia.' },
+  { id: 'feature_flags_manage', label: 'Feature Flags', description: 'Ativar, pausar e ajustar recursos experimentais.' },
+  { id: 'feedback_manage', label: 'Feedback', description: 'Ler, organizar e responder feedback dos jogadores.' },
+  { id: 'system_health_view', label: 'Saúde do sistema', description: 'Ver diagnóstico do app e erros recentes.' },
 ];
 
 export type AdminAccess = {

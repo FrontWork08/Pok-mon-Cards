@@ -43,6 +43,12 @@ const ALLOWED_DELEGATED_PERMISSIONS = new Set([
   "events_manage",
   "maintenance_manage",
   "guilds_manage",
+  "gamepasses_manage",
+  "battle_lab_manage",
+  "economy_control",
+  "feature_flags_manage",
+  "feedback_manage",
+  "system_health_view",
 ]);
 
 Deno.serve(async (req: Request) => {
@@ -413,6 +419,40 @@ Deno.serve(async (req: Request) => {
         admin.from("release_campaign_legacy_submissions").select("*", { count: "exact", head: true }).eq("campaign_id", current.id),
       ]);
       return json({ data: { ...campaign, selections: selections ?? 0, submissions: submissions ?? 0 } });
+    }
+
+    if (body.action === "owner_search_cards") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const search = typeof body.search === "string" ? body.search : "";
+      const offset = Math.max(0, Number(body.offset ?? 0) || 0);
+      const limit = Math.max(1, Math.min(120, Number(body.limit ?? 80) || 80));
+      const { data, error } = await admin.rpc("server_owner_search_cards", {
+        p_actor_id: user.id,
+        p_search: search,
+        p_offset: offset,
+        p_limit: limit,
+      });
+      if (error) throw error;
+      return json({ data });
+    }
+
+    if (body.action === "owner_grant_card") {
+      if (!isOwner) return json({ error: "OWNER_ONLY" }, 403);
+      const targetId = typeof body.targetId === "string" ? body.targetId : "";
+      const cardId = typeof body.cardId === "string" ? body.cardId : "";
+      const quantity = Number(body.quantity ?? 1);
+      const note = typeof body.note === "string" ? body.note : null;
+      if (!targetId || !cardId) return json({ error: "INVALID_TARGET_OR_CARD" }, 400);
+      if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100) return json({ error: "INVALID_CARD_QUANTITY" }, 400);
+      const { data, error } = await admin.rpc("server_owner_grant_card", {
+        p_actor_id: user.id,
+        p_target_id: targetId,
+        p_card_id: cardId,
+        p_quantity: quantity,
+        p_note: note,
+      });
+      if (error) throw error;
+      return json({ data });
     }
 
     if (body.action === "account_audit") {

@@ -387,6 +387,17 @@ export default function AdminAuditScreen() {
           </View>
         </View>
 
+        {access?.isOwner ? (
+          <Pressable onPress={() => router.push('/admin-card-grant')} style={[styles.accessCard, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
+            <View style={[styles.accessIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="add-circle" size={24} color={colors.yellow} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>ADICIONAR QUALQUER CARTA</Text>
+              <Text style={[styles.small, { color: colors.muted }]}>Exclusivo do Criador • não aparece entre as permissões delegáveis. Escolha qualquer carta e envie para sua conta ou para outro jogador.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.yellow} />
+          </Pressable>
+        ) : null}
+
         <Collapsible title="Auditar conta de jogador" defaultExpanded>
           <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>BUSCAR USUÁRIO OU ID</Text>
