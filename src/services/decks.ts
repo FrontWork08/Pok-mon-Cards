@@ -3,7 +3,11 @@ import { supabase } from '@/lib/supabase';
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('deck-action', { body });
   if (error) throw error;
-  if (data?.error) throw new Error(data.error);
+  if (data?.error) {
+    const raw = String(data.error);
+    if (raw.includes('DECK_PRO_GAMEPASS_REQUIRED')) throw new Error('A Gamepass Deck Pro é necessária para copiar decks.');
+    throw new Error(raw);
+  }
   return data?.data;
 }
 
@@ -22,6 +26,11 @@ export async function createDeck(name: string) {
   return data.deckId as string;
 }
 
+export async function copyDeck(deckId: string, name?: string) {
+  const data = await invoke({ action: 'copy', deckId, name: name?.trim() || null });
+  return data.deckId as string;
+}
+
 export async function setDeckCards(deckId: string, cards: Array<{ card_id: string; quantity: number }>) {
   return invoke({ action: 'set_cards', deckId, cards });
 }
@@ -37,7 +46,6 @@ export async function renameDeck(deckId: string, name: string) {
 export async function deleteDeck(deckId: string) {
   return invoke({ action: 'delete', deckId });
 }
-
 
 export type DeckBuilderCardEntry = {
   quantity: number;
