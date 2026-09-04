@@ -127,7 +127,7 @@ async function verifyApkSignature(apkPath) {
     throw new Error(`A assinatura Android do APK falhou na verificação.\n${output}`);
   }
 
-  const certMatch = output.match(/Signer #1 certificate SHA-256 digest:\s*([0-9a-f:]+)/i);
+  const certMatch = output.match(/(?:Signer #1|V\d(?:\.\d+)? Signer):?\s*certificate SHA-256 digest:\s*([0-9a-f:]+)/i);
   const certificateSha256 = normalizeHex(certMatch?.[1]);
   if (!/^[a-f0-9]{64}$/.test(certificateSha256)) {
     throw new Error('Não foi possível extrair o SHA-256 do certificado de assinatura do APK.');
@@ -140,7 +140,7 @@ async function verifyApkSignature(apkPath) {
     );
   }
 
-  const subjectMatch = output.match(/Signer #1 certificate DN:\s*(.+)/i);
+  const subjectMatch = output.match(/(?:Signer #1|V\d(?:\.\d+)? Signer):?\s*certificate DN:\s*(.+)/i);
   const certificateSubject = subjectMatch?.[1]?.trim() || trusted.certificateSubject || null;
 
   return {

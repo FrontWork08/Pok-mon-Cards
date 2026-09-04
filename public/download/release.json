@@ -15,7 +15,7 @@
     "certificateSha256": "7b4e0052f1bdf07e0c33abc4176de96f9cf7a64a8f325ae7c5dcbb2083cc2843",
     "certificateSubject": "CN=, OU=, O=, L=, ST=, C=",
     "signerMatchesTrustedCertificate": true,
-    "verifiedAt": "2026-09-04T18:49:31.693Z",
+    "verifiedAt": "2026-09-04T18:51:06.606Z",
     "verifier": "Android apksigner",
     "schemes": {
       "v1": false,
