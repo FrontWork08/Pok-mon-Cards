@@ -2,7 +2,8 @@ import { Platform } from 'react-native';
 
 /**
  * Shared list defaults for every long selector/list in Trainer Collection.
- * Keep these centralized so new screens do not reintroduce janky drag/scroll behavior.
+ * This is the project-wide standard: new long options must use virtualization
+ * so drag/scroll performance does not regress on Android.
  */
 export const VIRTUAL_LIST_PERF_PROPS = {
   initialNumToRender: 8,
