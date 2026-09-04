@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 export type PixelBattleFighter = {
   name: string;
+  pokemonId?: number | null;
   pokedexNumber?: number | null;
+  /** @deprecated Battle arenas must never use card artwork as a Pokémon sprite. */
   fallbackImage?: string | null;
   hp?: number | null;
   maxHp?: number | null;
@@ -26,12 +28,32 @@ type Props = {
 };
 
 const USE_NATIVE_DRIVER = true;
+const POKEAPI_SPRITE_PREFIX = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
 
-function spriteUrl(pokedexNumber: number | null | undefined, back = false) {
-  const value = Number(pokedexNumber);
-  if (!Number.isFinite(value) || value <= 0) return null;
-  const folder = back ? 'back/' : '';
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${folder}${Math.trunc(value)}.png`;
+function validPokemonId(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
+}
+
+function spriteUrl(id: number, back = false) {
+  return `${POKEAPI_SPRITE_PREFIX}${back ? 'back/' : ''}${id}.png`;
+}
+
+function safePokemonSpriteUrl(value: string | null | undefined) {
+  const url = String(value ?? '').trim();
+  return url.startsWith(POKEAPI_SPRITE_PREFIX) ? url : null;
+}
+
+function spriteCandidates(fighter: PixelBattleFighter | null, back = false) {
+  const ids = [validPokemonId(fighter?.pokemonId), validPokemonId(fighter?.pokedexNumber)]
+    .filter((value): value is number => value != null)
+    .filter((value, index, array) => array.indexOf(value) === index);
+  const urls: string[] = [];
+  if (back) ids.forEach((id) => urls.push(spriteUrl(id, true)));
+  ids.forEach((id) => urls.push(spriteUrl(id, false)));
+  const safeFallback = safePokemonSpriteUrl(fighter?.fallbackImage);
+  if (safeFallback) urls.push(safeFallback);
+  return urls.filter((url, index, array) => array.indexOf(url) === index);
 }
 
 function hpPercent(fighter: PixelBattleFighter | null) {
@@ -51,6 +73,13 @@ function damageLabel(fighter: PixelBattleFighter | null) {
   return damage > 0 ? `${Math.round(damage)} de dano` : 'sem dano';
 }
 
+function SpriteUnavailable({ label, size }: { label: string; size: number }) {
+  return <View style={styles.spriteUnavailable}>
+    <Ionicons name="paw" size={size} color="#59636F" />
+    <Text numberOfLines={1} style={styles.spriteUnavailableText}>{label}</Text>
+  </View>;
+}
+
 export function PixelBattleArena({ my, rival, resultKey = null, winner = null, title = 'ARENA 2D', subtitle = 'Batalha por turnos • HP, golpes, PP, tipos e velocidade', turnOnly = false }: Props) {
   const{effectsReduced}=useAppTheme();
   const myIdle = useRef(new Animated.Value(0)).current;
@@ -62,16 +91,19 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
   const myOpacity = useRef(new Animated.Value(1)).current;
   const rivalOpacity = useRef(new Animated.Value(1)).current;
   const flash = useRef(new Animated.Value(0)).current;
-  const [mySpriteFailed, setMySpriteFailed] = useState(false);
-  const [rivalSpriteFailed, setRivalSpriteFailed] = useState(false);
+  const [mySpriteIndex, setMySpriteIndex] = useState(0);
+  const [rivalSpriteIndex, setRivalSpriteIndex] = useState(0);
   const [message, setMessage] = useState('Os Pokémon estão prontos.');
   const [replayNonce, setReplayNonce] = useState(0);
 
-  const mySprite = useMemo(() => spriteUrl(my?.pokedexNumber, true), [my?.pokedexNumber]);
-  const rivalSprite = useMemo(() => spriteUrl(rival?.pokedexNumber, false), [rival?.pokedexNumber]);
+  const mySprites = useMemo(() => spriteCandidates(my, true), [my?.fallbackImage, my?.pokemonId, my?.pokedexNumber]);
+  const rivalSprites = useMemo(() => spriteCandidates(rival, false), [rival?.fallbackImage, rival?.pokemonId, rival?.pokedexNumber]);
+  const mySprite = mySprites[mySpriteIndex] ?? null;
+  const rivalSprite = rivalSprites[rivalSpriteIndex] ?? null;
+  const myUsesFrontFallback = Boolean(mySprite && !mySprite.includes('/back/'));
 
-  useEffect(() => { setMySpriteFailed(false); }, [mySprite]);
-  useEffect(() => { setRivalSpriteFailed(false); }, [rivalSprite]);
+  useEffect(() => { setMySpriteIndex(0); }, [my?.name, my?.pokemonId, my?.pokedexNumber, my?.fallbackImage]);
+  useEffect(() => { setRivalSpriteIndex(0); }, [rival?.name, rival?.pokemonId, rival?.pokedexNumber, rival?.fallbackImage]);
 
   useEffect(() => {
     if(effectsReduced){myIdle.setValue(0);rivalIdle.setValue(0);return;}
@@ -216,22 +248,18 @@ export function PixelBattleArena({ my, rival, resultKey = null, winner = null, t
         <View style={[styles.platform, styles.myPlatform]} />
 
         <Animated.View style={[styles.rivalSpriteWrap, { opacity: rivalOpacity, transform: [{ translateY: rivalIdleY }, { translateX: rivalActionX }, { translateX: rivalHitX }] }]}>
-          {rivalSprite && !rivalSpriteFailed ? (
-            <Animated.Image source={{ uri: rivalSprite }} resizeMode="contain" style={styles.rivalSprite} onError={() => setRivalSpriteFailed(true)} />
-          ) : rival?.fallbackImage ? (
-            <Image source={{ uri: rival.fallbackImage }} resizeMode="contain" style={styles.fallbackSprite} />
+          {rivalSprite ? (
+            <Animated.Image source={{ uri: rivalSprite }} resizeMode="contain" style={styles.rivalSprite} onError={() => setRivalSpriteIndex((index) => index + 1)} />
           ) : (
-            <Ionicons name="help-circle" size={72} color="#59636F" />
+            <SpriteUnavailable label={rival?.name ?? 'Pokémon'} size={56} />
           )}
         </Animated.View>
 
         <Animated.View style={[styles.mySpriteWrap, { opacity: myOpacity, transform: [{ translateY: myIdleY }, { translateX: myActionX }, { translateX: myHitX }] }]}>
-          {mySprite && !mySpriteFailed ? (
-            <Animated.Image source={{ uri: mySprite }} resizeMode="contain" style={styles.mySprite} onError={() => setMySpriteFailed(true)} />
-          ) : my?.fallbackImage ? (
-            <Image source={{ uri: my.fallbackImage }} resizeMode="contain" style={styles.fallbackSprite} />
+          {mySprite ? (
+            <Animated.Image source={{ uri: mySprite }} resizeMode="contain" style={[styles.mySprite, myUsesFrontFallback ? styles.myFrontSpriteFallback : null]} onError={() => setMySpriteIndex((index) => index + 1)} />
           ) : (
-            <Ionicons name="help-circle" size={78} color="#59636F" />
+            <SpriteUnavailable label={my?.name ?? 'Pokémon'} size={62} />
           )}
         </Animated.View>
 
@@ -266,7 +294,9 @@ const styles = StyleSheet.create({
   mySpriteWrap: { position: 'absolute', left: 17, bottom: 54, width: 180, height: 155, alignItems: 'center', justifyContent: 'flex-end', zIndex: 8 },
   rivalSprite: { width: 128, height: 128 },
   mySprite: { width: 150, height: 150 },
-  fallbackSprite: { width: 104, height: 132, borderRadius: 8 },
+  myFrontSpriteFallback: { transform: [{ scaleX: -1 }] },
+  spriteUnavailable: { width: 128, minHeight: 104, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  spriteUnavailableText: { maxWidth: 116, color: '#59636F', fontSize: 7, fontWeight: '900', textAlign: 'center' },
   statusBox: { position: 'absolute', width: 168, minHeight: 65, borderRadius: 5, borderWidth: 3, borderColor: '#38423C', backgroundColor: '#F4F0D8', paddingHorizontal: 8, paddingVertical: 5, zIndex: 12 },
   rivalStatus: { left: 12, top: 18 },
   myStatus: { right: 12, bottom: 49 },
