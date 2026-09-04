@@ -16,6 +16,9 @@ export type HomeDashboard = {
     xp:number;
     battle_rating:number;
     last_daily_claim_at:string|null;
+    daily_claimed_today:boolean;
+    daily_streak:number;
+    daily_cycle_day:number;
   };
   stats: {
     totalCards:number;
@@ -41,6 +44,9 @@ export async function getHomeDashboard(): Promise<HomeDashboard> {
       xp:Number(value.profile?.xp ?? 0),
       battle_rating:Number(value.profile?.battle_rating ?? 1000),
       last_daily_claim_at:value.profile?.last_daily_claim_at ?? null,
+      daily_claimed_today:Boolean(value.profile?.daily_claimed_today),
+      daily_streak:Number(value.profile?.daily_streak ?? 0),
+      daily_cycle_day:Number(value.profile?.daily_cycle_day ?? 0),
     },
     stats: {
       totalCards:Number(value.stats?.totalCards ?? 0),
@@ -174,6 +180,7 @@ export type HomeProgressSnapshot = {
     name:string;
     entries:number;
     maxPlayers:number;
+    entryFeeCoins:number;
     prizePoolCoins:number;
   } | null;
 };
@@ -239,6 +246,7 @@ export async function getHomeProgressSnapshot():Promise<HomeProgressSnapshot>{
       name:tournament.name,
       entries:tournament.entries.length,
       maxPlayers:tournament.maxPlayers,
+      entryFeeCoins:tournament.entryFeeCoins,
       prizePoolCoins:tournament.prizePoolCoins,
     } : null,
   };

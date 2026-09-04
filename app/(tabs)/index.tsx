@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { getProfileAvatarUrl } from '@/services/player';
 import { getHomeContinueItems, getHomeDashboard, getHomeProgressSnapshot, type HomeContinueItem, type HomeProgressSnapshot } from '@/services/home';
-import { claimDailyReward } from '@/services/playerActions';
+import { claimDailyLogin } from '@/services/retention';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { getBattlePass, type BattlePassReward, type BattlePassState } from '@/services/battlePass';
 import { GlobalChatHomeCard } from '@/components/GlobalChatHomeCard';
@@ -22,7 +22,7 @@ export default function HomeScreen() {
   const load=useCallback(async()=>{try{if(!loadedOnce.current)setLoading(true);const[dashboard,pass,continueData,progressData,journeyData]=await Promise.all([getHomeDashboard(),getBattlePass().catch(()=>null),getHomeContinueItems().catch(()=>[]),getHomeProgressSnapshot().catch(()=>null),getTrainerJourneySummary().catch(()=>null)]);setProfile(dashboard.profile);setStats(dashboard.stats);setBattlePass(pass);setContinueItems(continueData);setProgressSnapshot(progressData);setJourneySummary(journeyData);loadedOnce.current=true;}finally{setLoading(false);}},[]);
   useFocusEffect(useCallback(()=>{void load();},[load]));
   const avatarUrl=getProfileAvatarUrl(profile?.avatar_path,profile?.avatar_updated_at);
-  const canClaimDaily=useMemo(()=>!profile?.last_daily_claim_at||Date.now()-new Date(profile.last_daily_claim_at).getTime()>=24*60*60*1000,[profile?.last_daily_claim_at]);
+  const canClaimDaily=useMemo(()=>!Boolean(profile?.daily_claimed_today),[profile?.daily_claimed_today]);
   const battlePassPreview=useMemo(()=>{
     if(!battlePass)return[];
     const start=Math.max(1,battlePass.progress.level);
@@ -36,7 +36,7 @@ export default function HomeScreen() {
       };
     });
   },[battlePass]);
-  async function claimDaily(){if(!canClaimDaily||claiming)return;try{setClaiming(true);const reward=await claimDailyReward();setNotice(`Recompensa recebida: +${reward.rewardCoins} moedas e +${reward.rewardXp} XP.`);await load();}catch(err){setNotice(err instanceof Error?err.message:'Não foi possível receber a recompensa.');}finally{setClaiming(false);}}
+  async function claimDaily(){if(!canClaimDaily||claiming)return;try{setClaiming(true);const reward=await claimDailyLogin();const diamondText=Number(reward.diamonds??0)>0?` + 💎 ${Number(reward.diamonds)}`:'';setNotice(reward.claimed?`Sequência diária ${reward.streak}: +🪙 ${Number(reward.coins).toLocaleString('pt-BR')}${diamondText}`:'A recompensa de hoje já foi coletada.');await load();}catch(err){setNotice(err instanceof Error?err.message:'Não foi possível receber a recompensa.');}finally{setClaiming(false);}}
   return <Screen title={`Olá, ${profile?.username??'Trainer'}`} subtitle="Seu hub de coleção, packs, batalhas, amigos e progresso.">
     {loading?<ActivityIndicator color={colors.yellow} size="large"/>:null}
     {notice?<View style={[styles.notice,{backgroundColor:isLight?'#FFF7D6':'#2B2818',borderColor:isLight?'#E5C95E':'#5A5125'}]}><Ionicons name="gift" size={20} color={colors.yellow}/><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Pressable onPress={()=>setNotice(null)}><Ionicons name="close" size={18} color={colors.text}/></Pressable></View>:null}
@@ -68,7 +68,7 @@ export default function HomeScreen() {
         <Text style={[styles.heroEyebrow,{color:colors.yellow}]}>TRAINER COLLECTION • {themeVisual.mascot.toUpperCase()}</Text>
         <Text style={[styles.heroTitle,{color:colors.text}]}>Sua coleção vive aqui.</Text>
         <Text style={[styles.heroText,{color:colors.muted}]}>Abra boosters, complete sets, evolua seu perfil e acompanhe tudo sem sair do seu hub.</Text>
-        <View style={styles.heroActions}><Pressable style={[styles.primaryButton,{backgroundColor:colors.yellow}]} onPress={()=>router.push('/(tabs)/packs')}><Ionicons name="cube" color="#07111F" size={19}/><Text style={styles.primaryButtonText}>ABRIR PACKS</Text></Pressable><Pressable style={[styles.dailyButton,{backgroundColor:canClaimDaily?colors.accent:colors.surfaceAlt}]} onPress={claimDaily} disabled={!canClaimDaily||claiming}><Ionicons name="gift-outline" color={canClaimDaily?'#fff':colors.muted} size={18}/><Text style={[styles.dailyText,{color:canClaimDaily?'#fff':colors.muted}]}>{claiming?'RECEBENDO...':canClaimDaily?'RECOMPENSA DIÁRIA':'VOLTE AMANHÃ'}</Text></Pressable></View>
+        <View style={styles.heroActions}><Pressable style={[styles.primaryButton,{backgroundColor:colors.yellow}]} onPress={()=>router.push('/(tabs)/packs')}><Ionicons name="cube" color="#07111F" size={19}/><Text style={styles.primaryButtonText}>ABRIR PACKS</Text></Pressable><Pressable style={[styles.dailyButton,{backgroundColor:canClaimDaily?colors.accent:colors.surfaceAlt}]} onPress={claimDaily} disabled={!canClaimDaily||claiming}><Ionicons name="gift-outline" color={canClaimDaily?'#fff':colors.muted} size={18}/><Text style={[styles.dailyText,{color:canClaimDaily?'#fff':colors.muted}]}>{claiming?'RECEBENDO...':canClaimDaily?'RECOMPENSA DIÁRIA':'COLETADO HOJE'}</Text></Pressable></View>
       </View>
     </View>
     {continueItems.length?<View style={[styles.continuePanel,{backgroundColor:colors.surface,borderColor:colors.border}]}>
@@ -112,7 +112,7 @@ export default function HomeScreen() {
           <View style={[styles.todayIcon,{backgroundColor:'#FF735C1C'}]}><Ionicons name="trophy" size={20} color="#FF735C"/></View>
           <Text style={[styles.todayLabel,{color:colors.muted}]}>COPA TRAINER</Text>
           <Text numberOfLines={1} style={[styles.todayValue,{color:colors.text}]}>{progressSnapshot.tournament?.joined?'INSCRITO':progressSnapshot.tournament?.status==='registration'?'INSCRIÇÕES ABERTAS':String(progressSnapshot.tournament?.status??'Sem copa').toUpperCase()}</Text>
-          <Text numberOfLines={1} style={[styles.todayMeta,{color:colors.muted}]}>{progressSnapshot.tournament?`${progressSnapshot.tournament.entries}/${progressSnapshot.tournament.maxPlayers} jogadores • 🪙 ${progressSnapshot.tournament.prizePoolCoins.toLocaleString('pt-BR')}`:'Nenhum torneio ativo'}</Text>
+          <Text numberOfLines={1} style={[styles.todayMeta,{color:colors.muted}]}>{progressSnapshot.tournament?`${progressSnapshot.tournament.entries}/${progressSnapshot.tournament.maxPlayers} • Entrada 🪙 ${progressSnapshot.tournament.entryFeeCoins.toLocaleString('pt-BR')} • Pot 🪙 ${progressSnapshot.tournament.prizePoolCoins.toLocaleString('pt-BR')}`:'Nenhum torneio ativo'}</Text>
         </Pressable>
       </View>
     </View>:null}

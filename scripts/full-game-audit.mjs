@@ -134,6 +134,17 @@ if (existsSync(trainerCupMigration)) {
   assert(tournamentText.includes("'champion_prize'"), 'Copa Trainer: pagamento do pot de Coins ao campeão não está preservado.');
 }
 
+// 7) Home daily reward must share the 7-day streak state; no independent legacy claim path.
+const homeScreenText = readFileSync('app/(tabs)/index.tsx', 'utf8');
+const homeServiceText = readFileSync('src/services/home.ts', 'utf8');
+assert(homeScreenText.includes("claimDailyLogin"), 'Recompensa diária da Home deixou de usar o streak unificado.');
+assert(!homeScreenText.includes("claimDailyReward"), 'Recompensa diária legada voltou a ser acionável pela Home.');
+assert(homeScreenText.includes("daily_claimed_today"), 'Home voltou a usar janela de 24h em vez do dia calendário do streak.');
+assert(homeServiceText.includes("entryFeeCoins:tournament.entryFeeCoins"), 'Resumo da Copa Trainer perdeu a taxa de inscrição.');
+assert(homeScreenText.includes("Entrada 🪙") && homeScreenText.includes("Pot 🪙"), 'Home voltou a confundir taxa da Copa com o pot atual.');
+assert(existsSync('supabase/migrations/20260904181351_unify_daily_reward_paths.sql'), 'Migração de unificação da recompensa diária ausente.');
+assert(existsSync('supabase/migrations/20260904181655_home_daily_streak_status.sql'), 'Migração de status diário da Home ausente.');
+
 if (failures.length) {
   console.error(`\n❌ Auditoria completa encontrou ${failures.length} problema(s):`);
   for (const failure of failures) console.error(` - ${failure}`);
