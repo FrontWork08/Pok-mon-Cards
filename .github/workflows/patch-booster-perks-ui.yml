@@ -1,0 +1,236 @@
+name: Patch booster perks UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-booster-perks-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch Trainer Shop, Pack Lab and Admin
+        shell: python
+        run: |
+          from pathlib import Path
+
+          # Trainer Shop
+          p = Path('app/store.tsx')
+          text = p.read_text()
+          old = """import { TrainerAvatar } from '@/components/TrainerAvatar';
+"""
+          new = old + """import { getBoosterPerks, type BoosterPerks } from '@/services/boosterPerks';
+"""
+          assert old in text, 'store import anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """  guild_decor:{label:'Decoração de Guilda',icon:'shield'},
+};"""
+          new = """  guild_decor:{label:'Decoração de Guilda',icon:'shield'},
+  consumable:{label:'Consumível de Booster',icon:'sparkles'},
+};"""
+          assert old in text, 'store category anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """  if(filter==='booster') return item.category==='booster_fx';"""
+          new = """  if(filter==='booster') return item.category==='booster_fx'||item.category==='consumable';"""
+          assert old in text, 'store booster filter missing'
+          text = text.replace(old, new, 1)
+
+          old = """  const [catalog,setCatalog]=useState<TrainerShopCatalog|null>(null);
+"""
+          new = old + """  const [boosterPerks,setBoosterPerks]=useState<BoosterPerks|null>(null);
+"""
+          assert old in text, 'store catalog state missing'
+          text = text.replace(old, new, 1)
+
+          old = """      const next=await getTrainerShopCatalog();
+      setCatalog(next);"""
+          new = """      const [next,perks]=await Promise.all([
+        getTrainerShopCatalog(),
+        getBoosterPerks().catch(()=>null),
+      ]);
+      setCatalog(next);
+      setBoosterPerks(perks);"""
+          assert old in text, 'store load anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """      {notice ? <Pressable onPress={()=>setNotice(null)} style={[styles.notice,{backgroundColor:'#183528',borderColor:'#3F9A68'}]}><Ionicons name=\"checkmark-circle\" size={18} color=\"#65D894\"/><Text style={styles.noticeText}>{notice}</Text><Ionicons name=\"close\" size={16} color=\"#9CCDB1\"/></Pressable> : null}
+"""
+          gamepass = """      <View style={[styles.gamepassCard,{backgroundColor:colors.surface,borderColor:boosterPerks?.autoOpenGamepass?'#59D49A':colors.yellow}]}>
+        <View style={[styles.gamepassIcon,{backgroundColor:boosterPerks?.autoOpenGamepass?'#15392A':colors.accentSoft}]}>
+          <Ionicons name={boosterPerks?.autoOpenGamepass?'flash':'lock-closed'} size={25} color={boosterPerks?.autoOpenGamepass?'#59D49A':colors.yellow}/>
+        </View>
+        <View style={styles.gamepassCopy}>
+          <View style={styles.badgeRow}>
+            <Text style={[styles.gamepassKicker,{color:colors.yellow}]}>GAMEPASS AUTO BOOSTER</Text>
+            <Text style={[styles.manualPayTag,{backgroundColor:boosterPerks?.autoOpenGamepass?'#15392A':'#3B2313',color:boosterPerks?.autoOpenGamepass?'#79E6AE':'#FFD447'}]}>{boosterPerks?.autoOpenGamepass?'ATIVA':'DINHEIRO REAL'}</Text>
+          </View>
+          <Text style={[styles.gamepassTitle,{color:colors.text}]}>Abertura automática de boosters</Text>
+          <Text style={[styles.gamepassText,{color:colors.muted}]}>{boosterPerks?.autoOpenGamepass
+            ? 'Escolha o booster e abra até 50 de uma vez, sempre vendo o custo total antes de confirmar.'
+            : `Esta gamepass não pode ser comprada com Coins ou Diamantes. Fale diretamente com ${boosterPerks?.contactOwnerUsername?'@'+boosterPerks.contactOwnerUsername:'o dono do jogo'} para comprar; depois da confirmação ela é ativada manualmente.`}</Text>
+          <Text style={[styles.luckyStatus,{color:colors.yellow}]}>✨ 2× Lucky disponível: {Number(boosterPerks?.lucky2xUses??0)} abertura(s)</Text>
+        </View>
+        <Pressable onPress={()=>router.push('/auto-open')} style={[styles.gamepassButton,{backgroundColor:boosterPerks?.autoOpenGamepass?'#59D49A':colors.yellow}]}>
+          <Ionicons name={boosterPerks?.autoOpenGamepass?'play':'information-circle'} size={17} color=\"#07111F\"/>
+          <Text style={styles.gamepassButtonText}>{boosterPerks?.autoOpenGamepass?'ABRIR AUTO BOOSTER':'COMO COMPRAR'}</Text>
+        </Pressable>
+      </View>
+
+""" + old
+          assert old in text, 'store notice anchor missing'
+          text = text.replace(old, gamepass, 1)
+
+          old = """  const galaxy=String(item.metadata?.effect??'')==='galaxy'||item.id.includes('galaxy');
+"""
+          new = old + """  const consumable=item.category==='consumable';
+"""
+          assert old in text, 'store galaxy anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """          <Text style={[styles.priceLabel,{color:colors.muted}]}>{item.owned?'ITEM POSSUÍDO':'PREÇO'}</Text>
+          <Text style={[styles.price,{color:item.owned?accent:colors.yellow}]}>{item.owned?'✓ NA COLEÇÃO':`🪙 ${item.priceCoins.toLocaleString('pt-BR')}`}</Text>"""
+          new = """          <Text style={[styles.priceLabel,{color:colors.muted}]}>{consumable?'CONSUMÍVEL':item.owned?'ITEM POSSUÍDO':'PREÇO'}</Text>
+          <Text style={[styles.price,{color:consumable?colors.yellow:item.owned?accent:colors.yellow}]}>{consumable?`🪙 ${item.priceCoins.toLocaleString('pt-BR')}`:item.owned?'✓ NA COLEÇÃO':`🪙 ${item.priceCoins.toLocaleString('pt-BR')}`}</Text>"""
+          assert old in text, 'store price anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """  noticeText:{flex:1,color:'#D9FFE8',fontSize:9,lineHeight:14,fontWeight:'800'},
+"""
+          new = old + """  gamepassCard:{borderRadius:19,borderWidth:1,padding:13,flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:11},
+  gamepassIcon:{width:50,height:50,borderRadius:15,alignItems:'center',justifyContent:'center'},
+  gamepassCopy:{flex:1,minWidth:220,gap:2},gamepassKicker:{fontSize:7,fontWeight:'900',letterSpacing:1},manualPayTag:{fontSize:6,fontWeight:'900',borderRadius:999,paddingHorizontal:7,paddingVertical:3},gamepassTitle:{fontSize:15,fontWeight:'900'},gamepassText:{fontSize:8.5,lineHeight:13},luckyStatus:{fontSize:8,fontWeight:'900',marginTop:4},gamepassButton:{minHeight:42,borderRadius:12,paddingHorizontal:11,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},gamepassButtonText:{color:'#07111F',fontSize:7.5,fontWeight:'900'},
+"""
+          assert old in text, 'store style anchor missing'
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          # Pack Lab
+          p = Path('app/(tabs)/packs.tsx')
+          text = p.read_text()
+          old = """import { useFocusEffect } from 'expo-router';"""
+          new = """import { useFocusEffect, useRouter } from 'expo-router';"""
+          assert old in text, 'packs router import missing'
+          text = text.replace(old, new, 1)
+
+          old = """export default function PacksScreen() {
+  const { width } = useWindowDimensions();"""
+          new = """export default function PacksScreen() {
+  const router = useRouter();
+  const { width } = useWindowDimensions();"""
+          assert old in text, 'packs component anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """      {freeUntil ? (
+"""
+          auto_panel = """      <Pressable onPress={()=>router.push('/auto-open')} style={[styles.autoOpenEntry,{backgroundColor:colors.surface,borderColor:colors.accent}]}>
+        <View style={[styles.autoOpenEntryIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name=\"flash\" size={22} color={colors.yellow}/></View>
+        <View style={{flex:1,minWidth:180}}><Text style={[styles.autoOpenKicker,{color:colors.yellow}]}>AUTO BOOSTER</Text><Text style={[styles.autoOpenTitle,{color:colors.text}]}>Abrir vários boosters</Text><Text style={[styles.autoOpenText,{color:colors.muted}]}>Escolha o booster + quantidade e veja exatamente quanto vai gastar antes de confirmar.</Text></View>
+        <Ionicons name=\"chevron-forward\" size={20} color={colors.accent}/>
+      </Pressable>
+
+""" + old
+          assert old in text, 'packs freeUntil anchor missing'
+          text = text.replace(old, auto_panel, 1)
+
+          old = """  balanceActions:{flexDirection:'row',alignItems:'center',gap:7},exchangeButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},exchangeText:{fontSize:8,fontWeight:'900'},balanceBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+"""
+          new = old + """  autoOpenEntry:{borderRadius:16,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:10},autoOpenEntryIcon:{width:44,height:44,borderRadius:13,alignItems:'center',justifyContent:'center'},autoOpenKicker:{fontSize:7,fontWeight:'900',letterSpacing:1},autoOpenTitle:{fontSize:14,fontWeight:'900',marginTop:1},autoOpenText:{fontSize:8.5,lineHeight:13,marginTop:2},
+"""
+          assert old in text, 'packs style anchor missing'
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          # Admin service reward type
+          p = Path('src/services/admin.ts')
+          text = p.read_text()
+          old = """export type AdminRedeemCode = { id: string; code: string; reward: { coins?: number; diamonds?: number; cardId?: string; cardQuantity?: number }; active: boolean; max_total_uses: number | null; expires_at: string | null; created_at: string; code_redemptions?: Array<{ count: number }> };"""
+          new = """export type AdminRedeemCode = { id: string; code: string; reward: { coins?: number; diamonds?: number; cardId?: string; cardQuantity?: number; lucky2xUses?: number }; active: boolean; max_total_uses: number | null; expires_at: string | null; created_at: string; code_redemptions?: Array<{ count: number }> };"""
+          assert old in text, 'admin reward type anchor missing'
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          # Admin screen: Lucky code field + owner gamepass shortcut
+          p = Path('app/admin.tsx')
+          text = p.read_text()
+          old = """  const [codeDiamonds, setCodeDiamonds] = useState('');
+  const [codeCardId, setCodeCardId] = useState('');"""
+          new = """  const [codeDiamonds, setCodeDiamonds] = useState('');
+  const [codeLuckyUses, setCodeLuckyUses] = useState('');
+  const [codeCardId, setCodeCardId] = useState('');"""
+          assert old in text, 'admin code state anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """    if (Number(codeDiamonds) > 0) reward.diamonds = Number(codeDiamonds);
+    if (codeCardId.trim() && Number(codeCardQuantity) > 0) {"""
+          new = """    if (Number(codeDiamonds) > 0) reward.diamonds = Number(codeDiamonds);
+    if (Number(codeLuckyUses) > 0) reward.lucky2xUses = Math.min(10000, Number(codeLuckyUses));
+    if (codeCardId.trim() && Number(codeCardQuantity) > 0) {"""
+          assert old in text, 'admin code handler reward anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """    if (!reward.coins && !reward.diamonds && !reward.cardId) {"""
+          new = """    if (!reward.coins && !reward.diamonds && !reward.cardId && !reward.lucky2xUses) {"""
+          assert old in text, 'admin empty reward anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """      setNewCode(''); setCodeCoins(''); setCodeDiamonds(''); setCodeCardId('');
+      setCodeCardQuantity('1'); setCodeMaxUses(''); setCodeExpiresHours('');"""
+          new = """      setNewCode(''); setCodeCoins(''); setCodeDiamonds(''); setCodeLuckyUses(''); setCodeCardId('');
+      setCodeCardQuantity('1'); setCodeMaxUses(''); setCodeExpiresHours('');"""
+          assert old in text, 'admin reset code form anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>DIAMANTES</Text><TextInput value={codeDiamonds} onChangeText={(v)=>setCodeDiamonds(v.replace(/[^0-9]/g,''))} keyboardType=\"number-pad\" placeholder=\"0\" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+            </View>"""
+          new = """              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>DIAMANTES</Text><TextInput value={codeDiamonds} onChangeText={(v)=>setCodeDiamonds(v.replace(/[^0-9]/g,''))} keyboardType=\"number-pad\" placeholder=\"0\" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>2× LUCKY • ABERTURAS</Text><TextInput value={codeLuckyUses} onChangeText={(v)=>setCodeLuckyUses(v.replace(/[^0-9]/g,'').slice(0,5))} keyboardType=\"number-pad\" placeholder=\"0\" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+            </View>"""
+          assert old in text, 'admin code UI anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """          </View>
+
+          {adminAccess?.isOwner && releaseStatus ? ("""
+          new = """          </View>
+
+          {adminAccess?.isOwner ? (
+            <Pressable onPress={()=>router.push('/admin-gamepasses')} style={[styles.notice,{backgroundColor:'#241D3B',borderColor:'#9B7BFF'}]}>
+              <Ionicons name=\"flash\" size={20} color=\"#CBBEFF\"/>
+              <View style={{flex:1}}><Text style={[styles.historyUser,{color:colors.text}]}>GAMEPASS AUTO BOOSTER • VENDAS MANUAIS</Text><Text style={[styles.historyMeta,{color:colors.muted}]}>Ative ou remova a gamepass somente depois de confirmar diretamente o pagamento em dinheiro real.</Text></View>
+              <Ionicons name=\"chevron-forward\" size={18} color=\"#CBBEFF\"/>
+            </Pressable>
+          ) : null}
+
+          {adminAccess?.isOwner && releaseStatus ? ("""
+          assert old in text, 'admin owner panel anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = """  if(reward.cardId)parts.push(`🃏 ${reward.cardQuantity??1}× ${reward.cardId}`);
+  return parts.join(' • ');"""
+          new = """  if(reward.cardId)parts.push(`🃏 ${reward.cardQuantity??1}× ${reward.cardId}`);
+  if(Number(reward.lucky2xUses)>0)parts.push(`✨ 2× Lucky ${Number(reward.lucky2xUses)} abertura(s)`);
+  return parts.join(' • ');"""
+          assert old in text, 'admin reward summary anchor missing'
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+      - name: Remove one-time workflow and commit
+        run: |
+          rm .github/workflows/patch-booster-perks-ui.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'app/store.tsx' 'app/(tabs)/packs.tsx' 'app/admin.tsx' 'src/services/admin.ts' .github/workflows/patch-booster-perks-ui.yml
+          git commit -m "Expose Lucky and Auto Booster gamepass across the app"
+          git push origin main
