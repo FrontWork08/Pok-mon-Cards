@@ -99,6 +99,11 @@ if (existsSync('app/deck/[id].tsx')) {
   assert(deckEditor.includes('PokemonTypeSymbolFilter'), 'Regressão de UX: editor de deck deixou de usar símbolos de tipo.');
 }
 
+if (existsSync('app/(tabs)/index.tsx')) {
+  const home = read('app/(tabs)/index.tsx');
+  assert(home.includes("progressSnapshot.claimableMissions > 0 ? '/missions'"), 'Regressão de UX: presente de missão pronta voltou a abrir a atividade em vez da Central de Missões.');
+}
+
 if (existsSync('app/battle/[id].tsx')) {
   const battle = read('app/battle/[id].tsx');
   assert(battle.includes('forfeitBattle'), 'Regressão: tela de batalha perdeu a desistência.');

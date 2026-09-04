@@ -90,7 +90,7 @@ export default function HomeScreen() {
         <Pressable onPress={()=>router.push('/inbox')} style={[styles.activityButton,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}><Ionicons name="notifications-outline" size={17} color={colors.accent}/><Text style={[styles.activityButtonText,{color:colors.text}]}>CENTRAL</Text></Pressable>
       </View>
       <View style={styles.todayGrid}>
-        <Pressable onPress={()=>router.push(progressSnapshot.mission?.route as never || '/missions')} style={[styles.todayCard,{backgroundColor:colors.surfaceAlt,borderColor:progressSnapshot.claimableMissions?colors.yellow:colors.border}]}>
+        <Pressable onPress={()=>router.push((progressSnapshot.claimableMissions > 0 ? '/missions' : (progressSnapshot.mission?.route || '/missions')) as never)} style={[styles.todayCard,{backgroundColor:colors.surfaceAlt,borderColor:progressSnapshot.claimableMissions?colors.yellow:colors.border}]}>
           <View style={[styles.todayIcon,{backgroundColor:'#F0C74E1C'}]}><Ionicons name={progressSnapshot.claimableMissions?'gift':'checkbox'} size={20} color="#F0C74E"/></View>
           <Text style={[styles.todayLabel,{color:colors.muted}]}>MISSÃO</Text>
           <Text numberOfLines={1} style={[styles.todayValue,{color:colors.text}]}>{progressSnapshot.claimableMissions?progressSnapshot.claimableMissions+' recompensa(s) pronta(s)':progressSnapshot.mission?.title??'Tudo concluído'}</Text>
