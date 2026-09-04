@@ -1,0 +1,70 @@
+name: Patch team3 matchmaking UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-team3-matchmaking.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch Battle Arena
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/(tabs)/battles.tsx')
+          text = p.read_text()
+
+          old = """const MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
+            { id: 'quick', label: 'Quick', detail: '1 carta' },
+            { id: 'mystery', label: 'Mystery BO3', detail: 'Melhor de 3' },
+            { id: 'draft3', label: 'Draft 3', detail: 'Escolha alternada' },
+          ];"""
+          new = old + """
+          const RANKED_MODES: Array<{ id: BattleMode; label: string; detail: string }> = [
+            ...MODES,
+            { id: 'team3', label: 'Equipe 3×3', detail: 'Game Boy • troca no turno' },
+          ];
+          const battleRoute = (id: string, mode?: BattleMode | string | null) => mode === 'team3' ? `/team-battle/${id}` : `/battle/${id}`;"""
+          assert old in text, 'MODES block not found'
+          text = text.replace(old, new, 1)
+
+          old = "router.push(`/battle/${state.matched_battle_id}`);"
+          assert text.count(old) >= 1, 'subscription route not found'
+          text = text.replace(old, "router.push(battleRoute(state.matched_battle_id, state.mode_choice));", 1)
+
+          old = "router.push(`/battle/${result.battleId}`);"
+          count = text.count(old)
+          assert count >= 2, f'expected ranked result routes, got {count}'
+          text = text.replace(old, "router.push(battleRoute(result.battleId, result.mode ?? queueState.mode_choice));", 1)
+          text = text.replace(old, "router.push(battleRoute(result.battleId, result.mode ?? rankedMode));", 1)
+
+          old = "router.push(`/battle/${currentBattle.id}`);"
+          count = text.count(old)
+          assert count >= 2, f'expected active battle routes, got {count}'
+          text = text.replace(old, "router.push(battleRoute(currentBattle.id, currentBattle.mode));")
+
+          old = "{MODES.map((item)=><Pressable\n          key={`ranked-${item.id}`}"
+          new = "{RANKED_MODES.map((item)=><Pressable\n          key={`ranked-${item.id}`}"
+          assert old in text, 'ranked modes map not found'
+          text = text.replace(old, new, 1)
+
+          p.write_text(text)
+      - name: Remove one-time workflow and commit
+        run: |
+          rm .github/workflows/patch-team3-matchmaking.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'app/(tabs)/battles.tsx' .github/workflows/patch-team3-matchmaking.yml
+          git commit -m "Expose team3 Game Boy mode in ranked matchmaking"
+          git push origin main
