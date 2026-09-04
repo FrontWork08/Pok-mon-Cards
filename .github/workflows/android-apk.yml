@@ -2,7 +2,7 @@ name: Build Android APK
 
 # APK builds are release-controlled.
 # Day-to-day app changes ship through Expo Updates; public APK releases use the production channel.
-# The assistant triggers native releases by advancing the dedicated apk-release branch.
+# Native releases are blocked unless SHA-256 + Android signature + pinned signer certificate all verify.
 on:
   workflow_dispatch:
   push:
@@ -53,22 +53,57 @@ jobs:
           python -m pip install --disable-pip-version-check pillow
           python scripts/generate-trainer-assets.py
 
-      - name: Build and download release APK
+      - name: Verify project before native release
+        run: npm run verify
+
+      - name: Locate Android signature verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER_PATH="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER_PATH" ]; then
+            echo "apksigner was not found; refusing to create an unverified public APK."
+            exit 1
+          fi
+          chmod +x "$APKSIGNER_PATH"
+          echo "APKSIGNER=$APKSIGNER_PATH" >> "$GITHUB_ENV"
+          "$APKSIGNER_PATH" version
+
+      - name: Build, download and verify release APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: npm run apk
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Trainer-Collection-Android
-          path: builds/*.apk
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Validate published download metadata
         run: |
-          node -e "const fs=require('fs'); const p='public/download/release.json'; const x=JSON.parse(fs.readFileSync(p,'utf8')); if(x.status!=='ready'||!/^https:\/\//.test(x.downloadUrl)||!/^[a-f0-9]{64}$/i.test(x.sha256)||!(x.sizeBytes>0)){throw new Error('Invalid release metadata')}"
+          node <<'NODE'
+          const fs = require('fs');
+          const release = JSON.parse(fs.readFileSync('public/download/release.json','utf8'));
+          const trusted = JSON.parse(fs.readFileSync('public/download/trusted-signing-cert.json','utf8'));
+          const hex = (v) => String(v ?? '').replace(/[^a-fA-F0-9]/g,'').toLowerCase();
+          const cert = hex(release.verification?.certificateSha256);
+          const trustedCert = hex(trusted.certificateSha256);
+          if (release.status !== 'ready') throw new Error('Release is not ready');
+          if (!/^https:\/\//.test(release.downloadUrl || '')) throw new Error('Release URL must use HTTPS');
+          if (!/^[a-f0-9]{64}$/i.test(release.sha256 || '')) throw new Error('Invalid APK SHA-256');
+          if (!(Number(release.sizeBytes) > 0)) throw new Error('Invalid APK size');
+          if (release.packageName !== 'com.frontwork.pokemoncards') throw new Error('Unexpected Android package');
+          if (release.verification?.sha256Verified !== true) throw new Error('APK hash was not verified');
+          if (release.verification?.signatureVerified !== true) throw new Error('APK signature was not verified');
+          if (release.verification?.signerMatchesTrustedCertificate !== true) throw new Error('APK signer was not pinned');
+          if (!/^[a-f0-9]{64}$/.test(cert) || cert !== trustedCert) throw new Error('APK signer certificate mismatch');
+          if (!release.verification?.verifiedAt) throw new Error('Missing verification timestamp');
+          console.log('APK metadata, hash, signature and trusted signer certificate are valid.');
+          NODE
+
+      - name: Upload verified APK evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: Trainer-Collection-Android-Verified
+          path: builds/*
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Publish download metadata
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
@@ -87,7 +122,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "release: update Android download metadata"
+          git commit -m "release: update verified Android download metadata"
           git push origin HEAD:main
 
       - name: Deploy updated download site
