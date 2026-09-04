@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 const checks = [
   ['src/services/globalChat.ts', ['getPlayerAvatarMap', 'avatarPath', 'avatarUpdatedAt', 'frameId', 'backgroundId']],
-  ['src/components/GlobalChatHomeCard.tsx', ['getProfileAvatarUrl(message.avatarPath', 'frameId={message.frameId}', 'backgroundId={message.backgroundId}']],
+  ['src/components/GlobalChatHomeCard.tsx', ['getProfileAvatarUrl(message.avatarPath', 'CompactTrainerBanner', 'frameId={message.frameId}', 'backgroundId={message.backgroundId}', 'hasEquippedTheme', "borderColor: hasEquippedTheme ? 'transparent'"]],
   ['src/components/GuildChatPanel.tsx', ['frameId={avatars[message.playerId]?.frameId}', 'backgroundId={avatars[message.playerId]?.backgroundId}']],
   ['app/chat/[id].tsx', ['equipped_frame_id,equipped_background_id', 'frameId={friend?.equipped_frame_id}', 'backgroundId={friend?.equipped_background_id}']],
   ['src/services/globalSearch.ts', ['frameId: string | null', 'backgroundId: string | null', 'equipped_frame_id', 'equipped_background_id']],

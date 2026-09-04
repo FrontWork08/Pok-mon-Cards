@@ -72,6 +72,33 @@ function visualFor(frameId?:string|null,backgroundId?:string|null,fallback='#6A7
   if(key.includes('galaxy')) return {
     premium:true,galaxy:true,tier:5,primary:'#8B5CFF',secondary:'#55E6FF',tertiary:'#E056FD',background:'#151027',
   };
+  if(key.includes('aurora')||key.includes('prism')||key.includes('cosmetic_pass_nebula')) return {
+    premium:true,galaxy:true,tier:4,primary:'#8B5CFF',secondary:'#55E6FF',tertiary:'#C493FF',background:'#120D2B',
+  };
+  if(key.includes('trainer_vip')) return {
+    premium:true,galaxy:false,tier:4,primary:'#FFD447',secondary:'#8B5CFF',tertiary:'#FFF0A8',background:'#15102B',
+  };
+  if(key.includes('kanto')) return {
+    premium:true,galaxy:false,tier:3,primary:'#E84D5B',secondary:'#FF9A71',tertiary:'#FFD0A8',background:'#35151B',
+  };
+  if(key.includes('johto')) return {
+    premium:true,galaxy:false,tier:3,primary:'#F0C84B',secondary:'#FFF0A8',tertiary:'#FF9F2F',background:'#30280E',
+  };
+  if(key.includes('platinum')) return {
+    premium:true,galaxy:false,tier:3,primary:'#9CB6FF',secondary:'#D7E2FF',tertiary:'#6A7CFF',background:'#17203C',
+  };
+  if(key.includes('midnight')) return {
+    premium:true,galaxy:false,tier:3,primary:'#586A9E',secondary:'#8EA3E8',tertiary:'#AFA8FF',background:'#0B1020',
+  };
+  if(key.includes('collector')) return {
+    premium:true,galaxy:false,tier:3,primary:'#65D894',secondary:'#A7F3C7',tertiary:'#55E6FF',background:'#123023',
+  };
+  if(key.includes('guild')) return {
+    premium:true,galaxy:false,tier:3,primary:'#68D9FF',secondary:'#B7EEFF',tertiary:'#6A7CFF',background:'#102C3A',
+  };
+  if(key.includes('classic')) return {
+    premium:true,galaxy:false,tier:3,primary:'#FFD447',secondary:'#FFF0A8',tertiary:'#8EE7FF',background:'#111827',
+  };
   if(key.includes('master')) return {
     premium:true,galaxy:false,tier:5,primary:'#C493FF',secondary:'#8EE7FF',tertiary:'#F0CBFF',background:'#191329',
   };
@@ -86,6 +113,9 @@ function visualFor(frameId?:string|null,backgroundId?:string|null,fallback='#6A7
   };
   if(/^(coin_|lux_)/.test(frame)||/^(coin_|lux_)/.test(background)) return {
     premium:true,galaxy:false,tier:2,primary:fallback,secondary:'#FFD447',tertiary:'#8EE7FF',background:'#111B2C',
+  };
+  if(frame||background) return {
+    premium:true,galaxy:false,tier:2,primary:'#6A7CFF',secondary:'#55D9FF',tertiary:'#AFA8FF',background:'#111827',
   };
   return {
     premium:false,galaxy:false,tier:2,primary:fallback,secondary:fallback,tertiary:fallback,background:'transparent',

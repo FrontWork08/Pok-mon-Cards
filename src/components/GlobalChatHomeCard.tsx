@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { CompactTrainerBanner } from '@/components/CompactTrainerBanner';
 import { getGlobalChatMessages, sendGlobalChatMessage, subscribeGlobalChat, type GlobalChatMessage } from '@/services/globalChat';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
@@ -98,20 +99,28 @@ export function GlobalChatHomeCard() {
         <View style={styles.messages}>
           {visibleMessages.map((message) => {
             const mine = message.playerId === userId;
+            const hasEquippedTheme = Boolean(message.frameId || message.backgroundId);
             return (
               <View key={message.id} style={[styles.messageRow, mine && styles.messageMine]}>
                 <Pressable onPress={() => router.push(`/player/${message.playerId}`)} style={styles.avatarPress}>
                   <TrainerAvatar
                     icon={message.profileIcon}
                     avatarUrl={getProfileAvatarUrl(message.avatarPath, message.avatarUpdatedAt)}
-                    frameId={message.frameId}
-                    backgroundId={message.backgroundId}
                     size={31}
                     color={mine ? colors.yellow : colors.accent}
                     backgroundColor={colors.surfaceAlt}
                   />
                 </Pressable>
-                <View style={[styles.bubble, { backgroundColor: mine ? colors.accentSoft : colors.surfaceAlt, borderColor: mine ? colors.accent : colors.border }]}>
+                <CompactTrainerBanner
+                  frameId={message.frameId}
+                  backgroundId={message.backgroundId}
+                  fallbackColor={colors.accent}
+                  style={styles.bubbleTheme}
+                >
+                  <View style={[styles.bubble, {
+                    backgroundColor: hasEquippedTheme ? 'rgba(8,10,18,0.76)' : (mine ? colors.accentSoft : colors.surfaceAlt),
+                    borderColor: hasEquippedTheme ? 'transparent' : (mine ? colors.accent : colors.border),
+                  }]}>
                   <View style={styles.metaRow}>
                     <Pressable onPress={() => router.push(`/player/${message.playerId}`)} style={styles.identityPress}>
                       <Text numberOfLines={1} style={[styles.username, { color: mine ? colors.yellow : colors.text }]}>@{message.username}</Text>
@@ -129,7 +138,8 @@ export function GlobalChatHomeCard() {
                     <Ionicons name="person-circle-outline" size={12} color={colors.muted}/>
                     <Text style={[styles.profileHintText,{color:colors.muted}]}>VER PERFIL</Text>
                   </Pressable>
-                </View>
+                  </View>
+                </CompactTrainerBanner>
               </View>
             );
           })}
@@ -194,6 +204,7 @@ const styles=StyleSheet.create({
   messageRow:{flexDirection:'row',alignItems:'flex-end',gap:7},
   messageMine:{paddingLeft:18},
   avatarPress:{borderRadius:999},
+  bubbleTheme:{flex:1,borderRadius:16},
   bubble:{flex:1,borderRadius:14,borderWidth:1,paddingHorizontal:10,paddingVertical:8},
   metaRow:{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between',gap:8},
   identityPress:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},
