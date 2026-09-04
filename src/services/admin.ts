@@ -99,7 +99,7 @@ export type CurrencyRemovalBatchResult = {
   recipients: CoinGrantResult[];
 };
 export type BattlePassVipGrantResult = { seasonId: string; recipientCount: number; recipients: Array<{ id: string; username: string }> };
-export type AdminRedeemCode = { id: string; code: string; reward: { coins?: number; diamonds?: number; cardId?: string; cardQuantity?: number }; active: boolean; max_total_uses: number | null; expires_at: string | null; created_at: string; code_redemptions?: Array<{ count: number }> };
+export type AdminRedeemCode = { id: string; code: string; reward: { coins?: number; diamonds?: number; cardId?: string; cardQuantity?: number; lucky2xUses?: number }; active: boolean; max_total_uses: number | null; expires_at: string | null; created_at: string; code_redemptions?: Array<{ count: number }> };
 export type CoinGrantHistory = { id: string; target_id: string; amount: number; balance_before: number; balance_after: number; note: string | null; created_at: string; players?: { username?: string } | null };
 export type AdminCurrencyAdjustmentHistory = CoinGrantHistory & { currency: 'coins' | 'diamonds' };
 export type AdminGameEvent = { id: string; event_type: 'free_boosters' | 'double_xp' | 'rare_boost' | 'featured_set'; title: string; payload?: Record<string, unknown>; active: boolean; starts_at: string; ends_at: string; created_at: string };

@@ -110,6 +110,7 @@ export default function AdminScreen() {
   const [newCode, setNewCode] = useState('');
   const [codeCoins, setCodeCoins] = useState('');
   const [codeDiamonds, setCodeDiamonds] = useState('');
+  const [codeLuckyUses, setCodeLuckyUses] = useState('');
   const [codeCardId, setCodeCardId] = useState('');
   const [codeCardQuantity, setCodeCardQuantity] = useState('1');
   const [codeMaxUses, setCodeMaxUses] = useState('');
@@ -663,11 +664,12 @@ export default function AdminScreen() {
     const reward: AdminRedeemCode['reward'] = {};
     if (Number(codeCoins) > 0) reward.coins = Number(codeCoins);
     if (Number(codeDiamonds) > 0) reward.diamonds = Number(codeDiamonds);
+    if (Number(codeLuckyUses) > 0) reward.lucky2xUses = Math.min(10000, Number(codeLuckyUses));
     if (codeCardId.trim() && Number(codeCardQuantity) > 0) {
       reward.cardId = codeCardId.trim();
       reward.cardQuantity = Number(codeCardQuantity);
     }
-    if (!reward.coins && !reward.diamonds && !reward.cardId) {
+    if (!reward.coins && !reward.diamonds && !reward.cardId && !reward.lucky2xUses) {
       setError('Defina ao menos uma recompensa para o código.');
       return;
     }
@@ -680,7 +682,7 @@ export default function AdminScreen() {
         expiresHours:Number(codeExpiresHours)>0?Number(codeExpiresHours):null,
       });
       setNotice(`Código ${created.code} criado e pronto para resgate.`);
-      setNewCode(''); setCodeCoins(''); setCodeDiamonds(''); setCodeCardId('');
+      setNewCode(''); setCodeCoins(''); setCodeDiamonds(''); setCodeLuckyUses(''); setCodeCardId('');
       setCodeCardQuantity('1'); setCodeMaxUses(''); setCodeExpiresHours('');
       await load();
     } catch (e) {
@@ -1227,6 +1229,14 @@ export default function AdminScreen() {
               </View>
             </View>
           </View>
+
+          {adminAccess?.isOwner ? (
+            <Pressable onPress={()=>router.push('/admin-gamepasses')} style={[styles.notice,{backgroundColor:'#241D3B',borderColor:'#9B7BFF'}]}>
+              <Ionicons name="flash" size={20} color="#CBBEFF"/>
+              <View style={{flex:1}}><Text style={[styles.historyUser,{color:colors.text}]}>GAMEPASS AUTO BOOSTER • VENDAS MANUAIS</Text><Text style={[styles.historyMeta,{color:colors.muted}]}>Ative ou remova a gamepass somente depois de confirmar diretamente o pagamento em dinheiro real.</Text></View>
+              <Ionicons name="chevron-forward" size={18} color="#CBBEFF"/>
+            </Pressable>
+          ) : null}
 
           {adminAccess?.isOwner && releaseStatus ? (
             <View style={[styles.legacyAdminPanel,{backgroundColor:colors.surface,borderColor:releaseStatus.legacy_selection_enabled ? '#65D894' : colors.border}]}>
@@ -2763,6 +2773,7 @@ export default function AdminScreen() {
             <View style={styles.formSplit}>
               <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>COINS</Text><TextInput value={codeCoins} onChangeText={(v)=>setCodeCoins(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
               <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>DIAMANTES</Text><TextInput value={codeDiamonds} onChangeText={(v)=>setCodeDiamonds(v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+              <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>2× LUCKY • ABERTURAS</Text><TextInput value={codeLuckyUses} onChangeText={(v)=>setCodeLuckyUses(v.replace(/[^0-9]/g,'').slice(0,5))} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
             </View>
             <View style={styles.formSplit}>
               <View style={styles.formField}><Text style={[styles.fieldLabel,{color:colors.muted}]}>ID DA CARTA (OPCIONAL)</Text><TextInput value={codeCardId} onChangeText={setCodeCardId} autoCapitalize="none" placeholder="sv8-001" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
@@ -2839,6 +2850,7 @@ function rewardSummary(reward: AdminRedeemCode['reward']) {
   if(Number(reward.coins)>0)parts.push(`🪙 ${Number(reward.coins).toLocaleString('pt-BR')}`);
   if(Number(reward.diamonds)>0)parts.push(`💎 ${Number(reward.diamonds).toLocaleString('pt-BR')}`);
   if(reward.cardId)parts.push(`🃏 ${reward.cardQuantity??1}× ${reward.cardId}`);
+  if(Number(reward.lucky2xUses)>0)parts.push(`✨ 2× Lucky ${Number(reward.lucky2xUses)} abertura(s)`);
   return parts.join(' • ');
 }
 

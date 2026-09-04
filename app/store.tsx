@@ -20,6 +20,7 @@ import { useWallet } from '@/wallet/WalletProvider';
 import { getMySocial, type SocialPlayer } from '@/services/social';
 import { getProfileAvatarUrl } from '@/services/player';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
+import { getBoosterPerks, type BoosterPerks } from '@/services/boosterPerks';
 
 type FilterKey = 'all'|'profile'|'card'|'deck'|'market'|'booster'|'identity'|'owned';
 
@@ -44,6 +45,7 @@ const CATEGORY_META:Record<TrainerStoreCategory,{label:string;icon:keyof typeof 
   title:{label:'Título de Trainer',icon:'ribbon'},
   trophy:{label:'Troféu',icon:'trophy'},
   guild_decor:{label:'Decoração de Guilda',icon:'shield'},
+  consumable:{label:'Consumível de Booster',icon:'sparkles'},
 };
 
 function matchesFilter(item:TrainerStoreItem,filter:FilterKey){
@@ -53,7 +55,7 @@ function matchesFilter(item:TrainerStoreItem,filter:FilterKey){
   if(filter==='card') return item.category==='card_style';
   if(filter==='deck') return item.category==='deck_style';
   if(filter==='market') return item.category==='shop_theme';
-  if(filter==='booster') return item.category==='booster_fx';
+  if(filter==='booster') return item.category==='booster_fx'||item.category==='consumable';
   if(filter==='identity') return item.category==='title'||item.category==='trophy';
   return true;
 }
@@ -73,6 +75,7 @@ export default function TrainerStoreScreen(){
   const {colors}=useAppTheme();
   const wallet=useWallet();
   const [catalog,setCatalog]=useState<TrainerShopCatalog|null>(null);
+  const [boosterPerks,setBoosterPerks]=useState<BoosterPerks|null>(null);
   const [loading,setLoading]=useState(true);
   const [working,setWorking]=useState<string|null>(null);
   const [error,setError]=useState<string|null>(null);
@@ -93,8 +96,12 @@ export default function TrainerStoreScreen(){
     try{
       if(!loadedOnce.current)setLoading(true);
       setError(null);
-      const next=await getTrainerShopCatalog();
+      const [next,perks]=await Promise.all([
+        getTrainerShopCatalog(),
+        getBoosterPerks().catch(()=>null),
+      ]);
       setCatalog(next);
+      setBoosterPerks(perks);
       loadedOnce.current=true;
     }catch(e){
       setError(e instanceof Error?e.message:'Não foi possível abrir a Trainer Shop.');
@@ -300,6 +307,26 @@ export default function TrainerStoreScreen(){
         </View>
       ):null}
 
+      <View style={[styles.gamepassCard,{backgroundColor:colors.surface,borderColor:boosterPerks?.autoOpenGamepass?'#59D49A':colors.yellow}] }>
+        <View style={[styles.gamepassIcon,{backgroundColor:boosterPerks?.autoOpenGamepass?'#15392A':colors.accentSoft}]}>
+          <Ionicons name={boosterPerks?.autoOpenGamepass?'flash':'lock-closed'} size={25} color={boosterPerks?.autoOpenGamepass?'#59D49A':colors.yellow}/>
+        </View>
+        <View style={styles.gamepassCopy}>
+          <View style={styles.badgeRow}>
+            <Text style={[styles.gamepassKicker,{color:colors.yellow}]}>GAMEPASS AUTO BOOSTER</Text>
+            <Text style={[styles.manualPayTag,{backgroundColor:boosterPerks?.autoOpenGamepass?'#15392A':'#3B2313',color:boosterPerks?.autoOpenGamepass?'#79E6AE':'#FFD447'}]}>{boosterPerks?.autoOpenGamepass?'ATIVA':'DINHEIRO REAL'}</Text>
+          </View>
+          <Text style={[styles.gamepassTitle,{color:colors.text}]}>Abertura automática de boosters</Text>
+          <Text style={[styles.gamepassText,{color:colors.muted}]}>{boosterPerks?.autoOpenGamepass
+            ? 'Escolha o booster e abra até 50 de uma vez, sempre vendo o custo total antes de confirmar.'
+            : `Esta gamepass não pode ser comprada com Coins ou Diamantes. Fale diretamente com ${boosterPerks?.contactOwnerUsername?'@'+boosterPerks.contactOwnerUsername:'o dono do jogo'} para comprar; depois da confirmação ela é ativada manualmente.`}</Text>
+          <Text style={[styles.luckyStatus,{color:colors.yellow}]}>✨ 2× Lucky disponível: {Number(boosterPerks?.lucky2xUses??0)} abertura(s)</Text>
+        </View>
+        <Pressable onPress={()=>router.push('/auto-open')} style={[styles.gamepassButton,{backgroundColor:boosterPerks?.autoOpenGamepass?'#59D49A':colors.yellow}]}>
+          <Ionicons name={boosterPerks?.autoOpenGamepass?'play':'information-circle'} size={17} color="#07111F"/>
+          <Text style={styles.gamepassButtonText}>{boosterPerks?.autoOpenGamepass?'ABRIR AUTO BOOSTER':'COMO COMPRAR'}</Text>
+        </Pressable>
+      </View>
       {notice ? <Pressable onPress={()=>setNotice(null)} style={[styles.notice,{backgroundColor:'#183528',borderColor:'#3F9A68'}]}><Ionicons name="checkmark-circle" size={18} color="#65D894"/><Text style={styles.noticeText}>{notice}</Text><Ionicons name="close" size={16} color="#9CCDB1"/></Pressable> : null}
       {error ? <Pressable onPress={()=>setError(null)} style={[styles.notice,{backgroundColor:'#351A24',borderColor:'#683243'}]}><Ionicons name="alert-circle" size={18} color="#FF8998"/><Text style={[styles.noticeText,{color:'#FFD7DD'}]}>{error}</Text><Ionicons name="close" size={16} color="#FF9FAF"/></Pressable> : null}
 
@@ -499,6 +526,7 @@ function StoreCard({
   const canBuy=!item.owned||item.quantity<item.maxPurchases;
   const ownedAction=onOwned(item);
   const galaxy=String(item.metadata?.effect??'')==='galaxy'||item.id.includes('galaxy');
+  const consumable=item.category==='consumable';
   const card=(
     <View style={[styles.card,{backgroundColor:colors.surface,borderColor:equipped?accent:colors.border}]}>
       <View style={styles.cardTop}>
@@ -550,8 +578,8 @@ function StoreCard({
 
       <View style={styles.cardFooter}>
         <View>
-          <Text style={[styles.priceLabel,{color:colors.muted}]}>{item.owned?'ITEM POSSUÍDO':'PREÇO'}</Text>
-          <Text style={[styles.price,{color:item.owned?accent:colors.yellow}]}>{item.owned?'✓ NA COLEÇÃO':`🪙 ${item.priceCoins.toLocaleString('pt-BR')}`}</Text>
+          <Text style={[styles.priceLabel,{color:colors.muted}]}>{consumable?'CONSUMÍVEL':item.owned?'ITEM POSSUÍDO':'PREÇO'}</Text>
+          <Text style={[styles.price,{color:consumable?colors.yellow:item.owned?accent:colors.yellow}]}>{consumable?`🪙 ${item.priceCoins.toLocaleString('pt-BR')}`:item.owned?'✓ NA COLEÇÃO':`🪙 ${item.priceCoins.toLocaleString('pt-BR')}`}</Text>
         </View>
         {canBuy ? (
           <Pressable disabled={working} onPress={()=>onBuy(item)} style={[styles.buyButton,{backgroundColor:colors.yellow},working&&styles.disabled]}>
@@ -588,6 +616,9 @@ const styles=StyleSheet.create({
   gateText:{flex:1,fontSize:9,lineHeight:14,fontWeight:'800'},
   notice:{borderRadius:14,borderWidth:1,padding:10,flexDirection:'row',alignItems:'center',gap:8},
   noticeText:{flex:1,color:'#D9FFE8',fontSize:9,lineHeight:14,fontWeight:'800'},
+  gamepassCard:{borderRadius:19,borderWidth:1,padding:13,flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:11},
+  gamepassIcon:{width:50,height:50,borderRadius:15,alignItems:'center',justifyContent:'center'},
+  gamepassCopy:{flex:1,minWidth:220,gap:2},gamepassKicker:{fontSize:7,fontWeight:'900',letterSpacing:1},manualPayTag:{fontSize:6,fontWeight:'900',borderRadius:999,paddingHorizontal:7,paddingVertical:3},gamepassTitle:{fontSize:15,fontWeight:'900'},gamepassText:{fontSize:8.5,lineHeight:13},luckyStatus:{fontSize:8,fontWeight:'900',marginTop:4},gamepassButton:{minHeight:42,borderRadius:12,paddingHorizontal:11,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},gamepassButtonText:{color:'#07111F',fontSize:7.5,fontWeight:'900'},
   luxurySection:{gap:9},
   sectionHeading:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
   kicker:{fontSize:8,fontWeight:'900',letterSpacing:1.2},

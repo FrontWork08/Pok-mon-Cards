@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { BoosterPack2D } from '@/components/BoosterPack2D';
 import { PackContentsModal } from '@/components/PackContentsModal';
 import { PackOpeningModal } from '@/components/PackOpeningModal';
@@ -59,6 +59,7 @@ const DIAMOND_PACK_BASE: Pack = {
 };
 
 export default function PacksScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const { colors, isLight, themeName } = useAppTheme();
   const themeVisual = getThemeVisual(themeName);
@@ -277,6 +278,11 @@ export default function PacksScreen() {
         <View style={styles.balanceActions}><Pressable onPress={()=>void exchangeOneDiamond()} style={[styles.exchangeButton,{backgroundColor:colors.surfaceAlt,borderColor:'#68D9FF'}]}><Ionicons name="diamond" size={15} color="#68D9FF"/><Text style={[styles.exchangeText,{color:colors.text}]}>🪙100K → 💎1</Text></Pressable><View style={[styles.balanceBadge, { backgroundColor: colors.accentSoft }]}><Ionicons name="wallet-outline" size={20} color={colors.yellow} /></View></View>
       </View>
 
+      <Pressable onPress={()=>router.push('/auto-open')} style={[styles.autoOpenEntry,{backgroundColor:colors.surface,borderColor:colors.accent}]}>
+        <View style={[styles.autoOpenEntryIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name="flash" size={22} color={colors.yellow}/></View>
+        <View style={{flex:1,minWidth:180}}><Text style={[styles.autoOpenKicker,{color:colors.yellow}]}>AUTO BOOSTER</Text><Text style={[styles.autoOpenTitle,{color:colors.text}]}>Abrir vários boosters</Text><Text style={[styles.autoOpenText,{color:colors.muted}]}>Escolha o booster + quantidade e veja exatamente quanto vai gastar antes de confirmar.</Text></View>
+        <Ionicons name="chevron-forward" size={20} color={colors.accent}/>
+      </Pressable>
       {freeUntil ? (
         <View style={[styles.notice, { backgroundColor: isLight ? '#E3F8EB' : '#142C23', borderColor: '#4A9B70' }]}>
           <Ionicons name="gift" size={21} color="#45B777" />
@@ -627,6 +633,7 @@ const styles = StyleSheet.create({
   balanceLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   balanceValue: { fontSize: 22, fontWeight: '900', marginTop: 2 },
   balanceActions:{flexDirection:'row',alignItems:'center',gap:7},exchangeButton:{minHeight:38,borderRadius:11,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},exchangeText:{fontSize:8,fontWeight:'900'},balanceBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  autoOpenEntry:{borderRadius:16,borderWidth:1,padding:11,flexDirection:'row',alignItems:'center',gap:10},autoOpenEntryIcon:{width:44,height:44,borderRadius:13,alignItems:'center',justifyContent:'center'},autoOpenKicker:{fontSize:7,fontWeight:'900',letterSpacing:1},autoOpenTitle:{fontSize:14,fontWeight:'900',marginTop:1},autoOpenText:{fontSize:8.5,lineHeight:13,marginTop:2},
   diamondHero: { flexDirection:'row', flexWrap:'wrap', alignItems:'center', gap:12, borderRadius:20, borderWidth:1, padding:14 },
   diamondOrb: { width:52, height:52, borderRadius:18, backgroundColor:'#163C55', alignItems:'center', justifyContent:'center' },
   diamondKicker: { color:'#68D9FF', fontSize:8, fontWeight:'900', letterSpacing:1.2 },
