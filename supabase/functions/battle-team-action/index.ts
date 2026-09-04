@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
       p_conversation_id: conversationId,
       p_body: `${rematchOf ? "Revanche" : "Desafio"} Equipe 3×3 • escolha Golpear ou Trocar a cada turno.`,
       p_kind: "battle_invite",
-      p_metadata: { battleId, mode: "team3", stakeType: "none", teamSize: 3, switching: true, rematchOf: rematchOf ?? null },
+      p_metadata: { battleId, mode: "team3", stakeType: "none", teamSize: 3, switching: true, route: `/team-battle/${battleId}`, rematchOf: rematchOf ?? null },
     });
   }
 
