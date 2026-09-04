@@ -7,6 +7,7 @@ import { getAdminBattleLabCatalog, getAdminBattleLabMatrix, type AdminBattleLabC
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const PAGE_SIZE=80;
+const BATTLE_TYPES=['fire','water','grass','electric','psychic','fighting','dark','steel','dragon','fairy','normal','flying','poison','ground','bug','rock','ghost','ice'] as const;
 
 function prettyAbility(value:string|null|undefined){
   if(!value)return '—';
@@ -26,6 +27,10 @@ export default function AdminBattleLabScreen(){
   const[working,setWorking]=useState(false);
   const[error,setError]=useState<string|null>(null);
   const[search,setSearch]=useState('');
+  const[typeFilter,setTypeFilter]=useState('');
+  const[setFilter,setSetFilter]=useState('');
+  const[rarityFilter,setRarityFilter]=useState('');
+  const[filtersOpen,setFiltersOpen]=useState(false);
   const[catalog,setCatalog]=useState<AdminBattleLabCard[]>([]);
   const[catalogTotal,setCatalogTotal]=useState(0);
   const[catalogLoading,setCatalogLoading]=useState(false);
@@ -34,6 +39,7 @@ export default function AdminBattleLabScreen(){
 
   const ids=useMemo(()=>Object.keys(selected).slice(0,8),[selected]);
   const selectedCards=useMemo(()=>ids.map(id=>selected[id]).filter(Boolean),[ids,selected]);
+  const activeFilterCount=useMemo(()=>[typeFilter,setFilter.trim(),rarityFilter.trim()].filter(Boolean).length,[rarityFilter,setFilter,typeFilter]);
 
   const loadCatalog=useCallback(async(reset:boolean)=>{
     const requestId=++requestRef.current;
@@ -41,7 +47,7 @@ export default function AdminBattleLabScreen(){
       if(reset)setCatalogLoading(true);else setCatalogLoadingMore(true);
       setError(null);
       const offset=reset?0:catalog.length;
-      const page=await getAdminBattleLabCatalog(search,offset,PAGE_SIZE);
+      const page=await getAdminBattleLabCatalog(search,offset,PAGE_SIZE,{type:typeFilter,set:setFilter,rarity:rarityFilter});
       if(requestId!==requestRef.current)return;
       setCatalogTotal(page.total);
       setCatalog(current=>{
@@ -54,13 +60,19 @@ export default function AdminBattleLabScreen(){
     }finally{
       if(requestId===requestRef.current){setCatalogLoading(false);setCatalogLoadingMore(false);}
     }
-  },[catalog.length,search]);
+  },[catalog.length,rarityFilter,search,setFilter,typeFilter]);
 
   useEffect(()=>{
     if(!picker)return;
     const timer=setTimeout(()=>void loadCatalog(true),260);
     return()=>clearTimeout(timer);
-  },[picker,search]);
+  },[picker,rarityFilter,search,setFilter,typeFilter]);
+
+  function clearCatalogFilters(){
+    setTypeFilter('');
+    setSetFilter('');
+    setRarityFilter('');
+  }
 
   function toggleCard(card:AdminBattleLabCard){
     setSelected(current=>{
@@ -132,6 +144,28 @@ export default function AdminBattleLabScreen(){
 
           <View style={[styles.searchBox,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="search" size={18} color={colors.muted}/><TextInput value={search} onChangeText={setSearch} placeholder="Buscar Pokémon, set ou ID..." placeholderTextColor={colors.muted} style={[styles.searchInput,{color:colors.text}]}/>{search?<Pressable onPress={()=>setSearch('')} hitSlop={8}><Ionicons name="close-circle" size={17} color={colors.muted}/></Pressable>:null}</View>
 
+          <View style={styles.filterToolbar}>
+            <Pressable onPress={()=>setFiltersOpen(value=>!value)} style={[styles.filterToggle,{backgroundColor:activeFilterCount?colors.accentSoft:colors.surface,borderColor:activeFilterCount?colors.accent:colors.border}]}>
+              <Ionicons name="options" size={16} color={activeFilterCount?colors.yellow:colors.accent}/>
+              <Text style={[styles.filterToggleText,{color:colors.text}]}>FILTROS{activeFilterCount?` (${activeFilterCount})`:''}</Text>
+              <Ionicons name={filtersOpen?'chevron-up':'chevron-down'} size={14} color={colors.muted}/>
+            </Pressable>
+            {activeFilterCount?<Pressable onPress={clearCatalogFilters} style={[styles.clearFilters,{borderColor:'#D96575'}]}><Ionicons name="refresh" size={14} color="#FF8290"/><Text style={styles.clearFiltersText}>LIMPAR FILTROS</Text></Pressable>:null}
+          </View>
+
+          {filtersOpen?<View style={[styles.filterPanel,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+            <Text style={[styles.filterLabel,{color:colors.muted}]}>TIPO DO POKÉMON</Text>
+            <View style={styles.typeChips}>
+              <Pressable onPress={()=>setTypeFilter('')} style={[styles.typeChip,{backgroundColor:!typeFilter?colors.yellow:colors.surfaceAlt,borderColor:!typeFilter?colors.yellow:colors.border}]}><Text style={[styles.typeChipText,{color:!typeFilter?'#07111F':colors.text}]}>TODOS</Text></Pressable>
+              {BATTLE_TYPES.map(type=><Pressable key={type} onPress={()=>setTypeFilter(current=>current===type?'':type)} style={[styles.typeChip,{backgroundColor:typeFilter===type?colors.accentSoft:colors.surfaceAlt,borderColor:typeFilter===type?colors.accent:colors.border}]}><Text style={[styles.typeChipText,{color:typeFilter===type?colors.yellow:colors.text}]}>{type.toUpperCase()}</Text></Pressable>)}
+            </View>
+            <View style={styles.filterInputs}>
+              <View style={styles.filterField}><Text style={[styles.filterLabel,{color:colors.muted}]}>SET</Text><TextInput value={setFilter} onChangeText={setSetFilter} placeholder="Ex.: Base Set" placeholderTextColor={colors.muted} style={[styles.filterInput,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+              <View style={styles.filterField}><Text style={[styles.filterLabel,{color:colors.muted}]}>RARIDADE</Text><TextInput value={rarityFilter} onChangeText={setRarityFilter} placeholder="Ex.: Rare, Promo" placeholderTextColor={colors.muted} style={[styles.filterInput,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/></View>
+            </View>
+            <Text style={[styles.filterHelp,{color:colors.muted}]}>Os filtros são aplicados no catálogo completo do servidor e podem ser combinados com a busca.</Text>
+          </View>:null}
+
           <View style={styles.modalActions}>{ids.length?<Pressable onPress={clearSelection} style={[styles.modalClear,{borderColor:'#D96575'}]}><Ionicons name="trash-outline" size={15} color="#FF8290"/><Text style={styles.modalClearText}>LIMPAR TODAS</Text></Pressable>:<View/>}<Text style={[styles.catalogHint,{color:colors.muted}]}>Toque na imagem para ampliar. As estatísticas são do motor de batalha no nível 50.</Text></View>
 
           {catalogLoading?<View style={styles.loadingBox}><ActivityIndicator size="large" color={colors.yellow}/><Text style={[styles.loadingText,{color:colors.muted}]}>Carregando catálogo...</Text></View>:<FlatList
@@ -193,7 +227,7 @@ const styles=StyleSheet.create({
   run:{alignSelf:'flex-start',borderRadius:12,minHeight:42,paddingHorizontal:12,justifyContent:'center'},runText:{fontSize:8,fontWeight:'900',color:'#07111F'},disabled:{opacity:.4},error:{color:'#FF9EAA',fontSize:9},
   list:{gap:8},row:{borderRadius:14,borderWidth:1,padding:10,gap:8},matchupHead:{flexDirection:'row',alignItems:'center',gap:8},pair:{fontSize:10.5,fontWeight:'900'},cardIds:{fontSize:6.3,marginTop:2},winnerBadge:{maxWidth:'48%',minHeight:30,borderRadius:10,borderWidth:1,paddingHorizontal:7,flexDirection:'row',alignItems:'center',gap:4},winnerText:{fontSize:6.8,fontWeight:'900',flexShrink:1},rateRow:{flexDirection:'row',gap:7},rateBox:{flex:1,minWidth:0,borderRadius:11,borderWidth:1,padding:8},rateName:{fontSize:6.8,fontWeight:'800'},rateValue:{fontSize:16,fontWeight:'900',marginTop:2},
   modalBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.72)',padding:10,justifyContent:'center',position:'relative'},modalCard:{height:'94%',borderRadius:22,borderWidth:1,padding:11,gap:9,overflow:'hidden'},modalHead:{flexDirection:'row',alignItems:'flex-start',gap:8},modalKicker:{fontSize:6.5,fontWeight:'900',letterSpacing:.8},modalTitle:{fontSize:17,fontWeight:'900',marginTop:2},modalSub:{fontSize:7.5,marginTop:3},close:{width:40,height:40,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center'},
-  searchBox:{height:46,borderRadius:13,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},searchInput:{flex:1,fontSize:10,paddingVertical:0},modalActions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},modalClear:{minHeight:32,borderRadius:9,borderWidth:1,paddingHorizontal:7,flexDirection:'row',alignItems:'center',gap:4},modalClearText:{fontSize:6.5,fontWeight:'900',color:'#FF8290'},catalogHint:{fontSize:6.3,lineHeight:9.5,flex:1,textAlign:'right'},
+  searchBox:{height:46,borderRadius:13,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:7},searchInput:{flex:1,fontSize:10,paddingVertical:0},filterToolbar:{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'},filterToggle:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',gap:5},filterToggleText:{fontSize:7,fontWeight:'900'},clearFilters:{minHeight:36,borderRadius:10,borderWidth:1,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:4},clearFiltersText:{fontSize:6.5,fontWeight:'900',color:'#FF8290'},filterPanel:{borderRadius:13,borderWidth:1,padding:9,gap:8},filterLabel:{fontSize:6.2,fontWeight:'900',letterSpacing:.7},typeChips:{flexDirection:'row',flexWrap:'wrap',gap:5},typeChip:{minHeight:27,borderRadius:999,borderWidth:1,paddingHorizontal:8,alignItems:'center',justifyContent:'center'},typeChipText:{fontSize:5.9,fontWeight:'900'},filterInputs:{flexDirection:'row',gap:7,flexWrap:'wrap'},filterField:{flexGrow:1,flexBasis:145,gap:4},filterInput:{height:38,borderRadius:10,borderWidth:1,paddingHorizontal:8,fontSize:8.5},filterHelp:{fontSize:6.2,lineHeight:9.5},modalActions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},modalClear:{minHeight:32,borderRadius:9,borderWidth:1,paddingHorizontal:7,flexDirection:'row',alignItems:'center',gap:4},modalClearText:{fontSize:6.5,fontWeight:'900',color:'#FF8290'},catalogHint:{fontSize:6.3,lineHeight:9.5,flex:1,textAlign:'right'},
   loadingBox:{flex:1,alignItems:'center',justifyContent:'center',gap:8},loadingText:{fontSize:8},catalogList:{flex:1},catalogContent:{paddingBottom:8,gap:8},catalogCard:{borderRadius:16,borderWidth:1,padding:8,flexDirection:'row',gap:9,minHeight:205},catalogBlocked:{opacity:.42},catalogImageWrap:{width:132,height:184,borderRadius:11,borderWidth:1,alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden'},catalogImage:{width:'100%',height:'100%'},zoomBadge:{position:'absolute',left:5,bottom:5,borderRadius:8,paddingHorizontal:6,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:3},zoomText:{color:'#FFF',fontSize:5.8,fontWeight:'900'},selectedBadge:{position:'absolute',right:5,top:5,width:26,height:26,borderRadius:999,alignItems:'center',justifyContent:'center'},catalogInfo:{flex:1,minWidth:0,gap:4},catalogName:{fontSize:10.5,fontWeight:'900'},catalogMeta:{fontSize:6.5,lineHeight:9},catalogId:{fontSize:5.8,fontWeight:'800',flex:1},statsGrid:{flexDirection:'row',flexWrap:'wrap',gap:4,marginTop:3},statBox:{flexGrow:1,flexBasis:'30%',minWidth:48,borderRadius:8,borderWidth:1,paddingHorizontal:5,paddingVertical:4},statLabel:{fontSize:5.5,fontWeight:'900'},statValue:{fontSize:10.5,fontWeight:'900',marginTop:1},abilityRow:{borderRadius:8,borderWidth:1,paddingHorizontal:6,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:4},abilityText:{fontSize:6.4,fontWeight:'800',flex:1},catalogBottom:{marginTop:'auto',flexDirection:'row',alignItems:'center',gap:5},chooseButton:{minHeight:31,borderRadius:9,borderWidth:1,paddingHorizontal:7,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4},chooseText:{fontSize:6.2,fontWeight:'900'},empty:{paddingVertical:40,alignItems:'center',gap:7},emptyText:{fontSize:8},
   confirm:{minHeight:44,borderRadius:12,alignItems:'center',justifyContent:'center'},confirmText:{fontSize:8,fontWeight:'900',color:'#07111F'},
   previewOverlay:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(0,0,0,.86)',zIndex:30,padding:13,alignItems:'center',justifyContent:'center'},previewCard:{width:'100%',maxWidth:620,maxHeight:'95%',borderRadius:22,borderWidth:1,padding:12,gap:10},previewHead:{flexDirection:'row',alignItems:'flex-start',gap:8},previewTitle:{fontSize:18,fontWeight:'900',marginTop:2},previewMeta:{fontSize:7.5,lineHeight:11,marginTop:3},previewBody:{flexDirection:'row',gap:11,flexWrap:'wrap'},previewImageWrap:{flexGrow:1,flexBasis:210,minWidth:190,height:360,borderRadius:14,borderWidth:1,alignItems:'center',justifyContent:'center',overflow:'hidden'},previewImage:{width:'100%',height:'100%'},previewInfo:{flexGrow:1,flexBasis:190,minWidth:180,gap:7},previewSection:{fontSize:7,fontWeight:'900',letterSpacing:.6},previewStats:{flexDirection:'row',flexWrap:'wrap',gap:5},previewDetail:{borderRadius:10,borderWidth:1,padding:8},previewDetailLabel:{fontSize:5.8,fontWeight:'900'},previewDetailValue:{fontSize:9,fontWeight:'900',marginTop:2},previewId:{fontSize:6.5},previewChoose:{minHeight:44,borderRadius:12,borderWidth:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},previewChooseText:{fontSize:7.5,fontWeight:'900'}
