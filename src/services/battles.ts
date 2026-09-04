@@ -3,7 +3,7 @@ import { getSessionUserId } from '@/lib/session';
 import { normalizeFunctionError } from '@/services/functionErrors';
 
 export type BattleStakeType = 'none' | 'coins' | 'card';
-export type BattleMode = 'quick' | 'mystery' | 'draft3';
+export type BattleMode = 'quick' | 'mystery' | 'draft3' | 'team3';
 
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('battle-action', { body });
