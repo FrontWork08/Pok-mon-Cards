@@ -11,9 +11,10 @@
     "apk": "node scripts/android-apk.mjs build",
     "apk:download": "node scripts/android-apk.mjs download",
     "audit:project": "node scripts/project-audit.mjs",
-    "verify": "npx tsc --noEmit && node scripts/project-audit.mjs && node scripts/regression-audit.mjs && node scripts/scroll-performance-audit.mjs",
+    "verify": "npx tsc --noEmit && node scripts/project-audit.mjs && node scripts/regression-audit.mjs && node scripts/scroll-performance-audit.mjs && node scripts/full-game-audit.mjs",
     "audit:regression": "node scripts/regression-audit.mjs",
     "audit:scroll": "node scripts/scroll-performance-audit.mjs",
+    "audit:full": "node scripts/full-game-audit.mjs",
     "economy:sim": "node scripts/economy-sim.mjs"
   },
   "dependencies": {
