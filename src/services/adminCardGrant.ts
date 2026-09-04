@@ -1,6 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { normalizeFunctionError } from '@/services/functionErrors';
 
+const OWNER_CARD_GRANT_MIN = 1;
+const OWNER_CARD_GRANT_MAX = 100;
+
 async function invokeOwnerCard(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('admin-action', { body });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível concluir a ação de carta do Criador.');
@@ -47,5 +50,12 @@ export async function grantOwnerCard(
   quantity = 1,
   note = '',
 ): Promise<OwnerCardGrantResult> {
-  return invokeOwnerCard({ action: 'owner_grant_card', targetId, cardId, quantity, note }) as Promise<OwnerCardGrantResult>;
+  const target = targetId.trim();
+  const card = cardId.trim();
+  if (!target) throw new Error('Escolha a conta que vai receber a carta.');
+  if (!card) throw new Error('Escolha a carta que será adicionada.');
+  if (!Number.isSafeInteger(quantity) || quantity < OWNER_CARD_GRANT_MIN || quantity > OWNER_CARD_GRANT_MAX) {
+    throw new Error(`Escolha uma quantidade entre ${OWNER_CARD_GRANT_MIN} e ${OWNER_CARD_GRANT_MAX}.`);
+  }
+  return invokeOwnerCard({ action: 'owner_grant_card', targetId: target, cardId: card, quantity, note: note.trim() }) as Promise<OwnerCardGrantResult>;
 }
