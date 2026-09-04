@@ -37,7 +37,9 @@ function mapRow(row: any, identity?: PlayerAvatarMeta | null): GlobalChatMessage
 
 async function hydrateRows(rows: any[]): Promise<GlobalChatMessage[]> {
   if (!rows.length) return [];
-  const identityMap = await getPlayerAvatarMap(rows.map((row) => String(row.player_id ?? row.playerId ?? ''))).catch(() => ({}));
+  const identityMap: Record<string, PlayerAvatarMeta> = await getPlayerAvatarMap(
+    rows.map((row) => String(row.player_id ?? row.playerId ?? '')),
+  ).catch(() => ({} as Record<string, PlayerAvatarMeta>));
   return rows.map((row) => mapRow(row, identityMap[String(row.player_id ?? row.playerId ?? '')]));
 }
 
