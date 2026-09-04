@@ -7,9 +7,11 @@ export type RedeemResult = {
     diamonds?: number;
     cardId?: string;
     cardQuantity?: number;
+    lucky2xUses?: number;
   };
   coins: number;
   diamonds: number;
+  lucky2xRemaining: number;
 };
 
 export async function redeemCode(code: string): Promise<RedeemResult> {
@@ -23,6 +25,7 @@ export async function redeemCode(code: string): Promise<RedeemResult> {
       CODE_ALREADY_REDEEMED: 'Você já resgatou este código nesta conta.',
       CODE_LIMIT_REACHED: 'O limite total de resgates deste código foi atingido.',
       INVALID_CODE: 'Digite um código válido.',
+      INVALID_REWARD: 'A recompensa configurada neste código é inválida.',
     };
     const key = Object.keys(map).find((item) => error.message.includes(item));
     throw new Error(key ? map[key] : error.message);
@@ -33,5 +36,6 @@ export async function redeemCode(code: string): Promise<RedeemResult> {
     reward: value.reward ?? {},
     coins: Number(value.coins ?? 0),
     diamonds: Number(value.diamonds ?? 0),
+    lucky2xRemaining: Number(value.lucky2xRemaining ?? 0),
   };
 }
