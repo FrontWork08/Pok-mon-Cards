@@ -1,0 +1,28 @@
+name: Audit trainer identity surfaces
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/audit-trainer-identity-surfaces.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find trainer identity surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== TrainerAvatar usage ==='
+          grep -RIn --include='*.tsx' '<TrainerAvatar' app src || true
+          echo '=== CompactTrainerBanner usage ==='
+          grep -RIn --include='*.tsx' 'CompactTrainerBanner' app src || true
+          echo '=== profile icon / avatar fields ==='
+          grep -RInE --include='*.tsx' --include='*.ts' 'profile_icon|profileIcon|avatar_path|avatarPath|friend_username' app src | head -n 500 || true
+          echo '=== hand-built avatar/initial placeholders ==='
+          grep -RInE --include='*.tsx' 'avatarText|slice\(0,1\)|slice\(0, 1\)|person-circle|person-outline' app src | head -n 300 || true
