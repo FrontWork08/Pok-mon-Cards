@@ -1,0 +1,66 @@
+name: Finish team3 battle hub routing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-team3-ui-details.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch team3 labels and history routes
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/(tabs)/battles.tsx')
+          text = p.read_text()
+
+          old = "Modo: {queueState.mode_choice === 'draft3' ? 'Draft 3' : queueState.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'} • jogador real primeiro • IA após 18s"
+          new = "Modo: {queueState.mode_choice === 'team3' ? 'Equipe 3×3' : queueState.mode_choice === 'draft3' ? 'Draft 3' : queueState.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'} • jogador real primeiro • IA após 18s"
+          assert old in text, 'queue label not found'
+          text = text.replace(old, new, 1)
+
+          old = "<Pressable style={styles.battleBody} onPress={() => router.push(`/battle/${item.id}`)}>"
+          new = "<Pressable style={styles.battleBody} onPress={() => router.push(battleRoute(item.id, item.mode))}>"
+          assert old in text, 'history route not found'
+          text = text.replace(old, new, 1)
+
+          old = "{item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.is_bot_match ? 'Treinador IA'"
+          new = "{item.mode === 'team3' ? 'Equipe 3×3' : item.mode === 'draft3' ? 'Draft 3' : item.mode === 'mystery' ? 'Mystery BO3' : 'Quick'} • {item.is_bot_match ? 'Treinador IA'"
+          assert old in text, 'history mode label not found'
+          text = text.replace(old, new, 1)
+
+          old = "async function rematch(id: string) {"
+          new = "async function rematch(id: string, battleMode?: BattleMode) {"
+          assert old in text, 'rematch function not found'
+          text = text.replace(old, new, 1)
+
+          old = "router.push(`/battle/${next}`);"
+          new = "router.push(battleRoute(next, battleMode));"
+          assert old in text, 'rematch route not found'
+          text = text.replace(old, new, 1)
+
+          old = "onPress={() => rematch(item.id)}"
+          new = "onPress={() => rematch(item.id, item.mode)}"
+          assert old in text, 'rematch button not found'
+          text = text.replace(old, new, 1)
+
+          p.write_text(text)
+      - name: Remove one-time workflow and commit
+        run: |
+          rm .github/workflows/patch-team3-ui-details.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'app/(tabs)/battles.tsx' .github/workflows/patch-team3-ui-details.yml
+          git commit -m "Finish team3 matchmaking labels and routes"
+          git push origin main
