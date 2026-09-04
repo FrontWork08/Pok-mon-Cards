@@ -5,30 +5,55 @@ import { normalizeFunctionError } from '@/services/functionErrors';
 export type BattleStakeType = 'none' | 'coins' | 'card';
 export type BattleMode = 'quick' | 'mystery' | 'draft3' | 'team3';
 
+function normalizeBattleActionError(data: any) {
+  if (!data?.error) return;
+  if(String(data.error).includes('CARD_LOCKED')) throw new Error('Esta carta está bloqueada 🔒 e não pode ser usada como aposta. Ela continua liberada para batalhas normais.');
+  if(String(data.error).includes('CARD_NOT_ALLOWED_BY_FORMAT')) throw new Error('Esta carta não atende às regras do formato escolhido para esta batalha.');
+  if(String(data.error).includes('MUST_SWITCH')) throw new Error('Seu Pokémon foi nocauteado. Escolha um Pokémon da reserva antes de continuar.');
+  if(String(data.error).includes('WAITING_FOR_FORCED_SWITCH')) throw new Error('Aguardando a troca obrigatória do adversário.');
+  if(String(data.error).includes('ACTION_ALREADY_LOCKED')) throw new Error('Sua ação deste turno já foi confirmada.');
+  throw new Error(String(data.error));
+}
+
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('battle-action', { body });
   if (error) throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da batalha.');
-  if (data?.error) {
-    if(String(data.error).includes('CARD_LOCKED')) throw new Error('Esta carta está bloqueada 🔒 e não pode ser usada como aposta. Ela continua liberada para batalhas normais.');
-    if(String(data.error).includes('CARD_NOT_ALLOWED_BY_FORMAT')) throw new Error('Esta carta não atende às regras do formato escolhido para esta batalha.');
-    if(String(data.error).includes('MUST_SWITCH')) throw new Error('Seu Pokémon foi nocauteado. Escolha um Pokémon da reserva antes de continuar.');
-    if(String(data.error).includes('WAITING_FOR_FORCED_SWITCH')) throw new Error('Aguardando a troca obrigatória do adversário.');
-    if(String(data.error).includes('ACTION_ALREADY_LOCKED')) throw new Error('Sua ação deste turno já foi confirmada.');
-    throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível concluir a ação da batalha.');
-  }
+  try { normalizeBattleActionError(data); } catch (error) { throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da batalha.'); }
   return data?.data;
 }
 
+async function invokeTeam(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke('battle-team-action', { body });
+  if (error) throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da batalha de equipe.');
+  try { normalizeBattleActionError(data); } catch (error) { throw await normalizeFunctionError(error, 'Não foi possível concluir a ação da batalha de equipe.'); }
+  return data?.data;
+}
+
+async function getBattleMode(battleId: string): Promise<BattleMode | null> {
+  const { data, error } = await supabase.from('battles').select('mode').eq('id', battleId).maybeSingle();
+  if (error) throw error;
+  return (data?.mode as BattleMode | undefined) ?? null;
+}
+
 export async function createBattle(opponentId: string, mode: BattleMode = 'quick', stakeType: BattleStakeType = 'none', wagerCoins = 0, stakeCardId?: string | null, rematchOf?: string | null) {
+  if (mode === 'team3') {
+    const data = await invokeTeam({ action: 'create', opponentId, rematchOf: rematchOf ?? null });
+    return data.battleId as string;
+  }
   const data = await invoke({ action: 'create', opponentId, mode, stakeType, wagerCoins, stakeCardId: stakeCardId ?? null, rematchOf: rematchOf ?? null });
   return data.battleId as string;
 }
 
 export async function respondToBattle(battleId: string, accept: boolean, stakeCardId?: string | null) {
+  if (await getBattleMode(battleId) === 'team3') return invokeTeam({ action: 'respond', battleId, accept });
   return invoke({ action: 'respond', battleId, accept, stakeCardId: stakeCardId ?? null });
 }
 
 export async function rematchBattle(battleId: string) {
+  if (await getBattleMode(battleId) === 'team3') {
+    const data = await invokeTeam({ action: 'rematch', battleId });
+    return data.battleId as string;
+  }
   const data = await invoke({ action: 'rematch', battleId });
   return data.battleId as string;
 }
@@ -50,23 +75,23 @@ export async function chooseBattleAttack(battleId: string, attackName: string) {
 }
 
 export async function setBattleTeam(battleId: string, cardIds: string[]) {
-  return invoke({ action: 'team_set', battleId, cardIds });
+  return invokeTeam({ action: 'set_team', battleId, cardIds });
 }
 
 export async function getBattleTeamState(battleId: string) {
-  return invoke({ action: 'team_state', battleId });
+  return invokeTeam({ action: 'state', battleId });
 }
 
 export async function chooseBattleTeamAttack(battleId: string, attackName: string) {
-  return invoke({ action: 'team_attack', battleId, attackName });
+  return invokeTeam({ action: 'attack', battleId, attackName });
 }
 
 export async function chooseBattleTeamSwitch(battleId: string, slot: number) {
-  return invoke({ action: 'team_switch', battleId, slot });
+  return invokeTeam({ action: 'switch', battleId, slot });
 }
 
 export async function resolveBattleTeamTimeout(battleId: string) {
-  return invoke({ action: 'team_timeout', battleId });
+  return invokeTeam({ action: 'timeout', battleId });
 }
 
 export async function resolveBattleTimeout(battleId: string) {
