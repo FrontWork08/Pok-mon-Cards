@@ -3,7 +3,7 @@ import { getSessionUserId } from '@/lib/session';
 import { normalizeFunctionError } from '@/services/functionErrors';
 
 export type BattleStakeType = 'none' | 'coins' | 'card';
-export type BattleMode = 'quick' | 'mystery' | 'draft3';
+export type BattleMode = 'quick' | 'mystery' | 'draft3' | 'team3';
 
 async function invoke(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('battle-action', { body });
@@ -11,6 +11,9 @@ async function invoke(body: Record<string, unknown>) {
   if (data?.error) {
     if(String(data.error).includes('CARD_LOCKED')) throw new Error('Esta carta está bloqueada 🔒 e não pode ser usada como aposta. Ela continua liberada para batalhas normais.');
     if(String(data.error).includes('CARD_NOT_ALLOWED_BY_FORMAT')) throw new Error('Esta carta não atende às regras do formato escolhido para esta batalha.');
+    if(String(data.error).includes('MUST_SWITCH')) throw new Error('Seu Pokémon foi nocauteado. Escolha um Pokémon da reserva antes de continuar.');
+    if(String(data.error).includes('WAITING_FOR_FORCED_SWITCH')) throw new Error('Aguardando a troca obrigatória do adversário.');
+    if(String(data.error).includes('ACTION_ALREADY_LOCKED')) throw new Error('Sua ação deste turno já foi confirmada.');
     throw await normalizeFunctionError(new Error(String(data.error)), 'Não foi possível concluir a ação da batalha.');
   }
   return data?.data;
@@ -44,6 +47,26 @@ export async function getBattleAttackState(battleId: string) {
 
 export async function chooseBattleAttack(battleId: string, attackName: string) {
   return invoke({ action: 'attack', battleId, attackName });
+}
+
+export async function setBattleTeam(battleId: string, cardIds: string[]) {
+  return invoke({ action: 'team_set', battleId, cardIds });
+}
+
+export async function getBattleTeamState(battleId: string) {
+  return invoke({ action: 'team_state', battleId });
+}
+
+export async function chooseBattleTeamAttack(battleId: string, attackName: string) {
+  return invoke({ action: 'team_attack', battleId, attackName });
+}
+
+export async function chooseBattleTeamSwitch(battleId: string, slot: number) {
+  return invoke({ action: 'team_switch', battleId, slot });
+}
+
+export async function resolveBattleTeamTimeout(battleId: string) {
+  return invoke({ action: 'team_timeout', battleId });
 }
 
 export async function resolveBattleTimeout(battleId: string) {
