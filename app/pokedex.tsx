@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -216,6 +217,7 @@ export default function PokedexScreen() {
     <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
         key={`pokedex-grid-${columns}`}
         data={loading ? [] : filtered}
         keyExtractor={(entry) => String(entry.pokedex_number)}

@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -556,6 +557,7 @@ export default function EconomyScreen(){
           <View style={[styles.searchBox,{backgroundColor:colors.surface,borderColor:colors.border}]}><Ionicons name="search" size={18} color={colors.muted}/><TextInput value={bagSearch} onChangeText={setBagSearch} placeholder="Buscar Pokémon..." placeholderTextColor={colors.muted} style={[styles.searchInput,{color:colors.text}]}/></View>
           {bagLoading?<ActivityIndicator style={{margin:14}} color={colors.yellow}/>:null}
           <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
             data={bagCards}
             keyExtractor={(x,i)=>x.cards?.id??`bag-${i}`}
             contentContainerStyle={styles.pickerList}

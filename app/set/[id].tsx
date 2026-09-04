@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -153,6 +154,7 @@ export default function SetDetailScreen() {
     <SafeAreaView edges={['left','right','bottom']} style={[styles.safe,{backgroundColor:colors.bg}]}>
       <PremiumBackground />
       <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
         key={`set-detail-${columns}`}
         data={loading ? [] : cards}
         keyExtractor={(card) => card.id}

@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -134,6 +135,7 @@ export default function AdminBattleLabScreen(){
           <View style={styles.modalActions}>{ids.length?<Pressable onPress={clearSelection} style={[styles.modalClear,{borderColor:'#D96575'}]}><Ionicons name="trash-outline" size={15} color="#FF8290"/><Text style={styles.modalClearText}>LIMPAR TODAS</Text></Pressable>:<View/>}<Text style={[styles.catalogHint,{color:colors.muted}]}>Toque na imagem para ampliar. As estatísticas são do motor de batalha no nível 50.</Text></View>
 
           {catalogLoading?<View style={styles.loadingBox}><ActivityIndicator size="large" color={colors.yellow}/><Text style={[styles.loadingText,{color:colors.muted}]}>Carregando catálogo...</Text></View>:<FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
             data={catalog}
             keyExtractor={item=>item.id}
             style={styles.catalogList}

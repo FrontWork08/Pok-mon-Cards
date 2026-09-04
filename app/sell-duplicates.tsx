@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -180,6 +181,7 @@ export default function SellDuplicatesScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
         data={filtered}
         keyExtractor={(item) => item.cards?.id ?? String(item.quantity)}
         contentContainerStyle={styles.content}

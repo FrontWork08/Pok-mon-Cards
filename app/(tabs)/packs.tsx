@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -469,6 +470,7 @@ export default function PacksScreen() {
     <SafeAreaView edges={['left','right','bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
         key={`pack-grid-${columns}`}
         data={filtered}
         keyExtractor={(pack) => pack.id}

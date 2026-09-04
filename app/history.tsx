@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -224,6 +225,7 @@ export default function HistoryScreen() {
     <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
         data={history}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}

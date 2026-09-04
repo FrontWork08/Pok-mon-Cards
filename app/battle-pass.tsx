@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -229,6 +230,7 @@ export default function BattlePassScreen() {
       <PremiumBackground />
       {tab === 'rewards' ? (
         <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
           data={levels}
           keyExtractor={(item) => String(item.level)}
           ListHeaderComponent={header}
@@ -250,6 +252,7 @@ export default function BattlePassScreen() {
         />
       ) : (
         <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
           data={missions}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={header}

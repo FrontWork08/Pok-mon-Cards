@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -482,6 +483,7 @@ export default function DeckEditorScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <PremiumBackground />
       <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
         key={`deck-builder-${columns}`}
         data={loadingCards ? [] : cards}
         numColumns={columns}
@@ -594,6 +596,7 @@ export default function DeckEditorScreen() {
             </View>
             {styleOptionsLoading?<ActivityIndicator size="large" color={colors.yellow}/>:(
               <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
                 data={styleOptions}
                 keyExtractor={(item)=>item.id}
                 style={styles.themeList}

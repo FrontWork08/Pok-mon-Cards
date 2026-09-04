@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -178,6 +179,7 @@ export default function SetsScreen() {
     <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: colors.bg }]}>
       <PremiumBackground />
       <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
         key={`set-grid-${columns}`}
         data={loading ? [] : filtered}
         keyExtractor={(set) => set.set_id}

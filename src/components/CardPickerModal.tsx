@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -251,6 +252,7 @@ export function CardPickerModal({
         </View>
 
         <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
           key={`picker-${columns}`}
           data={visibleCards}
           numColumns={columns}

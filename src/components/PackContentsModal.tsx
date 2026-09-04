@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -129,6 +130,7 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
           </View>
         ) : (
           <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
             data={cards}
             keyExtractor={(item) => item.id}
             numColumns={2}

@@ -1,3 +1,4 @@
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, InteractionManager, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -940,6 +941,7 @@ function CardPickerModal({
             </View>
           ) : (
             <FlatList
+        {...VIRTUAL_LIST_PERF_PROPS}
               style={styles.cardScroll}
               contentContainerStyle={styles.virtualCardGrid}
               columnWrapperStyle={styles.virtualCardRow}
