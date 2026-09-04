@@ -83,7 +83,7 @@
 
           <div class="trust-row" aria-label="Informações de segurança">
             <span>✓ Sem anúncios no instalador</span>
-            <span>✓ APK assinado</span>
+            <span>✓ Assinatura Android verificada</span>
             <span>✓ SHA-256 publicado</span>
           </div>
         </div>
@@ -186,12 +186,21 @@
             <span class="shield">✓</span>
             <div><small>INTEGRIDADE DO ARQUIVO</small><strong>Verificação SHA-256</strong></div>
           </div>
-          <p>Compare este código com o hash do arquivo baixado para confirmar que o APK não foi alterado.</p>
+          <p>Compare este código com o hash do arquivo baixado para confirmar que o APK não foi alterado. A release também é conferida pelo Android <code>apksigner</code> antes de ser liberada.</p>
           <div class="hash-box">
             <code id="release-hash">Aguardando build oficial</code>
             <button id="copy-hash" type="button" disabled>Copiar</button>
           </div>
-          <div class="integrity-row"><span>Canal</span><strong>Android • Production oficial</strong></div>
+          <div class="integrity-row"><span>Assinatura Android</span><strong id="release-signature">Verificando…</strong></div>
+<div class="integrity-row"><span>Package</span><strong id="release-package">Verificando…</strong></div>
+<div class="integrity-row"><span>Verificador</span><strong id="release-verifier">Verificando…</strong></div>
+<div class="integrity-row"><span>Verificado em</span><strong id="release-verified-date">Verificando…</strong></div>
+<p><strong>Fingerprint SHA-256 do certificado oficial</strong></p>
+<div class="hash-box">
+  <code id="release-cert-hash">Aguardando verificação</code>
+  <button id="copy-cert-hash" type="button" disabled>Copiar</button>
+</div>
+<div class="integrity-row"><span>Canal</span><strong>Android • Production oficial</strong></div>
           <div class="integrity-row"><span>Transporte</span><strong>HTTPS obrigatório</strong></div>
           <div class="integrity-row"><span>Origem</span><strong id="release-origin">Aguardando release</strong></div>
         </aside>
@@ -210,7 +219,7 @@
           <article><strong>CSP restritiva</strong><p>A página aceita scripts, estilos e conexões apenas da própria origem.</p></article>
           <article><strong>Sem formulários sensíveis</strong><p>A página não possui login, campos de senha, pagamento ou coleta de credenciais.</p></article>
           <article><strong>Link validado</strong><p>O botão só habilita URLs HTTPS de provedores de release permitidos.</p></article>
-          <article><strong>Hash do APK</strong><p>Cada build oficial pode publicar seu SHA-256 para verificação independente.</p></article>
+          <article><strong>Hash + assinatura</strong><p>O download só é liberado quando o SHA-256, a assinatura Android e o certificado oficial fixado estão consistentes.</p></article>
         </div>
       </div>
     </section>
@@ -239,10 +248,14 @@
         <div class="faq">
           <details>
             <summary>Por que o Android pode avisar sobre instalação externa?</summary>
-            <p>Porque o APK é instalado diretamente pelo navegador, fora da Play Store. Baixe somente pela página oficial e confira o SHA-256 publicado.</p>
+            <p>Porque o APK é instalado diretamente pelo navegador, fora da Play Store. Esse aviso genérico pode aparecer mesmo quando o arquivo está íntegro. Esta página confere SHA-256, assinatura Android e certificado oficial antes de liberar o botão.</p>
           </details>
           <details>
-            <summary>Preciso baixar um APK novo para toda atualização?</summary>
+            <summary>E se o Play Protect disser especificamente “app nocivo” ou mostrar o nome de uma ameaça?</summary>
+  <p>Nesse caso, não force a instalação. Um alerta explícito de ameaça é diferente do aviso genérico de instalação externa. Avise o responsável pelo Trainer Collection para a release ser investigada e, se for falso positivo, contestada antes de continuar.</p>
+</details>
+<details>
+  <summary>Preciso baixar um APK novo para toda atualização?</summary>
             <p>Não. Muitas alterações do app são entregues por atualização OTA. Um novo APK é necessário principalmente quando a parte nativa do aplicativo muda.</p>
           </details>
           <details>
