@@ -15,6 +15,7 @@ on:
       - scripts/generate-trainer-assets.py
       - scripts/project-audit.mjs
       - scripts/regression-audit.mjs
+      - scripts/apk-security-audit.mjs
       - .github/workflows/eas-update.yml
 
 permissions:
