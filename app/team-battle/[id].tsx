@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
@@ -19,6 +19,7 @@ import {
 } from '@/services/teamBattles';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
+import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 
 function hpValues(member?: TeamBattleMember | null) {
   const item = (member ?? {}) as Record<string, unknown>;
@@ -46,6 +47,7 @@ export default function TeamBattleScreen() {
   const [cards, setCards] = useState<TeamBattleCard[]>([]);
   const [selected, setSelected] = useState<TeamBattleCard[]>([]);
   const [search, setSearch] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -249,35 +251,21 @@ export default function TeamBattleScreen() {
                   })}
                 </View>
 
-                <TextInput
-                  value={search}
-                  onChangeText={setSearch}
-                  placeholder="Buscar Pokémon ou coleção..."
-                  placeholderTextColor={colors.muted}
-                  style={[styles.search, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceAlt }]}
-                />
-
-                <View style={styles.cardGrid}>
-                  {cards.map((card) => {
-                    const index = selected.findIndex((item) => item.cardId === card.cardId);
-                    const active = index >= 0;
-                    return (
-                      <Pressable
-                        key={card.cardId}
-                        onPress={() => toggleCard(card)}
-                        style={[styles.cardPick, { borderColor: active ? colors.accent : colors.border, backgroundColor: active ? colors.accentSoft : colors.surfaceAlt }]}
-                      >
-                        {card.image ? <Image source={{ uri: card.image }} style={styles.cardImage} resizeMode="contain" /> : <View style={[styles.cardImage, { backgroundColor: colors.bg }]} />}
-                        <View style={{ flex: 1, gap: 3 }}>
-                          <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.name}</Text>
-                          <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{card.setName ?? card.rarity ?? 'Pokémon'}</Text>
-                          <Text style={{ color: colors.muted, fontSize: 11 }}>HP {card.hp ?? '—'} • SPD {card.speed ?? '—'}</Text>
-                        </View>
-                        {active ? <View style={[styles.pickBadge, { backgroundColor: colors.accent }]}><Text style={styles.pickBadgeText}>{index + 1}</Text></View> : null}
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <Pressable
+                  onPress={() => setPickerOpen(true)}
+                  style={[styles.pickerTrigger, { backgroundColor: colors.surfaceAlt, borderColor: colors.accent }]}
+                >
+                  <View style={[styles.pickerTriggerIcon, { backgroundColor: colors.accentSoft }]}>
+                    <Ionicons name="albums" size={22} color={colors.accent} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.bold, { color: colors.text }]}>Escolher Pokémon</Text>
+                    <Text style={{ color: colors.muted, fontSize: 11 }}>
+                      {selected.length}/3 escolhidos • lista otimizada para scroll
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={19} color={colors.accent} />
+                </Pressable>
 
                 <Pressable disabled={working || selected.length !== 3} onPress={() => void lockTeam()} style={[styles.primaryButton, { backgroundColor: selected.length === 3 ? colors.accent : colors.border, opacity: working ? 0.65 : 1 }]}>
                   {working ? <ActivityIndicator color="#fff" /> : <Ionicons name="checkmark-circle" size={20} color="#fff" />}
@@ -406,6 +394,71 @@ export default function TeamBattleScreen() {
           </View>
         ) : null}
       </Screen>
+
+      <Modal visible={pickerOpen && state?.status === 'drafting' && !state?.myTeamLocked} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
+        <View style={styles.pickerBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPickerOpen(false)} />
+          <View style={[styles.pickerModal, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+            <View style={styles.pickerHeader}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.leader, { color: colors.yellow }]}>EQUIPE 3×3 • SELETOR OTIMIZADO</Text>
+                <Text style={[styles.title, { color: colors.text }]}>Escolha seus Pokémon</Text>
+                <Text style={[styles.subtitle, { color: colors.muted }]}>{selected.length}/3 selecionados • o primeiro será o líder</Text>
+              </View>
+              <Pressable onPress={() => setPickerOpen(false)} style={[styles.pickerClose, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Ionicons name="close" size={20} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Buscar Pokémon ou coleção..."
+              placeholderTextColor={colors.muted}
+              style={[styles.search, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+            />
+
+            <FlatList
+              {...VIRTUAL_LIST_PERF_PROPS}
+              data={cards}
+              keyExtractor={(card) => card.cardId}
+              style={styles.pickerList}
+              contentContainerStyle={styles.pickerListContent}
+              ListEmptyComponent={(
+                <View style={styles.pickerEmpty}>
+                  <Ionicons name="search" size={28} color={colors.muted} />
+                  <Text style={[styles.subtitle, { color: colors.muted }]}>Nenhum Pokémon encontrado.</Text>
+                </View>
+              )}
+              renderItem={({ item: card }) => {
+                const index = selected.findIndex((item) => item.cardId === card.cardId);
+                const active = index >= 0;
+                const blocked = !active && selected.length >= 3;
+                return (
+                  <Pressable
+                    disabled={blocked || working}
+                    onPress={() => toggleCard(card)}
+                    style={[styles.pickerCard, { borderColor: active ? colors.accent : colors.border, backgroundColor: active ? colors.accentSoft : colors.surface }, blocked && styles.pickerBlocked]}
+                  >
+                    {card.image ? <Image source={{ uri: card.image }} style={styles.cardImage} resizeMode="contain" resizeMethod="resize" fadeDuration={0} /> : <View style={[styles.cardImage, { backgroundColor: colors.surfaceAlt }]} />}
+                    <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
+                      <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.name}</Text>
+                      <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{card.setName ?? card.rarity ?? 'Pokémon'}</Text>
+                      <Text style={{ color: colors.muted, fontSize: 11 }}>HP {card.hp ?? '—'} • SPD {card.speed ?? '—'}</Text>
+                    </View>
+                    {active ? <View style={[styles.pickBadge, { backgroundColor: colors.accent }]}><Text style={styles.pickBadgeText}>{index + 1}</Text></View> : <Ionicons name="add-circle-outline" size={22} color={blocked ? colors.muted : colors.accent} />}
+                  </Pressable>
+                );
+              }}
+            />
+
+            <Pressable onPress={() => setPickerOpen(false)} style={[styles.primaryButton, { backgroundColor: colors.accent }]}>
+              <Ionicons name="checkmark" size={20} color="#fff" />
+              <Text style={styles.primaryButtonText}>USAR {selected.length}/3 SELECIONADOS</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -428,8 +481,17 @@ const styles = StyleSheet.create({
   slotName: { fontSize: 12, fontWeight: '800' },
   leader: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   search: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  cardPick: { width: '48.5%', minHeight: 116, borderWidth: 1.5, borderRadius: 13, padding: 8, flexDirection: 'row', gap: 8, alignItems: 'center', position: 'relative' },
+  pickerTrigger: { minHeight: 64, borderWidth: 1, borderRadius: 13, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  pickerTriggerIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(2,5,12,.84)', padding: 14, justifyContent: 'center' },
+  pickerModal: { width: '100%', maxWidth: 720, height: '88%', alignSelf: 'center', borderWidth: 1, borderRadius: 22, padding: 12, gap: 10 },
+  pickerHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pickerClose: { width: 38, height: 38, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pickerList: { flex: 1 },
+  pickerListContent: { gap: 7, paddingBottom: 8 },
+  pickerCard: { minHeight: 100, borderWidth: 1.5, borderRadius: 13, padding: 8, flexDirection: 'row', gap: 9, alignItems: 'center', position: 'relative' },
+  pickerBlocked: { opacity: 0.45 },
+  pickerEmpty: { padding: 30, alignItems: 'center', gap: 8 },
   cardImage: { width: 58, height: 82, borderRadius: 6 },
   cardName: { fontSize: 13, fontWeight: '900' },
   pickBadge: { position: 'absolute', right: 6, top: 6, minWidth: 23, height: 23, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
