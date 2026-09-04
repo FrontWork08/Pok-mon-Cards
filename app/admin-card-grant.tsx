@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
@@ -25,6 +25,7 @@ export default function AdminCardGrantScreen() {
   const [cardTotal, setCardTotal] = useState(0);
   const [playerPicker, setPlayerPicker] = useState(false);
   const [cardPicker, setCardPicker] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogMore, setCatalogMore] = useState(false);
@@ -90,7 +91,10 @@ export default function AdminCardGrantScreen() {
   const qty = Math.max(0, Number(quantity.replace(/[^0-9]/g, '')) || 0);
 
   async function executeGrant() {
-    if (!target || !card || working || qty < 1 || qty > 100) return;
+    if (working) return;
+    if (!target) { setError('Escolha a conta que vai receber a carta.'); return; }
+    if (!card) { setError('Escolha a carta que será adicionada.'); return; }
+    if (qty < 1 || qty > 100) { setError('Escolha uma quantidade entre 1 e 100.'); return; }
     try {
       setWorking(true);
       setError(null);
@@ -106,16 +110,21 @@ export default function AdminCardGrantScreen() {
   }
 
   function confirmGrant() {
-    if (!target || !card) return;
+    setError(null);
+    setNotice(null);
+    if (!target) {
+      setError('Escolha a conta que vai receber a carta.');
+      return;
+    }
+    if (!card) {
+      setError('Escolha a carta que será adicionada.');
+      return;
+    }
     if (qty < 1 || qty > 100) {
       setError('Escolha uma quantidade entre 1 e 100.');
       return;
     }
-    Alert.alert(
-      'Adicionar carta à conta?',
-      `Adicionar ${qty}x ${card.name} (${card.setName ?? card.setId} #${card.number ?? '—'}) para @${target.username}?\n\nEsta ação é exclusiva do Criador e ficará registrada na auditoria.`,
-      [{ text: 'Cancelar', style: 'cancel' }, { text: 'ADICIONAR', onPress: () => { void executeGrant(); } }],
-    );
+    setConfirmOpen(true);
   }
 
   return (
@@ -159,11 +168,27 @@ export default function AdminCardGrantScreen() {
         <Text style={[styles.label, { color: colors.muted }]}>4. NOTA DE AUDITORIA (OPCIONAL)</Text>
         <TextInput value={note} onChangeText={setNote} maxLength={500} style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} placeholder="Ex.: presente, correção, teste..." placeholderTextColor={colors.muted} />
 
-        <Pressable disabled={!target || !card || qty < 1 || qty > 100 || working} onPress={confirmGrant} style={[styles.primary, { backgroundColor: colors.yellow }, (!target || !card || qty < 1 || qty > 100 || working) && styles.disabled]}>
+        <Pressable disabled={working} onPress={confirmGrant} style={[styles.primary, { backgroundColor: colors.yellow }, working && styles.disabled]}>
           {working ? <ActivityIndicator color="#07111F" /> : <Ionicons name="gift" size={20} color="#07111F" />}
-          <Text style={styles.primaryText}>ADICIONAR CARTA À CONTA</Text>
+          <Text style={styles.primaryText}>{working ? 'ADICIONANDO…' : 'ADICIONAR CARTA À CONTA'}</Text>
         </Pressable>
       </View> : null}
+
+      <Modal visible={confirmOpen} transparent animationType="fade" onRequestClose={() => { if (!working) setConfirmOpen(false); }}>
+        <View style={styles.overlay}>
+          <Pressable style={StyleSheet.absoluteFill} disabled={working} onPress={() => setConfirmOpen(false)} />
+          <View style={[styles.confirmCard, { backgroundColor: colors.bg, borderColor: colors.yellow }]}>
+            <View style={[styles.confirmIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="gift" size={28} color={colors.yellow} /></View>
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>Adicionar carta à conta?</Text>
+            <Text style={[styles.confirmBody, { color: colors.muted }]}>{card && target ? `Adicionar ${qty}x ${card.name} (${card.setName ?? card.setId} #${card.number ?? '—'}) para @${target.username}?` : ''}</Text>
+            <Text style={[styles.confirmAudit, { color: colors.muted }]}>A ação é exclusiva do Criador e ficará registrada na auditoria.</Text>
+            <View style={styles.confirmActions}>
+              <Pressable disabled={working} onPress={() => setConfirmOpen(false)} style={[styles.confirmSecondary, { borderColor: colors.border, backgroundColor: colors.surface }]}><Text style={[styles.confirmSecondaryText, { color: colors.text }]}>CANCELAR</Text></Pressable>
+              <Pressable disabled={working} onPress={() => { setConfirmOpen(false); void executeGrant(); }} style={[styles.confirmPrimary, { backgroundColor: colors.yellow }, working && styles.disabled]}>{working ? <ActivityIndicator color="#07111F" /> : <Ionicons name="add-circle" size={18} color="#07111F" />}<Text style={styles.confirmPrimaryText}>{working ? 'ADICIONANDO…' : 'ADICIONAR'}</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={playerPicker} transparent animationType="fade" onRequestClose={() => setPlayerPicker(false)}>
         <View style={styles.overlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setPlayerPicker(false)} /><View style={[styles.picker, { backgroundColor: colors.bg, borderColor: colors.border }]}>
@@ -186,5 +211,5 @@ export default function AdminCardGrantScreen() {
 }
 
 const styles = StyleSheet.create({
-  back:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:7},backText:{fontSize:12,fontWeight:'800'},hero:{borderRadius:20,borderWidth:1,padding:15,flexDirection:'row',gap:11,alignItems:'center'},heroIcon:{width:58,height:58,borderRadius:18,alignItems:'center',justifyContent:'center'},kicker:{fontSize:8,fontWeight:'900',letterSpacing:1},heroTitle:{fontSize:18,fontWeight:'900',marginTop:2},helper:{fontSize:9,lineHeight:14,marginTop:3},notice:{borderRadius:13,borderWidth:1,padding:10,flexDirection:'row',gap:8,alignItems:'center'},noticeText:{flex:1,color:'#D9FFEC',fontSize:9,lineHeight:14,fontWeight:'800'},panel:{borderRadius:18,borderWidth:1,padding:13,gap:9},label:{fontSize:8,fontWeight:'900',letterSpacing:.8,marginTop:3},selector:{minHeight:58,borderRadius:13,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:9},selectorName:{fontSize:11,fontWeight:'900'},meta:{fontSize:7.5,lineHeight:11,marginTop:2},thumb:{width:42,height:55,borderRadius:6},thumbPlaceholder:{alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.04)'},input:{minHeight:46,borderWidth:1,borderRadius:12,paddingHorizontal:11,fontSize:10},primary:{minHeight:50,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,marginTop:4},primaryText:{color:'#07111F',fontSize:9,fontWeight:'900'},disabled:{opacity:.45},overlay:{flex:1,backgroundColor:'rgba(0,0,0,.72)',justifyContent:'center',padding:16},picker:{height:'70%',borderWidth:1,borderRadius:20,padding:12},cardPicker:{height:'88%',borderWidth:1,borderRadius:20,padding:12},pickerHead:{flexDirection:'row',alignItems:'center',gap:10,marginBottom:8},pickerTitle:{fontSize:18,fontWeight:'900'},searchBox:{height:46,borderRadius:12,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:8,marginBottom:8},searchInput:{flex:1,fontSize:11},list:{gap:7,paddingBottom:18},row:{minHeight:50,borderWidth:1,borderRadius:12,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:8},rowName:{fontSize:10,fontWeight:'900',flex:1},cardRow:{minHeight:86,borderWidth:1,borderRadius:13,padding:8,flexDirection:'row',alignItems:'center',gap:9},cardThumb:{width:50,height:70,borderRadius:5},cardId:{fontSize:6.8,fontWeight:'800',marginTop:3},price:{fontSize:9,fontWeight:'900'}
+  back:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:7},backText:{fontSize:12,fontWeight:'800'},hero:{borderRadius:20,borderWidth:1,padding:15,flexDirection:'row',gap:11,alignItems:'center'},heroIcon:{width:58,height:58,borderRadius:18,alignItems:'center',justifyContent:'center'},kicker:{fontSize:8,fontWeight:'900',letterSpacing:1},heroTitle:{fontSize:18,fontWeight:'900',marginTop:2},helper:{fontSize:9,lineHeight:14,marginTop:3},notice:{borderRadius:13,borderWidth:1,padding:10,flexDirection:'row',gap:8,alignItems:'center'},noticeText:{flex:1,color:'#D9FFEC',fontSize:9,lineHeight:14,fontWeight:'800'},panel:{borderRadius:18,borderWidth:1,padding:13,gap:9},label:{fontSize:8,fontWeight:'900',letterSpacing:.8,marginTop:3},selector:{minHeight:58,borderRadius:13,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:9},selectorName:{fontSize:11,fontWeight:'900'},meta:{fontSize:7.5,lineHeight:11,marginTop:2},thumb:{width:42,height:55,borderRadius:6},thumbPlaceholder:{alignItems:'center',justifyContent:'center',backgroundColor:'rgba(255,255,255,.04)'},input:{minHeight:46,borderWidth:1,borderRadius:12,paddingHorizontal:11,fontSize:10},primary:{minHeight:50,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,marginTop:4},primaryText:{color:'#07111F',fontSize:9,fontWeight:'900'},disabled:{opacity:.45},overlay:{flex:1,backgroundColor:'rgba(0,0,0,.72)',justifyContent:'center',padding:16},picker:{height:'70%',borderWidth:1,borderRadius:20,padding:12},cardPicker:{height:'88%',borderWidth:1,borderRadius:20,padding:12},pickerHead:{flexDirection:'row',alignItems:'center',gap:10,marginBottom:8},pickerTitle:{fontSize:18,fontWeight:'900'},searchBox:{height:46,borderRadius:12,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:8,marginBottom:8},searchInput:{flex:1,fontSize:11},list:{gap:7,paddingBottom:18},row:{minHeight:50,borderWidth:1,borderRadius:12,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:8},rowName:{fontSize:10,fontWeight:'900',flex:1},cardRow:{minHeight:86,borderWidth:1,borderRadius:13,padding:8,flexDirection:'row',alignItems:'center',gap:9},cardThumb:{width:50,height:70,borderRadius:5},cardId:{fontSize:6.8,fontWeight:'800',marginTop:3},price:{fontSize:9,fontWeight:'900'},confirmCard:{width:'100%',maxWidth:470,alignSelf:'center',borderWidth:1,borderRadius:20,padding:18,alignItems:'center',gap:9},confirmIcon:{width:56,height:56,borderRadius:18,alignItems:'center',justifyContent:'center'},confirmTitle:{fontSize:18,fontWeight:'900',textAlign:'center'},confirmBody:{fontSize:10,lineHeight:15,textAlign:'center'},confirmAudit:{fontSize:7.5,lineHeight:11,textAlign:'center'},confirmActions:{width:'100%',flexDirection:'row',gap:8,marginTop:4},confirmSecondary:{flex:1,minHeight:46,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center'},confirmSecondaryText:{fontSize:8,fontWeight:'900'},confirmPrimary:{flex:1,minHeight:46,borderRadius:12,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6},confirmPrimaryText:{fontSize:8,fontWeight:'900',color:'#07111F'}
 });
