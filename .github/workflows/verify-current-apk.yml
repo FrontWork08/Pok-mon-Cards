@@ -1,0 +1,98 @@
+name: Verify current APK security
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-current-apk.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and verify current APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_URL="$(node -p "require('./public/download/release.json').downloadUrl")"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          if [[ ! "$APK_URL" =~ ^https:// ]]; then
+            echo "Release URL is not HTTPS"
+            exit 1
+          fi
+
+          curl --fail --location --retry 3 --retry-delay 2 "$APK_URL" -o /tmp/trainer-current.apk
+          ACTUAL_SHA="$(sha256sum /tmp/trainer-current.apk | awk '{print $1}')"
+          if [[ "${ACTUAL_SHA,,}" != "${EXPECTED_SHA,,}" ]]; then
+            echo "APK SHA-256 mismatch"
+            exit 1
+          fi
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          if [[ -z "$APKSIGNER" ]]; then
+            echo "apksigner not found"
+            exit 1
+          fi
+          echo "Using $APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs /tmp/trainer-current.apk | tee /tmp/apksigner-output.txt
+
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const output = fs.readFileSync('/tmp/apksigner-output.txt', 'utf8');
+          const releasePath = 'public/download/release.json';
+          const trustedPath = 'public/download/trusted-signing-cert.json';
+          const release = JSON.parse(fs.readFileSync(releasePath, 'utf8'));
+
+          const certMatch = output.match(/Signer #1 certificate SHA-256 digest:\s*([0-9a-f:]+)/i);
+          if (!certMatch) throw new Error('Could not read signing certificate SHA-256 from apksigner');
+          const certSha256 = certMatch[1].replace(/:/g, '').toLowerCase();
+          if (!/^[0-9a-f]{64}$/.test(certSha256)) throw new Error('Invalid signing certificate SHA-256');
+          const subjectMatch = output.match(/Signer #1 certificate DN:\s*(.+)/i);
+          const certSubject = subjectMatch ? subjectMatch[1].trim() : null;
+          const scheme = (n) => new RegExp(`Verified using v${n} scheme[^:]*:\\s*(true|false)`, 'i').exec(output)?.[1]?.toLowerCase() === 'true';
+
+          if (fs.existsSync(trustedPath)) {
+            const trusted = JSON.parse(fs.readFileSync(trustedPath, 'utf8'));
+            if (String(trusted.certificateSha256 || '').toLowerCase() !== certSha256) {
+              throw new Error('Current APK signing certificate does not match pinned official certificate');
+            }
+          } else {
+            fs.writeFileSync(trustedPath, JSON.stringify({
+              appName: 'Trainer Collection',
+              packageName: 'com.frontwork.pokemoncards',
+              certificateSha256: certSha256,
+              certificateSubject: certSubject,
+              pinnedAt: new Date().toISOString(),
+              source: 'Current official release verified with Android apksigner'
+            }, null, 2) + '\n');
+          }
+
+          release.verification = {
+            sha256Verified: true,
+            signatureVerified: true,
+            certificateSha256: certSha256,
+            certificateSubject: certSubject,
+            signerMatchesTrustedCertificate: true,
+            verifiedAt: new Date().toISOString(),
+            verifier: 'Android apksigner',
+            schemes: { v1: scheme(1), v2: scheme(2), v3: scheme(3), v4: scheme(4) }
+          };
+          fs.writeFileSync(releasePath, JSON.stringify(release, null, 2) + '\n');
+          NODE
+
+      - name: Remove temporary workflow and commit verification
+        run: |
+          rm .github/workflows/verify-current-apk.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/download/release.json public/download/trusted-signing-cert.json .github/workflows/verify-current-apk.yml
+          git commit -m "security: verify APK signature and pin signing certificate"
+          git push
