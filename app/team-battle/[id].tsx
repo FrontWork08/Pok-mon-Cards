@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
@@ -21,6 +21,8 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { BattleStyleArenaOverlay } from '@/components/BattleStyleArenaOverlay';
+import { getMyDecks } from '@/services/decks';
+import { filterAndSortTeamCards, getAvailableTeamTypes, getDeckCardIds, type TeamSelectionSortMode } from '@/battles/teamSelection';
 
 function hpValues(member?: TeamBattleMember | null) {
   const item = (member ?? {}) as Record<string, unknown>;
@@ -37,6 +39,15 @@ function attackLabel(attack: TeamBattleAttackOption) {
   return String(attack.name ?? attack.identifier ?? 'Ataque');
 }
 
+const TEAM_SORT_OPTIONS: Array<{ id: TeamSelectionSortMode; label: string }> = [
+  { id: 'value', label: 'MAIS FORTE' },
+  { id: 'hp', label: 'MAIS HP' },
+  { id: 'attack', label: 'MAIS ATAQUE' },
+  { id: 'defense', label: 'MAIS DEFESA' },
+  { id: 'speed', label: 'MAIS RÁPIDO' },
+  { id: 'name', label: 'NOME' },
+];
+
 export default function TeamBattleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const battleId = String(id ?? '');
@@ -49,6 +60,13 @@ export default function TeamBattleScreen() {
   const [selected, setSelected] = useState<TeamBattleCard[]>([]);
   const [search, setSearch] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [deckPickerOpen, setDeckPickerOpen] = useState(false);
+  const [forfeitOpen, setForfeitOpen] = useState(false);
+  const [decks, setDecks] = useState<any[]>([]);
+  const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [sortMode, setSortMode] = useState<TeamSelectionSortMode>('value');
+  const [cardsLoading, setCardsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -72,15 +90,38 @@ export default function TeamBattleScreen() {
     }
   }, [battleId]);
 
-  const loadCards = useCallback(async (query = '') => {
+  const loadCards = useCallback(async () => {
     if (!battleId) return;
+    setCardsLoading(true);
     try {
-      const result = await getEligibleTeamBattleCards(battleId, query, 120, 0);
-      setCards(result.items ?? []);
+      const pageSize = 250;
+      let offset = 0;
+      let total = 0;
+      const byId = new Map<string, TeamBattleCard>();
+      do {
+        const result = await getEligibleTeamBattleCards(battleId, '', pageSize, offset);
+        const items = Array.isArray(result.items) ? result.items : [];
+        for (const item of items) byId.set(item.cardId, item);
+        total = Math.max(Number(result.total ?? 0), byId.size);
+        offset += items.length;
+        if (!items.length) break;
+      } while (offset < total);
+      setCards([...byId.values()]);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível carregar seus Pokémon.');
+    } finally {
+      setCardsLoading(false);
     }
   }, [battleId]);
+
+  const loadDecks = useCallback(async () => {
+    try {
+      const rows = await getMyDecks();
+      setDecks(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível carregar seus decks.');
+    }
+  }, []);
 
   useEffect(() => {
     void refresh(false);
@@ -95,9 +136,9 @@ export default function TeamBattleScreen() {
 
   useEffect(() => {
     if (state?.status !== 'drafting' || state?.myTeamLocked) return;
-    const timer = setTimeout(() => { void loadCards(search); }, 250);
-    return () => clearTimeout(timer);
-  }, [loadCards, search, state?.myTeamLocked, state?.status]);
+    void loadCards();
+    void loadDecks();
+  }, [loadCards, loadDecks, state?.myTeamLocked, state?.status]);
 
   const myTeam = Array.isArray(state?.myTeam) ? state!.myTeam! : [];
   const opponentTeam = Array.isArray(state?.opponentTeam) ? state!.opponentTeam! : [];
@@ -118,6 +159,40 @@ export default function TeamBattleScreen() {
     const value = Math.ceil((new Date(deadline).getTime() - Date.now()) / 1000);
     return Number.isFinite(value) ? Math.max(0, value) : null;
   }, [deadline, state?.turn, state?.status]);
+
+  const selectedDeck = useMemo(() => decks.find((deck) => String(deck?.id ?? '') === selectedDeckId) ?? null, [decks, selectedDeckId]);
+  const selectedDeckCardIds = useMemo(() => selectedDeck ? getDeckCardIds(selectedDeck) : null, [selectedDeck]);
+  const availableTypes = useMemo(() => getAvailableTeamTypes(cards), [cards]);
+  const visibleCards = useMemo(() => filterAndSortTeamCards(cards, {
+    search,
+    typeFilter,
+    sortMode,
+    deckCardIds: selectedDeckCardIds,
+  }), [cards, search, selectedDeckCardIds, sortMode, typeFilter]);
+  const deckEligibleCount = useMemo(() => selectedDeckCardIds ? cards.filter((card) => selectedDeckCardIds.has(card.cardId)).length : cards.length, [cards, selectedDeckCardIds]);
+
+  const applyDeck = (deck: any | null) => {
+    const ids = deck ? getDeckCardIds(deck) : null;
+    setSelectedDeckId(deck ? String(deck.id) : null);
+    setDeckPickerOpen(false);
+    setSearch('');
+    setTypeFilter('all');
+    if (!deck || !ids) return;
+    const eligible = cards.filter((card) => ids.has(card.cardId));
+    setSelected((current) => {
+      if (eligible.length === 3) return eligible;
+      return current.filter((card) => ids.has(card.cardId)).slice(0, 3);
+    });
+    if (!cards.length) {
+      setNotice(`Deck ${String(deck.name ?? 'selecionado')} aplicado. Carregando Pokémon válidos...`);
+    } else if (eligible.length < 3) {
+      setNotice(`Esse deck tem só ${eligible.length} Pokémon válidos para o 3×3. Escolha outro deck ou use toda a Bag.`);
+    } else if (eligible.length === 3) {
+      setNotice(`Deck ${String(deck.name ?? '')} aplicado e os 3 Pokémon válidos já foram selecionados.`);
+    } else {
+      setNotice(`Deck ${String(deck.name ?? '')} aplicado. Agora escolha 3 entre os ${eligible.length} Pokémon válidos.`);
+    }
+  };
 
   const toggleCard = (card: TeamBattleCard) => {
     if (working) return;
@@ -176,20 +251,23 @@ export default function TeamBattleScreen() {
   };
 
   const confirmForfeit = () => {
-    Alert.alert('Desistir da batalha?', 'Depois que a batalha começou, a desistência dá a vitória ao adversário.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Desistir',
-        style: 'destructive',
-        onPress: () => {
-          setWorking(true);
-          void forfeitTeamBattle(battleId)
-            .then(() => refresh(true))
-            .catch((error) => setNotice(error instanceof Error ? error.message : 'Não foi possível desistir.'))
-            .finally(() => setWorking(false));
-        },
-      },
-    ]);
+    if (working || state?.status === 'completed') return;
+    setForfeitOpen(true);
+  };
+
+  const doForfeit = async () => {
+    if (working) return;
+    setForfeitOpen(false);
+    setWorking(true);
+    setNotice(null);
+    try {
+      await forfeitTeamBattle(battleId);
+      await refresh(true);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível desistir.');
+    } finally {
+      setWorking(false);
+    }
   };
 
   if (loading) {
@@ -239,6 +317,18 @@ export default function TeamBattleScreen() {
               </View>
             ) : (
               <>
+                <Text style={[styles.utilityLabel, { color: colors.muted }]}>DECK DA BATALHA</Text>
+                <Pressable onPress={() => setDeckPickerOpen(true)} style={[styles.pickerTrigger, { backgroundColor: colors.surfaceAlt, borderColor: selectedDeck ? colors.yellow : colors.border }]}>
+                  <View style={[styles.pickerTriggerIcon, { backgroundColor: colors.accentSoft }]}>
+                    <Ionicons name="folder-open" size={22} color={selectedDeck ? colors.yellow : colors.accent} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={1} style={[styles.bold, { color: colors.text }]}>{selectedDeck ? selectedDeck.name : 'Escolher deck'}</Text>
+                    <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{selectedDeck ? `${deckEligibleCount} Pokémon válidos desse deck` : 'Opcional • use um deck pronto ou escolha direto da Bag'}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={19} color={colors.accent} />
+                </Pressable>
+
                 <View style={styles.selectedRow}>
                   {[0, 1, 2].map((index) => {
                     const item = selected[index];
@@ -274,6 +364,12 @@ export default function TeamBattleScreen() {
                 </Pressable>
               </>
             )}
+
+            <Pressable disabled={working} onPress={confirmForfeit} style={[styles.dangerButton, { borderColor: colors.red, opacity: working ? 0.55 : 1 }]}>
+              <Ionicons name="flag" size={18} color={colors.red} />
+              <Text style={{ color: colors.red, fontWeight: '800' }}>Desistir da batalha</Text>
+            </Pressable>
+            <Text style={[styles.forfeitHint, { color: colors.muted }]}>{state.myTeamLocked ? 'Sua equipe já foi confirmada: desistir dá a vitória ao adversário e conta como derrota.' : 'Antes de confirmar a equipe, a desistência encerra a partida sem alterar o ELO.'}</Text>
           </View>
         ) : null}
 
@@ -412,6 +508,33 @@ export default function TeamBattleScreen() {
               </Pressable>
             </View>
 
+            <View style={[styles.filterPanel, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+              <View style={styles.filterTopRow}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.utilityLabel, { color: colors.muted }]}>DECK</Text>
+                  <Text numberOfLines={1} style={[styles.bold, { color: colors.text }]}>{selectedDeck ? selectedDeck.name : 'Toda a Bag'}</Text>
+                  <Text style={{ color: colors.muted, fontSize: 10 }}>{deckEligibleCount} Pokémon válidos</Text>
+                </View>
+                <Pressable onPress={() => setDeckPickerOpen(true)} style={[styles.smallButton, { borderColor: colors.accent }]}><Ionicons name="folder-open" size={15} color={colors.accent} /><Text style={{ color: colors.accent, fontWeight: '900', fontSize: 10 }}>TROCAR DECK</Text></Pressable>
+              </View>
+
+              <Text style={[styles.utilityLabel, { color: colors.muted }]}>FILTRAR POR TIPO</Text>
+              <View style={styles.filterWrap}>
+                {['all', ...availableTypes].map((type) => {
+                  const active = typeFilter === type;
+                  return <Pressable key={type} onPress={() => setTypeFilter(type)} style={[styles.filterChip, { borderColor: active ? colors.accent : colors.border, backgroundColor: active ? colors.accentSoft : colors.surface }]}><Text style={{ color: active ? colors.accent : colors.muted, fontSize: 10, fontWeight: '900' }}>{type === 'all' ? 'TODOS' : type.toUpperCase()}</Text></Pressable>;
+                })}
+              </View>
+
+              <Text style={[styles.utilityLabel, { color: colors.muted }]}>ORDENAR</Text>
+              <View style={styles.filterWrap}>
+                {TEAM_SORT_OPTIONS.map((option) => {
+                  const active = sortMode === option.id;
+                  return <Pressable key={option.id} onPress={() => setSortMode(option.id)} style={[styles.filterChip, { borderColor: active ? colors.yellow : colors.border, backgroundColor: active ? colors.surface : colors.bg }]}><Text style={{ color: active ? colors.yellow : colors.muted, fontSize: 10, fontWeight: '900' }}>{option.label}</Text></Pressable>;
+                })}
+              </View>
+            </View>
+
             <TextInput
               value={search}
               onChangeText={setSearch}
@@ -422,14 +545,14 @@ export default function TeamBattleScreen() {
 
             <FlatList
               {...VIRTUAL_LIST_PERF_PROPS}
-              data={cards}
+              data={cardsLoading ? [] : visibleCards}
               keyExtractor={(card) => card.cardId}
               style={styles.pickerList}
               contentContainerStyle={styles.pickerListContent}
               ListEmptyComponent={(
                 <View style={styles.pickerEmpty}>
                   <Ionicons name="search" size={28} color={colors.muted} />
-                  <Text style={[styles.subtitle, { color: colors.muted }]}>Nenhum Pokémon encontrado.</Text>
+                  <Text style={[styles.subtitle, { color: colors.muted }]}>{cardsLoading ? 'Carregando seus Pokémon...' : 'Nenhum Pokémon encontrado com estes filtros.'}</Text>
                 </View>
               )}
               renderItem={({ item: card }) => {
@@ -446,7 +569,7 @@ export default function TeamBattleScreen() {
                     <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
                       <Text numberOfLines={1} style={[styles.cardName, { color: colors.text }]}>{card.name}</Text>
                       <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{card.setName ?? card.rarity ?? 'Pokémon'}</Text>
-                      <Text style={{ color: colors.muted, fontSize: 11 }}>HP {card.hp ?? '—'} • SPD {card.speed ?? '—'}</Text>
+                      <Text style={{ color: colors.muted, fontSize: 11 }}>HP {card.hp ?? '—'} • ATK {card.attack ?? '—'} • DEF {card.defense ?? '—'} • SPD {card.speed ?? '—'}</Text>
                     </View>
                     {active ? <View style={[styles.pickBadge, { backgroundColor: colors.accent }]}><Text style={styles.pickBadgeText}>{index + 1}</Text></View> : <Ionicons name="add-circle-outline" size={22} color={blocked ? colors.muted : colors.accent} />}
                   </Pressable>
@@ -454,10 +577,68 @@ export default function TeamBattleScreen() {
               }}
             />
 
+            <Text style={[styles.filterMeta, { color: colors.muted }]}>Mostrando {visibleCards.length} de {cards.length} Pokémon válidos.</Text>
             <Pressable onPress={() => setPickerOpen(false)} style={[styles.primaryButton, { backgroundColor: colors.accent }]}>
               <Ionicons name="checkmark" size={20} color="#fff" />
               <Text style={styles.primaryButtonText}>USAR {selected.length}/3 SELECIONADOS</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={deckPickerOpen && state?.status === 'drafting' && !state?.myTeamLocked} transparent animationType="fade" onRequestClose={() => setDeckPickerOpen(false)}>
+        <View style={styles.pickerBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setDeckPickerOpen(false)} />
+          <View style={[styles.deckModal, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+            <View style={styles.pickerHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.leader, { color: colors.yellow }]}>EQUIPE 3×3 • DECK</Text>
+                <Text style={[styles.title, { color: colors.text }]}>Escolher deck</Text>
+                <Text style={[styles.subtitle, { color: colors.muted }]}>O deck limita a lista aos Pokémon válidos que estão nele.</Text>
+              </View>
+              <Pressable onPress={() => setDeckPickerOpen(false)} style={[styles.pickerClose, { backgroundColor: colors.surface, borderColor: colors.border }]}><Ionicons name="close" size={20} color={colors.text} /></Pressable>
+            </View>
+
+            <Pressable onPress={() => applyDeck(null)} style={[styles.deckRow, { backgroundColor: colors.surface, borderColor: selectedDeckId ? colors.border : colors.accent }]}>
+              <Ionicons name="albums" size={22} color={colors.accent} />
+              <View style={{ flex: 1 }}><Text style={[styles.bold, { color: colors.text }]}>Toda a Bag</Text><Text style={{ color: colors.muted, fontSize: 11 }}>Não limitar por deck • {cards.length} Pokémon válidos</Text></View>
+              {!selectedDeckId ? <Ionicons name="checkmark-circle" size={20} color={colors.accent} /> : null}
+            </Pressable>
+
+            <FlatList
+              {...VIRTUAL_LIST_PERF_PROPS}
+              data={decks}
+              keyExtractor={(deck) => String(deck.id)}
+              style={styles.pickerList}
+              contentContainerStyle={styles.pickerListContent}
+              ListEmptyComponent={<View style={styles.pickerEmpty}><Ionicons name="folder-open" size={28} color={colors.muted} /><Text style={[styles.subtitle, { color: colors.muted }]}>Você ainda não criou nenhum deck.</Text></View>}
+              renderItem={({ item: deck }) => {
+                const active = String(deck.id) === selectedDeckId;
+                const count = cards.filter((card) => getDeckCardIds(deck).has(card.cardId)).length;
+                return (
+                  <Pressable onPress={() => applyDeck(deck)} style={[styles.deckRow, { backgroundColor: active ? colors.accentSoft : colors.surface, borderColor: active ? colors.accent : colors.border }]}>
+                    <Ionicons name={deck.is_default ? 'star' : 'folder'} size={21} color={deck.is_default ? colors.yellow : colors.accent} />
+                    <View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={1} style={[styles.bold, { color: colors.text }]}>{String(deck.name ?? 'Deck')}</Text><Text style={{ color: colors.muted, fontSize: 11 }}>{count} Pokémon válidos para o 3×3{deck.is_default ? ' • PADRÃO' : ''}</Text></View>
+                    {active ? <Ionicons name="checkmark-circle" size={20} color={colors.accent} /> : <Ionicons name="chevron-forward" size={18} color={colors.muted} />}
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={forfeitOpen && state?.status !== 'completed'} transparent animationType="fade" onRequestClose={() => { if (!working) setForfeitOpen(false); }}>
+        <View style={styles.pickerBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} disabled={working} onPress={() => setForfeitOpen(false)} />
+          <View style={[styles.confirmModal, { backgroundColor: colors.bg, borderColor: colors.red }]}>
+            <View style={[styles.forfeitIcon, { backgroundColor: colors.surfaceAlt }]}><Ionicons name="flag" size={30} color={colors.red} /></View>
+            <Text style={[styles.resultTitle, { color: colors.text, fontSize: 22 }]}>Desistir da batalha?</Text>
+            <Text style={[styles.subtitle, { color: colors.muted, textAlign: 'center' }]}>{state?.status === 'drafting' && !state?.myTeamLocked ? 'Você ainda não confirmou sua equipe. A partida será encerrada sem alterar o ELO.' : 'Sua escolha já foi confirmada ou a luta começou. A vitória será dada ao adversário e a desistência contará como derrota.'}</Text>
+            <View style={styles.confirmActions}>
+              <Pressable disabled={working} onPress={() => setForfeitOpen(false)} style={[styles.secondaryButton, { borderColor: colors.border, backgroundColor: colors.surface }]}><Text style={[styles.secondaryButtonText, { color: colors.text }]}>CANCELAR</Text></Pressable>
+              <Pressable disabled={working} onPress={() => void doForfeit()} style={[styles.primaryButton, { flex: 1, backgroundColor: colors.red, opacity: working ? 0.55 : 1 }]}>{working ? <ActivityIndicator color="#fff" /> : <Ionicons name="flag" size={18} color="#fff" />}<Text style={styles.primaryButtonText}>DESISTIR</Text></Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -523,6 +704,21 @@ const styles = StyleSheet.create({
   teamMember: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: 11, padding: 9, gap: 2 },
   teamMemberName: { fontSize: 12, fontWeight: '900' },
   dangerButton: { borderWidth: 1, borderRadius: 12, padding: 11, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center' },
+  forfeitHint: { fontSize: 10, lineHeight: 14, textAlign: 'center' },
+  utilityLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 0.65 },
+  filterPanel: { borderWidth: 1, borderRadius: 14, padding: 10, gap: 8 },
+  filterTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  filterChip: { minHeight: 30, borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center' },
+  smallButton: { minHeight: 34, borderWidth: 1, borderRadius: 10, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  filterMeta: { fontSize: 10, textAlign: 'center', fontWeight: '700' },
+  deckModal: { width: '100%', maxWidth: 620, height: '72%', alignSelf: 'center', borderWidth: 1, borderRadius: 22, padding: 12, gap: 10 },
+  deckRow: { minHeight: 58, borderWidth: 1, borderRadius: 13, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  confirmModal: { width: '100%', maxWidth: 470, alignSelf: 'center', borderWidth: 1.5, borderRadius: 20, padding: 18, alignItems: 'center', gap: 12 },
+  forfeitIcon: { width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  confirmActions: { width: '100%', flexDirection: 'row', gap: 8 },
+  secondaryButton: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  secondaryButtonText: { fontSize: 12, fontWeight: '900' },
   resultPanel: { borderWidth: 2, borderRadius: 20, padding: 24, alignItems: 'center', gap: 10 },
   resultTitle: { fontSize: 26, fontWeight: '900' },
 });
