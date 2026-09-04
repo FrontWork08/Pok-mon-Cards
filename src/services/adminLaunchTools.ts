@@ -26,6 +26,11 @@ export type AdminBattleLabCard={
   ability:string|null;
   stats:AdminBattleLabStats|null;
 };
+export type AdminBattleLabCatalogFilters={
+  type?:string|null;
+  set?:string|null;
+  rarity?:string|null;
+};
 export async function captureEconomySnapshot(){
   const id=await actorId();
   const{data,error}=await supabase.rpc('server_capture_economy_snapshot',{p_actor_id:id});
@@ -49,8 +54,15 @@ export async function getAdminBattleLabMatrix(cardIds:string[],iterations=30){
   const{data,error}=await supabase.rpc('get_admin_battle_lab_matrix',{p_card_ids:cardIds,p_iterations:iterations});
   if(error)throw error;return data as any;
 }
-export async function getAdminBattleLabCatalog(search='',offset=0,limit=80){
-  const{data,error}=await supabase.rpc('get_admin_battle_lab_catalog',{p_search:search||null,p_offset:offset,p_limit:limit});
+export async function getAdminBattleLabCatalog(search='',offset=0,limit=80,filters:AdminBattleLabCatalogFilters={}){
+  const{data,error}=await supabase.rpc('get_admin_battle_lab_catalog',{
+    p_search:search||null,
+    p_offset:offset,
+    p_limit:limit,
+    p_type:filters.type||null,
+    p_set:filters.set||null,
+    p_rarity:filters.rarity||null,
+  });
   if(error)throw error;
   const payload=(data??{}) as {items?:AdminBattleLabCard[];total?:number;offset?:number;limit?:number};
   return {items:Array.isArray(payload.items)?payload.items:[],total:Number(payload.total??0),offset:Number(payload.offset??offset),limit:Number(payload.limit??limit)};
