@@ -322,9 +322,9 @@ export default function TrainerStoreScreen(){
             : `Esta gamepass não pode ser comprada com Coins ou Diamantes. Fale diretamente com ${boosterPerks?.contactOwnerUsername?'@'+boosterPerks.contactOwnerUsername:'o dono do jogo'} para comprar; depois da confirmação ela é ativada manualmente.`}</Text>
           <Text style={[styles.luckyStatus,{color:colors.yellow}]}>✨ 2× Lucky disponível: {Number(boosterPerks?.lucky2xUses??0)} abertura(s)</Text>
         </View>
-        <Pressable onPress={()=>router.push('/auto-open')} style={[styles.gamepassButton,{backgroundColor:boosterPerks?.autoOpenGamepass?'#59D49A':colors.yellow}]}>
-          <Ionicons name={boosterPerks?.autoOpenGamepass?'play':'information-circle'} size={17} color="#07111F"/>
-          <Text style={styles.gamepassButtonText}>{boosterPerks?.autoOpenGamepass?'ABRIR AUTO BOOSTER':'COMO COMPRAR'}</Text>
+        <Pressable onPress={()=>router.push(boosterPerks?.autoOpenGamepass?'/auto-open':'/gamepasses')} style={[styles.gamepassButton,{backgroundColor:boosterPerks?.autoOpenGamepass?'#59D49A':colors.yellow}]}>
+          <Ionicons name={boosterPerks?.autoOpenGamepass?'play':'diamond'} size={17} color="#07111F"/>
+          <Text style={styles.gamepassButtonText}>{boosterPerks?.autoOpenGamepass?'ABRIR AUTO BOOSTER':'VER TODAS AS GAMEPASSES'}</Text>
         </Pressable>
       </View>
       {notice ? <Pressable onPress={()=>setNotice(null)} style={[styles.notice,{backgroundColor:'#183528',borderColor:'#3F9A68'}]}><Ionicons name="checkmark-circle" size={18} color="#65D894"/><Text style={styles.noticeText}>{notice}</Text><Ionicons name="close" size={16} color="#9CCDB1"/></Pressable> : null}
