@@ -75,6 +75,47 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: npm run apk
 
+      - name: Publish friendly APK filename
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./public/download/release.json').version")"
+          SOURCE_APK="$(find builds -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$SOURCE_APK"
+          FRIENDLY_NAME="Trainer-Collection-v${VERSION}.apk"
+          FRIENDLY_APK="/tmp/${FRIENDLY_NAME}"
+          cp "$SOURCE_APK" "$FRIENDLY_APK"
+
+          TAG="android-v${VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; replacing verified asset."
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Trainer Collection v${VERSION}" --notes "APK oficial do Trainer Collection. Arquivo verificado por SHA-256 e assinatura Android antes da publicação."
+          fi
+          gh release upload "$TAG" "$FRIENDLY_APK" --repo "$GITHUB_REPOSITORY" --clobber
+
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${FRIENDLY_NAME}"
+          export DOWNLOAD_URL FRIENDLY_NAME
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'public/download/release.json';
+          const release = JSON.parse(fs.readFileSync(p, 'utf8'));
+          release.downloadUrl = process.env.DOWNLOAD_URL;
+          release.downloadFileName = process.env.FRIENDLY_NAME;
+          release.downloadProvider = 'GitHub Release';
+          fs.writeFileSync(p, JSON.stringify(release, null, 2) + '\n');
+          NODE
+
+          curl --fail --location --retry 4 --retry-delay 2 "$DOWNLOAD_URL" -o /tmp/friendly-recheck.apk
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          ACTUAL_SHA="$(sha256sum /tmp/friendly-recheck.apk | awk '{print $1}')"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          "$APKSIGNER" verify --verbose --print-certs /tmp/friendly-recheck.apk >/tmp/friendly-recheck-signature.txt
+          grep -q 'Verifies' /tmp/friendly-recheck-signature.txt
+          echo "Friendly release asset is byte-identical and Android signature-valid."
+
       - name: Validate published download metadata
         run: |
           node <<'NODE'
@@ -89,12 +130,14 @@ jobs:
           if (!/^[a-f0-9]{64}$/i.test(release.sha256 || '')) throw new Error('Invalid APK SHA-256');
           if (!(Number(release.sizeBytes) > 0)) throw new Error('Invalid APK size');
           if (release.packageName !== 'com.frontwork.pokemoncards') throw new Error('Unexpected Android package');
+          if (!/^Trainer-Collection-v.+\.apk$/.test(release.downloadFileName || '')) throw new Error('Public APK filename is not friendly');
+          if (release.downloadProvider !== 'GitHub Release') throw new Error('Public APK must use the friendly release provider');
           if (release.verification?.sha256Verified !== true) throw new Error('APK hash was not verified');
           if (release.verification?.signatureVerified !== true) throw new Error('APK signature was not verified');
           if (release.verification?.signerMatchesTrustedCertificate !== true) throw new Error('APK signer was not pinned');
           if (!/^[a-f0-9]{64}$/.test(cert) || cert !== trustedCert) throw new Error('APK signer certificate mismatch');
           if (!release.verification?.verifiedAt) throw new Error('Missing verification timestamp');
-          console.log('APK metadata, hash, signature and trusted signer certificate are valid.');
+          console.log('APK metadata, friendly filename, hash, signature and trusted signer certificate are valid.');
           NODE
 
       - name: Upload verified APK evidence
