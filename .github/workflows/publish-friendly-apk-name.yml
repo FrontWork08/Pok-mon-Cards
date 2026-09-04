@@ -1,0 +1,103 @@
+name: Publish friendly Trainer Collection APK filename
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-friendly-apk-name.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Recover and verify current official APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/trainer-current
+          gh run download 33292077907 --repo "$GITHUB_REPOSITORY" --name Trainer-Collection-Android --dir /tmp/trainer-current
+          SOURCE_APK="$(find /tmp/trainer-current -type f -name '*.apk' | head -n 1)"
+          test -n "$SOURCE_APK"
+
+          VERSION="$(node -p "require('./public/download/release.json').version")"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          FRIENDLY_NAME="Trainer-Collection-v${VERSION}.apk"
+          FRIENDLY_APK="/tmp/${FRIENDLY_NAME}"
+          cp "$SOURCE_APK" "$FRIENDLY_APK"
+
+          ACTUAL_SHA="$(sha256sum "$FRIENDLY_APK" | awk '{print $1}')"
+          echo "Expected SHA-256: $EXPECTED_SHA"
+          echo "Actual SHA-256:   $ACTUAL_SHA"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$FRIENDLY_APK" | tee /tmp/friendly-apksigner.txt
+
+          EXPECTED_CERT="$(node -p "require('./public/download/trusted-signing-cert.json').certificateSha256")"
+          ACTUAL_CERT="$(sed -nE 's/.*certificate SHA-256 digest:[[:space:]]*([0-9a-fA-F:]+).*/\1/p' /tmp/friendly-apksigner.txt | head -n 1 | tr -d ':' | tr 'A-F' 'a-f')"
+          [[ -n "$ACTUAL_CERT" && "${ACTUAL_CERT,,}" == "${EXPECTED_CERT,,}" ]]
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "FRIENDLY_NAME=$FRIENDLY_NAME" >> "$GITHUB_ENV"
+          echo "FRIENDLY_APK=$FRIENDLY_APK" >> "$GITHUB_ENV"
+          echo "EXPECTED_SHA=$EXPECTED_SHA" >> "$GITHUB_ENV"
+          echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
+
+      - name: Publish friendly GitHub Release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="android-v${VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target main --title "Trainer Collection v${VERSION}" --notes "APK oficial do Trainer Collection. Arquivo verificado por SHA-256 e assinatura Android antes da publicação."
+          fi
+          gh release upload "$TAG" "$FRIENDLY_APK" --repo "$GITHUB_REPOSITORY" --clobber
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${FRIENDLY_NAME}"
+          echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> "$GITHUB_ENV"
+
+      - name: Re-download friendly URL and verify exact bytes and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 4 --retry-delay 2 "$DOWNLOAD_URL" -o /tmp/recheck.apk
+          ACTUAL_SHA="$(sha256sum /tmp/recheck.apk | awk '{print $1}')"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          "$APKSIGNER" verify --verbose --print-certs /tmp/recheck.apk >/tmp/recheck-signature.txt
+          grep -q 'Verifies' /tmp/recheck-signature.txt
+          echo "✅ Friendly APK URL serves the same verified APK bytes."
+
+      - name: Point official download metadata to friendly filename
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'public/download/release.json';
+          const release = JSON.parse(fs.readFileSync(p, 'utf8'));
+          release.downloadUrl = process.env.DOWNLOAD_URL;
+          release.downloadFileName = process.env.FRIENDLY_NAME;
+          release.downloadProvider = 'GitHub Release';
+          fs.writeFileSync(p, JSON.stringify(release, null, 2) + '\n');
+          NODE
+          node scripts/apk-security-audit.mjs
+
+      - name: Commit friendly download metadata
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/download/release.json
+          git commit -m "release: use friendly Trainer Collection APK filename"
+          git push
