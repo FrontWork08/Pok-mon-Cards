@@ -7,6 +7,7 @@
   "easProjectId": "e02b9525-0e99-4b45-a84f-1c44501633be",
   "googleServicesFile": "./google-services.json",
   "plugins": [
+    "./plugins/withTrainerNotificationSounds",
     "expo-camera",
     "expo-image-picker",
     "expo-local-authentication",
