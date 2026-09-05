@@ -14,9 +14,11 @@ export function DeviceSecurityGate({ enabled }: { enabled: boolean }) {
   const [message, setMessage] = useState('');
   const backgroundAt = useRef<number | null>(null);
   const disposed = useRef(false);
+  const unlockingRef = useRef(false);
 
   const unlock = useCallback(async () => {
-    if (!enabled || Platform.OS === 'web' || unlocking) return;
+    if (!enabled || Platform.OS === 'web' || unlockingRef.current) return;
+    unlockingRef.current = true;
     setUnlocking(true);
     setMessage('');
     try {
@@ -26,9 +28,19 @@ export function DeviceSecurityGate({ enabled }: { enabled: boolean }) {
     } catch {
       if (!disposed.current) setMessage('Não foi possível confirmar o desbloqueio do aparelho.');
     } finally {
+      unlockingRef.current = false;
       if (!disposed.current) setUnlocking(false);
     }
-  }, [enabled, unlocking]);
+  }, [enabled]);
+
+  const lockAndPrompt = useCallback(() => {
+    if (!enabled || Platform.OS === 'web') return;
+    setMessage('');
+    setLocked(true);
+    // One automatic prompt per lock event. If the user cancels, the screen stays
+    // locked and the explicit DESBLOQUEAR button retries without a prompt loop.
+    setTimeout(() => { if (!disposed.current) void unlock(); }, 120);
+  }, [enabled, unlock]);
 
   useEffect(() => {
     disposed.current = false;
@@ -39,13 +51,12 @@ export function DeviceSecurityGate({ enabled }: { enabled: boolean }) {
     let active = true;
     void isDeviceLockEnabled().then((isEnabled) => {
       if (!active || !isEnabled) return;
-      setLocked(true);
-      setTimeout(() => { void unlock(); }, 80);
+      lockAndPrompt();
     });
 
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'background' || state === 'inactive') {
-        backgroundAt.current = Date.now();
+        if (backgroundAt.current === null) backgroundAt.current = Date.now();
         return;
       }
       if (state === 'active' && backgroundAt.current) {
@@ -54,7 +65,7 @@ export function DeviceSecurityGate({ enabled }: { enabled: boolean }) {
         if (awayFor >= RELOCK_AFTER_MS) {
           void isDeviceLockEnabled().then((isEnabled) => {
             if (!active || !isEnabled) return;
-            setLocked(true);
+            lockAndPrompt();
           });
         }
       }
@@ -62,17 +73,10 @@ export function DeviceSecurityGate({ enabled }: { enabled: boolean }) {
     return () => {
       active = false;
       disposed.current = true;
+      unlockingRef.current = false;
       sub.remove();
     };
-  }, [enabled, unlock]);
-
-  useEffect(() => {
-    if (locked && enabled && !unlocking) {
-      const timer = setTimeout(() => { void unlock(); }, 120);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [locked, enabled, unlocking, unlock]);
+  }, [enabled, lockAndPrompt]);
 
   if (!enabled || Platform.OS === 'web') return null;
 
@@ -84,9 +88,7 @@ export function DeviceSecurityGate({ enabled }: { enabled: boolean }) {
         </View>
         <Text style={[styles.kicker, { color: colors.yellow }]}>CONTA PROTEGIDA</Text>
         <Text style={[styles.title, { color: colors.text }]}>Trainer Collection bloqueada</Text>
-        <Text style={[styles.body, { color: colors.muted }]}>
-          Confirme sua biometria. O Android pode oferecer o código/PIN seguro do aparelho como alternativa.
-        </Text>
+        <Text style={[styles.body, { color: colors.muted }]}>Confirme sua biometria. O Android pode oferecer o código/PIN seguro do aparelho como alternativa.</Text>
         {message ? <Text style={[styles.message, { color: colors.text }]}>{message}</Text> : null}
         <Pressable disabled={unlocking} onPress={() => { void unlock(); }} style={[styles.button, { backgroundColor: colors.yellow, opacity: unlocking ? .65 : 1 }]}>
           <Ionicons name="finger-print" size={21} color="#07111F" />
