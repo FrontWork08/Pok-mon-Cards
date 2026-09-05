@@ -1,0 +1,95 @@
+name: Trainer Collection 1.1 Native Upgrade
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/app-11-native-upgrade.yml
+      - scripts/patch-native-11.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trainer-collection-11-native-upgrade
+  cancel-in-progress: true
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply native 1.1 patch
+        run: python scripts/patch-native-11.py
+
+      - name: Install SDK 53 native dependencies
+        run: |
+          npm install --save expo-local-authentication@~16.0.5 expo-quick-actions@5.0.0
+
+      - name: Generate original notification sounds
+        shell: python
+        run: |
+          from pathlib import Path
+          import math, struct, wave
+          out = Path('assets/sounds')
+          out.mkdir(parents=True, exist_ok=True)
+          sr = 22050
+          specs = {
+            'tc_default': [([660],.12,.22),([880],.18,.20)],
+            'tc_battle': [([440,660],.10,.26),([660,990],.11,.28),([880,1320],.20,.24)],
+            'tc_social': [([784],.12,.18),([1046.5],.20,.16)],
+            'tc_trade': [([523.25,1046.5],.10,.20),([659.25,1318.5],.12,.18),([783.99,1568],.18,.16)],
+          }
+          for name, segments in specs.items():
+            samples = []
+            for freqs, dur, amp in segments:
+              count = int(sr * dur)
+              for i in range(count):
+                t = i / sr
+                attack = min(1.0, i / max(1, int(.015 * sr)))
+                release = min(1.0, (count - i - 1) / max(1, int(.04 * sr)))
+                env = max(0.0, min(attack, release))
+                value = sum(math.sin(2 * math.pi * f * t) for f in freqs) / len(freqs)
+                samples.append(int(32767 * amp * env * value))
+              samples.extend([0] * int(sr * .02))
+            with wave.open(str(out / f'{name}.wav'), 'wb') as wav:
+              wav.setnchannels(1)
+              wav.setsampwidth(2)
+              wav.setframerate(sr)
+              wav.writeframes(b''.join(struct.pack('<h', max(-32768, min(32767, s))) for s in samples))
+
+      - name: Prepare generated artwork
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/generate-trainer-assets.py
+
+      - name: Verify TypeScript and all permanent audits
+        run: npm run verify
+
+      - name: Validate Expo native config
+        run: |
+          npx expo config --type public >/tmp/expo-config.txt
+          grep -q '1.1.0' /tmp/expo-config.txt
+          npx expo prebuild --platform android --clean --no-install
+          grep -q 'pokemon-cards-frontwork.expo.app' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:autoVerify="true"' android/app/src/main/AndroidManifest.xml
+
+      - name: Verify web export with auth callback
+        run: npx expo export --platform web
+
+      - name: Commit tested 1.1 implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.json package.json package-lock.json app src public scripts/native-11-audit.mjs assets/sounds
+          git diff --cached --check
+          git commit -m 'feat: add Trainer Collection 1.1 native features'
+          git push
