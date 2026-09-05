@@ -1,95 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Updates from 'expo-updates';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
-const FOREGROUND_CHECK_COOLDOWN_MS = 10 * 60 * 1000;
-
-type UpdateState = 'idle' | 'available' | 'downloading' | 'error';
+const REQUIRED_APK_DOWNLOAD_PAGE = 'https://pokemon-cards-frontwork.expo.app/download/';
 
 export function UpdatePrompt() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const [state, setState] = useState<UpdateState>('idle');
-  const [dismissed, setDismissed] = useState(false);
+  const [opening, setOpening] = useState(false);
   const [errorText, setErrorText] = useState('');
-  const checkingRef = useRef(false);
-  const lastCheckRef = useRef(0);
 
-  const canUseUpdates = Platform.OS !== 'web' && !__DEV__ && Updates.isEnabled;
+  if (Platform.OS === 'web' || __DEV__) return null;
 
-  const checkForUpdate = useCallback(async (force = false) => {
-    if (!canUseUpdates || checkingRef.current || dismissed || state !== 'idle') return;
-
-    const now = Date.now();
-    if (!force && now - lastCheckRef.current < FOREGROUND_CHECK_COOLDOWN_MS) return;
-
-    checkingRef.current = true;
-    lastCheckRef.current = now;
+  async function openRequiredDownload() {
+    if (opening) return;
 
     try {
-      const result = await Updates.checkForUpdateAsync();
-      if (result.isAvailable || result.isRollBackToEmbedded) {
-        setErrorText('');
-        setState('available');
-      }
-    } catch (error) {
-      // Update checks should never block the game. We only surface an error
-      // after the player has explicitly tried to install an available update.
-      console.warn('OTA update check failed:', error);
-    } finally {
-      checkingRef.current = false;
-    }
-  }, [canUseUpdates, dismissed, state]);
-
-  useEffect(() => {
-    if (!canUseUpdates) return;
-
-    const timer = setTimeout(() => {
-      checkForUpdate(true).catch(() => null);
-    }, 1800);
-
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') checkForUpdate(false).catch(() => null);
-    });
-
-    return () => {
-      clearTimeout(timer);
-      subscription.remove();
-    };
-  }, [canUseUpdates, checkForUpdate]);
-
-  async function installUpdate() {
-    if (!canUseUpdates || state === 'downloading') return;
-
-    try {
+      setOpening(true);
       setErrorText('');
-      setState('downloading');
-      const result = await Updates.fetchUpdateAsync();
-
-      if (!result.isNew && !result.isRollBackToEmbedded) {
-        setState('idle');
-        return;
-      }
-
-      await Updates.reloadAsync();
+      const supported = await Linking.canOpenURL(REQUIRED_APK_DOWNLOAD_PAGE);
+      if (!supported) throw new Error('Não foi possível abrir a página oficial de download.');
+      await Linking.openURL(REQUIRED_APK_DOWNLOAD_PAGE);
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : 'Não foi possível instalar a atualização agora.');
-      setState('error');
+      setErrorText(error instanceof Error ? error.message : 'Não foi possível abrir o download agora.');
+    } finally {
+      setOpening(false);
     }
   }
-
-  function dismiss() {
-    setDismissed(true);
-    setState('idle');
-    setErrorText('');
-  }
-
-  if (!canUseUpdates || state === 'idle') return null;
-
-  const downloading = state === 'downloading';
 
   return (
     <Modal
@@ -97,9 +36,7 @@ export function UpdatePrompt() {
       transparent
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={() => {
-        if (!downloading) dismiss();
-      }}
+      onRequestClose={() => undefined}
     >
       <View style={styles.overlay}>
         <View
@@ -108,62 +45,51 @@ export function UpdatePrompt() {
             {
               backgroundColor: colors.surface,
               borderColor: colors.border,
-              paddingBottom: Math.max(insets.bottom, 18),
+              paddingBottom: Math.max(insets.bottom, 22),
             },
           ]}
         >
           <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="cloud-download-outline" size={28} color={colors.yellow} />
+            <Ionicons name="download-outline" size={30} color={colors.yellow} />
           </View>
 
-          <Text style={[styles.eyebrow, { color: colors.yellow }]}>ATUALIZAÇÃO DISPONÍVEL</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Tem novidade no Pokémon Cards.</Text>
+          <Text style={[styles.eyebrow, { color: colors.yellow }]}>ATUALIZAÇÃO OBRIGATÓRIA</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Trainer Collection 1.1 é necessária.</Text>
           <Text style={[styles.body, { color: colors.muted }]}>
-            Baixe a versão mais recente agora. O app vai reiniciar automaticamente quando terminar.
+            Esta versão 1.0.1 foi encerrada. Para continuar jogando, baixe e instale o novo APK oficial do Trainer Collection 1.1.
           </Text>
 
-          {state === 'error' ? (
+          {errorText ? (
             <View style={[styles.errorBox, { borderColor: colors.red }]}>
               <Ionicons name="alert-circle-outline" size={18} color={colors.red} />
               <Text style={[styles.errorText, { color: colors.text }]} numberOfLines={3}>
-                {errorText || 'Não foi possível atualizar agora.'}
+                {errorText}
               </Text>
             </View>
           ) : null}
 
           <Pressable
-            disabled={downloading}
-            onPress={installUpdate}
+            disabled={opening}
+            onPress={openRequiredDownload}
             style={({ pressed }) => [
               styles.primaryButton,
               {
                 backgroundColor: colors.yellow,
-                opacity: pressed || downloading ? 0.82 : 1,
+                opacity: pressed || opening ? 0.82 : 1,
               },
             ]}
           >
-            {downloading ? (
-              <>
-                <ActivityIndicator size="small" color="#080808" />
-                <Text style={styles.primaryText}>BAIXANDO ATUALIZAÇÃO…</Text>
-              </>
+            {opening ? (
+              <ActivityIndicator size="small" color="#080808" />
             ) : (
-              <>
-                <Ionicons name="download-outline" size={19} color="#080808" />
-                <Text style={styles.primaryText}>
-                  {state === 'error' ? 'TENTAR NOVAMENTE' : 'BAIXAR E REINICIAR'}
-                </Text>
-              </>
+              <Ionicons name="logo-android" size={20} color="#080808" />
             )}
+            <Text style={styles.primaryText}>
+              {opening ? 'ABRINDO DOWNLOAD…' : 'BAIXAR TRAINER COLLECTION 1.1'}
+            </Text>
           </Pressable>
 
-          {!downloading ? (
-            <Pressable onPress={dismiss} style={styles.laterButton}>
-              <Text style={[styles.laterText, { color: colors.muted }]}>DEPOIS</Text>
-            </Pressable>
-          ) : (
-            <Text style={[styles.waitText, { color: colors.muted }]}>Não feche o app durante o download.</Text>
-          )}
+          <Text style={[styles.lockText, { color: colors.muted }]}>O APK antigo não pode continuar sem atualizar.</Text>
         </View>
       </View>
     </Modal>
@@ -174,21 +100,21 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,.66)',
+    backgroundColor: 'rgba(0,0,0,.78)',
   },
   sheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
-    paddingTop: 24,
+    paddingTop: 26,
     paddingHorizontal: 20,
-    minHeight: 330,
+    minHeight: 345,
     alignItems: 'stretch',
   },
   iconWrap: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
+    width: 58,
+    height: 58,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
@@ -209,10 +135,10 @@ const styles = StyleSheet.create({
   },
   body: {
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 20,
     textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 6,
+    marginTop: 9,
+    paddingHorizontal: 4,
   },
   errorBox: {
     marginTop: 14,
@@ -231,7 +157,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   primaryButton: {
-    height: 54,
+    height: 56,
     borderRadius: 16,
     marginTop: 20,
     flexDirection: 'row',
@@ -243,22 +169,12 @@ const styles = StyleSheet.create({
     color: '#080808',
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: .5,
+    letterSpacing: .4,
   },
-  laterButton: {
-    minHeight: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  laterText: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: .8,
-  },
-  waitText: {
+  lockText: {
     textAlign: 'center',
     fontSize: 10,
-    marginTop: 12,
+    fontWeight: '700',
+    marginTop: 13,
   },
 });
