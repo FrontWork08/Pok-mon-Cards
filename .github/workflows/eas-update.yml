@@ -18,6 +18,7 @@ on:
       - scripts/apk-security-audit.mjs
       - scripts/trainer-identity-audit.mjs
       - scripts/battle-lab-filter-audit.mjs
+      - scripts/native-11-audit.mjs
       - .github/workflows/eas-update.yml
 
 permissions:
@@ -69,15 +70,21 @@ jobs:
         run: npm run verify
 
       - name: Load Expo preview environment
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas env:pull --environment preview --path .env.local --non-interactive
 
       - name: Export web app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: npx expo export --platform web
 
       - name: Deploy web app to production
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas deploy --prod --environment preview --dev-domain pokemon-cards-frontwork --non-interactive
 
       - name: Publish Android update to production
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --channel production --platform android --environment production --message "GitHub ${GITHUB_SHA:0:7}" --non-interactive
+        run: eas update --channel production --environment preview --platform android --message "Trainer Collection production $GITHUB_SHA" --non-interactive
