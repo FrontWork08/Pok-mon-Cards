@@ -1,12 +1,12 @@
 {
   "appName": "Trainer Collection",
   "packageName": "com.frontwork.pokemoncards",
-  "version": "1.0.1",
-  "buildVersion": "9",
-  "downloadUrl": "https://github.com/FrontWork08/Pok-mon-Cards/releases/download/android-v1.0.1/Trainer-Collection-v1.0.1.apk",
-  "sha256": "3eb232d5dcb7ad96ae1c6b352c20beeb5f3a121958c1ad10d351b0c317cc2f40",
-  "sizeBytes": 104172842,
-  "publishedAt": "2026-08-30T04:27:36.930Z",
+  "version": "1.1.0",
+  "buildVersion": "11",
+  "downloadUrl": "https://github.com/FrontWork08/Pok-mon-Cards/releases/download/android-v1.1.0/Trainer-Collection-v1.1.0.apk",
+  "sha256": "a1b5193112c725150f40cf39e61e9e56bb4a9fa46e89ca145bfba21f4c5994fa",
+  "sizeBytes": 105262731,
+  "publishedAt": "2026-09-05T23:57:59.842Z",
   "channel": "production",
   "status": "ready",
   "verification": {
@@ -15,7 +15,7 @@
     "certificateSha256": "7b4e0052f1bdf07e0c33abc4176de96f9cf7a64a8f325ae7c5dcbb2083cc2843",
     "certificateSubject": "CN=, OU=, O=, L=, ST=, C=",
     "signerMatchesTrustedCertificate": true,
-    "verifiedAt": "2026-09-04T18:51:06.606Z",
+    "verifiedAt": "2026-09-05T23:57:59.775Z",
     "verifier": "Android apksigner",
     "schemes": {
       "v1": false,
@@ -24,6 +24,6 @@
       "v4": false
     }
   },
-  "downloadFileName": "Trainer-Collection-v1.0.1.apk",
+  "downloadFileName": "Trainer-Collection-v1.1.0.apk",
   "downloadProvider": "GitHub Release"
 }
