@@ -239,16 +239,40 @@ Deno.serve(async (req: Request) => {
     }
 
     if (body.action === "attack") {
+      const battleId = String(body.battleId);
+      const expectedTurn = Number(body.expectedTurn ?? 0);
+      if (expectedTurn > 0) {
+        const { data: before, error: beforeError } = await admin.rpc("server_get_battle_attack_state", {
+          p_actor_id: user.id,
+          p_battle_id: battleId,
+        });
+        if (beforeError) throw beforeError;
+        if (before?.status !== "revealing" || Number(before?.turn ?? 0) !== expectedTurn || before?.myLocked) {
+          return json({ data: { recovered: true, staleTurn: Number(before?.turn ?? 0) !== expectedTurn, state: before } });
+        }
+      }
+
       const { data: attackResult, error } = await admin.rpc("server_choose_battle_attack", {
         p_actor_id: user.id,
-        p_battle_id: body.battleId,
+        p_battle_id: battleId,
         p_attack_name: String(body.attackName ?? ""),
       });
-      if (error) throw error;
+      if (error) {
+        const message = readableError(error);
+        if (message.includes("ALREADY_ATTACK_LOCKED")) {
+          const { data: current, error: currentError } = await admin.rpc("server_get_battle_attack_state", {
+            p_actor_id: user.id,
+            p_battle_id: battleId,
+          });
+          if (currentError) throw currentError;
+          return json({ data: { recovered: true, state: current } });
+        }
+        throw error;
+      }
       if (!attackResult?.bothAttacksLocked) return json({ data: attackResult });
 
       const { data: resolved, error: resolveError } = await admin.rpc("server_resolve_battle_round", {
-        p_battle_id: body.battleId,
+        p_battle_id: battleId,
       });
       if (resolveError) throw resolveError;
       return json({ data: { ...attackResult, resolved } });

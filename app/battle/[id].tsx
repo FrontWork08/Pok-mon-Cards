@@ -419,7 +419,7 @@ export default function BattleScreen() {
       setWorking(true);
       setNotice(null);
       setArenaTurnResult(null);
-      const result = await chooseBattleAttack(String(id), selectedAttackName);
+      const result = await chooseBattleAttack(String(id), selectedAttackName, Number(attackState?.turn ?? 0));
       if (settings?.battle_vibration ?? true) Vibration.vibrate(65);
       if (settings?.battle_sounds ?? true) void playBattleSound('confirm');
       if (result?.resolved?.engineVersion === 'game_v1') {

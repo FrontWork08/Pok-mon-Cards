@@ -227,7 +227,8 @@ export default function TeamBattleScreen() {
     setWorking(true);
     setNotice(null);
     try {
-      await chooseTeamBattleAttack(battleId, value);
+      const result = await chooseTeamBattleAttack(battleId, value, Number(state?.turn ?? 0));
+      if (result?.state) setState(result.state as TeamBattleState);
       await refresh(true);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível usar esse ataque.');

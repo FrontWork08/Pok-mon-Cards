@@ -140,6 +140,44 @@ async function invoke(body: Record<string, unknown>) {
   return data?.data;
 }
 
+const ATTACK_ACTION_TIMEOUT_MS = 7000;
+
+function withAttackActionTimeout<T>(promise: Promise<T>) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('BATTLE_ACTION_REQUEST_TIMEOUT')), ATTACK_ACTION_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => { if (timer) clearTimeout(timer); }) as Promise<T>;
+}
+
+function isTransientAttackActionError(error: unknown) {
+  const message = String(error instanceof Error ? error.message : error ?? '').toLowerCase();
+  return message.includes('battle_action_request_timeout')
+    || message.includes('network')
+    || message.includes('failed to fetch')
+    || message.includes('fetch failed')
+    || message.includes('timeout')
+    || message.includes('timed out');
+}
+
+async function invokeAttackWithRetry(body: Record<string, unknown>) {
+  const run = () => withAttackActionTimeout(invoke(body));
+  try {
+    return await run();
+  } catch (error) {
+    if (!isTransientAttackActionError(error)) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    try {
+      return await run();
+    } catch (retryError) {
+      if (isTransientAttackActionError(retryError)) {
+        throw new Error('A conexão com a batalha demorou. O estado será atualizado; tente o golpe novamente.');
+      }
+      throw retryError;
+    }
+  }
+}
+
 export async function getTeamBattleState(battleId: string) {
   return invoke({ action: 'state', battleId }) as Promise<TeamBattleState>;
 }
@@ -157,8 +195,8 @@ export async function setTeamBattleTeam(battleId: string, cardIds: string[]) {
   return invoke({ action: 'set_team', battleId, cardIds });
 }
 
-export async function chooseTeamBattleAttack(battleId: string, attackName: string) {
-  return invoke({ action: 'attack', battleId, attackName });
+export async function chooseTeamBattleAttack(battleId: string, attackName: string, expectedTurn?: number | null) {
+  return invokeAttackWithRetry({ action: 'attack', battleId, attackName, expectedTurn: expectedTurn ?? null });
 }
 
 export async function chooseTeamBattleSwitch(battleId: string, slot: number) {

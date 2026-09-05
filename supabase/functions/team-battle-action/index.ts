@@ -33,7 +33,14 @@ Deno.serve(async(req:Request)=>{
     }
     if(body.action==="state"){await driveBot(String(body.battleId));return json({data:await state(String(body.battleId))})}
     if(body.action==="set_team"){const cardIds=Array.isArray(body.cardIds)?body.cardIds.map(String):[];const {data:result,error}=await admin.rpc("server_set_battle_team",{p_actor_id:user.id,p_battle_id:body.battleId,p_card_ids:cardIds});if(error)throw error;const bot=await driveBot(String(body.battleId));return json({data:{...result,bot}})}
-    if(body.action==="attack"){const {data:action,error}=await admin.rpc("server_choose_battle_team_attack",{p_actor_id:user.id,p_battle_id:body.battleId,p_attack_name:String(body.attackName??"")});if(error)throw error;let resolved=null;if(action?.bothActionsLocked){const result=await admin.rpc("server_resolve_team_turn",{p_battle_id:body.battleId});if(result.error)throw result.error;resolved=result.data}const bot=await driveBot(String(body.battleId));return json({data:{...action,resolved,bot}})}
+    if(body.action==="attack"){
+      const battleId=String(body.battleId);const expectedTurn=Number(body.expectedTurn??0);
+      if(expectedTurn>0){const before=await state(battleId);if(before?.status!=="revealing"||Number(before?.turn??0)!==expectedTurn||before?.myLocked){return json({data:{recovered:true,staleTurn:Number(before?.turn??0)!==expectedTurn,state:before}})}}
+      const {data:action,error}=await admin.rpc("server_choose_battle_team_attack",{p_actor_id:user.id,p_battle_id:battleId,p_attack_name:String(body.attackName??"")});
+      if(error){const message=readableError(error);if(message.includes("ACTION_ALREADY_LOCKED")){return json({data:{recovered:true,state:await state(battleId)}})}throw error}
+      let resolved=null;if(action?.bothActionsLocked){const result=await admin.rpc("server_resolve_team_turn",{p_battle_id:battleId});if(result.error)throw result.error;resolved=result.data}
+      const bot=await driveBot(battleId);const after=await state(battleId);return json({data:{...action,resolved,bot,state:after}})
+    }
     if(body.action==="switch"){const {data:action,error}=await admin.rpc("server_choose_battle_team_switch",{p_actor_id:user.id,p_battle_id:body.battleId,p_slot:Number(body.slot)});if(error)throw error;let resolved=action?.resolved??null;if(action?.bothActionsLocked){const result=await admin.rpc("server_resolve_team_turn",{p_battle_id:body.battleId});if(result.error)throw result.error;resolved=result.data}const bot=await driveBot(String(body.battleId));return json({data:{...action,resolved,bot}})}
     if(body.action==="timeout"){const {data:result,error}=await admin.rpc("server_timeout_team_battle",{p_actor_id:user.id,p_battle_id:body.battleId});if(error)throw error;const bot=await driveBot(String(body.battleId));return json({data:{...result,bot}})}
     if(body.action==="forfeit"){const {data,error}=await admin.rpc("server_forfeit_battle",{p_actor_id:user.id,p_battle_id:body.battleId});if(error)throw error;return json({data})}
