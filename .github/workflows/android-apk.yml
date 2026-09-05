@@ -56,27 +56,39 @@ jobs:
       - name: Verify project before native release
         run: npm run verify
 
-      - name: Locate Android signature verifier
+      - name: Locate Android APK verifiers
         shell: bash
         run: |
           set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           APKSIGNER_PATH="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
-          if [ -z "$APKSIGNER_PATH" ]; then
-            echo "apksigner was not found; refusing to create an unverified public APK."
+          AAPT2_PATH="$(find "$SDK_ROOT/build-tools" -type f -name aapt2 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER_PATH" ] || [ ! -x "$APKSIGNER_PATH" ]; then
+            echo "apksigner was not found or is not executable; refusing to create an unverified public APK."
             exit 1
           fi
-          if [ ! -x "$APKSIGNER_PATH" ]; then
-            echo "apksigner exists but is not executable; refusing to create an unverified public APK."
+          if [ -z "$AAPT2_PATH" ] || [ ! -x "$AAPT2_PATH" ]; then
+            echo "aapt2 was not found or is not executable; refusing to publish without native resource verification."
             exit 1
           fi
           echo "APKSIGNER=$APKSIGNER_PATH" >> "$GITHUB_ENV"
+          echo "AAPT2=$AAPT2_PATH" >> "$GITHUB_ENV"
           "$APKSIGNER_PATH" version
+          "$AAPT2_PATH" version
 
       - name: Build, download and verify release APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npm run apk
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$COMMIT_MESSAGE" == *"[reuse-apk]"* ]]; then
+            echo "Workflow-only verification fix detected; reusing the latest completed 1.1 APK instead of spending another cloud build."
+            npm run apk:download
+          else
+            npm run apk
+          fi
 
       - name: Verify 1.1 native resources inside APK
         shell: bash
@@ -84,14 +96,15 @@ jobs:
           set -euo pipefail
           SOURCE_APK="$(find builds -maxdepth 1 -type f -name '*.apk' | head -n 1)"
           test -n "$SOURCE_APK"
-          unzip -l "$SOURCE_APK" >/tmp/apk-files.txt
+          "$AAPT2" dump resources "$SOURCE_APK" >/tmp/apk-resources.txt
           for resource in tc_default tc_battle tc_social tc_trade; do
-            grep -Eq "res/raw/${resource}(\.[^ ]+)?$" /tmp/apk-files.txt || {
-              echo "Missing bundled notification sound in APK: ${resource}"
+            grep -Fq "raw/${resource}" /tmp/apk-resources.txt || {
+              echo "Missing bundled notification sound resource in APK table: ${resource}"
+              grep -E 'type raw|raw/' /tmp/apk-resources.txt | tail -n 120 || true
               exit 1
             }
           done
-          echo "All Trainer Collection 1.1 notification sounds are packaged in the APK."
+          echo "All Trainer Collection 1.1 notification sounds are registered in the APK resource table."
 
       - name: Publish friendly APK filename
         env:
