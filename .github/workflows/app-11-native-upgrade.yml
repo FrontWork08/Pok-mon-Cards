@@ -7,6 +7,7 @@ on:
       - .github/workflows/app-11-native-upgrade.yml
       - scripts/patch-native-11.py
       - scripts/patch-native-11-baseline.py
+      - scripts/patch-native-11-regression.py
 
 permissions:
   contents: write
@@ -30,6 +31,7 @@ jobs:
         run: |
           python scripts/patch-native-11.py
           python scripts/patch-native-11-baseline.py
+          python scripts/patch-native-11-regression.py
 
       - name: Install SDK 53 native dependencies
         run: |
@@ -91,8 +93,8 @@ jobs:
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
-          git config user.email '4189824+github-actions[bot]@users.noreply.github.com'
-          git add app.json package.json package-lock.json app src public scripts/native-runtime-baseline.json scripts/native-11-audit.mjs assets/sounds
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.json package.json package-lock.json app src public scripts/native-runtime-baseline.json scripts/regression-audit.mjs scripts/native-11-audit.mjs assets/sounds
           git diff --cached --check
           git commit -m 'feat: add Trainer Collection 1.1 native features'
           git push
