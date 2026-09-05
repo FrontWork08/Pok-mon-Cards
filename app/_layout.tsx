@@ -33,6 +33,7 @@ function AppStack() {
   const [liveNotification, setLiveNotification] = useState<any>(null);
   const [accountRestriction, setAccountRestriction] = useState<PlayerProfile | null>(null);
   const [matchmaking, setMatchmaking] = useState<MatchmakingState | null>(null);
+  const [bottomNavHeight, setBottomNavHeight] = useState(0);
   const [maintenanceStatus, setMaintenanceStatus] = useState<AppRuntimeStatus | null>(null);
   const [maintenanceAdmin, setMaintenanceAdmin] = useState(false);
   const [maintenanceRefreshVersion, setMaintenanceRefreshVersion] = useState(0);
@@ -338,12 +339,25 @@ function AppStack() {
   }
 
   const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/') && pathname !== '/reset-password';
+  const matchmakingBottom = showChrome
+    ? Math.max(bottomNavHeight + 10, Math.max(insets.bottom, 5) + 77)
+    : Math.max(insets.bottom + 12, 18);
   return (
     <View style={[styles.appShell,{backgroundColor:colors.bg}]}>
       <StatusBar style={isLight ? 'dark' : 'light'} />
       {showChrome ? <View style={[styles.appChrome,{backgroundColor:colors.bg,borderBottomColor:colors.border,paddingTop:Math.max(insets.top,6)}]}><TrainerNavigation /></View> : null}
       <View style={styles.stackHost}><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} /></View>
-      {showChrome ? <GlobalBottomNavigation /> : null}
+      {showChrome ? (
+        <View
+          collapsable={false}
+          onLayout={(event) => {
+            const height = Math.ceil(event.nativeEvent.layout.height);
+            if (height > 0) setBottomNavHeight((current) => current === height ? current : height);
+          }}
+        >
+          <GlobalBottomNavigation />
+        </View>
+      ) : null}
       <UpdatePrompt />
       <GlobalAnnouncementOverlay />
       <ReleaseCampaignNotice />
@@ -412,7 +426,7 @@ function AppStack() {
         </View>
       ) : null}
       {matchmaking?.status === 'waiting' && !accountRestriction ? (
-        <View pointerEvents="box-none" style={[styles.matchmakingHost, { bottom: Math.max(insets.bottom + 12, 18) }]}>
+        <View pointerEvents="box-none" style={[styles.matchmakingHost, { bottom: matchmakingBottom }]}>
           <View style={[styles.matchmakingBanner, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
             <View style={[styles.matchmakingPulse, { backgroundColor: colors.yellow }]}>
               <Text style={styles.matchmakingPulseText}>⚡</Text>
