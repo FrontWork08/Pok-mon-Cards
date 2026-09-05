@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
-import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { clearPendingPasswordRecovery, completeOAuthFromUrl, getCurrentSession, isPasswordRecoveryUrl, isPendingPasswordRecoveryFor } from '@/services/auth';
 import { initialWebAuthUrl } from '@/lib/supabase';
@@ -8,15 +7,26 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function AuthCallbackScreen() {
   const { colors } = useAppTheme();
-  const [message, setMessage] = useState('Confirmando acesso seguro…');
+  const [message, setMessage] = useState(Platform.OS === 'web' ? 'Confirmando acesso seguro…' : 'Abrindo Trainer Collection…');
 
   useEffect(() => {
+    // On Android the root layout owns Linking.getInitialURL/addEventListener and is
+    // the single writer that exchanges the PKCE code. Keeping this route passive
+    // prevents two concurrent exchangeCodeForSession calls for the same App Link.
+    if (Platform.OS !== 'web') return;
+
     let disposed = false;
     void (async () => {
       try {
-        const url = Platform.OS === 'web' ? initialWebAuthUrl : await Linking.getInitialURL();
-        let session = Platform.OS === 'web' ? await getCurrentSession() : (url ? await completeOAuthFromUrl(url) : null);
-        if (!session) session = await getCurrentSession();
+        const url = initialWebAuthUrl;
+        let session = await getCurrentSession();
+        if (!session && url) {
+          try {
+            session = await completeOAuthFromUrl(url);
+          } catch {
+            session = await getCurrentSession();
+          }
+        }
         if (disposed || !session?.user) throw new Error('Sessão não encontrada.');
         const recovery = isPasswordRecoveryUrl(url) || await isPendingPasswordRecoveryFor(session.user.email);
         if (recovery) {
