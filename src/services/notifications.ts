@@ -141,36 +141,48 @@ export async function registerPushNotifications() {
 
   if (Platform.OS === 'android') {
     await Promise.all([
-      Notifications.setNotificationChannelAsync('default', {
+      Notifications.setNotificationChannelAsync('default_v11', {
         name: 'Trainer Collection',
         description: 'Avisos gerais da sua conta Trainer Collection.',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 180, 90, 180],
-        sound: 'default',
+        sound: 'tc_default.wav',
       }),
-      Notifications.setNotificationChannelAsync('battles', {
+      Notifications.setNotificationChannelAsync('battles_v11', {
         name: 'Batalhas',
         description: 'Desafios, matchmaking e resultados de batalha.',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 220, 100, 220],
-        sound: 'default',
+        sound: 'tc_battle.wav',
       }),
-      Notifications.setNotificationChannelAsync('social', {
+      Notifications.setNotificationChannelAsync('social_v11', {
         name: 'Amigos e Guilda',
         description: 'Mensagens, amizades e atividades da guilda.',
         importance: Notifications.AndroidImportance.DEFAULT,
         vibrationPattern: [0, 160],
-        sound: 'default',
+        sound: 'tc_social.wav',
       }),
-      Notifications.setNotificationChannelAsync('trades', {
+      Notifications.setNotificationChannelAsync('trades_v11', {
         name: 'Trocas e Mercado',
         description: 'Ofertas, trocas e movimentações do mercado.',
         importance: Notifications.AndroidImportance.DEFAULT,
         vibrationPattern: [0, 160],
-        sound: 'default',
+        sound: 'tc_trade.wav',
       }),
     ]);
   }
+
+  await Promise.all([
+    Notifications.setNotificationCategoryAsync('tc_battle', [
+      { identifier: 'tc_open_battle', buttonTitle: 'ABRIR BATALHA', options: { opensAppToForeground: true } },
+    ]),
+    Notifications.setNotificationCategoryAsync('tc_social', [
+      { identifier: 'tc_open_social', buttonTitle: 'ABRIR CONVERSA', options: { opensAppToForeground: true } },
+    ]),
+    Notifications.setNotificationCategoryAsync('tc_trade', [
+      { identifier: 'tc_open_trade', buttonTitle: 'VER TROCA / MERCADO', options: { opensAppToForeground: true } },
+    ]),
+  ]);
 
   const projectId = Constants.easConfig?.projectId ?? (Constants.expoConfig?.extra as any)?.eas?.projectId;
   if (!projectId) return null;
@@ -181,6 +193,7 @@ export async function registerPushNotifications() {
     expo_push_token: token,
     player_id: user.id,
     platform: Platform.OS,
+    app_version: Constants.expoConfig?.version ?? null,
     enabled: true,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'expo_push_token' });

@@ -1,5 +1,5 @@
 {
-  "appVersion": "1.0.1",
+  "appVersion": "1.1.0",
   "runtimeVersionPolicy": "appVersion",
   "androidPackage": "com.frontwork.pokemoncards",
   "scheme": "pokemoncards",
@@ -9,7 +9,9 @@
   "plugins": [
     "expo-camera",
     "expo-image-picker",
+    "expo-local-authentication",
     "expo-notifications",
+    "expo-quick-actions",
     "expo-router",
     "expo-secure-store"
   ],

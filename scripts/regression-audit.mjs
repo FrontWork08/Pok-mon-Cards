@@ -588,7 +588,7 @@ if (existsSync('src/services/auth.ts') && existsSync('app/index.tsx') && existsS
   const login = read('app/index.tsx');
   const reset = read('app/reset-password.tsx');
   assert(auth.includes('resetPasswordForEmail'), 'Regressão: serviço de recuperação de senha ausente.');
-  assert(auth.includes('return GOOGLE_OAUTH_REDIRECT'), 'Regressão: recuperação nativa deixou de abrir o callback do APK.');
+  assert(auth.includes('APP_LINK_AUTH_CALLBACK') && auth.includes('return APP_LINK_AUTH_CALLBACK') && auth.includes("GOOGLE_OAUTH_REDIRECT = 'pokemoncards://auth/callback'"), 'Regressão: recuperação nativa perdeu o App Link HTTPS verificado ou o fallback do callback legado.');
   assert(auth.includes('PASSWORD_RECOVERY_PENDING_KEY'), 'Regressão: recuperação nativa não preserva estado pendente no aparelho.');
   assert(auth.includes('isPendingPasswordRecoveryFor'), 'Regressão: callback code-only não pode identificar recuperação pendente.');
   assert(auth.includes('updateUser({ password })'), 'Regressão: atualização segura da nova senha ausente.');

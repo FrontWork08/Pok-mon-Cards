@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.frontwork.pokemoncards",
+      "sha256_cert_fingerprints": [
+        "7B:4E:00:52:F1:BD:F0:7E:0C:33:AB:C4:17:6D:E9:6F:9C:F7:A6:4A:8F:32:5A:E7:C5:DC:BB:20:83:CC:28:43"
+      ]
+    }
+  }
+]

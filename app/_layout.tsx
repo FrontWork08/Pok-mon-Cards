@@ -23,6 +23,8 @@ import { isCurrentUserAdmin } from '@/services/market';
 import { getMaintenanceStatus, type AppRuntimeStatus } from '@/services/maintenance';
 import { publishMyOnlinePresence } from '@/services/presence';
 import { WebPwaBootstrap } from '@/components/WebPwaBootstrap';
+import { DeviceSecurityGate } from '@/components/DeviceSecurityGate';
+import { NativeQuickActionsBootstrap } from '@/components/NativeQuickActionsBootstrap';
 
 function AppStack() {
   const { isLight, colors, settings } = useAppTheme();
@@ -361,6 +363,8 @@ function AppStack() {
       <UpdatePrompt />
       <GlobalAnnouncementOverlay />
       <ReleaseCampaignNotice />
+      <NativeQuickActionsBootstrap userId={userId} />
+      <DeviceSecurityGate enabled={Boolean(userId) && !publicAuthRoute} />
       {maintenanceBlocked ? (
         <View style={styles.maintenanceBlocker}>
           <View style={[styles.maintenanceCard, { backgroundColor: colors.surface, borderColor: '#FF6475' }]}>

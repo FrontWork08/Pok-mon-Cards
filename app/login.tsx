@@ -195,7 +195,7 @@ export default function AuthScreen() {
               <View style={styles.versionRow}>
                 <View style={[styles.versionBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={[styles.versionDot, { backgroundColor: '#65D894' }]} />
-                  <Text style={[styles.versionText, { color: colors.text }]}>VERSÃO 1.0</Text>
+                  <Text style={[styles.versionText, { color: colors.text }]}>VERSÃO 1.1</Text>
                 </View>
                 <Text style={[styles.mascotText, { color: colors.yellow }]}>{visual.mascot.toUpperCase()} THEME</Text>
               </View>

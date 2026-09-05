@@ -3,6 +3,8 @@ import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../lib/supabase';
 
+export const APP_LINK_ORIGIN = 'https://pokemon-cards-frontwork.expo.app';
+export const APP_LINK_AUTH_CALLBACK = `${APP_LINK_ORIGIN}/auth/callback`;
 export const GOOGLE_OAUTH_REDIRECT = 'pokemoncards://auth/callback';
 const PASSWORD_RECOVERY_PENDING_KEY = 'trainer_collection_password_recovery_pending_v1';
 const PASSWORD_RECOVERY_PENDING_TTL_MS = 2 * 60 * 60 * 1000;
@@ -58,7 +60,7 @@ function getAuthRedirectUrl() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     return `${window.location.origin}/`;
   }
-  return GOOGLE_OAUTH_REDIRECT;
+  return APP_LINK_AUTH_CALLBACK;
 }
 
 function authErrorMessage(message: string) {
@@ -98,7 +100,7 @@ function parseOAuthParams(url: string) {
 
 export function isOAuthCallbackUrl(url?: string | null) {
   if (!url) return false;
-  return url.startsWith(GOOGLE_OAUTH_REDIRECT) || url.includes('access_token=') || url.includes('refresh_token=') || url.includes('code=');
+  return url.startsWith(GOOGLE_OAUTH_REDIRECT) || url.startsWith(APP_LINK_AUTH_CALLBACK) || url.includes('access_token=') || url.includes('refresh_token=') || url.includes('code=');
 }
 
 export async function completeOAuthFromUrl(url: string) {
@@ -189,9 +191,9 @@ function getPasswordRecoveryRedirectUrl() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     return `${window.location.origin}/`;
   }
-  // Reuse the callback scheme already embedded in the installed APK and
-  // already used by Auth. No new Android intent filter or APK is required.
-  return GOOGLE_OAUTH_REDIRECT;
+  // APK 1.1 uses the verified HTTPS App Link. The custom scheme remains
+  // accepted by isOAuthCallbackUrl for backwards-compatible old e-mails.
+  return APP_LINK_AUTH_CALLBACK;
 }
 
 export async function requestPasswordReset(email: string) {

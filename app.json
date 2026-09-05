@@ -3,7 +3,7 @@
     "name": "Trainer Collection",
     "slug": "pokemon-cards",
     "owner": "frontwork",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "pokemoncards",
@@ -28,20 +28,33 @@
         }
       ],
       [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#D9B45B",
-          "defaultChannel": "default"
-        }
-      ],
-      [
         "expo-camera",
         {
           "cameraPermission": "A Trainer Collection usa a câmera para escanear QR Codes de amizade.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#D9B45B",
+          "defaultChannel": "default_v11",
+          "sounds": [
+            "./assets/sounds/tc_default.wav",
+            "./assets/sounds/tc_battle.wav",
+            "./assets/sounds/tc_social.wav",
+            "./assets/sounds/tc_trade.wav"
+          ]
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "A Trainer Collection usa a biometria somente para desbloquear sua conta neste aparelho."
+        }
+      ],
+      "expo-quick-actions"
     ],
     "splash": {
       "image": "./assets/splash.png",
@@ -55,7 +68,49 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#07111F"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "pokemon-cards-frontwork.expo.app",
+              "pathPrefix": "/auth/callback"
+            },
+            {
+              "scheme": "https",
+              "host": "pokemon-cards-frontwork.expo.app",
+              "pathPrefix": "/battle/"
+            },
+            {
+              "scheme": "https",
+              "host": "pokemon-cards-frontwork.expo.app",
+              "pathPrefix": "/player/"
+            },
+            {
+              "scheme": "https",
+              "host": "pokemon-cards-frontwork.expo.app",
+              "pathPrefix": "/trade/"
+            },
+            {
+              "scheme": "https",
+              "host": "pokemon-cards-frontwork.expo.app",
+              "pathPrefix": "/chat/"
+            },
+            {
+              "scheme": "https",
+              "host": "pokemon-cards-frontwork.expo.app",
+              "pathPrefix": "/friend-qr"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "extra": {
       "eas": {
