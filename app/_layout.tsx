@@ -105,14 +105,9 @@ function AppStack() {
       registerPushNotifications().catch(() => null);
     };
 
-    // Try immediately for an already-restored session, and retry whenever Auth
-    // establishes a session after login. This prevents a first-launch race where
-    // push registration happens before the user is authenticated.
     registerPush();
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) return;
-      // supabase-js can deadlock if another Supabase call starts inside
-      // onAuthStateChange. Always defer follow-up work to the next tick.
       setTimeout(registerPush, 0);
     });
 
@@ -316,7 +311,6 @@ function AppStack() {
       )
       .subscribe();
 
-    // Realtime is the primary path. The fallback only guards a dropped channel.
     const fallbackTimer = setInterval(() => {
       void refreshRuntime().catch(() => null);
     }, 60000);
@@ -332,15 +326,14 @@ function AppStack() {
     userId && maintenanceStatus?.maintenance_enabled && !maintenanceAdmin,
   );
 
-  // Global auth boundary: once WalletProvider confirms there is no session,
-  // private routes cannot stay mounted. This also covers logout from profile,
-  // maintenance screens, deep links and any future sign-out entry point.
-  const publicAuthRoute = pathname === '/login' || pathname === '/reset-password';
+  // Auth callbacks must mount before a session exists so verified HTTPS App Links
+  // can finish OAuth/password recovery instead of being redirected to login first.
+  const publicAuthRoute = pathname === '/login' || pathname === '/reset-password' || pathname === '/auth/callback';
   if (!walletLoading && !userId && !publicAuthRoute) {
     return <Redirect href="/login" />;
   }
 
-  const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/') && pathname !== '/reset-password';
+  const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/') && !pathname.startsWith('/auth/') && pathname !== '/reset-password';
   const matchmakingBottom = showChrome
     ? Math.max(bottomNavHeight + 10, Math.max(insets.bottom, 5) + 77)
     : Math.max(insets.bottom + 12, 18);
@@ -399,101 +392,36 @@ function AppStack() {
         <View style={styles.accountBlocker}>
           <View style={[styles.accountBlockerCard, { backgroundColor: colors.surface, borderColor: accountRestriction.account_status === 'banned' ? '#A84250' : '#D97732' }]}>
             <View style={[styles.accountBlockerIcon, { backgroundColor: accountRestriction.account_status === 'banned' ? '#351A24' : '#3B2313' }]}>
-              <Text style={styles.accountBlockerEmoji}>{accountRestriction.account_status === 'banned' ? '⛔' : '⏳'}</Text>
+              <Text style={styles.accountBlockerEmoji}>{accountRestriction.account_status === 'banned' ? '⛔' : '⏸️'}</Text>
             </View>
             <Text style={[styles.accountBlockerTitle, { color: colors.text }]}>
               {accountRestriction.account_status === 'banned' ? 'Conta banida' : 'Conta suspensa'}
             </Text>
-            <Text style={[styles.accountBlockerText, { color: colors.muted }]}>
-              {accountRestriction.account_status === 'banned'
-                ? 'Seu acesso ao jogo foi bloqueado pela moderação.'
-                : 'Seu acesso ao jogo está temporariamente suspenso.'}
+            <Text style={[styles.accountBlockerBody, { color: colors.muted }]}>
+              {accountRestriction.account_status_reason || 'Esta conta está temporariamente indisponível.'}
             </Text>
-            {accountRestriction.moderation_reason ? (
-              <View style={[styles.accountReason, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-                <Text style={[styles.accountReasonLabel, { color: colors.muted }]}>MOTIVO</Text>
-                <Text style={[styles.accountReasonText, { color: colors.text }]}>{accountRestriction.moderation_reason}</Text>
-              </View>
+            {accountRestriction.account_status === 'suspended' && accountRestriction.account_status_until ? (
+              <Text style={[styles.accountBlockerMeta, { color: colors.yellow }]}>Até {new Date(accountRestriction.account_status_until).toLocaleString('pt-BR')}</Text>
             ) : null}
-            {accountRestriction.account_status === 'suspended' && accountRestriction.suspended_until ? (
-              <Text style={[styles.accountUntil, { color: '#FFB16A' }]}>
-                Até {new Date(accountRestriction.suspended_until).toLocaleString('pt-BR')}
-              </Text>
-            ) : null}
-            <Pressable
-              onPress={() => { void supabase.auth.signOut(); }}
-              style={[styles.accountSignOut, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]}
-            >
-              <Text style={[styles.accountSignOutText, { color: colors.text }]}>SAIR DA CONTA</Text>
+            <Pressable onPress={() => { void supabase.auth.signOut(); }} style={[styles.accountBlockerButton, { borderColor: colors.border }]}>
+              <Text style={[styles.accountBlockerButtonText, { color: colors.text }]}>SAIR DA CONTA</Text>
             </Pressable>
           </View>
         </View>
       ) : null}
-      {matchmaking?.status === 'waiting' && !accountRestriction ? (
+      {liveNotification && !maintenanceBlocked ? (
+        <Pressable onPress={openLiveNotification} style={[styles.notificationToast,{top:Math.max(insets.top,8)+64,backgroundColor:colors.surface,borderColor:colors.yellow}]}>
+          <View style={[styles.notificationIcon,{backgroundColor:colors.yellow}]}><Text style={styles.notificationIconText}>!</Text></View>
+          <View style={styles.notificationCopy}><Text style={[styles.notificationTitle,{color:colors.text}]} numberOfLines={1}>{liveNotification.title}</Text><Text style={[styles.notificationBody,{color:colors.muted}]} numberOfLines={2}>{liveNotification.body}</Text></View>
+        </Pressable>
+      ) : null}
+      {matchmaking?.status === 'searching' && !maintenanceBlocked ? (
         <View pointerEvents="box-none" style={[styles.matchmakingHost, { bottom: matchmakingBottom }]}>
-          <View style={[styles.matchmakingBanner, { backgroundColor: colors.surface, borderColor: colors.yellow }]}>
-            <View style={[styles.matchmakingPulse, { backgroundColor: colors.yellow }]}>
-              <Text style={styles.matchmakingPulseText}>⚡</Text>
-            </View>
-            <Pressable style={styles.matchmakingBody} onPress={() => router.push('/(tabs)/battles')}>
-              <Text style={[styles.matchmakingTitle, { color: colors.text }]}>Buscando partida ranqueada...</Text>
-              <Text style={[styles.matchmakingText, { color: colors.muted }]}>
-                {matchmaking.mode_choice === 'draft3' ? 'Draft 3' : matchmaking.mode_choice === 'mystery' ? 'Mystery BO3' : 'Quick'} • continue navegando normalmente
-              </Text>
-            </Pressable>
-            <Pressable accessibilityLabel="Cancelar busca de partida" onPress={() => { void cancelGlobalMatchmaking(); }} style={[styles.matchmakingCancel, { borderColor: colors.border }]}>
-              <Text style={styles.matchmakingCancelText}>✕</Text>
-            </Pressable>
+          <View style={[styles.matchmakingBanner,{backgroundColor:colors.surface,borderColor:colors.yellow}]}>
+            <View style={[styles.matchmakingPulse,{backgroundColor:colors.yellow}]} />
+            <View style={styles.matchmakingCopy}><Text style={[styles.matchmakingTitle,{color:colors.text}]}>Buscando partida ranqueada...</Text><Text style={[styles.matchmakingBody,{color:colors.muted}]}>Você pode continuar usando o app. Abriremos a batalha automaticamente.</Text></View>
+            <Pressable onPress={()=>{void cancelGlobalMatchmaking();}} style={[styles.matchmakingCancel,{borderColor:colors.border}]}><Text style={[styles.matchmakingCancelText,{color:colors.muted}]}>CANCELAR</Text></Pressable>
           </View>
-        </View>
-      ) : null}
-      {liveNotification && !accountRestriction ? (
-        <View pointerEvents="box-none" style={[styles.liveNotificationHost, { top: showChrome ? Math.max(insets.top + 92, 98) : Math.max(insets.top + 8, 14) }]}>
-          {liveNotification.type === 'store_gift' ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${liveNotification.title ?? 'Presente recebido'}: ${liveNotification.body ?? ''}`}
-              onPress={openLiveNotification}
-              style={[styles.giftNotification, { backgroundColor: colors.surface, borderColor: '#FFD447' }]}
-            >
-              <View style={styles.giftNotificationGlow} />
-              <View style={[styles.giftNotificationIcon, { backgroundColor: colors.accentSoft }]}>
-                <Text style={styles.giftNotificationEmoji}>🎁</Text>
-              </View>
-              <View style={styles.giftNotificationText}>
-                <Text numberOfLines={1} style={[styles.giftNotificationKicker, { color: colors.yellow }]}>PRESENTE RECEBIDO</Text>
-                <Text numberOfLines={1} style={[styles.giftNotificationTitle, { color: colors.text }]}>
-                  {liveNotification.metadata?.itemName ?? liveNotification.title ?? 'Novo presente'}
-                </Text>
-                <Text numberOfLines={2} style={[styles.giftNotificationBody, { color: colors.muted }]}>
-                  {liveNotification.metadata?.giftMessage
-                    ? `@${liveNotification.metadata?.senderName ?? 'Trainer'}: “${liveNotification.metadata.giftMessage}”`
-                    : liveNotification.body ?? 'Um amigo enviou um presente para você.'}
-                </Text>
-              </View>
-              <View style={[styles.giftNotificationOpen, { borderColor: colors.border }]}>
-                <Text style={[styles.giftNotificationOpenText, { color: colors.yellow }]}>VER</Text>
-              </View>
-            </Pressable>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${liveNotification.title ?? 'Notificação'}: ${liveNotification.body ?? ''}`}
-              onPress={openLiveNotification}
-              style={[styles.liveNotification, { backgroundColor: colors.surface, borderColor: colors.accent }]}
-            >
-              <View style={[styles.liveNotificationDot, { backgroundColor: colors.yellow }]} />
-              <View style={styles.liveNotificationText}>
-                <Text numberOfLines={1} style={[styles.liveNotificationTitle, { color: colors.text }]}>
-                  {liveNotification.title ?? 'Nova notificação'}
-                </Text>
-                <Text numberOfLines={2} style={[styles.liveNotificationBody, { color: colors.muted }]}>
-                  {liveNotification.body ?? 'Toque para abrir.'}
-                </Text>
-              </View>
-              <Text style={[styles.liveNotificationOpen, { color: colors.accent }]}>ABRIR</Text>
-            </Pressable>
-          )}
         </View>
       ) : null}
     </View>
@@ -504,7 +432,6 @@ export default function RootLayout() {
   return <SafeAreaProvider><ThemeProvider><WalletProvider><WebPwaBootstrap /><AppStack /></WalletProvider></ThemeProvider></SafeAreaProvider>;
 }
 
-
 const styles = StyleSheet.create({
   appShell:{flex:1},
   stackHost:{flex:1,minHeight:0},
@@ -512,169 +439,50 @@ const styles = StyleSheet.create({
   maintenanceBlocker: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 7000,
-    backgroundColor: 'rgba(3,7,14,.94)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 22,
+    backgroundColor: 'rgba(4,9,17,0.94)',
   },
   maintenanceCard: {
     width: '100%',
-    maxWidth: 440,
-    borderRadius: 26,
+    maxWidth: 520,
     borderWidth: 1,
-    padding: 23,
+    borderRadius: 28,
+    padding: 24,
     alignItems: 'center',
   },
-  maintenanceIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#351A24',
-    marginBottom: 15,
-  },
-  maintenanceEmoji: { fontSize: 34 },
-  maintenanceTitle: { fontSize: 25, fontWeight: '900', textAlign: 'center' },
-  maintenanceText: { fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8 },
-  maintenanceNotice: { width: '100%', borderRadius: 15, borderWidth: 1, padding: 13, marginTop: 17 },
-  maintenanceNoticeText: { fontSize: 10, lineHeight: 15, textAlign: 'center', fontWeight: '700' },
-  maintenanceRefresh: { minHeight: 50, width: '100%', borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 15 },
-  maintenanceRefreshText: { color: '#07111F', fontSize: 10, fontWeight: '900', letterSpacing: .45 },
-  maintenanceSignOut: { minHeight: 44, minWidth: 160, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 9, paddingHorizontal: 14 },
-  maintenanceSignOutText: { fontSize: 9, fontWeight: '900' },
-  accountBlocker: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 5000,
-    backgroundColor: 'rgba(0,0,0,.82)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 22,
-  },
-  accountBlockerCard: {
-    width: '100%',
-    maxWidth: 430,
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 22,
-    alignItems: 'center',
-  },
-  accountBlockerIcon: {
-    width: 66,
-    height: 66,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  accountBlockerEmoji: { fontSize: 30 },
-  accountBlockerTitle: { fontSize: 25, fontWeight: '900', textAlign: 'center' },
-  accountBlockerText: { fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
-  accountReason: { width: '100%', borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 15 },
-  accountReasonLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
-  accountReasonText: { fontSize: 12, lineHeight: 17, marginTop: 4 },
-  accountUntil: { fontSize: 11, fontWeight: '900', marginTop: 12 },
-  accountSignOut: { minHeight: 48, minWidth: 180, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 18, paddingHorizontal: 16 },
-  accountSignOutText: { fontSize: 9, fontWeight: '900', letterSpacing: .5 },
-  matchmakingHost: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    zIndex: 1300,
-    alignItems: 'center',
-  },
-  matchmakingBanner: {
-    width: '100%',
-    maxWidth: 600,
-    minHeight: 68,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    shadowColor: '#000',
-    shadowOpacity: .3,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 12,
-  },
-  matchmakingPulse: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  matchmakingPulseText: { fontSize: 18 },
-  matchmakingBody: { flex: 1, minWidth: 0 },
-  matchmakingTitle: { fontSize: 12, fontWeight: '900' },
-  matchmakingText: { fontSize: 8, lineHeight: 12, marginTop: 3 },
-  matchmakingCancel: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  matchmakingCancelText: { color: '#FF8290', fontSize: 18, fontWeight: '900' },
-  liveNotificationHost: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    zIndex: 1000,
-    alignItems: 'center',
-  },
-  giftNotification:{width:'100%',maxWidth:560,minHeight:88,borderRadius:20,borderWidth:1.5,padding:11,flexDirection:'row',alignItems:'center',gap:10,overflow:'hidden'},
-  giftNotificationGlow:{position:'absolute',right:-55,top:-75,width:180,height:180,borderRadius:999,backgroundColor:'#FFD447',opacity:.11},
-  giftNotificationIcon:{width:52,height:52,borderRadius:17,alignItems:'center',justifyContent:'center',zIndex:2},
-  giftNotificationEmoji:{fontSize:27},
-  giftNotificationText:{flex:1,minWidth:0,zIndex:2},
-  giftNotificationKicker:{fontSize:7,fontWeight:'900',letterSpacing:1},
-  giftNotificationTitle:{fontSize:13,fontWeight:'900',marginTop:2},
-  giftNotificationBody:{fontSize:9,lineHeight:13,marginTop:3,fontWeight:'700'},
-  giftNotificationOpen:{minWidth:45,height:34,borderRadius:11,borderWidth:1,alignItems:'center',justifyContent:'center',zIndex:2},
-  giftNotificationOpenText:{fontSize:8,fontWeight:'900'},
-  liveNotification: {
-    width: '100%',
-    maxWidth: 560,
-    minHeight: 70,
-    borderRadius: 17,
-    borderWidth: 1,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    shadowColor: '#000',
-    shadowOpacity: .28,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 10,
-  },
-  liveNotificationDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 99,
-  },
-  liveNotificationText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  liveNotificationTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  liveNotificationBody: {
-    fontSize: 10,
-    lineHeight: 14,
-    marginTop: 3,
-  },
-  liveNotificationOpen: {
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: .6,
-  },
+  maintenanceIcon: { width: 78, height: 78, borderRadius: 24, backgroundColor: '#162235', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  maintenanceEmoji: { fontSize: 38 },
+  maintenanceTitle: { fontSize: 23, fontWeight: '900', textAlign: 'center' },
+  maintenanceText: { marginTop: 10, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  maintenanceNotice: { marginTop: 18, width: '100%', borderWidth: 1, borderRadius: 16, padding: 14 },
+  maintenanceNoticeText: { fontSize: 11, lineHeight: 17, textAlign: 'center', fontWeight: '700' },
+  maintenanceRefresh: { marginTop: 18, minHeight: 48, paddingHorizontal: 20, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  maintenanceRefreshText: { color: '#07111F', fontSize: 11, fontWeight: '900' },
+  maintenanceSignOut: { marginTop: 10, minHeight: 42, paddingHorizontal: 22, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  maintenanceSignOutText: { fontSize: 10, fontWeight: '800' },
+  accountBlocker:{...StyleSheet.absoluteFillObject,zIndex:6000,alignItems:'center',justifyContent:'center',padding:22,backgroundColor:'rgba(4,9,17,0.93)'},
+  accountBlockerCard:{width:'100%',maxWidth:460,borderWidth:1,borderRadius:26,padding:24,alignItems:'center'},
+  accountBlockerIcon:{width:76,height:76,borderRadius:24,alignItems:'center',justifyContent:'center',marginBottom:14},
+  accountBlockerEmoji:{fontSize:38},
+  accountBlockerTitle:{fontSize:24,fontWeight:'900',textAlign:'center'},
+  accountBlockerBody:{fontSize:13,lineHeight:20,textAlign:'center',marginTop:10},
+  accountBlockerMeta:{fontSize:11,fontWeight:'900',marginTop:12},
+  accountBlockerButton:{marginTop:20,minHeight:46,paddingHorizontal:26,borderRadius:14,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  accountBlockerButtonText:{fontSize:11,fontWeight:'900'},
+  notificationToast:{position:'absolute',zIndex:5000,left:12,right:12,maxWidth:560,alignSelf:'center',borderWidth:1,borderRadius:18,padding:12,flexDirection:'row',alignItems:'center',gap:10,shadowColor:'#000',shadowOpacity:.35,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:12},
+  notificationIcon:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center'},
+  notificationIconText:{color:'#07111F',fontSize:16,fontWeight:'900'},
+  notificationCopy:{flex:1,minWidth:0},
+  notificationTitle:{fontSize:12,fontWeight:'900'},
+  notificationBody:{fontSize:10,lineHeight:14,marginTop:2},
+  matchmakingHost:{position:'absolute',zIndex:4850,left:10,right:10,alignItems:'center'},
+  matchmakingBanner:{width:'100%',maxWidth:620,minHeight:62,borderWidth:1,borderRadius:18,paddingHorizontal:12,paddingVertical:10,flexDirection:'row',alignItems:'center',gap:10,shadowColor:'#000',shadowOpacity:.30,shadowRadius:16,shadowOffset:{width:0,height:7},elevation:11},
+  matchmakingPulse:{width:12,height:12,borderRadius:6},
+  matchmakingCopy:{flex:1,minWidth:0},
+  matchmakingTitle:{fontSize:11,fontWeight:'900'},
+  matchmakingBody:{fontSize:9,lineHeight:13,marginTop:2},
+  matchmakingCancel:{minHeight:34,paddingHorizontal:10,borderRadius:10,borderWidth:1,alignItems:'center',justifyContent:'center'},
+  matchmakingCancelText:{fontSize:8,fontWeight:'900'},
 });
