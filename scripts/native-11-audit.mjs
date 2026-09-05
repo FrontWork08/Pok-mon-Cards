@@ -31,7 +31,15 @@ const n = readFileSync('src/services/notifications.ts','utf8');
 for (const id of ['default_v11','battles_v11','social_v11','trades_v11','tc_battle','tc_social','tc_trade']) assert(n.includes(id), `notification native contract missing ${id}`);
 const layout = readFileSync('app/_layout.tsx','utf8');
 assert(layout.includes('DeviceSecurityGate') && layout.includes('NativeQuickActionsBootstrap'), 'root native bootstraps missing');
+assert(layout.includes("pathname === '/auth/callback'"), 'verified auth callback must remain public before a session exists');
+assert(layout.includes("!pathname.startsWith('/auth/')"), 'auth callback must not render private app chrome');
+const callback = readFileSync('app/auth/callback.tsx','utf8');
+assert(callback.includes("if (Platform.OS !== 'web') return;"), 'native callback route must not exchange the same PKCE code as the root Linking handler');
+assert(!callback.includes('Linking.getInitialURL'), 'native callback screen reintroduced duplicate Linking ownership');
 assert(existsSync('app/security.tsx') && existsSync('src/services/deviceSecurity.ts'), 'device security UI/service missing');
+const gate = readFileSync('src/components/DeviceSecurityGate.tsx','utf8');
+assert(gate.includes('unlockingRef') && gate.includes('lockAndPrompt'), 'device security gate lost single-flight prompt protection');
+assert(!gate.includes('if (locked && enabled && !unlocking)'), 'device security gate reintroduced automatic retry prompt loop');
 assert(existsSync('src/components/NativeQuickActionsBootstrap.tsx'), 'quick actions bootstrap missing');
 if (fail.length) { console.error(fail.map((x) => `- ${x}`).join('\n')); process.exit(1); }
 console.log('Trainer Collection 1.1 native contracts: OK');
