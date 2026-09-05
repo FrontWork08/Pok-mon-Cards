@@ -11,6 +11,7 @@ import { Platform } from 'react-native';
  * Revalidated after battle attack retry guards and fast notification dispatch.
  * Revalidated after moving the matchmaking search banner above bottom navigation.
  * Revalidated for the Trainer Collection 1.1 native release and new runtime.
+ * Native APK build uses this same fully audited 1.1 release tree.
  */
 export const VIRTUAL_LIST_PERF_PROPS = {
   initialNumToRender: 8,
