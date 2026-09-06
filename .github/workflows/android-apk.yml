@@ -23,6 +23,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lock native artwork to v1.1 Rayquaza source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          BASE_TAG="android-v1.1.0"
+          test "$(git rev-parse HEAD:assets/trainer-poster-base64)" = "$(git rev-parse ${BASE_TAG}:assets/trainer-poster-base64)"
+          test "$(git rev-parse HEAD:assets/icon.png)" = "$(git rev-parse ${BASE_TAG}:assets/icon.png)"
+          test "$(git rev-parse HEAD:assets/adaptive-icon.png)" = "$(git rev-parse ${BASE_TAG}:assets/adaptive-icon.png)"
+          echo "Rayquaza artwork source is byte-identical to Trainer Collection 1.1.0."
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -73,10 +86,14 @@ jobs:
           echo "APKSIGNER=$APKSIGNER_PATH" >> "$GITHUB_ENV"
           "$APKSIGNER_PATH" version
 
-      - name: Build, download and verify release APK
+      - name: Build clean, download and verify release APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npm run apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          eas build --platform android --profile release-apk --non-interactive --clear-cache
+          npm run apk:download
 
       - name: Verify native Trainer sounds inside APK
         shell: bash
@@ -86,9 +103,10 @@ jobs:
           test -n "$SOURCE_APK"
           node scripts/verify-apk-sounds.mjs "$SOURCE_APK"
 
-      - name: Publish friendly APK filename
+      - name: Publish verified archive and official installer metadata
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -101,32 +119,40 @@ jobs:
 
           TAG="android-v${VERSION}"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; replacing verified asset."
+            echo "Release $TAG already exists; replacing verified archive asset."
           else
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Trainer Collection v${VERSION}" --notes "APK oficial do Trainer Collection. Arquivo verificado por SHA-256 e assinatura Android antes da publicação."
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Trainer Collection v${VERSION}" --notes "APK oficial do Trainer Collection. Arquivo verificado por SHA-256 e assinatura Android antes da publicação. A instalação pública começa no site oficial."
           fi
           gh release upload "$TAG" "$FRIENDLY_APK" --repo "$GITHUB_REPOSITORY" --clobber
 
-          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${FRIENDLY_NAME}"
-          export DOWNLOAD_URL FRIENDLY_NAME
+          ARCHIVE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${FRIENDLY_NAME}"
+          EAS_JSON="$(eas build:list --platform android --profile release-apk --status finished --limit 1 --json --non-interactive)"
+          export EAS_JSON
+          EAS_BUILD_ID="$(node -e "const x=JSON.parse(process.env.EAS_JSON); const b=Array.isArray(x)?x[0]:x.builds?.[0]; if(!b?.id) process.exit(2); process.stdout.write(b.id)")"
+          EAS_BUILD_URL="https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/${EAS_BUILD_ID}"
+          SITE_URL="https://pokemon-cards-frontwork.expo.app/download/"
+          export ARCHIVE_URL EAS_BUILD_ID EAS_BUILD_URL SITE_URL FRIENDLY_NAME
+
           node <<'NODE'
           const fs = require('fs');
           const p = 'public/download/release.json';
           const release = JSON.parse(fs.readFileSync(p, 'utf8'));
-          release.downloadUrl = process.env.DOWNLOAD_URL;
+          release.downloadUrl = process.env.SITE_URL;
           release.downloadFileName = process.env.FRIENDLY_NAME;
-          release.downloadProvider = 'GitHub Release';
+          release.downloadProvider = 'Expo EAS Build';
+          release.easBuildId = process.env.EAS_BUILD_ID;
+          release.easBuildUrl = process.env.EAS_BUILD_URL;
+          release.archiveUrl = process.env.ARCHIVE_URL;
           fs.writeFileSync(p, JSON.stringify(release, null, 2) + '\n');
           NODE
 
-          curl --fail --location --retry 4 --retry-delay 2 "$DOWNLOAD_URL" -o /tmp/friendly-recheck.apk
+          curl --fail --location --retry 4 --retry-delay 2 "$ARCHIVE_URL" -o /tmp/friendly-recheck.apk
           EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
           ACTUAL_SHA="$(sha256sum /tmp/friendly-recheck.apk | awk '{print $1}')"
           [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
           node scripts/verify-apk-sounds.mjs /tmp/friendly-recheck.apk
           "$APKSIGNER" verify --verbose --print-certs /tmp/friendly-recheck.apk >/tmp/friendly-recheck-signature.txt
-          grep -q 'Verifies' /tmp/friendly-recheck-signature.txt
-          echo "Friendly release asset is byte-identical, sound-valid and Android signature-valid."
+          echo "Release archive is byte-identical to the signed build. Public installation remains on the Trainer Collection site -> Expo EAS."
 
       - name: Validate published download metadata
         run: |
@@ -138,18 +164,19 @@ jobs:
           const cert = hex(release.verification?.certificateSha256);
           const trustedCert = hex(trusted.certificateSha256);
           if (release.status !== 'ready') throw new Error('Release is not ready');
-          if (!/^https:\/\//.test(release.downloadUrl || '')) throw new Error('Release URL must use HTTPS');
+          if (release.downloadUrl !== 'https://pokemon-cards-frontwork.expo.app/download/') throw new Error('Public entry point must be the Trainer Collection site');
+          if (!/^https:\/\/expo\.dev\/accounts\/frontwork\/projects\/pokemon-cards\/builds\/[0-9a-f-]{36}$/i.test(release.easBuildUrl || '')) throw new Error('EAS installer page is invalid');
           if (!/^[a-f0-9]{64}$/i.test(release.sha256 || '')) throw new Error('Invalid APK SHA-256');
           if (!(Number(release.sizeBytes) > 0)) throw new Error('Invalid APK size');
           if (release.packageName !== 'com.frontwork.pokemoncards') throw new Error('Unexpected Android package');
           if (!/^Trainer-Collection-v.+\.apk$/.test(release.downloadFileName || '')) throw new Error('Public APK filename is not friendly');
-          if (release.downloadProvider !== 'GitHub Release') throw new Error('Public APK must use the friendly release provider');
+          if (release.downloadProvider !== 'Expo EAS Build') throw new Error('Public installer provider must be Expo EAS Build');
           if (release.verification?.sha256Verified !== true) throw new Error('APK hash was not verified');
           if (release.verification?.signatureVerified !== true) throw new Error('APK signature was not verified');
           if (release.verification?.signerMatchesTrustedCertificate !== true) throw new Error('APK signer was not pinned');
           if (!/^[a-f0-9]{64}$/.test(cert) || cert !== trustedCert) throw new Error('APK signer certificate mismatch');
           if (!release.verification?.verifiedAt) throw new Error('Missing verification timestamp');
-          console.log('APK metadata, friendly filename, hash, signature and trusted signer certificate are valid.');
+          console.log('Official-site entry point, EAS installer, hash, signature and trusted signer certificate are valid.');
           NODE
 
       - name: Upload verified APK evidence
@@ -185,6 +212,6 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          eas env:pull --environment preview --path .env.local --non-interactive
+          eas env:pull --environment production --path .env.local --non-interactive
           npx expo export --platform web
-          eas deploy --prod --environment preview --dev-domain pokemon-cards-frontwork --non-interactive
+          eas deploy --prod --environment production --dev-domain pokemon-cards-frontwork --non-interactive
