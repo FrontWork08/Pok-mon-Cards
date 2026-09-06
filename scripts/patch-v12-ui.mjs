@@ -60,6 +60,16 @@ function patchBattleHub(){
   fs.writeFileSync(path,text);
 }
 
+function patchRootRuntimeTypes(){
+  const path='app/_layout.tsx';
+  let text=fs.readFileSync(path,'utf8');
+  text=text.replaceAll('accountRestriction.account_status_reason','accountRestriction.moderation_reason');
+  text=text.replaceAll('accountRestriction.account_status_until','accountRestriction.suspended_until');
+  text=text.replace("matchmaking?.status === 'searching'","matchmaking?.status === 'waiting'");
+  fs.writeFileSync(path,text);
+}
+
 patchTeamBattle();
 patchBattleHub();
-console.log('Trainer Collection 1.2 battle UI patched.');
+patchRootRuntimeTypes();
+console.log('Trainer Collection 1.2 battle UI and runtime types patched.');
