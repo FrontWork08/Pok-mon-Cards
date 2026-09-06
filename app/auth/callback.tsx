@@ -10,9 +10,9 @@ export default function AuthCallbackScreen() {
   const [message, setMessage] = useState(Platform.OS === 'web' ? 'Confirmando acesso seguro…' : 'Abrindo Trainer Collection…');
 
   useEffect(() => {
-    // On Android the root layout owns Linking.getInitialURL/addEventListener and is
-    // the single writer that exchanges the PKCE code. Keeping this route passive
-    // prevents two concurrent exchangeCodeForSession calls for the same App Link.
+    // On Android the root layout exclusively owns incoming App Links and is the
+    // single writer that exchanges the PKCE code. Keeping this route passive
+    // prevents two concurrent exchangeCodeForSession calls for the same callback.
     if (Platform.OS !== 'web') return;
 
     let disposed = false;
