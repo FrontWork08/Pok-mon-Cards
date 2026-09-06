@@ -78,20 +78,13 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: npm run apk
 
-      - name: Verify 1.1 native resources inside APK
+      - name: Verify native Trainer sounds inside APK
         shell: bash
         run: |
           set -euo pipefail
           SOURCE_APK="$(find builds -maxdepth 1 -type f -name '*.apk' | head -n 1)"
           test -n "$SOURCE_APK"
-          unzip -l "$SOURCE_APK" >/tmp/apk-files.txt
-          for resource in tc_default tc_battle tc_social tc_trade; do
-            grep -Eq "res/raw/${resource}(\.[^ ]+)?$" /tmp/apk-files.txt || {
-              echo "Missing bundled notification sound in APK: ${resource}"
-              exit 1
-            }
-          done
-          echo "All Trainer Collection 1.1 notification sounds are packaged in the APK."
+          node scripts/verify-apk-sounds.mjs "$SOURCE_APK"
 
       - name: Publish friendly APK filename
         env:
@@ -130,9 +123,10 @@ jobs:
           EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
           ACTUAL_SHA="$(sha256sum /tmp/friendly-recheck.apk | awk '{print $1}')"
           [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          node scripts/verify-apk-sounds.mjs /tmp/friendly-recheck.apk
           "$APKSIGNER" verify --verbose --print-certs /tmp/friendly-recheck.apk >/tmp/friendly-recheck-signature.txt
           grep -q 'Verifies' /tmp/friendly-recheck-signature.txt
-          echo "Friendly release asset is byte-identical and Android signature-valid."
+          echo "Friendly release asset is byte-identical, sound-valid and Android signature-valid."
 
       - name: Validate published download metadata
         run: |
