@@ -1,0 +1,64 @@
+name: Prepare Trainer Collection 1.2 3D
+
+on:
+  push:
+    branches: [feature/v1.2-adventure-3d]
+    paths:
+      - .github/workflows/prepare-v12-3d.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/v1.2-adventure-3d
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install current dependencies
+        run: npm ci
+
+      - name: Install Expo-compatible 3D runtime
+        run: |
+          npx expo install expo-gl
+          npm install three
+          npm install -D @types/three
+
+      - name: Promote app/runtime to 1.2.0
+        run: |
+          npm version 1.2.0 --no-git-tag-version
+          node - <<'NODE'
+          const fs=require('fs');
+          const p='app.json';
+          const data=JSON.parse(fs.readFileSync(p,'utf8'));
+          data.expo.version='1.2.0';
+          fs.writeFileSync(p,JSON.stringify(data,null,2)+'\n');
+          NODE
+
+      - name: Validate dependency graph
+        run: |
+          npx expo install --check
+          node -e "const p=require('./package.json'); if(p.version!=='1.2.0'||!p.dependencies['expo-gl']||!p.dependencies['three']) process.exit(1)"
+
+      - name: Commit native foundation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json app.json
+          if git diff --cached --quiet; then
+            echo "1.2 foundation already prepared"
+            exit 0
+          fi
+          git commit -m "build: add Expo GL 3D runtime and bump 1.2.0"
+          git push origin HEAD:feature/v1.2-adventure-3d
