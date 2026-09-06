@@ -1,5 +1,6 @@
 name: Publish Production Update
 
+# Trainer Collection 1.2 production deploy; retry after verified APK metadata repair.
 on:
   workflow_dispatch:
   push:
