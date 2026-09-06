@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { PixelBattleFighter } from '@/components/PixelBattleArena';
 import {
   readPokemon3DModelArrayBuffer,
@@ -82,6 +81,31 @@ function tintFor(fighter: Fighter3D | null, fallback: number) {
     hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
   }
   return text ? 0x555555 + (hash % 0x777777) : fallback;
+}
+
+function createExpoThreeRenderer(
+  gl: ExpoWebGLRenderingContext,
+  quality: 'low' | 'medium' | 'high',
+) {
+  const width = Math.max(1, gl.drawingBufferWidth);
+  const height = Math.max(1, gl.drawingBufferHeight);
+  const canvas = {
+    width,
+    height,
+    clientWidth: width,
+    clientHeight: height,
+    style: {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    setAttribute: () => {},
+    getContext: () => gl,
+  };
+  return new THREE.WebGLRenderer({
+    canvas: canvas as any,
+    context: gl as any,
+    antialias: quality !== 'low',
+    alpha: false,
+  });
 }
 
 function hpPercent(fighter: Fighter3D | null) {
@@ -270,6 +294,7 @@ async function loadRemoteCreature(
   try {
     const buffer = await readPokemon3DModelArrayBuffer(asset.localUri);
     if (!isCurrent()) return null;
+    const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
     const loader = new GLTFLoader();
     const gltf = await new Promise<{ scene: THREE.Group; animations: THREE.AnimationClip[] }>((resolve, reject) => {
       loader.parse(buffer, '', (loaded) => resolve({
@@ -305,6 +330,7 @@ export function BattleArena3D({
   const disposed = useRef(false);
   const contextGeneration = useRef(0);
   const [modelState, setModelState] = useState<'loading' | 'remote' | 'fallback'>('loading');
+  const [contextError, setContextError] = useState<string | null>(null);
   const myTint = useMemo(() => tintFor(my, 0x5f8fd1), [my?.name, my?.types]);
   const rivalTint = useMemo(() => tintFor(rival, 0xc96868), [rival?.name, rival?.types]);
   const myPokemonId = fighterPokemonId(my);
@@ -325,6 +351,7 @@ export function BattleArena3D({
 
   useEffect(() => {
     setModelState('loading');
+    setContextError(null);
   }, [sceneKey]);
 
   useEffect(() => {
@@ -340,11 +367,17 @@ export function BattleArena3D({
     const generation = ++contextGeneration.current;
     let cleaned = false;
     const isCurrent = () => !disposed.current && contextGeneration.current === generation;
-    const renderer = new THREE.WebGLRenderer({
-      context: gl as any,
-      antialias: quality !== 'low',
-      alpha: false,
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = createExpoThreeRenderer(gl, quality);
+      setContextError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao criar WebGLRenderer';
+      console.warn('[3D] WebGLRenderer init failed', error);
+      setModelState('fallback');
+      setContextError(message);
+      return;
+    }
     renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight, false);
     renderer.setPixelRatio(1);
     renderer.shadowMap.enabled = quality === 'high';
@@ -492,9 +525,17 @@ export function BattleArena3D({
         }
       }
 
-      renderer.render(scene, camera);
-      gl.endFrameEXP();
-      animationFrame.current = requestAnimationFrame(animate);
+      try {
+        renderer.render(scene, camera);
+        gl.endFrameEXP();
+        animationFrame.current = requestAnimationFrame(animate);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Falha durante o frame 3D';
+        console.warn('[3D] frame failed; stopping renderer safely', error);
+        setContextError(message);
+        setModelState('fallback');
+        cleanup();
+      }
     };
     animate();
   }, [my, myTint, quality, rival, rivalTint]);
@@ -517,7 +558,15 @@ export function BattleArena3D({
         <View style={styles.badge}><Text style={styles.badgeText}>{badgeLabel}</Text></View>
       </View>
       <View style={styles.viewport}>
-        <GLView key={sceneKey} style={StyleSheet.absoluteFill} onContextCreate={onContextCreate} />
+        {contextError ? (
+          <View style={styles.renderError}>
+            <Text style={styles.renderErrorTitle}>3D interrompido com segurança</Text>
+            <Text style={styles.renderErrorText}>{contextError}</Text>
+            <Text style={styles.renderErrorHint}>Use o botão 2D acima e reporte esta mensagem. A batalha não é afetada.</Text>
+          </View>
+        ) : (
+          <GLView key={sceneKey} style={StyleSheet.absoluteFill} onContextCreate={onContextCreate} />
+        )}
         <View style={[styles.hpBox, styles.rivalHp]}>
           <Text numberOfLines={1} style={styles.name}>{rival?.name ?? 'Rival'}</Text>
           <View style={styles.hpTrack}>
@@ -574,6 +623,16 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: '#8DD7FF', fontSize: 10, fontWeight: '900' },
   viewport: { height: 310, position: 'relative' },
+  renderError: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#101923',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+  },
+  renderErrorTitle: { color: '#FFB6C0', fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  renderErrorText: { color: '#E5EDF3', fontSize: 10, lineHeight: 15, marginTop: 7, textAlign: 'center' },
+  renderErrorHint: { color: '#8DA8BA', fontSize: 9, lineHeight: 14, marginTop: 7, textAlign: 'center' },
   hpBox: {
     position: 'absolute',
     width: '43%',
