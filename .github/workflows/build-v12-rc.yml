@@ -1,6 +1,6 @@
 name: Build Trainer Collection 1.2 RC
 
-# RC retry after intentional 1.2 native baseline acceptance and production OTA audit fix.
+# RC retry after runtime baseline, production OTA and gift-notification regression fixes.
 on:
   workflow_dispatch:
   push:
