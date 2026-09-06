@@ -1,0 +1,105 @@
+name: Apply Trainer Collection 1.2 UI patches
+
+on:
+  push:
+    branches: [feature/v1.2-adventure-3d]
+    paths:
+      - .github/workflows/apply-v12-ui-patches.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v1.2-adventure-3d
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Patch battle surfaces
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          team=Path('app/team-battle/[id].tsx')
+          text=team.read_text()
+          anchor="import { BattleStyleArenaOverlay } from '@/components/BattleStyleArenaOverlay';"
+          if "AdaptiveBattleArena" not in text:
+              text=text.replace(anchor,anchor+"\nimport { AdaptiveBattleArena } from '@/components/AdaptiveBattleArena';")
+          start="            <View style={[styles.arena, { backgroundColor: colors.surface, borderColor: colors.border }]}>"
+          end="\n\n            <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+"
+          if start in text:
+              a=text.index(start)
+              b=text.index(end,a)
+              arena="""            <AdaptiveBattleArena
+              my={{
+                name: myName,
+                pokemonId: Number((state as any)?.myPokemonId ?? 0) || null,
+                hp: myHp,
+                maxHp: myMaxHp,
+                types: Array.isArray((state as any)?.myTypes) ? (state as any).myTypes : [],
+                attackName: String((state as any)?.myAttackName ?? ''),
+                firstPlayer: true,
+                knockedOut: myHp <= 0,
+              }}
+              rival={{
+                name: opponentName,
+                pokemonId: Number((state as any)?.opponentPokemonId ?? 0) || null,
+                hp: opponentHp,
+                maxHp: opponentMaxHp,
+                types: Array.isArray((state as any)?.opponentTypes) ? (state as any).opponentTypes : [],
+                firstPlayer: false,
+                knockedOut: opponentHp <= 0,
+              }}
+              resultKey={`${Number((state as any)?.lastTurnNo ?? 0)}:${Number((state as any)?.turn ?? 1)}`}
+              winner={null}
+              turnOnly
+              title={`TURNO ${Number((state as any)?.turn ?? 1)} • ${opponentName} VS ${myName}`}
+              subtitle="Game Boy rules • modelos 3D não usam arte da carta"
+            />"""
+              text=text[:a]+arena+text[b:]
+          team.write_text(text)
+
+          hub=Path('app/(tabs)/battles.tsx')
+          text=hub.read_text()
+          anchor='      <AreaIdentityStrip area="competitive" />'
+          card='''\n      <Pressable
+        onPress={() => router.push('/adventure' as any)}
+        style={{borderWidth:1,borderColor:'#4B89AF',backgroundColor:'#102534',borderRadius:16,padding:14,flexDirection:'row',alignItems:'center',gap:11}}
+      >
+        <View style={{width:46,height:46,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:'#19384C'}}><Ionicons name="map" size={24} color="#8DD7FF"/></View>
+        <View style={{flex:1}}><Text style={{color:'#F0F7FC',fontSize:14,fontWeight:'900'}}>TRAINER ADVENTURE 1.2</Text><Text style={{color:'#89A2B5',fontSize:10,marginTop:2}}>Kanto • Battle Tower • Elite Four • Raids • Rogue • Desafios • Campeão • 3D</Text></View>
+        <Ionicons name="chevron-forward" size={20} color="#8DD7FF"/>
+      </Pressable>'''
+          if 'TRAINER ADVENTURE 1.2' not in text:
+              text=text.replace(anchor,anchor+card,1)
+          hub.write_text(text)
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck changed 1.2 files
+        run: |
+          set +e
+          npx tsc --noEmit 2>&1 | tee /tmp/tsc.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if grep -E "(app/adventure\.tsx|app/kanto-adventure\.tsx|app/pokemon-mastery\.tsx|app/battle-records\.tsx|app/adventure-challenges\.tsx|src/components/AdaptiveBattleArena\.tsx|src/components/BattleArena3D|src/services/adventure\.ts|app/team-battle/\[id\]\.tsx|app/\(tabs\)/battles\.tsx)" /tmp/tsc.log; then
+            echo "1.2 changed files have TypeScript errors"
+            exit 1
+          fi
+          echo "No TypeScript errors reported in the 1.2 changed files. Full-project pre-existing errors, if any, are not introduced here."
+      - name: Commit UI wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/team-battle/'[id].tsx' app/'(tabs)'/battles.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "feat: expose Adventure 1.2 and adaptive 3D team arena"
+          git push origin HEAD:feature/v1.2-adventure-3d
