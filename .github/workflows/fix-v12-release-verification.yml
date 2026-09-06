@@ -1,0 +1,95 @@
+name: Fix Trainer Collection 1.2 Release Verification Metadata
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-v12-release-verification.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APK_URL: https://github.com/FrontWork08/Pok-mon-Cards/releases/download/android-v1.2.0/Trainer-Collection-v1.2.0.apk
+      EXPECTED_SHA256: 744194ae33d3da645595d81d7528eb5dcfe73c8e44a1ba18cd14dcc26ef604a7
+      EXPECTED_CERT: 7b4e0052f1bdf07e0c33abc4176de96f9cf7a64a8f325ae7c5dcbb2083cc2843
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Locate Android apksigner
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER_PATH="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          test -x "$APKSIGNER_PATH"
+          echo "APKSIGNER=$APKSIGNER_PATH" >> "$GITHUB_ENV"
+
+      - name: Verify public APK and capture signing schemes
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 5 --retry-delay 2 "$APK_URL" -o /tmp/trainer-v12.apk
+          SHA="$(sha256sum /tmp/trainer-v12.apk | awk '{print $1}')"
+          [[ "${SHA,,}" == "${EXPECTED_SHA256,,}" ]]
+          "$APKSIGNER" verify --verbose --print-certs /tmp/trainer-v12.apk > /tmp/signature.txt
+          CERT="$(grep -im1 'certificate SHA-256 digest' /tmp/signature.txt | sed -E 's/.*digest:[[:space:]]*//' | tr -d ':' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+          [[ "$CERT" == "$EXPECTED_CERT" ]]
+          cat /tmp/signature.txt
+
+          V1=false; V2=false; V3=false; V4=false
+          grep -Eqi 'Verified using v1 scheme[^:]*:[[:space:]]*true' /tmp/signature.txt && V1=true || true
+          grep -Eqi 'Verified using v2 scheme[^:]*:[[:space:]]*true' /tmp/signature.txt && V2=true || true
+          grep -Eqi 'Verified using v3 scheme[^:]*:[[:space:]]*true' /tmp/signature.txt && V3=true || true
+          grep -Eqi 'Verified using v4 scheme[^:]*:[[:space:]]*true' /tmp/signature.txt && V4=true || true
+          [[ "$V2" == true || "$V3" == true || "$V4" == true ]]
+          echo "V1=$V1" >> "$GITHUB_ENV"
+          echo "V2=$V2" >> "$GITHUB_ENV"
+          echo "V3=$V3" >> "$GITHUB_ENV"
+          echo "V4=$V4" >> "$GITHUB_ENV"
+
+      - name: Repair release verification metadata
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'public/download/release.json';
+          const r = JSON.parse(fs.readFileSync(p, 'utf8'));
+          r.verification = {
+            ...(r.verification || {}),
+            sha256Verified: true,
+            signatureVerified: true,
+            certificateSha256: process.env.EXPECTED_CERT,
+            signerMatchesTrustedCertificate: true,
+            verifiedAt: new Date().toISOString(),
+            verifier: 'Android apksigner',
+            schemes: {
+              v1: process.env.V1 === 'true',
+              v2: process.env.V2 === 'true',
+              v3: process.env.V3 === 'true',
+              v4: process.env.V4 === 'true',
+            },
+          };
+          fs.writeFileSync(p, JSON.stringify(r, null, 2) + '\n');
+          NODE
+          node scripts/apk-security-audit.mjs
+
+      - name: Commit corrected metadata and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/download/release.json
+          git rm .github/workflows/fix-v12-release-verification.yml
+          git commit -m "release: restore verified Android signing schemes for 1.2.0"
+          git push origin HEAD:main
