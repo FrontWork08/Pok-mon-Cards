@@ -1243,6 +1243,27 @@ export default function AdminScreen() {
             </Pressable>
           ) : null}
 
+          {adminAccess?.isOwner ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir laboratório 3D interno"
+              onPress={()=>router.push('/admin-3d-lab')}
+              style={[styles.notice,{backgroundColor:'#102A33',borderColor:'#50D7F0'}]}
+            >
+              <Ionicons name="cube" size={21} color="#7FEAFF"/>
+              <View style={{flex:1}}>
+                <Text style={[styles.historyUser,{color:colors.text}]}>3D LAB • TESTE INTERNO</Text>
+                <Text style={[styles.historyMeta,{color:colors.muted}]}>Pikachu #25 • Charizard #6 • Gyarados #130 • ataque, dano, KO, vitória, troca, cache e stress de 100 ciclos. Somente owner.</Text>
+              </View>
+              <View style={{alignItems:'flex-end',gap:4}}>
+                <View style={{borderRadius:999,borderWidth:1,borderColor:'#50D7F0',backgroundColor:'#133846',paddingHorizontal:7,paddingVertical:3}}>
+                  <Text style={{color:'#9AF0FF',fontSize:7,fontWeight:'900',letterSpacing:.5}}>NÃO LIBERADO</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#7FEAFF"/>
+              </View>
+            </Pressable>
+          ) : null}
+
           {adminAccess?.isOwner && releaseStatus && !['completed'].includes(releaseStatus.phase) ? (
             <View style={[styles.legacyAdminPanel,{backgroundColor:colors.surface,borderColor:releaseStatus.legacy_selection_enabled ? '#65D894' : colors.border}]}>
               <View style={styles.legacyAdminHeader}>
