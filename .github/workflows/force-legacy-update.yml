@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install mandatory v1.1.0 upgrade gate into legacy bundle
+      - name: Install mandatory v1.1.0 APK upgrade gate into legacy bundle
         shell: bash
         run: |
           cat > src/components/UpdatePrompt.tsx <<'EOF'
@@ -59,8 +59,7 @@ jobs:
           import { useSafeAreaInsets } from 'react-native-safe-area-context';
           import { useAppTheme } from '@/theme/ThemeProvider';
 
-          const DOWNLOAD_URL = 'https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/ee391e3f-1e2b-4662-8d1e-c1acccba5960';
-          const RELEASE_URL = 'https://github.com/FrontWork08/Pok-mon-Cards/releases/tag/android-v1.1.0';
+          const APK_INSTALLER_URL = 'https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/ee391e3f-1e2b-4662-8d1e-c1acccba5960';
 
           export function UpdatePrompt() {
             const { colors } = useAppTheme();
@@ -69,14 +68,14 @@ jobs:
             const [errorText, setErrorText] = useState('');
             const mandatoryUpgrade = Platform.OS === 'android' && !__DEV__;
 
-            async function openUrl(url: string) {
+            async function openInstaller() {
               if (opening) return;
               setOpening(true);
               setErrorText('');
               try {
-                await Linking.openURL(url);
+                await Linking.openURL(APK_INSTALLER_URL);
               } catch {
-                setErrorText('Não foi possível abrir o instalador. Tente a alternativa abaixo.');
+                setErrorText('Não foi possível abrir o instalador do novo APK. Verifique sua conexão e tente novamente.');
               } finally {
                 setOpening(false);
               }
@@ -94,20 +93,17 @@ jobs:
                     <Text style={[styles.eyebrow, { color: colors.yellow }]}>ATUALIZAÇÃO OBRIGATÓRIA</Text>
                     <Text style={[styles.title, { color: colors.text }]}>Trainer Collection 1.1.0</Text>
                     <Text style={[styles.body, { color: colors.muted }]}>
-                      Esta versão foi encerrada. Para continuar jogando, instale o APK oficial mais recente pelo instalador do Expo.
+                      Esta versão foi encerrada. Para continuar jogando, instale o novo APK oficial do Trainer Collection.
                     </Text>
                     <View style={[styles.notice, { borderColor: colors.border }]}>
-                      <Text style={[styles.noticeText, { color: colors.text }]}>O jogo ficará bloqueado nesta versão até a atualização.</Text>
+                      <Text style={[styles.noticeText, { color: colors.text }]}>O jogo permanece bloqueado neste APK antigo até você instalar a versão 1.1.0.</Text>
                     </View>
                     {errorText ? <Text style={[styles.errorText, { color: colors.red }]}>{errorText}</Text> : null}
-                    <Pressable disabled={opening} onPress={() => { void openUrl(DOWNLOAD_URL); }} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.yellow, opacity: pressed || opening ? 0.8 : 1 }]}>
+                    <Pressable disabled={opening} onPress={() => { void openInstaller(); }} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.yellow, opacity: pressed || opening ? 0.8 : 1 }]}>
                       <Ionicons name="download-outline" size={20} color="#080808" />
-                      <Text style={styles.primaryText}>{opening ? 'ABRINDO INSTALADOR…' : 'ATUALIZAR AGORA'}</Text>
+                      <Text style={styles.primaryText}>{opening ? 'ABRINDO INSTALADOR…' : 'ATUALIZAR APK AGORA'}</Text>
                     </Pressable>
-                    <Pressable disabled={opening} onPress={() => { void openUrl(RELEASE_URL); }} style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.border, opacity: pressed ? 0.75 : 1 }]}>
-                      <Text style={[styles.secondaryText, { color: colors.muted }]}>ALTERNATIVA: GITHUB</Text>
-                    </Pressable>
-                    <Text style={[styles.footer, { color: colors.muted }]}>Não existe opção “Depois” nesta versão.</Text>
+                    <Text style={[styles.footer, { color: colors.muted }]}>Não existe opção “Depois” e não há atualização OTA para substituir o APK.</Text>
                   </View>
                 </View>
               </Modal>
@@ -126,8 +122,6 @@ jobs:
             errorText: { marginTop: 12, fontSize: 11, lineHeight: 16, fontWeight: '700', textAlign: 'center' },
             primaryButton: { height: 56, borderRadius: 16, marginTop: 20, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' },
             primaryText: { color: '#080808', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-            secondaryButton: { minHeight: 48, borderRadius: 15, borderWidth: 1, marginTop: 9, alignItems: 'center', justifyContent: 'center' },
-            secondaryText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
             footer: { textAlign: 'center', fontSize: 10, marginTop: 12 },
           });
           EOF
@@ -137,7 +131,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas env:pull --environment preview --path .env.local --non-interactive
 
-      - name: Publish mandatory gate to v1.0.1 production runtime
+      - name: Deliver mandatory APK gate to v1.0.1 runtime
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --channel production --environment preview --platform android --message "Mandatory Trainer Collection upgrade v1.0.1 to v1.1.0 via EAS installer" --non-interactive
+        run: eas update --channel production --environment preview --platform android --message "Mandatory APK upgrade gate v1.0.1 to v1.1.0" --non-interactive
