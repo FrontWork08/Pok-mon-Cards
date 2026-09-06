@@ -48,6 +48,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@babel/plugin-transform-class-static-block": "^7.29.7",
     "@types/react": "~19.0.10",
     "@types/three": "^0.185.4",
     "typescript": "~5.8.3"
