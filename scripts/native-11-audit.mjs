@@ -4,7 +4,7 @@ const assert = (ok, msg) => { if (!ok) fail.push(msg); };
 const app = JSON.parse(readFileSync('app.json','utf8'));
 const pkg = JSON.parse(readFileSync('package.json','utf8'));
 const expo = app.expo ?? {};
-assert(expo.version === '1.2.0', 'app version must be 1.2.0');
+assert(expo.version === '1.2.1', 'app version must be 1.2.1');
 assert(pkg.dependencies?.['expo-local-authentication'], 'expo-local-authentication missing');
 assert(pkg.dependencies?.['expo-quick-actions'], 'expo-quick-actions missing');
 assert(pkg.dependencies?.['expo-gl'], 'expo-gl missing from 1.2 native runtime');
@@ -44,4 +44,4 @@ assert(gate.includes('unlockingRef') && gate.includes('lockAndPrompt'), 'device 
 assert(!gate.includes('if (locked && enabled && !unlocking)'), 'device security gate reintroduced automatic retry prompt loop');
 assert(existsSync('src/components/NativeQuickActionsBootstrap.tsx'), 'quick actions bootstrap missing');
 if (fail.length) { console.error(fail.map((x) => `- ${x}`).join('\n')); process.exit(1); }
-console.log('Trainer Collection 1.2 native contracts: OK');
+console.log('Trainer Collection 1.2.1 native contracts: OK');
