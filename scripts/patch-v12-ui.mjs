@@ -66,10 +66,18 @@ function patchRootRuntimeTypes(){
   text=text.replaceAll('accountRestriction.account_status_reason','accountRestriction.moderation_reason');
   text=text.replaceAll('accountRestriction.account_status_until','accountRestriction.suspended_until');
   text=text.replace("matchmaking?.status === 'searching'","matchmaking?.status === 'waiting'");
+  text=text.replace(
+    '        router.push(`/battle/${state.matched_battle_id}`);',
+    "        router.push((state.mode_choice === 'team3' ? `/team-battle/${state.matched_battle_id}` : `/battle/${state.matched_battle_id}`) as never);",
+  );
+  text=text.replace(
+    "&& !pathname.startsWith('/battle/') && !pathname.startsWith('/auth/')",
+    "&& !pathname.startsWith('/battle/') && !pathname.startsWith('/team-battle/') && !pathname.startsWith('/auth/')",
+  );
   fs.writeFileSync(path,text);
 }
 
 patchTeamBattle();
 patchBattleHub();
 patchRootRuntimeTypes();
-console.log('Trainer Collection 1.2 battle UI and runtime types patched.');
+console.log('Trainer Collection 1.2 battle UI, routing and runtime types patched.');
