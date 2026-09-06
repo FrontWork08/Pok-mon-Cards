@@ -53,10 +53,11 @@ jobs:
         shell: bash
         run: |
           cat > src/components/UpdatePrompt.tsx <<'EOF'
-          import { useState } from 'react';
+          import { useEffect, useState } from 'react';
           import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
           import { Ionicons } from '@expo/vector-icons';
           import { useSafeAreaInsets } from 'react-native-safe-area-context';
+          import * as Updates from 'expo-updates';
           import { useAppTheme } from '@/theme/ThemeProvider';
 
           const APK_INSTALLER_URL = 'https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/ee391e3f-1e2b-4662-8d1e-c1acccba5960';
@@ -65,8 +66,32 @@ jobs:
             const { colors } = useAppTheme();
             const insets = useSafeAreaInsets();
             const [opening, setOpening] = useState(false);
+            const [checkingGateUpdate, setCheckingGateUpdate] = useState(false);
             const [errorText, setErrorText] = useState('');
             const mandatoryUpgrade = Platform.OS === 'android' && !__DEV__;
+
+            useEffect(() => {
+              if (!mandatoryUpgrade || !Updates.isEnabled) return;
+
+              let cancelled = false;
+              const refreshGateIfNeeded = async () => {
+                try {
+                  if (!cancelled) setCheckingGateUpdate(true);
+                  const result = await Updates.checkForUpdateAsync();
+                  if (!result.isAvailable || cancelled) return;
+                  await Updates.fetchUpdateAsync();
+                  if (!cancelled) await Updates.reloadAsync();
+                } catch {
+                  // A falha de uma checagem OTA nunca libera o APK antigo.
+                  // O usuário ainda pode instalar a nova versão pelo botão abaixo.
+                } finally {
+                  if (!cancelled) setCheckingGateUpdate(false);
+                }
+              };
+
+              void refreshGateIfNeeded();
+              return () => { cancelled = true; };
+            }, [mandatoryUpgrade]);
 
             async function openInstaller() {
               if (opening) return;
@@ -98,12 +123,15 @@ jobs:
                     <View style={[styles.notice, { borderColor: colors.border }]}>
                       <Text style={[styles.noticeText, { color: colors.text }]}>O jogo permanece bloqueado neste APK antigo até você instalar a versão 1.1.0.</Text>
                     </View>
+                    {checkingGateUpdate ? (
+                      <Text style={[styles.syncText, { color: colors.muted }]}>Verificando correções desta tela…</Text>
+                    ) : null}
                     {errorText ? <Text style={[styles.errorText, { color: colors.red }]}>{errorText}</Text> : null}
                     <Pressable disabled={opening} onPress={() => { void openInstaller(); }} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.yellow, opacity: pressed || opening ? 0.8 : 1 }]}>
                       <Ionicons name="download-outline" size={20} color="#080808" />
                       <Text style={styles.primaryText}>{opening ? 'ABRINDO INSTALADOR…' : 'ATUALIZAR APK AGORA'}</Text>
                     </Pressable>
-                    <Text style={[styles.footer, { color: colors.muted }]}>Não existe opção “Depois” e não há atualização OTA para substituir o APK.</Text>
+                    <Text style={[styles.footer, { color: colors.muted }]}>O OTA serve apenas para manter esta tela de bloqueio corrigida. A atualização do jogo exige o novo APK.</Text>
                   </View>
                 </View>
               </Modal>
@@ -119,10 +147,11 @@ jobs:
             body: { fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 9 },
             notice: { marginTop: 18, borderWidth: 1, borderRadius: 15, paddingHorizontal: 13, paddingVertical: 12 },
             noticeText: { fontSize: 11, lineHeight: 16, fontWeight: '700', textAlign: 'center' },
+            syncText: { marginTop: 10, fontSize: 10, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
             errorText: { marginTop: 12, fontSize: 11, lineHeight: 16, fontWeight: '700', textAlign: 'center' },
             primaryButton: { height: 56, borderRadius: 16, marginTop: 20, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' },
             primaryText: { color: '#080808', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-            footer: { textAlign: 'center', fontSize: 10, marginTop: 12 },
+            footer: { textAlign: 'center', fontSize: 10, lineHeight: 14, marginTop: 12 },
           });
           EOF
 
@@ -134,4 +163,4 @@ jobs:
       - name: Deliver mandatory APK gate to v1.0.1 runtime
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --channel production --environment preview --platform android --message "Mandatory APK upgrade gate v1.0.1 to v1.1.0" --non-interactive
+        run: eas update --channel production --environment preview --platform android --message "Legacy APK gate self-refreshes OTA corrections; APK upgrade remains mandatory" --non-interactive
