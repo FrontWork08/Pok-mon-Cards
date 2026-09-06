@@ -1,0 +1,148 @@
+name: Patch 3D Black Screen
+on:
+  push:
+    branches: [fix/3d-lab-black-screen]
+    paths: [.github/workflows/patch-3d-black-screen.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/3d-lab-black-screen
+      - name: Harden Expo GL + Three runtime
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/components/BattleArena3D.native.tsx')
+          s = p.read_text()
+          s = s.replace("import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';\n", '')
+
+          marker = "function hpPercent(fighter: Fighter3D | null) {\n"
+          helper = """function createExpoThreeRenderer(\n  gl: ExpoWebGLRenderingContext,\n  quality: 'low' | 'medium' | 'high',\n) {\n  const width = Math.max(1, gl.drawingBufferWidth);\n  const height = Math.max(1, gl.drawingBufferHeight);\n  // Three.js expects a browser-like canvas even when a WebGL context is supplied.\n  // React Native has no DOM, so provide only the canvas surface APIs used by WebGLRenderer.\n  const canvas = {\n    width,\n    height,\n    clientWidth: width,\n    clientHeight: height,\n    style: {},\n    addEventListener: () => {},\n    removeEventListener: () => {},\n    setAttribute: () => {},\n    getContext: () => gl,\n  };\n  return new THREE.WebGLRenderer({\n    canvas: canvas as any,\n    context: gl as any,\n    antialias: quality !== 'low',\n    alpha: false,\n  });\n}\n\n"""
+          if helper not in s:
+              s = s.replace(marker, helper + marker)
+
+          old_loader = """    const loader = new GLTFLoader();\n    const gltf = await new Promise<{ scene: THREE.Group; animations: THREE.AnimationClip[] }>((resolve, reject) => {\n"""
+          new_loader = """    // Do not evaluate GLTFLoader until a real remote model exists. This keeps the\n    // procedural fallback independent from browser-oriented loader helpers.\n    const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');\n    const loader = new GLTFLoader();\n    const gltf = await new Promise<{ scene: THREE.Group; animations: THREE.AnimationClip[] }>((resolve, reject) => {\n"""
+          s = s.replace(old_loader, new_loader)
+
+          old_state = """  const [modelState, setModelState] = useState<'loading' | 'remote' | 'fallback'>('loading');\n"""
+          new_state = old_state + "  const [contextError, setContextError] = useState<string | null>(null);\n"
+          s = s.replace(old_state, new_state)
+
+          s = s.replace("""  useEffect(() => {\n    setModelState('loading');\n  }, [sceneKey]);\n""", """  useEffect(() => {\n    setModelState('loading');\n    setContextError(null);\n  }, [sceneKey]);\n""")
+
+          s = s.replace("""    const renderer = new THREE.WebGLRenderer({\n      context: gl as any,\n      antialias: quality !== 'low',\n      alpha: false,\n    });\n""", """    let renderer: THREE.WebGLRenderer;\n    try {\n      renderer = createExpoThreeRenderer(gl, quality);\n      setContextError(null);\n    } catch (error) {\n      const message = error instanceof Error ? error.message : 'Falha ao criar WebGLRenderer';\n      console.warn('[3D] WebGLRenderer init failed', error);\n      setModelState('fallback');\n      setContextError(message);\n      return;\n    }\n""")
+
+          s = s.replace("""      renderer.render(scene, camera);\n      gl.endFrameEXP();\n      animationFrame.current = requestAnimationFrame(animate);\n""", """      try {\n        renderer.render(scene, camera);\n        gl.endFrameEXP();\n        animationFrame.current = requestAnimationFrame(animate);\n      } catch (error) {\n        const message = error instanceof Error ? error.message : 'Falha durante o frame 3D';\n        console.warn('[3D] frame failed; stopping renderer safely', error);\n        setContextError(message);\n        setModelState('fallback');\n        cleanup();\n      }\n""")
+
+          old_gl = """        <GLView key={sceneKey} style={StyleSheet.absoluteFill} onContextCreate={onContextCreate} />\n"""
+          new_gl = """        {contextError ? (\n          <View style={styles.renderError}>\n            <Text style={styles.renderErrorTitle}>3D interrompido com segurança</Text>\n            <Text style={styles.renderErrorText}>{contextError}</Text>\n            <Text style={styles.renderErrorHint}>Use o botão 2D acima e reporte esta mensagem. A batalha não é afetada.</Text>\n          </View>\n        ) : (\n          <GLView key={sceneKey} style={StyleSheet.absoluteFill} onContextCreate={onContextCreate} />\n        )}\n"""
+          s = s.replace(old_gl, new_gl)
+
+          style_marker = """  hpBox: {\n"""
+          error_styles = """  renderError: {\n    ...StyleSheet.absoluteFillObject,\n    backgroundColor: '#101923',\n    alignItems: 'center',\n    justifyContent: 'center',\n    padding: 22,\n  },\n  renderErrorTitle: { color: '#FFB6C0', fontSize: 14, fontWeight: '900', textAlign: 'center' },\n  renderErrorText: { color: '#E5EDF3', fontSize: 10, lineHeight: 15, marginTop: 7, textAlign: 'center' },\n  renderErrorHint: { color: '#8DA8BA', fontSize: 9, lineHeight: 14, marginTop: 7, textAlign: 'center' },\n"""
+          if error_styles not in s:
+              s = s.replace(style_marker, error_styles + style_marker)
+          p.write_text(s)
+
+          p = Path('app/admin-3d-lab.tsx')
+          s = p.read_text()
+          s = s.replace("import { useEffect, useMemo, useRef, useState } from 'react';", "import { Component, type ComponentType, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';")
+          s = s.replace("import { AdaptiveBattleArena } from '@/components/AdaptiveBattleArena';\n", '')
+
+          insert_after = "type ProbeState = 'pending' | 'remote' | 'fallback' | 'error';\n"
+          boundary = r'''
+type ArenaProps = {
+  my: LabPokemon;
+  rival: LabPokemon;
+  resultKey: number;
+  winner: 'me' | 'rival' | null;
+  title: string;
+  subtitle: string;
+  prefer3D: boolean;
+};
+
+type BoundaryProps = { children: ReactNode; onError: (message: string) => void };
+type BoundaryState = { failed: boolean };
+class ArenaErrorBoundary extends Component<BoundaryProps, BoundaryState> {
+  state: BoundaryState = { failed: false };
+  static getDerivedStateFromError(): BoundaryState { return { failed: true }; }
+  componentDidCatch(error: unknown) {
+    this.props.onError(error instanceof Error ? error.message : 'Falha inesperada no componente 3D');
+  }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+'''
+          if boundary not in s:
+              s = s.replace(insert_after, insert_after + boundary)
+
+          state_marker = "  const [stressErrors, setStressErrors] = useState(0);\n"
+          extra_state = """  const [arenaComponent, setArenaComponent] = useState<ComponentType<ArenaProps> | null>(null);\n  const [rendererState, setRendererState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');\n  const [rendererError, setRendererError] = useState<string | null>(null);\n  const [arenaAttempt, setArenaAttempt] = useState(0);\n"""
+          if extra_state not in s:
+              s = s.replace(state_marker, state_marker + extra_state)
+
+          fn_marker = "  function resetBattle() {\n"
+          start_fn = """  async function startRenderer() {\n    if (rendererState === 'loading') return;\n    setRendererState('loading');\n    setRendererError(null);\n    setArenaComponent(null);\n    try {\n      const module = await import('@/components/AdaptiveBattleArena');\n      setArenaComponent(() => module.AdaptiveBattleArena as ComponentType<ArenaProps>);\n      setArenaAttempt((value) => value + 1);\n      setRendererState('ready');\n    } catch (error) {\n      setRendererState('error');\n      setRendererError(error instanceof Error ? error.message : 'Não foi possível carregar o módulo 3D');\n    }\n  }\n\n  function handleArenaError(message: string) {\n    setRendererState('error');\n    setRendererError(message);\n    setArenaComponent(null);\n    stopStress();\n  }\n\n"""
+          if start_fn not in s:
+              s = s.replace(fn_marker, start_fn + fn_marker)
+
+          old_arena = r'''    <AdaptiveBattleArena
+      my={my}
+      rival={rival}
+      resultKey={resultKey}
+      winner={winner}
+      title="ARENA 3D • LAB"
+      subtitle={`${my.name} × ${rival.name} • teste sem efeito no servidor`}
+      prefer3D
+    />
+'''
+          new_arena = r'''    {rendererState === 'idle' ? (
+      <View style={[styles.card,{backgroundColor:colors.surface,borderColor:'#50D7F0'}]}>
+        <View style={styles.row}><Ionicons name="cube-outline" size={21} color="#7FEAFF"/><Text style={[styles.title,{color:colors.text}]}>Render 3D ainda não iniciado</Text></View>
+        <Text style={[styles.body,{color:colors.muted}]}>A tela do laboratório abre primeiro sem carregar o GLView. Toque abaixo para iniciar o renderizador de forma isolada.</Text>
+        <Pressable onPress={() => void startRenderer()} style={[styles.primary,{backgroundColor:colors.yellow}]}><Ionicons name="play" size={18} color="#08131F"/><Text style={[styles.primaryText,{color:'#08131F'}]}>INICIAR TESTE 3D</Text></Pressable>
+      </View>
+    ) : rendererState === 'loading' ? (
+      <View style={[styles.card,{backgroundColor:colors.surface,borderColor:colors.border}]}><ActivityIndicator color={colors.yellow}/><Text style={[styles.body,{color:colors.muted}]}>Carregando módulo 3D de forma protegida…</Text></View>
+    ) : rendererState === 'error' || !arenaComponent ? (
+      <View style={[styles.card,{backgroundColor:colors.surface,borderColor:'#D96575'}]}>
+        <View style={styles.row}><Ionicons name="warning-outline" size={21} color="#FF8290"/><Text style={[styles.title,{color:colors.text}]}>Render 3D bloqueado com segurança</Text></View>
+        <Text selectable style={[styles.body,{color:'#FFB6C0'}]}>{rendererError ?? 'Falha desconhecida no renderizador.'}</Text>
+        <Text style={[styles.note,{color:colors.muted}]}>O laboratório continua aberto para diagnóstico; nenhum dado do jogo foi alterado.</Text>
+        <Pressable onPress={() => void startRenderer()} style={[styles.secondary,{borderColor:colors.accent,backgroundColor:colors.accentSoft}]}><Ionicons name="refresh" size={17} color={colors.accent}/><Text style={[styles.secondaryText,{color:colors.text}]}>TENTAR NOVAMENTE</Text></Pressable>
+      </View>
+    ) : (() => {
+      const Arena = arenaComponent;
+      return <ArenaErrorBoundary key={arenaAttempt} onError={handleArenaError}>
+        <Arena
+          my={my}
+          rival={rival}
+          resultKey={resultKey}
+          winner={winner}
+          title="ARENA 3D • LAB"
+          subtitle={`${my.name} × ${rival.name} • teste sem efeito no servidor`}
+          prefer3D
+        />
+      </ArenaErrorBoundary>;
+    })()}
+'''
+          if old_arena not in s:
+              raise SystemExit('AdaptiveBattleArena block not found')
+          s = s.replace(old_arena, new_arena)
+          p.write_text(s)
+          PY
+      - name: Commit patch and remove one-shot workflow
+        shell: bash
+        run: |
+          rm .github/workflows/patch-3d-black-screen.yml
+          git config user.name "FrontWork08"
+          git config user.email "frontwork08@users.noreply.github.com"
+          git add src/components/BattleArena3D.native.tsx app/admin-3d-lab.tsx .github/workflows/patch-3d-black-screen.yml
+          git commit -m "fix: prevent 3D lab black screen on Android"
+          git push origin HEAD:fix/3d-lab-black-screen
