@@ -1,9 +1,10 @@
 import { Component, type ComponentType, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { getMyAdminAccess } from '@/services/admin';
 import { invalidatePokemon3DManifest, resolvePokemon3DModel } from '@/services/pokemon3dModels';
+import { ingestPokemon3DLabModel, type Pokemon3DLabIngestResult } from '@/services/pokemon3dLab';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 type LabPokemon = {
@@ -29,6 +30,7 @@ type ArenaProps = {
   title: string;
   subtitle: string;
   prefer3D: boolean;
+  modelFormKey: string;
 };
 
 type BoundaryProps = { children: ReactNode; onError: (message: string) => void };
@@ -71,6 +73,14 @@ export default function Admin3DLabScreen() {
   const [rendererState, setRendererState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [rendererError, setRendererError] = useState<string | null>(null);
   const [arenaAttempt, setArenaAttempt] = useState(0);
+  const [importPokemonId, setImportPokemonId] = useState<6 | 25 | 130>(25);
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceAuthor, setSourceAuthor] = useState('');
+  const [sourceLicense, setSourceLicense] = useState('');
+  const [sourceLicenseUrl, setSourceLicenseUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [lastImport, setLastImport] = useState<Pokemon3DLabIngestResult | null>(null);
   const [probe, setProbe] = useState<Record<number, ProbeState>>({ 25: 'pending', 6: 'pending', 130: 'pending' });
   const stressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const stressStep = useRef(0);
@@ -100,11 +110,11 @@ export default function Admin3DLabScreen() {
   }, []);
 
   async function probeModels() {
-    invalidatePokemon3DManifest();
+    invalidatePokemon3DManifest(undefined, 'lab');
     setProbe({ 25: 'pending', 6: 'pending', 130: 'pending' });
     await Promise.all(TEST_POKEMON.map(async (pokemon) => {
       try {
-        const asset = await resolvePokemon3DModel(pokemon.pokemonId, 'medium');
+        const asset = await resolvePokemon3DModel(pokemon.pokemonId, 'medium', 'lab');
         setProbe((current) => ({ ...current, [pokemon.pokemonId]: asset ? 'remote' : 'fallback' }));
       } catch {
         setProbe((current) => ({ ...current, [pokemon.pokemonId]: 'error' }));
@@ -115,6 +125,31 @@ export default function Admin3DLabScreen() {
   useEffect(() => {
     if (allowed) void probeModels();
   }, [allowed]);
+
+  async function importLabModel() {
+    if (importing) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      const result = await ingestPokemon3DLabModel({
+        pokemonId: importPokemonId,
+        sourceUrl: sourceUrl.trim(),
+        sourceAuthor: sourceAuthor.trim(),
+        sourceLicense: sourceLicense.trim(),
+        sourceLicenseUrl: sourceLicenseUrl.trim() || undefined,
+      });
+      setLastImport(result);
+      invalidatePokemon3DManifest(importPokemonId, 'lab');
+      await probeModels();
+      setRendererState('idle');
+      setArenaComponent(null);
+      setRendererError(null);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Falha ao importar GLB');
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function startRenderer() {
     if (rendererState === 'loading') return;
@@ -225,6 +260,23 @@ export default function Admin3DLabScreen() {
       </View>)}
     </View>
 
+    <View style={[styles.card,{backgroundColor:colors.surface,borderColor:'#7C65D9'}]}>
+      <View style={styles.row}><Ionicons name="cube" size={21} color="#BDA8FF"/><Text style={[styles.title,{color:colors.text}]}>GLB real • forma LAB isolada</Text></View>
+      <Text style={[styles.body,{color:colors.muted}]}>Cole um link HTTPS direto para um GLB que você tenha direito de usar. O servidor valida o arquivo antes de salvar e nunca altera a forma default usada pelas batalhas normais.</Text>
+      <View style={styles.selectorRow}>
+        {([25,6,130] as const).map((id) => <Pressable key={id} onPress={() => setImportPokemonId(id)} style={[styles.selectorChip,{borderColor:importPokemonId===id?'#BDA8FF':colors.border,backgroundColor:importPokemonId===id?'#2C2448':colors.surface}]}>
+          <Text style={[styles.selectorText,{color:importPokemonId===id?'#E8DFFF':colors.muted}]}>#{id} {id===25?'Pikachu':id===6?'Charizard':'Gyarados'}</Text>
+        </Pressable>)}
+      </View>
+      <TextInput value={sourceUrl} onChangeText={setSourceUrl} autoCapitalize="none" autoCorrect={false} placeholder="https://.../model.glb" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,borderColor:colors.border,backgroundColor:'#08131F'}]} />
+      <TextInput value={sourceAuthor} onChangeText={setSourceAuthor} placeholder="Autor / fornecedor do modelo" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,borderColor:colors.border,backgroundColor:'#08131F'}]} />
+      <TextInput value={sourceLicense} onChangeText={setSourceLicense} placeholder="Licença / permissão (ex.: CC BY 4.0)" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,borderColor:colors.border,backgroundColor:'#08131F'}]} />
+      <TextInput value={sourceLicenseUrl} onChangeText={setSourceLicenseUrl} autoCapitalize="none" autoCorrect={false} placeholder="Link da licença (opcional)" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,borderColor:colors.border,backgroundColor:'#08131F'}]} />
+      {importError ? <Text selectable style={[styles.note,{color:'#FF8290'}]}>{importError}</Text> : null}
+      {lastImport ? <Text style={[styles.note,{color:'#65D894'}]}>Último import: #{lastImport.pokemon_id} • v{lastImport.version} • {(lastImport.byte_size/1024/1024).toFixed(2)} MB • {lastImport.inspection.meshCount} mesh(es) • {lastImport.inspection.animationNames.length} animação(ões)</Text> : null}
+      <Pressable onPress={() => void importLabModel()} disabled={importing} style={[styles.primary,{backgroundColor:importing?'#5C5870':colors.yellow},importing&&styles.disabled]}><Ionicons name={importing?'hourglass-outline':'cloud-upload-outline'} size={18} color={importing?'#FFF':'#08131F'}/><Text style={[styles.primaryText,{color:importing?'#FFF':'#08131F'}]}>{importing?'VALIDANDO GLB…':'IMPORTAR GLB PARA LAB'}</Text></Pressable>
+    </View>
+
     <Pressable onPress={() => void probeModels()} style={[styles.secondary,{borderColor:colors.accent,backgroundColor:colors.accentSoft}]}><Ionicons name="cloud-download-outline" size={17} color={colors.accent}/><Text style={[styles.secondaryText,{color:colors.text}]}>RETESTAR REGISTRO/CACHE 3D</Text></Pressable>
 
     {rendererState === 'idle' ? (
@@ -253,6 +305,7 @@ export default function Admin3DLabScreen() {
           title="ARENA 3D • LAB"
           subtitle={`${my.name} × ${rival.name} • teste sem efeito no servidor`}
           prefer3D
+          modelFormKey="lab"
         />
       </ArenaErrorBoundary>;
     })()}
@@ -289,6 +342,10 @@ const styles = StyleSheet.create({
   probeName:{fontSize:11,fontWeight:'900'},
   probeMeta:{fontSize:9},
   probeStatus:{fontSize:10,fontWeight:'900'},
+  selectorRow:{flexDirection:'row',flexWrap:'wrap',gap:7},
+  selectorChip:{borderWidth:1,borderRadius:999,paddingHorizontal:9,paddingVertical:7},
+  selectorText:{fontSize:9,fontWeight:'900'},
+  input:{minHeight:44,borderWidth:1,borderRadius:11,paddingHorizontal:11,fontSize:11},
   secondary:{minHeight:44,borderWidth:1,borderRadius:12,paddingHorizontal:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},
   secondaryText:{fontSize:10,fontWeight:'900'},
   actions:{flexDirection:'row',flexWrap:'wrap',gap:8},

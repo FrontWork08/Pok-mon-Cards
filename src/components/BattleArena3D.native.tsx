@@ -20,6 +20,7 @@ type Props = {
   title?: string;
   subtitle?: string;
   quality?: 'low' | 'medium' | 'high';
+  modelFormKey?: string;
 };
 
 type AnimationRuntime = {
@@ -284,11 +285,12 @@ async function loadRemoteCreature(
   fallback: THREE.Object3D,
   fighter: Fighter3D | null,
   quality: 'low' | 'medium' | 'high',
+  modelFormKey: string,
   isCurrent: () => boolean,
 ) {
   const pokemonId = fighterPokemonId(fighter);
   if (!pokemonId) return null;
-  const asset = await resolvePokemon3DModel(pokemonId, quality);
+  const asset = await resolvePokemon3DModel(pokemonId, quality, modelFormKey);
   if (!asset || !isCurrent()) return null;
 
   try {
@@ -325,6 +327,7 @@ export function BattleArena3D({
   title = 'ARENA 3D',
   subtitle = 'Modo 3D nativo • modelos remotos com fallback automático',
   quality = 'medium',
+  modelFormKey = 'default',
 }: Props) {
   const animationFrame = useRef<number | null>(null);
   const disposed = useRef(false);
@@ -335,7 +338,7 @@ export function BattleArena3D({
   const rivalTint = useMemo(() => tintFor(rival, 0xc96868), [rival?.name, rival?.types]);
   const myPokemonId = fighterPokemonId(my);
   const rivalPokemonId = fighterPokemonId(rival);
-  const sceneKey = `${myPokemonId ?? 'none'}:${rivalPokemonId ?? 'none'}:${quality}`;
+  const sceneKey = `${myPokemonId ?? 'none'}:${rivalPokemonId ?? 'none'}:${quality}:${modelFormKey}`;
   const battleRef = useRef<BattleSnapshot>({ my, rival, winner, resultKey, actionStamp: resultKey == null ? 0 : Date.now() });
 
   useEffect(() => {
@@ -437,8 +440,8 @@ export function BattleArena3D({
     let myRuntime: AnimationRuntime | null = null;
     let rivalRuntime: AnimationRuntime | null = null;
     void Promise.all([
-      loadRemoteCreature(myModel, myFallback, my, quality, isCurrent).then((runtime) => { myRuntime = runtime; return runtime; }),
-      loadRemoteCreature(rivalModel, rivalFallback, rival, quality, isCurrent).then((runtime) => { rivalRuntime = runtime; return runtime; }),
+      loadRemoteCreature(myModel, myFallback, my, quality, modelFormKey, isCurrent).then((runtime) => { myRuntime = runtime; return runtime; }),
+      loadRemoteCreature(rivalModel, rivalFallback, rival, quality, modelFormKey, isCurrent).then((runtime) => { rivalRuntime = runtime; return runtime; }),
     ]).then((runtimes) => {
       if (isCurrent()) setModelState(runtimes.some(Boolean) ? 'remote' : 'fallback');
     }).catch((error) => {
@@ -538,7 +541,7 @@ export function BattleArena3D({
       }
     };
     animate();
-  }, [my, myTint, quality, rival, rivalTint]);
+  }, [modelFormKey, my, myTint, quality, rival, rivalTint]);
 
   const myHpPercent = hpPercent(my);
   const rivalHpPercent = hpPercent(rival);

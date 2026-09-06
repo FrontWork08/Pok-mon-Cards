@@ -14,9 +14,10 @@ type Props={
   subtitle?:string;
   turnOnly?:boolean;
   prefer3D?:boolean;
+  modelFormKey?:string;
 };
 
-export function AdaptiveBattleArena({my,rival,resultKey=null,winner=null,title,subtitle,turnOnly=false,prefer3D=true}:Props){
+export function AdaptiveBattleArena({my,rival,resultKey=null,winner=null,title,subtitle,turnOnly=false,prefer3D=true,modelFormKey='default'}:Props){
   const available=Platform.OS!=='web';
   const [mode,setMode]=useState<'3d'|'2d'>(available&&prefer3D?'3d':'2d');
   const quality=useMemo<'low'|'medium'|'high'>(()=>{
@@ -33,7 +34,7 @@ export function AdaptiveBattleArena({my,rival,resultKey=null,winner=null,title,s
       {available?<Pressable onPress={()=>setMode(current=>current==='3d'?'2d':'3d')} style={styles.toggle}><Ionicons name={mode==='3d'?'grid-outline':'cube-outline'} size={14} color="#FFD447"/><Text style={styles.toggleText}>{mode==='3d'?'USAR 2D':'USAR 3D'}</Text></Pressable>:null}
     </View>
     {mode==='3d'&&available?
-      <BattleArena3D my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 3D'} subtitle={subtitle??'Modelos 3D em tempo real • Game Boy rules'} quality={quality}/>
+      <BattleArena3D my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 3D'} subtitle={subtitle??'Modelos 3D em tempo real • Game Boy rules'} quality={quality} modelFormKey={modelFormKey}/>
       :<PixelBattleArena my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 2D'} subtitle={subtitle} turnOnly={turnOnly}/>
     }
   </View>;
