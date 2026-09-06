@@ -1,13 +1,9 @@
 import { readFileSync } from 'node:fs';
 
 const failures = [];
-const ok = (condition, message) => {
-  if (!condition) failures.push(message);
-};
+const ok = (condition, message) => { if (!condition) failures.push(message); };
 const normalizeHex = (value) => String(value ?? '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
-
-const EXPECTED_EXPO_OWNER = 'frontwork';
-const EXPECTED_EXPO_PROJECT = 'pokemon-cards';
+const OFFICIAL_ORIGIN = 'https://pokemon-cards-frontwork.expo.app';
 
 let release;
 let trusted;
@@ -26,28 +22,25 @@ if (release && trusted) {
   const apkHash = normalizeHex(release.sha256);
   const releaseCert = normalizeHex(release.verification?.certificateSha256);
   const trustedCert = normalizeHex(trusted.certificateSha256);
-  let url = null;
-  try { url = new URL(String(release.easBuildUrl || release.downloadUrl || '')); } catch {}
+  const fileName = String(release.downloadFileName || '');
+  let downloadUrl = null;
+  try { downloadUrl = new URL(String(release.downloadUrl || '')); } catch {}
 
-  const expectedBuildPrefix = `/accounts/${EXPECTED_EXPO_OWNER}/projects/${EXPECTED_EXPO_PROJECT}/builds/`;
-  const buildId = url?.pathname?.startsWith(expectedBuildPrefix)
-    ? url.pathname.slice(expectedBuildPrefix.length).split('/')[0]
-    : '';
-  const validEasInstaller = Boolean(
-    url
-    && url.protocol === 'https:'
-    && url.hostname.toLowerCase() === 'expo.dev'
-    && url.pathname.startsWith(expectedBuildPrefix)
-    && /^[0-9a-f-]{36}$/i.test(buildId)
-    && (!release.easBuildId || release.easBuildId === buildId)
+  const validFileName = /^Trainer-Collection-v\d+\.\d+\.\d+\.apk$/.test(fileName);
+  const validDirectSiteDownload = Boolean(
+    downloadUrl
+    && downloadUrl.origin === OFFICIAL_ORIGIN
+    && validFileName
+    && downloadUrl.pathname === `/download/${fileName}`
   );
 
   ok(release.appName === 'Trainer Collection', 'Nome do APK oficial inesperado.');
   ok(release.packageName === 'com.frontwork.pokemoncards', 'Package Android oficial divergente.');
   ok(trusted.packageName === 'com.frontwork.pokemoncards', 'Package do certificado fixado divergente.');
   ok(release.status === 'ready', 'Release APK não está marcada como ready.');
-  ok(validEasInstaller, 'Instalador oficial precisa apontar para o build verificado no Expo EAS.');
-  ok(release.downloadProvider === 'Expo EAS Build', 'Provedor oficial de instalação deve ser Expo EAS Build.');
+  ok(validFileName, 'Nome público do APK não segue Trainer-Collection-vX.Y.Z.apk.');
+  ok(validDirectSiteDownload, 'Download público precisa ser um APK direto no domínio oficial do Trainer Collection.');
+  ok(release.downloadProvider === 'Trainer Collection Site', 'Provedor público precisa ser o site do Trainer Collection.');
   ok(/^[a-f0-9]{64}$/.test(apkHash), 'SHA-256 do APK ausente ou inválido.');
   ok(Number(release.sizeBytes) > 0, 'Tamanho do APK ausente ou inválido.');
   ok(release.verification?.sha256Verified === true, 'APK não está marcado como hash verificado.');
@@ -68,4 +61,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('✅ APK security audit: Expo EAS installer, metadata, SHA-256, assinatura e certificado oficial consistentes.');
+console.log('✅ APK security audit: download direto no site oficial, nome amigável, SHA-256, assinatura e certificado consistentes.');

@@ -1,6 +1,7 @@
 name: Publish Production Update
 
-# Trainer Collection 1.2 production deploy; retry after verified APK metadata repair.
+# Trainer Collection production deploy. Web/OTA updates always keep the currently
+# verified APK available as a direct same-origin download on the official site.
 on:
   workflow_dispatch:
   push:
@@ -32,7 +33,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -75,6 +76,24 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas env:pull --environment production --path .env.local --non-interactive
 
+      - name: Stage verified APK for direct official-site download
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_NAME="$(node -p "require('./public/download/release.json').downloadFileName")"
+          ARCHIVE_URL="$(node -p "require('./public/download/release.json').archiveUrl")"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          DOWNLOAD_URL="$(node -p "require('./public/download/release.json').downloadUrl")"
+          PROVIDER="$(node -p "require('./public/download/release.json').downloadProvider")"
+          [[ "$FILE_NAME" =~ ^Trainer-Collection-v[0-9]+\.[0-9]+\.[0-9]+\.apk$ ]]
+          [[ "$DOWNLOAD_URL" == "https://pokemon-cards-frontwork.expo.app/download/$FILE_NAME" ]]
+          [[ "$PROVIDER" == "Trainer Collection Site" ]]
+          mkdir -p public/download
+          curl --fail --location --retry 5 --retry-delay 2 "$ARCHIVE_URL" -o "public/download/$FILE_NAME"
+          ACTUAL_SHA="$(sha256sum "public/download/$FILE_NAME" | awk '{print $1}')"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          echo "Verified APK staged at /download/$FILE_NAME"
+
       - name: Export web app
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -84,6 +103,18 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas deploy --prod --environment production --dev-domain pokemon-cards-frontwork --non-interactive
+
+      - name: Verify direct APK from official site
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_NAME="$(node -p "require('./public/download/release.json').downloadFileName")"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          SITE_APK="https://pokemon-cards-frontwork.expo.app/download/$FILE_NAME"
+          curl --fail --location --retry 6 --retry-delay 3 "$SITE_APK" -o /tmp/trainer-site.apk
+          ACTUAL_SHA="$(sha256sum /tmp/trainer-site.apk | awk '{print $1}')"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          echo "Direct official-site APK download is byte-identical to the verified release."
 
       - name: Publish Android update to production
         env:

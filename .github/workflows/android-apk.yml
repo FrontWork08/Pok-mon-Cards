@@ -1,8 +1,7 @@
 name: Build Android APK
 
-# APK builds are release-controlled.
-# Day-to-day app changes ship through Expo Updates; public APK releases use the production channel.
-# Native releases are blocked unless SHA-256 + Android signature + pinned signer certificate all verify.
+# APK builds are release-controlled. Public installation starts and completes on
+# the Trainer Collection site; GitHub/EAS remain provenance/archive only.
 on:
   workflow_dispatch:
   push:
@@ -19,7 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 100
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -75,12 +74,8 @@ jobs:
           set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           APKSIGNER_PATH="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
-          if [ -z "$APKSIGNER_PATH" ]; then
+          if [ -z "$APKSIGNER_PATH" ] || [ ! -x "$APKSIGNER_PATH" ]; then
             echo "apksigner was not found; refusing to create an unverified public APK."
-            exit 1
-          fi
-          if [ ! -x "$APKSIGNER_PATH" ]; then
-            echo "apksigner exists but is not executable; refusing to create an unverified public APK."
             exit 1
           fi
           echo "APKSIGNER=$APKSIGNER_PATH" >> "$GITHUB_ENV"
@@ -103,7 +98,7 @@ jobs:
           test -n "$SOURCE_APK"
           node scripts/verify-apk-sounds.mjs "$SOURCE_APK"
 
-      - name: Publish verified archive and official installer metadata
+      - name: Publish verified archive and direct-site metadata
         env:
           GH_TOKEN: ${{ github.token }}
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -121,7 +116,7 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG already exists; replacing verified archive asset."
           else
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Trainer Collection v${VERSION}" --notes "APK oficial do Trainer Collection. Arquivo verificado por SHA-256 e assinatura Android antes da publicação. A instalação pública começa no site oficial."
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Trainer Collection v${VERSION}" --notes "APK oficial do Trainer Collection. Arquivo verificado por SHA-256 e assinatura Android. O download público é servido diretamente pelo site oficial."
           fi
           gh release upload "$TAG" "$FRIENDLY_APK" --repo "$GITHUB_REPOSITORY" --clobber
 
@@ -130,16 +125,16 @@ jobs:
           export EAS_JSON
           EAS_BUILD_ID="$(node -e "const x=JSON.parse(process.env.EAS_JSON); const b=Array.isArray(x)?x[0]:x.builds?.[0]; if(!b?.id) process.exit(2); process.stdout.write(b.id)")"
           EAS_BUILD_URL="https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/${EAS_BUILD_ID}"
-          SITE_URL="https://pokemon-cards-frontwork.expo.app/download/"
-          export ARCHIVE_URL EAS_BUILD_ID EAS_BUILD_URL SITE_URL FRIENDLY_NAME
+          SITE_APK_URL="https://pokemon-cards-frontwork.expo.app/download/${FRIENDLY_NAME}"
+          export ARCHIVE_URL EAS_BUILD_ID EAS_BUILD_URL SITE_APK_URL FRIENDLY_NAME
 
           node <<'NODE'
           const fs = require('fs');
           const p = 'public/download/release.json';
           const release = JSON.parse(fs.readFileSync(p, 'utf8'));
-          release.downloadUrl = process.env.SITE_URL;
+          release.downloadUrl = process.env.SITE_APK_URL;
           release.downloadFileName = process.env.FRIENDLY_NAME;
-          release.downloadProvider = 'Expo EAS Build';
+          release.downloadProvider = 'Trainer Collection Site';
           release.easBuildId = process.env.EAS_BUILD_ID;
           release.easBuildUrl = process.env.EAS_BUILD_URL;
           release.archiveUrl = process.env.ARCHIVE_URL;
@@ -152,32 +147,10 @@ jobs:
           [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
           node scripts/verify-apk-sounds.mjs /tmp/friendly-recheck.apk
           "$APKSIGNER" verify --verbose --print-certs /tmp/friendly-recheck.apk >/tmp/friendly-recheck-signature.txt
-          echo "Release archive is byte-identical to the signed build. Public installation remains on the Trainer Collection site -> Expo EAS."
+          echo "Release archive is byte-identical to the signed build; public URL is $SITE_APK_URL"
 
       - name: Validate published download metadata
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const release = JSON.parse(fs.readFileSync('public/download/release.json','utf8'));
-          const trusted = JSON.parse(fs.readFileSync('public/download/trusted-signing-cert.json','utf8'));
-          const hex = (v) => String(v ?? '').replace(/[^a-fA-F0-9]/g,'').toLowerCase();
-          const cert = hex(release.verification?.certificateSha256);
-          const trustedCert = hex(trusted.certificateSha256);
-          if (release.status !== 'ready') throw new Error('Release is not ready');
-          if (release.downloadUrl !== 'https://pokemon-cards-frontwork.expo.app/download/') throw new Error('Public entry point must be the Trainer Collection site');
-          if (!/^https:\/\/expo\.dev\/accounts\/frontwork\/projects\/pokemon-cards\/builds\/[0-9a-f-]{36}$/i.test(release.easBuildUrl || '')) throw new Error('EAS installer page is invalid');
-          if (!/^[a-f0-9]{64}$/i.test(release.sha256 || '')) throw new Error('Invalid APK SHA-256');
-          if (!(Number(release.sizeBytes) > 0)) throw new Error('Invalid APK size');
-          if (release.packageName !== 'com.frontwork.pokemoncards') throw new Error('Unexpected Android package');
-          if (!/^Trainer-Collection-v.+\.apk$/.test(release.downloadFileName || '')) throw new Error('Public APK filename is not friendly');
-          if (release.downloadProvider !== 'Expo EAS Build') throw new Error('Public installer provider must be Expo EAS Build');
-          if (release.verification?.sha256Verified !== true) throw new Error('APK hash was not verified');
-          if (release.verification?.signatureVerified !== true) throw new Error('APK signature was not verified');
-          if (release.verification?.signerMatchesTrustedCertificate !== true) throw new Error('APK signer was not pinned');
-          if (!/^[a-f0-9]{64}$/.test(cert) || cert !== trustedCert) throw new Error('APK signer certificate mismatch');
-          if (!release.verification?.verifiedAt) throw new Error('Missing verification timestamp');
-          console.log('Official-site entry point, EAS installer, hash, signature and trusted signer certificate are valid.');
-          NODE
+        run: node scripts/apk-security-audit.mjs
 
       - name: Upload verified APK evidence
         uses: actions/upload-artifact@v4
@@ -190,22 +163,32 @@ jobs:
       - name: Publish download metadata
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           cp public/download/release.json /tmp/trainer-release.json
           git fetch origin main
           git checkout -B release-metadata origin/main
           cp /tmp/trainer-release.json public/download/release.json
-
           git add public/download/release.json
-          if git diff --cached --quiet; then
+          if ! git diff --cached --quiet; then
+            git commit -m "release: update verified Android download metadata"
+            git push origin HEAD:main
+          else
             echo "Release metadata already current."
-            exit 0
           fi
 
-          git commit -m "release: update verified Android download metadata"
-          git push origin HEAD:main
+      - name: Stage verified APK on official site
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_NAME="$(node -p "require('./public/download/release.json').downloadFileName")"
+          ARCHIVE_URL="$(node -p "require('./public/download/release.json').archiveUrl")"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          mkdir -p public/download
+          curl --fail --location --retry 5 --retry-delay 2 "$ARCHIVE_URL" -o "public/download/$FILE_NAME"
+          ACTUAL_SHA="$(sha256sum "public/download/$FILE_NAME" | awk '{print $1}')"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
 
       - name: Deploy updated download site
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
@@ -215,3 +198,16 @@ jobs:
           eas env:pull --environment production --path .env.local --non-interactive
           npx expo export --platform web
           eas deploy --prod --environment production --dev-domain pokemon-cards-frontwork --non-interactive
+
+      - name: Verify direct APK from official site
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_NAME="$(node -p "require('./public/download/release.json').downloadFileName")"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          SITE_APK="https://pokemon-cards-frontwork.expo.app/download/$FILE_NAME"
+          curl --fail --location --retry 6 --retry-delay 3 "$SITE_APK" -o /tmp/site-recheck.apk
+          ACTUAL_SHA="$(sha256sum /tmp/site-recheck.apk | awk '{print $1}')"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          echo "Official site serves the exact verified APK with the Trainer Collection filename."
