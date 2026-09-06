@@ -398,10 +398,10 @@ function AppStack() {
               {accountRestriction.account_status === 'banned' ? 'Conta banida' : 'Conta suspensa'}
             </Text>
             <Text style={[styles.accountBlockerBody, { color: colors.muted }]}>
-              {accountRestriction.account_status_reason || 'Esta conta está temporariamente indisponível.'}
+              {accountRestriction.moderation_reason || 'Esta conta está temporariamente indisponível.'}
             </Text>
-            {accountRestriction.account_status === 'suspended' && accountRestriction.account_status_until ? (
-              <Text style={[styles.accountBlockerMeta, { color: colors.yellow }]}>Até {new Date(accountRestriction.account_status_until).toLocaleString('pt-BR')}</Text>
+            {accountRestriction.account_status === 'suspended' && accountRestriction.suspended_until ? (
+              <Text style={[styles.accountBlockerMeta, { color: colors.yellow }]}>Até {new Date(accountRestriction.suspended_until).toLocaleString('pt-BR')}</Text>
             ) : null}
             <Pressable onPress={() => { void supabase.auth.signOut(); }} style={[styles.accountBlockerButton, { borderColor: colors.border }]}>
               <Text style={[styles.accountBlockerButtonText, { color: colors.text }]}>SAIR DA CONTA</Text>
@@ -415,7 +415,7 @@ function AppStack() {
           <View style={styles.notificationCopy}><Text style={[styles.notificationTitle,{color:colors.text}]} numberOfLines={1}>{liveNotification.title}</Text><Text style={[styles.notificationBody,{color:colors.muted}]} numberOfLines={2}>{liveNotification.body}</Text></View>
         </Pressable>
       ) : null}
-      {matchmaking?.status === 'searching' && !maintenanceBlocked ? (
+      {matchmaking?.status === 'waiting' && !maintenanceBlocked ? (
         <View pointerEvents="box-none" style={[styles.matchmakingHost, { bottom: matchmakingBottom }]}>
           <View style={[styles.matchmakingBanner,{backgroundColor:colors.surface,borderColor:colors.yellow}]}>
             <View style={[styles.matchmakingPulse,{backgroundColor:colors.yellow}]} />

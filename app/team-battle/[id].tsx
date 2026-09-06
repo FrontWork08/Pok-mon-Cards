@@ -21,6 +21,7 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWallet } from '@/wallet/WalletProvider';
 import { VIRTUAL_LIST_PERF_PROPS } from '@/performance/scrollPerformance';
 import { BattleStyleArenaOverlay } from '@/components/BattleStyleArenaOverlay';
+import { AdaptiveBattleArena } from '@/components/AdaptiveBattleArena';
 import { getMyDecks } from '@/services/decks';
 import { filterAndSortTeamCards, getAvailableTeamTypes, getDeckCardIds, type TeamSelectionSortMode } from '@/battles/teamSelection';
 
@@ -376,30 +377,32 @@ export default function TeamBattleScreen() {
 
         {state?.status === 'revealing' ? (
           <>
-            <View style={[styles.arena, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <BattleStyleArenaOverlay turn={Number((state as any)?.turn ?? 1)} activeSlot={state?.myActiveSlot} />
-              <View style={styles.fighterSide}>
-                <Text style={[styles.fighterOwner, { color: colors.muted }]}>ADVERSÁRIO</Text>
-                <Text style={[styles.fighterName, { color: colors.text }]}>{opponentName}</Text>
-                <View style={[styles.hpTrack, { backgroundColor: colors.border }]}><View style={[styles.hpFill, { width: hpPercent(opponentHp, opponentMaxHp), backgroundColor: opponentHp / opponentMaxHp <= 0.25 ? colors.red : colors.green }]} /></View>
-                <Text style={[styles.hpText, { color: colors.muted }]}>{opponentHp}/{opponentMaxHp} HP</Text>
-                {(state as any)?.opponentCardImage ? <Image source={{ uri: String((state as any).opponentCardImage) }} style={styles.sprite} resizeMode="contain" /> : <View style={styles.sprite} />}
-              </View>
-
-              <View style={styles.vsColumn}>
-                <Text style={[styles.turnText, { color: colors.yellow }]}>TURNO {Number((state as any)?.turn ?? 1)}</Text>
-                <Text style={[styles.vs, { color: colors.accent }]}>VS</Text>
-                {secondsLeft !== null ? <Text style={[styles.timerSmall, { color: secondsLeft <= 15 ? colors.red : colors.muted }]}>{secondsLeft}s</Text> : null}
-              </View>
-
-              <View style={styles.fighterSide}>
-                <Text style={[styles.fighterOwner, { color: colors.muted }]}>VOCÊ</Text>
-                <Text style={[styles.fighterName, { color: colors.text }]}>{myName}</Text>
-                <View style={[styles.hpTrack, { backgroundColor: colors.border }]}><View style={[styles.hpFill, { width: hpPercent(myHp, myMaxHp), backgroundColor: myHp / myMaxHp <= 0.25 ? colors.red : colors.green }]} /></View>
-                <Text style={[styles.hpText, { color: colors.muted }]}>{myHp}/{myMaxHp} HP</Text>
-                {(state as any)?.myCardImage ? <Image source={{ uri: String((state as any).myCardImage) }} style={styles.sprite} resizeMode="contain" /> : <View style={styles.sprite} />}
-              </View>
-            </View>
+            <AdaptiveBattleArena
+              my={{
+                name: myName,
+                pokemonId: Number((state as any)?.myPokemonId ?? 0) || null,
+                hp: myHp,
+                maxHp: myMaxHp,
+                types: Array.isArray((state as any)?.myTypes) ? (state as any).myTypes : [],
+                attackName: String((state as any)?.myAttackName ?? ''),
+                firstPlayer: true,
+                knockedOut: myHp <= 0,
+              }}
+              rival={{
+                name: opponentName,
+                pokemonId: Number((state as any)?.opponentPokemonId ?? 0) || null,
+                hp: opponentHp,
+                maxHp: opponentMaxHp,
+                types: Array.isArray((state as any)?.opponentTypes) ? (state as any).opponentTypes : [],
+                firstPlayer: false,
+                knockedOut: opponentHp <= 0,
+              }}
+              resultKey={`${Number((state as any)?.lastTurnNo ?? 0)}:${Number((state as any)?.turn ?? 1)}`}
+              winner={null}
+              turnOnly
+              title={`TURNO ${Number((state as any)?.turn ?? 1)} • ${opponentName} VS ${myName}`}
+              subtitle="Game Boy rules • modelos 3D não usam arte da carta"
+            />
 
             <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.rowBetween}>

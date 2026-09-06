@@ -240,6 +240,14 @@ export default function BattlesHubScreen() {
 
   return <Screen title="Battle Arena" subtitle="Ranqueadas, desafios entre amigos, histórico, regras e matchmaking competitivo.">
       <AreaIdentityStrip area="competitive" />
+      <Pressable
+        onPress={() => router.push('/adventure' as any)}
+        style={{borderWidth:1,borderColor:'#4B89AF',backgroundColor:'#102534',borderRadius:16,padding:14,flexDirection:'row',alignItems:'center',gap:11}}
+      >
+        <View style={{width:46,height:46,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:'#19384C'}}><Ionicons name="map" size={24} color="#8DD7FF"/></View>
+        <View style={{flex:1}}><Text style={{color:'#F0F7FC',fontSize:14,fontWeight:'900'}}>TRAINER ADVENTURE 1.2</Text><Text style={{color:'#89A2B5',fontSize:10,marginTop:2}}>Kanto • Battle Tower • Elite Four • Raids • Rogue • Desafios • Campeão • 3D</Text></View>
+        <Ionicons name="chevron-forward" size={20} color="#8DD7FF"/>
+      </Pressable>
     {notice ? <Pressable style={styles.notice} onPress={() => setNotice(null)}><Ionicons name="information-circle" size={18} color={colors.yellow}/><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
     {loading ? <ActivityIndicator size="large" color={colors.yellow}/> : null}
 
