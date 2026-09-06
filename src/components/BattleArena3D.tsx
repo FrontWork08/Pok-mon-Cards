@@ -10,6 +10,7 @@ export type BattleArena3DProps = {
   title?: string;
   subtitle?: string;
   quality?: 'low' | 'medium' | 'high';
+  modelFormKey?: string;
 };
 
 // Metro resolves BattleArena3D.native.tsx on Android/iOS and BattleArena3D.web.tsx on Web.

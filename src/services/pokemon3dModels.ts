@@ -35,12 +35,18 @@ const CACHE_LIMITS: Record<'low' | 'medium' | 'high', number> = {
   high: 224 * 1024 * 1024,
 };
 
-const manifestCache = new Map<number, { expiresAt: number; value: Pokemon3DModelManifest | null }>();
+const manifestCache = new Map<string, { expiresAt: number; value: Pokemon3DModelManifest | null }>();
 const inflight = new Map<string, Promise<Pokemon3DModelAsset | null>>();
 
 function validPokemonId(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
+}
+
+function normalizeFormKey(value: unknown) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw || raw.length > 40 || !/^[a-zA-Z0-9_-]+$/.test(raw)) return null;
+  return raw;
 }
 
 function safeFilePart(value: string) {
@@ -65,23 +71,25 @@ function cacheFilename(manifest: Pokemon3DModelManifest) {
   return `p${manifest.pokemon_id}-${safeFilePart(manifest.form_key)}-v${manifest.version}-${hash}.glb`;
 }
 
-async function getManifest(pokemonId: number) {
+async function getManifest(pokemonId: number, formKeyInput = 'default') {
   const id = validPokemonId(pokemonId);
-  if (!id) return null;
-  const cached = manifestCache.get(id);
+  const formKey = normalizeFormKey(formKeyInput);
+  if (!id || !formKey) return null;
+  const cacheKey = `${id}:${formKey}`;
+  const cached = manifestCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
   const { data, error } = await supabase
     .from('pokemon_3d_models')
     .select('pokemon_id,form_key,storage_path,format,version,sha256,byte_size,scale,offset_x,offset_y,offset_z,rotation_y,animations,min_app_version')
     .eq('pokemon_id', id)
-    .eq('form_key', 'default')
+    .eq('form_key', formKey)
     .eq('enabled', true)
     .maybeSingle();
 
   if (error) {
     console.warn('[3D] model registry lookup failed', error.message);
-    manifestCache.set(id, { expiresAt: Date.now() + 30_000, value: null });
+    manifestCache.set(cacheKey, { expiresAt: Date.now() + 30_000, value: null });
     return null;
   }
 
@@ -98,7 +106,7 @@ async function getManifest(pokemonId: number) {
     animations: (data.animations && typeof data.animations === 'object' ? data.animations : {}) as Pokemon3DModelManifest['animations'],
   } as Pokemon3DModelManifest) : null;
 
-  manifestCache.set(id, { expiresAt: Date.now() + MANIFEST_TTL_MS, value: manifest });
+  manifestCache.set(cacheKey, { expiresAt: Date.now() + MANIFEST_TTL_MS, value: manifest });
   return manifest;
 }
 
@@ -179,10 +187,12 @@ async function downloadModel(manifest: Pokemon3DModelManifest, quality: 'low' | 
 export async function resolvePokemon3DModel(
   pokemonId: unknown,
   quality: 'low' | 'medium' | 'high' = 'medium',
+  formKeyInput = 'default',
 ): Promise<Pokemon3DModelAsset | null> {
   const id = validPokemonId(pokemonId);
-  if (!id) return null;
-  const manifest = await getManifest(id);
+  const formKey = normalizeFormKey(formKeyInput);
+  if (!id || !formKey) return null;
+  const manifest = await getManifest(id, formKey);
   if (!manifest) return null;
   const cleanPath = manifest.storage_path.replace(/^\/+/, '');
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(cleanPath);
@@ -210,8 +220,18 @@ export async function readPokemon3DModelArrayBuffer(localUri: string) {
   return bytes.buffer;
 }
 
-export function invalidatePokemon3DManifest(pokemonId?: unknown) {
+export function invalidatePokemon3DManifest(pokemonId?: unknown, formKeyInput?: unknown) {
   const id = validPokemonId(pokemonId);
-  if (id) manifestCache.delete(id);
-  else manifestCache.clear();
+  const formKey = normalizeFormKey(formKeyInput);
+  if (id && formKey) {
+    manifestCache.delete(`${id}:${formKey}`);
+    return;
+  }
+  if (id) {
+    for (const key of manifestCache.keys()) {
+      if (key.startsWith(`${id}:`)) manifestCache.delete(key);
+    }
+    return;
+  }
+  manifestCache.clear();
 }
