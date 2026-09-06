@@ -5,6 +5,7 @@ const readText = (path) => readFileSync(path, 'utf8');
 
 const app = readJson('app.json');
 const pkg = readJson('package.json');
+// The version itself is intentionally pinned in native-runtime-baseline.json for each native release.
 const baseline = readJson('scripts/native-runtime-baseline.json');
 const apkWorkflow = readText('.github/workflows/android-apk.yml');
 const otaWorkflow = readText('.github/workflows/eas-update.yml');
