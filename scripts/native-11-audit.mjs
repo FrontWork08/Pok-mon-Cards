@@ -18,7 +18,7 @@ for (const sound of ['tc_default.wav','tc_battle.wav','tc_social.wav','tc_trade.
   assert(existsSync(path) && statSync(path).size > 1000, `native notification sound missing: ${sound}`);
   assert(notificationConfig?.sounds?.some((item) => String(item).endsWith(sound)), `notification plugin does not bundle ${sound}`);
 }
-// Existing v11 channel ids stay stable across 1.2 so Android users do not get duplicate channels.
+// Existing v11 channel ids stay stable across the 1.2.1 hotfix so Android users do not get duplicate channels.
 assert(notificationConfig?.defaultChannel === 'default_v11', 'stable default notification channel missing');
 const filters = expo.android?.intentFilters ?? [];
 const verified = filters.find((f) => f.autoVerify === true && (f.data ?? []).some((d) => d.host === 'pokemon-cards-frontwork.expo.app' && d.pathPrefix === '/auth/callback'));
