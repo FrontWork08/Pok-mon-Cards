@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install mandatory v1.1.0 APK upgrade gate into legacy bundle
+      - name: Install mandatory v1.2.0 APK upgrade gate into legacy bundle
         shell: bash
         run: |
           cat > src/components/UpdatePrompt.tsx <<'EOF'
@@ -60,7 +60,7 @@ jobs:
           import * as Updates from 'expo-updates';
           import { useAppTheme } from '@/theme/ThemeProvider';
 
-          const APK_INSTALLER_URL = 'https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/ee391e3f-1e2b-4662-8d1e-c1acccba5960';
+          const APK_INSTALLER_URL = 'https://github.com/FrontWork08/Pok-mon-Cards/releases/download/android-v1.2.0/Trainer-Collection-v1.2.0.apk';
 
           export function UpdatePrompt() {
             const { colors } = useAppTheme();
@@ -100,7 +100,7 @@ jobs:
               try {
                 await Linking.openURL(APK_INSTALLER_URL);
               } catch {
-                setErrorText('Não foi possível abrir o instalador do novo APK. Verifique sua conexão e tente novamente.');
+                setErrorText('Não foi possível abrir o download do novo APK. Verifique sua conexão e tente novamente.');
               } finally {
                 setOpening(false);
               }
@@ -116,12 +116,12 @@ jobs:
                       <Ionicons name="cloud-download-outline" size={30} color={colors.yellow} />
                     </View>
                     <Text style={[styles.eyebrow, { color: colors.yellow }]}>ATUALIZAÇÃO OBRIGATÓRIA</Text>
-                    <Text style={[styles.title, { color: colors.text }]}>Trainer Collection 1.1.0</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>Trainer Collection 1.2.0</Text>
                     <Text style={[styles.body, { color: colors.muted }]}>
                       Esta versão foi encerrada. Para continuar jogando, instale o novo APK oficial do Trainer Collection.
                     </Text>
                     <View style={[styles.notice, { borderColor: colors.border }]}>
-                      <Text style={[styles.noticeText, { color: colors.text }]}>O jogo permanece bloqueado neste APK antigo até você instalar a versão 1.1.0.</Text>
+                      <Text style={[styles.noticeText, { color: colors.text }]}>O jogo permanece bloqueado neste APK antigo até você instalar a versão 1.2.0.</Text>
                     </View>
                     {checkingGateUpdate ? (
                       <Text style={[styles.syncText, { color: colors.muted }]}>Verificando correções desta tela…</Text>
@@ -129,7 +129,7 @@ jobs:
                     {errorText ? <Text style={[styles.errorText, { color: colors.red }]}>{errorText}</Text> : null}
                     <Pressable disabled={opening} onPress={() => { void openInstaller(); }} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.yellow, opacity: pressed || opening ? 0.8 : 1 }]}>
                       <Ionicons name="download-outline" size={20} color="#080808" />
-                      <Text style={styles.primaryText}>{opening ? 'ABRINDO INSTALADOR…' : 'ATUALIZAR APK AGORA'}</Text>
+                      <Text style={styles.primaryText}>{opening ? 'ABRINDO DOWNLOAD…' : 'ATUALIZAR APK AGORA'}</Text>
                     </Pressable>
                     <Text style={[styles.footer, { color: colors.muted }]}>O OTA serve apenas para manter esta tela de bloqueio corrigida. A atualização do jogo exige o novo APK.</Text>
                   </View>
@@ -163,4 +163,4 @@ jobs:
       - name: Deliver mandatory APK gate to v1.0.1 runtime
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --channel production --environment preview --platform android --message "Legacy APK gate self-refreshes OTA corrections; APK upgrade remains mandatory" --non-interactive
+        run: eas update --channel production --environment preview --platform android --message "Legacy v1.0.1 gate now requires Trainer Collection 1.2.0 APK" --non-interactive
