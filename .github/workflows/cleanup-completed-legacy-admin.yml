@@ -12,6 +12,7 @@ permissions:
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,10 +28,13 @@ jobs:
           text = path.read_text()
           old = "{adminAccess?.isOwner && releaseStatus ? ("
           new = "{adminAccess?.isOwner && releaseStatus && !['completed'].includes(releaseStatus.phase) ? ("
-          count = text.count(old)
-          if count != 1:
-              raise SystemExit(f'Expected exactly one legacy admin condition, found {count}')
-          path.write_text(text.replace(old, new, 1))
+          if new in text:
+              print('Legacy admin panel is already hidden for completed campaigns.')
+          elif old in text:
+              path.write_text(text.replace(old, new, 1))
+              print('Legacy admin panel condition updated.')
+          else:
+              raise SystemExit('Legacy admin condition was not found.')
           PY
 
       - name: Verify completed migration stays hidden
@@ -47,15 +51,41 @@ jobs:
           fi
           echo "No TypeScript errors in app/admin.tsx after the cleanup."
 
-      - name: Commit cleanup
+      - name: Commit cleanup if needed
         shell: bash
         run: |
           if git diff --quiet -- app/admin.tsx; then
-            echo "Legacy admin panel already hidden."
-            exit 0
+            echo "Legacy admin panel already committed."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/admin.tsx
+            git commit -m "admin: hide completed 10-card transition controls"
+            git push origin HEAD:main
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/admin.tsx
-          git commit -m "admin: hide completed 10-card transition controls"
-          git push origin HEAD:main
+
+      - name: Check Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN is not configured in this repository."
+            exit 1
+          fi
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Load Expo environment
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas env:pull --environment preview --path .env.local --non-interactive
+
+      - name: Publish Android 1.1 admin cleanup OTA
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas update --channel production --environment preview --platform android --message "Hide completed 10-card admin transition panel" --non-interactive
