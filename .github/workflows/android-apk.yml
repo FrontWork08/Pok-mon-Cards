@@ -178,7 +178,7 @@ jobs:
             echo "Release metadata already current."
           fi
 
-      - name: Stage verified APK on official site
+      - name: Stage verified APK source for site
         shell: bash
         run: |
           set -euo pipefail
@@ -190,14 +190,32 @@ jobs:
           ACTUAL_SHA="$(sha256sum "public/download/$FILE_NAME" | awk '{print $1}')"
           [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
 
-      - name: Deploy updated download site
+      - name: Export updated download site
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           eas env:pull --environment production --path .env.local --non-interactive
           npx expo export --platform web
-          eas deploy --prod --environment production --dev-domain pokemon-cards-frontwork --non-interactive
+
+      - name: Inject verified APK into exported site
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_NAME="$(node -p "require('./public/download/release.json').downloadFileName")"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          mkdir -p dist/download
+          cp "public/download/$FILE_NAME" "dist/download/$FILE_NAME"
+          ACTUAL_SHA="$(sha256sum "dist/download/$FILE_NAME" | awk '{print $1}')"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          test "$(stat -c%s "dist/download/$FILE_NAME")" -gt 100000000
+
+      - name: Deploy updated download site
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas deploy --prod --environment production --dev-domain pokemon-cards-frontwork --non-interactive
 
       - name: Verify direct APK from official site
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/apk-release'
@@ -208,6 +226,7 @@ jobs:
           EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
           SITE_APK="https://pokemon-cards-frontwork.expo.app/download/$FILE_NAME"
           curl --fail --location --retry 6 --retry-delay 3 "$SITE_APK" -o /tmp/site-recheck.apk
+          test "$(stat -c%s /tmp/site-recheck.apk)" -gt 100000000
           ACTUAL_SHA="$(sha256sum /tmp/site-recheck.apk | awk '{print $1}')"
           [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
           echo "Official site serves the exact verified APK with the Trainer Collection filename."
