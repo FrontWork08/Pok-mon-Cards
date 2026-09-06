@@ -1243,7 +1243,7 @@ export default function AdminScreen() {
             </Pressable>
           ) : null}
 
-          {adminAccess?.isOwner && releaseStatus ? (
+          {adminAccess?.isOwner && releaseStatus && !['completed'].includes(releaseStatus.phase) ? (
             <View style={[styles.legacyAdminPanel,{backgroundColor:colors.surface,borderColor:releaseStatus.legacy_selection_enabled ? '#65D894' : colors.border}]}>
               <View style={styles.legacyAdminHeader}>
                 <View style={[styles.legacyAdminIcon,{backgroundColor:releaseStatus.legacy_selection_enabled ? '#153426' : colors.accentSoft}]}>
