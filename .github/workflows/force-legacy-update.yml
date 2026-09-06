@@ -26,6 +26,8 @@ jobs:
             label: v1.0.1
           - ref: android-v1.1.0
             label: v1.1.0
+          - ref: android-v1.2.0
+            label: v1.2.0
 
     steps:
       - name: Checkout ${{ matrix.label }} source
@@ -58,7 +60,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install OTA-first mandatory v1.2.0 upgrade gate
+      - name: Install OTA-first mandatory v1.2.1 upgrade gate
         shell: bash
         run: |
           cat > src/components/UpdatePrompt.tsx <<'EOF'
@@ -108,7 +110,7 @@ jobs:
                     }
                   }
                 } catch {
-                  // The native upgrade remains available even if OTA is temporarily offline.
+                  // Native upgrade stays available even if OTA is temporarily offline.
                 }
                 finishGateBootstrap();
               };
@@ -143,8 +145,8 @@ jobs:
                       <Ionicons name="cloud-download-outline" size={30} color={colors.yellow} />
                     </View>
                     <Text style={[styles.eyebrow, { color: colors.yellow }]}>ATUALIZAÇÃO OBRIGATÓRIA</Text>
-                    <Text style={[styles.title, { color: colors.text }]}>Trainer Collection 1.2.0</Text>
-                    <Text style={[styles.body, { color: colors.muted }]}>Esta versão foi encerrada. Para continuar jogando, instale o novo APK pelo site oficial do Trainer Collection.</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>Trainer Collection 1.2.1</Text>
+                    <Text style={[styles.body, { color: colors.muted }]}>Esta versão foi encerrada. Para continuar jogando, instale o APK 1.2.1 pelo site oficial do Trainer Collection.</Text>
                     <View style={[styles.notice, { borderColor: colors.border }]}>
                       <Text style={[styles.noticeText, { color: colors.text }]}>Antes desta tela aparecer, o app verifica e aplica silenciosamente qualquer correção OTA disponível para este APK.</Text>
                     </View>
@@ -153,7 +155,7 @@ jobs:
                       <Ionicons name="globe-outline" size={20} color="#080808" />
                       <Text style={styles.primaryText}>{opening ? 'ABRINDO SITE…' : 'ABRIR SITE E ATUALIZAR'}</Text>
                     </Pressable>
-                    <Text style={[styles.footer, { color: colors.muted }]}>O APK não é mais aberto pelo GitHub. O botão leva sempre à página oficial de download.</Text>
+                    <Text style={[styles.footer, { color: colors.muted }]}>O botão abre somente a página oficial do Trainer Collection. O app não direciona mais o jogador para o GitHub.</Text>
                   </View>
                 </View>
               </Modal>
@@ -185,4 +187,4 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          eas update --channel production --environment preview --platform android --message "${{ matrix.label }} gate - OTA first, then Trainer Collection 1.2.0 via official site" --non-interactive
+          eas update --channel production --environment preview --platform android --message "${{ matrix.label }} gate - OTA first, then Trainer Collection 1.2.1 via official site" --non-interactive
