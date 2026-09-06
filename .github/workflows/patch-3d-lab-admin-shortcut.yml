@@ -1,0 +1,52 @@
+name: Patch 3D Lab Admin Shortcut
+
+on:
+  push:
+    branches:
+      - test/3d-lab-first-pass
+    paths:
+      - .github/workflows/patch-3d-lab-admin-shortcut.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: test/3d-lab-first-pass
+          fetch-depth: 0
+      - name: Add owner-only shortcut and remove one-shot workflow
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('app/admin.tsx')
+          text = path.read_text(encoding='utf-8')
+          marker = """          {adminAccess?.isOwner ? (\n            <Pressable onPress={()=>router.push('/admin-gamepasses')} style={[styles.notice,{backgroundColor:'#241D3B',borderColor:'#9B7BFF'}]}>\n              <Ionicons name=\"flash\" size={20} color=\"#CBBEFF\"/>\n              <View style={{flex:1}}><Text style={[styles.historyUser,{color:colors.text}]}>GAMEPASS AUTO BOOSTER • VENDAS MANUAIS</Text><Text style={[styles.historyMeta,{color:colors.muted}]}>Ative ou remova a gamepass somente depois de confirmar diretamente o pagamento em dinheiro real.</Text></View>\n              <Ionicons name=\"chevron-forward\" size={18} color=\"#CBBEFF\"/>\n            </Pressable>\n          ) : null}\n"""
+          shortcut = marker + """\n          {adminAccess?.isOwner ? (\n            <Pressable\n              accessibilityRole=\"button\"\n              accessibilityLabel=\"Abrir laboratório 3D interno\"\n              onPress={()=>router.push('/admin-3d-lab')}\n              style={[styles.notice,{backgroundColor:'#102A33',borderColor:'#50D7F0'}]}\n            >\n              <Ionicons name=\"cube\" size={21} color=\"#7FEAFF\"/>\n              <View style={{flex:1}}>\n                <Text style={[styles.historyUser,{color:colors.text}]}>3D LAB • TESTE INTERNO</Text>\n                <Text style={[styles.historyMeta,{color:colors.muted}]}>Pikachu #25 • Charizard #6 • Gyarados #130 • ataque, dano, KO, vitória, troca, cache e stress de 100 ciclos. Somente owner.</Text>\n              </View>\n              <View style={{alignItems:'flex-end',gap:4}}>\n                <View style={{borderRadius:999,borderWidth:1,borderColor:'#50D7F0',backgroundColor:'#133846',paddingHorizontal:7,paddingVertical:3}}>\n                  <Text style={{color:'#9AF0FF',fontSize:7,fontWeight:'900',letterSpacing:.5}}>NÃO LIBERADO</Text>\n                </View>\n                <Ionicons name=\"chevron-forward\" size={18} color=\"#7FEAFF\"/>\n              </View>\n            </Pressable>\n          ) : null}\n"""
+
+          if "router.push('/admin-3d-lab')" not in text:
+              if marker not in text:
+                  raise SystemExit('Admin shortcut anchor not found; refusing an unsafe patch.')
+              text = text.replace(marker, shortcut, 1)
+              path.write_text(text, encoding='utf-8')
+
+          workflow = Path('.github/workflows/patch-3d-lab-admin-shortcut.yml')
+          if workflow.exists():
+              workflow.unlink()
+      - name: Commit test-only shortcut
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Nothing to patch."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/admin.tsx .github/workflows/patch-3d-lab-admin-shortcut.yml
+          git commit -m "test: expose owner-only 3D Lab shortcut in admin"
+          git push origin HEAD:test/3d-lab-first-pass
