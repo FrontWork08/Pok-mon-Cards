@@ -1,0 +1,287 @@
+name: Force Legacy Android Upgrade
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/force-legacy-update.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: force-legacy-android-v1.0.1
+  cancel-in-progress: false
+
+jobs:
+  publish-legacy-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout v1.0.1 source
+        uses: actions/checkout@v4
+        with:
+          ref: android-v1.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN is not configured in this repository."
+            exit 1
+          fi
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install mandatory v1.1.0 upgrade gate into legacy bundle
+        shell: bash
+        run: |
+          cat > src/components/UpdatePrompt.tsx <<'EOF'
+          import { useCallback, useEffect, useState } from 'react';
+          import { BackHandler, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+          import { Ionicons } from '@expo/vector-icons';
+          import { useSafeAreaInsets } from 'react-native-safe-area-context';
+          import { useAppTheme } from '@/theme/ThemeProvider';
+
+          const DOWNLOAD_URL = 'https://github.com/FrontWork08/Pok-mon-Cards/releases/download/android-v1.1.0/Trainer-Collection-v1.1.0.apk';
+          const RELEASE_URL = 'https://github.com/FrontWork08/Pok-mon-Cards/releases/tag/android-v1.1.0';
+
+          export function UpdatePrompt() {
+            const { colors } = useAppTheme();
+            const insets = useSafeAreaInsets();
+            const [opening, setOpening] = useState(false);
+            const [errorText, setErrorText] = useState('');
+            const mandatoryUpgrade = Platform.OS === 'android' && !__DEV__;
+
+            useEffect(() => {
+              if (!mandatoryUpgrade) return;
+              const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+              return () => backSubscription.remove();
+            }, [mandatoryUpgrade]);
+
+            const openUrl = useCallback(async (url: string) => {
+              if (opening) return;
+              setOpening(true);
+              setErrorText('');
+              try {
+                await Linking.openURL(url);
+              } catch (error) {
+                setErrorText(error instanceof Error ? error.message : 'Não foi possível abrir o download.');
+              } finally {
+                setOpening(false);
+              }
+            }, [opening]);
+
+            if (!mandatoryUpgrade) return null;
+
+            return (
+              <Modal
+                visible
+                transparent
+                animationType="fade"
+                statusBarTranslucent
+                onRequestClose={() => undefined}
+              >
+                <View style={styles.overlay}>
+                  <View
+                    style={[
+                      styles.sheet,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                        paddingBottom: Math.max(insets.bottom, 20),
+                      },
+                    ]}
+                  >
+                    <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
+                      <Ionicons name="shield-checkmark-outline" size={30} color={colors.yellow} />
+                    </View>
+
+                    <Text style={[styles.eyebrow, { color: colors.yellow }]}>ATUALIZAÇÃO OBRIGATÓRIA</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>Trainer Collection 1.1.0</Text>
+                    <Text style={[styles.body, { color: colors.muted }]}>
+                      Esta versão do aplicativo foi encerrada. Para continuar jogando, instale o APK oficial mais recente.
+                    </Text>
+
+                    <View style={[styles.notice, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                      <Ionicons name="lock-closed-outline" size={18} color={colors.yellow} />
+                      <Text style={[styles.noticeText, { color: colors.text }]}>
+                        O acesso ao jogo permanece bloqueado até a atualização para a versão 1.1.0.
+                      </Text>
+                    </View>
+
+                    {errorText ? (
+                      <View style={[styles.errorBox, { borderColor: colors.red }]}>
+                        <Ionicons name="alert-circle-outline" size={18} color={colors.red} />
+                        <Text style={[styles.errorText, { color: colors.text }]} numberOfLines={3}>
+                          {errorText}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    <Pressable
+                      disabled={opening}
+                      onPress={() => { void openUrl(DOWNLOAD_URL); }}
+                      style={({ pressed }) => [
+                        styles.primaryButton,
+                        { backgroundColor: colors.yellow, opacity: pressed || opening ? 0.8 : 1 },
+                      ]}
+                    >
+                      <Ionicons name="download-outline" size={20} color="#080808" />
+                      <Text style={styles.primaryText}>{opening ? 'ABRINDO DOWNLOAD…' : 'ATUALIZAR AGORA'}</Text>
+                    </Pressable>
+
+                    <Pressable
+                      disabled={opening}
+                      onPress={() => { void openUrl(RELEASE_URL); }}
+                      style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.border, opacity: pressed ? 0.75 : 1 }]}
+                    >
+                      <Text style={[styles.secondaryText, { color: colors.muted }]}>ABRIR PÁGINA OFICIAL</Text>
+                    </Pressable>
+
+                    <Text style={[styles.footer, { color: colors.muted }]}>Não existe opção “Depois” nesta versão.</Text>
+                  </View>
+                </View>
+              </Modal>
+            );
+          }
+
+          const styles = StyleSheet.create({
+            overlay: {
+              flex: 1,
+              justifyContent: 'center',
+              paddingHorizontal: 18,
+              backgroundColor: 'rgba(0,0,0,.82)',
+            },
+            sheet: {
+              borderRadius: 28,
+              borderWidth: 1,
+              paddingTop: 26,
+              paddingHorizontal: 20,
+              alignItems: 'stretch',
+            },
+            iconWrap: {
+              width: 58,
+              height: 58,
+              borderRadius: 19,
+              alignItems: 'center',
+              justifyContent: 'center',
+              alignSelf: 'center',
+            },
+            eyebrow: {
+              fontSize: 10,
+              fontWeight: '900',
+              letterSpacing: 1.5,
+              textAlign: 'center',
+              marginTop: 15,
+            },
+            title: {
+              fontSize: 24,
+              lineHeight: 30,
+              fontWeight: '900',
+              textAlign: 'center',
+              marginTop: 5,
+            },
+            body: {
+              fontSize: 13,
+              lineHeight: 20,
+              textAlign: 'center',
+              marginTop: 9,
+              paddingHorizontal: 4,
+            },
+            notice: {
+              marginTop: 18,
+              borderWidth: 1,
+              borderRadius: 15,
+              paddingHorizontal: 13,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              gap: 9,
+              alignItems: 'center',
+            },
+            noticeText: {
+              flex: 1,
+              fontSize: 11,
+              lineHeight: 16,
+              fontWeight: '700',
+            },
+            errorBox: {
+              marginTop: 12,
+              borderWidth: 1,
+              borderRadius: 14,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              flexDirection: 'row',
+              gap: 8,
+              alignItems: 'center',
+            },
+            errorText: {
+              flex: 1,
+              fontSize: 11,
+              lineHeight: 16,
+              fontWeight: '700',
+            },
+            primaryButton: {
+              height: 56,
+              borderRadius: 16,
+              marginTop: 20,
+              flexDirection: 'row',
+              gap: 9,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+            primaryText: {
+              color: '#080808',
+              fontSize: 11,
+              fontWeight: '900',
+              letterSpacing: 0.5,
+            },
+            secondaryButton: {
+              minHeight: 48,
+              borderRadius: 15,
+              borderWidth: 1,
+              marginTop: 9,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+            secondaryText: {
+              fontSize: 10,
+              fontWeight: '900',
+              letterSpacing: 0.6,
+            },
+            footer: {
+              textAlign: 'center',
+              fontSize: 10,
+              marginTop: 12,
+            },
+          });
+          EOF
+
+      - name: Type-check legacy mandatory gate
+        run: npx tsc --noEmit
+
+      - name: Load Expo environment
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas env:pull --environment preview --path .env.local --non-interactive
+
+      - name: Publish mandatory gate to v1.0.1 production runtime
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas update --channel production --environment preview --platform android --message "Mandatory Trainer Collection upgrade v1.0.1 to v1.1.0" --non-interactive
