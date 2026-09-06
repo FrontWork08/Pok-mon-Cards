@@ -1,0 +1,122 @@
+name: Build Trainer Collection 1.2 RC
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "feature/v1.2-adventure-3d"
+    paths:
+      - .github/workflows/build-v12-rc.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trainer-collection-v12-rc
+  cancel-in-progress: false
+
+jobs:
+  rc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout 1.2 candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "EXPO_TOKEN is missing"; exit 1; }
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare Trainer Collection artwork
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/generate-trainer-assets.py
+
+      - name: Verify 1.2 release identity
+        run: |
+          node <<'NODE'
+          const app = require('./app.json').expo;
+          const pkg = require('./package.json');
+          if (app.name !== 'Trainer Collection') throw new Error('Unexpected app name');
+          if (app.version !== '1.2.0' || pkg.version !== '1.2.0') throw new Error('Candidate is not 1.2.0');
+          if (app.android?.package !== 'com.frontwork.pokemoncards') throw new Error('Unexpected Android package');
+          if (!pkg.dependencies?.['expo-gl']) throw new Error('expo-gl missing from 1.2 native candidate');
+          if (!pkg.dependencies?.three) throw new Error('three missing from 1.2 candidate');
+          console.log('Trainer Collection 1.2 identity and 3D dependencies verified.');
+          NODE
+
+      - name: Run full project verification
+        run: npm run verify
+
+      - name: Locate Android signature verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER_PATH="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          test -n "$APKSIGNER_PATH" && test -x "$APKSIGNER_PATH" || { echo "apksigner not found"; exit 1; }
+          echo "APKSIGNER=$APKSIGNER_PATH" >> "$GITHUB_ENV"
+          "$APKSIGNER_PATH" version
+
+      - name: Build, download and cryptographically verify APK
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npm run apk
+
+      - name: Validate RC metadata and versionCode
+        run: |
+          node <<'NODE'
+          const r = require('./public/download/release.json');
+          const trusted = require('./public/download/trusted-signing-cert.json');
+          const hex = v => String(v ?? '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+          if (r.version !== '1.2.0') throw new Error(`Wrong APK version: ${r.version}`);
+          if (!(Number(r.buildVersion) >= 12)) throw new Error(`Expected Android build >= 12, got ${r.buildVersion}`);
+          if (r.packageName !== 'com.frontwork.pokemoncards') throw new Error('Wrong APK package metadata');
+          if (!/^[a-f0-9]{64}$/i.test(r.sha256 || '')) throw new Error('Invalid APK SHA-256');
+          if (!(Number(r.sizeBytes) > 0)) throw new Error('Invalid APK size');
+          if (r.verification?.signatureVerified !== true) throw new Error('APK signature not verified');
+          if (r.verification?.signerMatchesTrustedCertificate !== true) throw new Error('APK signer was not pinned');
+          if (hex(r.verification?.certificateSha256) !== hex(trusted.certificateSha256)) throw new Error('Signer certificate mismatch');
+          console.log(JSON.stringify({version:r.version, buildVersion:r.buildVersion, sha256:r.sha256, sizeBytes:r.sizeBytes, certificateSha256:r.verification.certificateSha256}, null, 2));
+          NODE
+
+      - name: Verify native Trainer resources inside APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find builds -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          unzip -l "$APK" >/tmp/apk-files.txt
+          for resource in tc_default tc_battle tc_social tc_trade; do
+            grep -Eq "res/raw/${resource}(\.[^ ]+)?$" /tmp/apk-files.txt || { echo "Missing native sound: $resource"; exit 1; }
+          done
+          "$APKSIGNER" verify --verbose --print-certs "$APK" >/tmp/apk-signature.txt
+          grep -q 'Verifies' /tmp/apk-signature.txt
+          echo "Native resources and Android signature verified."
+
+      - name: Upload 1.2 RC evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: Trainer-Collection-v1.2.0-RC
+          path: |
+            builds/*
+            public/download/release.json
+          if-no-files-found: error
+          retention-days: 14
