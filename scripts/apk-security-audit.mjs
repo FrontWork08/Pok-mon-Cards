@@ -6,6 +6,9 @@ const ok = (condition, message) => {
 };
 const normalizeHex = (value) => String(value ?? '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
 
+const EXPECTED_EXPO_OWNER = 'frontwork';
+const EXPECTED_EXPO_PROJECT = 'pokemon-cards';
+
 let release;
 let trusted;
 try {
@@ -24,14 +27,27 @@ if (release && trusted) {
   const releaseCert = normalizeHex(release.verification?.certificateSha256);
   const trustedCert = normalizeHex(trusted.certificateSha256);
   let url = null;
-  try { url = new URL(String(release.downloadUrl ?? '')); } catch {}
+  try { url = new URL(String(release.easBuildUrl || release.downloadUrl || '')); } catch {}
+
+  const expectedBuildPrefix = `/accounts/${EXPECTED_EXPO_OWNER}/projects/${EXPECTED_EXPO_PROJECT}/builds/`;
+  const buildId = url?.pathname?.startsWith(expectedBuildPrefix)
+    ? url.pathname.slice(expectedBuildPrefix.length).split('/')[0]
+    : '';
+  const validEasInstaller = Boolean(
+    url
+    && url.protocol === 'https:'
+    && url.hostname.toLowerCase() === 'expo.dev'
+    && url.pathname.startsWith(expectedBuildPrefix)
+    && /^[0-9a-f-]{36}$/i.test(buildId)
+    && (!release.easBuildId || release.easBuildId === buildId)
+  );
 
   ok(release.appName === 'Trainer Collection', 'Nome do APK oficial inesperado.');
   ok(release.packageName === 'com.frontwork.pokemoncards', 'Package Android oficial divergente.');
   ok(trusted.packageName === 'com.frontwork.pokemoncards', 'Package do certificado fixado divergente.');
   ok(release.status === 'ready', 'Release APK não está marcada como ready.');
-  ok(url?.protocol === 'https:', 'URL do APK oficial precisa usar HTTPS.');
-  ok(Boolean(url?.pathname?.toLowerCase().includes('.apk')), 'URL oficial não aponta para um APK.');
+  ok(validEasInstaller, 'Instalador oficial precisa apontar para o build verificado no Expo EAS.');
+  ok(release.downloadProvider === 'Expo EAS Build', 'Provedor oficial de instalação deve ser Expo EAS Build.');
   ok(/^[a-f0-9]{64}$/.test(apkHash), 'SHA-256 do APK ausente ou inválido.');
   ok(Number(release.sizeBytes) > 0, 'Tamanho do APK ausente ou inválido.');
   ok(release.verification?.sha256Verified === true, 'APK não está marcado como hash verificado.');
@@ -52,4 +68,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('✅ APK security audit: metadata, SHA-256, assinatura e certificado oficial consistentes.');
+console.log('✅ APK security audit: Expo EAS installer, metadata, SHA-256, assinatura e certificado oficial consistentes.');
