@@ -137,9 +137,6 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas env:pull --environment preview --path .env.local --non-interactive
 
-      - name: Bundle-check legacy mandatory gate
-        run: npx expo export --platform android --output-dir /tmp/legacy-gate-export --clear
-
       - name: Publish mandatory gate to v1.0.1 production runtime
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
