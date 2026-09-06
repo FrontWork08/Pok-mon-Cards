@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Component, type ComponentType, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
-import { AdaptiveBattleArena } from '@/components/AdaptiveBattleArena';
 import { getMyAdminAccess } from '@/services/admin';
 import { invalidatePokemon3DManifest, resolvePokemon3DModel } from '@/services/pokemon3dModels';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -21,6 +20,27 @@ type LabPokemon = {
 };
 
 type ProbeState = 'pending' | 'remote' | 'fallback' | 'error';
+
+type ArenaProps = {
+  my: LabPokemon;
+  rival: LabPokemon;
+  resultKey: number;
+  winner: 'me' | 'rival' | null;
+  title: string;
+  subtitle: string;
+  prefer3D: boolean;
+};
+
+type BoundaryProps = { children: ReactNode; onError: (message: string) => void };
+type BoundaryState = { failed: boolean };
+class ArenaErrorBoundary extends Component<BoundaryProps, BoundaryState> {
+  state: BoundaryState = { failed: false };
+  static getDerivedStateFromError(): BoundaryState { return { failed: true }; }
+  componentDidCatch(error: unknown) {
+    this.props.onError(error instanceof Error ? error.message : 'Falha inesperada no componente 3D');
+  }
+  render() { return this.state.failed ? null : this.props.children; }
+}
 
 const TEST_POKEMON: LabPokemon[] = [
   { name: 'Pikachu • teste pequeno', pokemonId: 25, pokedexNumber: 25, hp: 110, maxHp: 110, attackName: 'Thunderbolt', damage: 36, firstPlayer: true, types: ['electric'] },
@@ -47,6 +67,10 @@ export default function Admin3DLabScreen() {
   const [stressRunning, setStressRunning] = useState(false);
   const [stressDone, setStressDone] = useState(0);
   const [stressErrors, setStressErrors] = useState(0);
+  const [arenaComponent, setArenaComponent] = useState<ComponentType<ArenaProps> | null>(null);
+  const [rendererState, setRendererState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [rendererError, setRendererError] = useState<string | null>(null);
+  const [arenaAttempt, setArenaAttempt] = useState(0);
   const [probe, setProbe] = useState<Record<number, ProbeState>>({ 25: 'pending', 6: 'pending', 130: 'pending' });
   const stressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const stressStep = useRef(0);
@@ -91,6 +115,29 @@ export default function Admin3DLabScreen() {
   useEffect(() => {
     if (allowed) void probeModels();
   }, [allowed]);
+
+  async function startRenderer() {
+    if (rendererState === 'loading') return;
+    setRendererState('loading');
+    setRendererError(null);
+    setArenaComponent(null);
+    try {
+      const module = await import('@/components/AdaptiveBattleArena');
+      setArenaComponent(() => module.AdaptiveBattleArena as ComponentType<ArenaProps>);
+      setArenaAttempt((value) => value + 1);
+      setRendererState('ready');
+    } catch (error) {
+      setRendererState('error');
+      setRendererError(error instanceof Error ? error.message : 'Não foi possível carregar o módulo 3D');
+    }
+  }
+
+  function handleArenaError(message: string) {
+    setRendererState('error');
+    setRendererError(message);
+    setArenaComponent(null);
+    stopStress();
+  }
 
   function resetBattle() {
     setMyPatch({});
@@ -180,15 +227,35 @@ export default function Admin3DLabScreen() {
 
     <Pressable onPress={() => void probeModels()} style={[styles.secondary,{borderColor:colors.accent,backgroundColor:colors.accentSoft}]}><Ionicons name="cloud-download-outline" size={17} color={colors.accent}/><Text style={[styles.secondaryText,{color:colors.text}]}>RETESTAR REGISTRO/CACHE 3D</Text></Pressable>
 
-    <AdaptiveBattleArena
-      my={my}
-      rival={rival}
-      resultKey={resultKey}
-      winner={winner}
-      title="ARENA 3D • LAB"
-      subtitle={`${my.name} × ${rival.name} • teste sem efeito no servidor`}
-      prefer3D
-    />
+    {rendererState === 'idle' ? (
+      <View style={[styles.card,{backgroundColor:colors.surface,borderColor:'#50D7F0'}]}>
+        <View style={styles.row}><Ionicons name="cube-outline" size={21} color="#7FEAFF"/><Text style={[styles.title,{color:colors.text}]}>Render 3D ainda não iniciado</Text></View>
+        <Text style={[styles.body,{color:colors.muted}]}>A tela do laboratório abre primeiro sem carregar o GLView. Toque abaixo para iniciar o renderizador de forma isolada.</Text>
+        <Pressable onPress={() => void startRenderer()} style={[styles.primary,{backgroundColor:colors.yellow}]}><Ionicons name="play" size={18} color="#08131F"/><Text style={[styles.primaryText,{color:'#08131F'}]}>INICIAR TESTE 3D</Text></Pressable>
+      </View>
+    ) : rendererState === 'loading' ? (
+      <View style={[styles.card,{backgroundColor:colors.surface,borderColor:colors.border}]}><ActivityIndicator color={colors.yellow}/><Text style={[styles.body,{color:colors.muted}]}>Carregando módulo 3D de forma protegida…</Text></View>
+    ) : rendererState === 'error' || !arenaComponent ? (
+      <View style={[styles.card,{backgroundColor:colors.surface,borderColor:'#D96575'}]}>
+        <View style={styles.row}><Ionicons name="warning-outline" size={21} color="#FF8290"/><Text style={[styles.title,{color:colors.text}]}>Render 3D bloqueado com segurança</Text></View>
+        <Text selectable style={[styles.body,{color:'#FFB6C0'}]}>{rendererError ?? 'Falha desconhecida no renderizador.'}</Text>
+        <Text style={[styles.note,{color:colors.muted}]}>O laboratório continua aberto para diagnóstico; nenhum dado do jogo foi alterado.</Text>
+        <Pressable onPress={() => void startRenderer()} style={[styles.secondary,{borderColor:colors.accent,backgroundColor:colors.accentSoft}]}><Ionicons name="refresh" size={17} color={colors.accent}/><Text style={[styles.secondaryText,{color:colors.text}]}>TENTAR NOVAMENTE</Text></Pressable>
+      </View>
+    ) : (() => {
+      const Arena = arenaComponent;
+      return <ArenaErrorBoundary key={arenaAttempt} onError={handleArenaError}>
+        <Arena
+          my={my}
+          rival={rival}
+          resultKey={resultKey}
+          winner={winner}
+          title="ARENA 3D • LAB"
+          subtitle={`${my.name} × ${rival.name} • teste sem efeito no servidor`}
+          prefer3D
+        />
+      </ArenaErrorBoundary>;
+    })()}
 
     <View style={styles.actions}>
       <Pressable onPress={triggerAttack} disabled={stressRunning} style={[styles.action,{backgroundColor:colors.surface,borderColor:colors.border},stressRunning&&styles.disabled]}><Ionicons name="flash" size={17} color="#FFD447"/><Text style={[styles.actionText,{color:colors.text}]}>ATAQUE</Text></Pressable>
