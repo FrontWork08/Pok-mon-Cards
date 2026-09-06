@@ -11,18 +11,27 @@ permissions:
   contents: read
 
 concurrency:
-  group: force-legacy-android-v1.0.1
+  group: force-legacy-android-gates
   cancel-in-progress: false
 
 jobs:
   publish-legacy-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ref: android-v1.0.1
+            label: v1.0.1
+          - ref: android-v1.1.0
+            label: v1.1.0
+
     steps:
-      - name: Checkout v1.0.1 source
+      - name: Checkout ${{ matrix.label }} source
         uses: actions/checkout@v4
         with:
-          ref: android-v1.0.1
+          ref: ${{ matrix.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -49,7 +58,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install mandatory v1.2.0 APK upgrade gate into legacy bundle
+      - name: Install OTA-first mandatory v1.2.0 upgrade gate
         shell: bash
         run: |
           cat > src/components/UpdatePrompt.tsx <<'EOF'
@@ -60,53 +69,73 @@ jobs:
           import * as Updates from 'expo-updates';
           import { useAppTheme } from '@/theme/ThemeProvider';
 
-          const APK_INSTALLER_URL = 'https://github.com/FrontWork08/Pok-mon-Cards/releases/download/android-v1.2.0/Trainer-Collection-v1.2.0.apk';
+          const OFFICIAL_DOWNLOAD_SITE = 'https://pokemon-cards-frontwork.expo.app/download/';
 
           export function UpdatePrompt() {
             const { colors } = useAppTheme();
             const insets = useSafeAreaInsets();
             const [opening, setOpening] = useState(false);
-            const [checkingGateUpdate, setCheckingGateUpdate] = useState(false);
+            const [gateReady, setGateReady] = useState(false);
             const [errorText, setErrorText] = useState('');
             const mandatoryUpgrade = Platform.OS === 'android' && !__DEV__;
 
             useEffect(() => {
-              if (!mandatoryUpgrade || !Updates.isEnabled) return;
+              if (!mandatoryUpgrade) return;
 
               let cancelled = false;
-              const refreshGateIfNeeded = async () => {
-                try {
-                  if (!cancelled) setCheckingGateUpdate(true);
-                  const result = await Updates.checkForUpdateAsync();
-                  if (!result.isAvailable || cancelled) return;
-                  await Updates.fetchUpdateAsync();
-                  if (!cancelled) await Updates.reloadAsync();
-                } catch {
-                  // A falha de uma checagem OTA nunca libera o APK antigo.
-                  // O usuário ainda pode instalar a nova versão pelo botão abaixo.
-                } finally {
-                  if (!cancelled) setCheckingGateUpdate(false);
-                }
+              let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+              const finishGateBootstrap = () => {
+                if (!cancelled) setGateReady(true);
               };
 
-              void refreshGateIfNeeded();
-              return () => { cancelled = true; };
+              // Never let the forced APK screen stop an OTA for this same runtime.
+              // We check/fetch/reload first; the gate only appears after that attempt.
+              const refreshOtaFirst = async () => {
+                if (!Updates.isEnabled) {
+                  finishGateBootstrap();
+                  return;
+                }
+
+                fallbackTimer = setTimeout(finishGateBootstrap, 6500);
+                try {
+                  const result = await Updates.checkForUpdateAsync();
+                  if (cancelled) return;
+                  if (result.isAvailable || result.isRollBackToEmbedded) {
+                    const fetched = await Updates.fetchUpdateAsync();
+                    if (cancelled) return;
+                    if (fetched.isNew || fetched.isRollBackToEmbedded) {
+                      await Updates.reloadAsync();
+                      return;
+                    }
+                  }
+                } catch {
+                  // The native upgrade remains available even if OTA is temporarily offline.
+                }
+                finishGateBootstrap();
+              };
+
+              void refreshOtaFirst();
+              return () => {
+                cancelled = true;
+                if (fallbackTimer) clearTimeout(fallbackTimer);
+              };
             }, [mandatoryUpgrade]);
 
-            async function openInstaller() {
+            async function openInstallerSite() {
               if (opening) return;
               setOpening(true);
               setErrorText('');
               try {
-                await Linking.openURL(APK_INSTALLER_URL);
+                await Linking.openURL(OFFICIAL_DOWNLOAD_SITE);
               } catch {
-                setErrorText('Não foi possível abrir o download do novo APK. Verifique sua conexão e tente novamente.');
+                setErrorText('Não foi possível abrir o site oficial de download. Verifique sua conexão e tente novamente.');
               } finally {
                 setOpening(false);
               }
             }
 
-            if (!mandatoryUpgrade) return null;
+            if (!mandatoryUpgrade || !gateReady) return null;
 
             return (
               <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
@@ -117,21 +146,16 @@ jobs:
                     </View>
                     <Text style={[styles.eyebrow, { color: colors.yellow }]}>ATUALIZAÇÃO OBRIGATÓRIA</Text>
                     <Text style={[styles.title, { color: colors.text }]}>Trainer Collection 1.2.0</Text>
-                    <Text style={[styles.body, { color: colors.muted }]}>
-                      Esta versão foi encerrada. Para continuar jogando, instale o novo APK oficial do Trainer Collection.
-                    </Text>
+                    <Text style={[styles.body, { color: colors.muted }]}>Esta versão foi encerrada. Para continuar jogando, instale o novo APK pelo site oficial do Trainer Collection.</Text>
                     <View style={[styles.notice, { borderColor: colors.border }]}>
-                      <Text style={[styles.noticeText, { color: colors.text }]}>O jogo permanece bloqueado neste APK antigo até você instalar a versão 1.2.0.</Text>
+                      <Text style={[styles.noticeText, { color: colors.text }]}>Antes desta tela aparecer, o app verifica e aplica silenciosamente qualquer correção OTA disponível para este APK.</Text>
                     </View>
-                    {checkingGateUpdate ? (
-                      <Text style={[styles.syncText, { color: colors.muted }]}>Verificando correções desta tela…</Text>
-                    ) : null}
                     {errorText ? <Text style={[styles.errorText, { color: colors.red }]}>{errorText}</Text> : null}
-                    <Pressable disabled={opening} onPress={() => { void openInstaller(); }} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.yellow, opacity: pressed || opening ? 0.8 : 1 }]}>
-                      <Ionicons name="download-outline" size={20} color="#080808" />
-                      <Text style={styles.primaryText}>{opening ? 'ABRINDO DOWNLOAD…' : 'ATUALIZAR APK AGORA'}</Text>
+                    <Pressable disabled={opening} onPress={() => { void openInstallerSite(); }} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.yellow, opacity: pressed || opening ? 0.8 : 1 }]}>
+                      <Ionicons name="globe-outline" size={20} color="#080808" />
+                      <Text style={styles.primaryText}>{opening ? 'ABRINDO SITE…' : 'ABRIR SITE E ATUALIZAR'}</Text>
                     </Pressable>
-                    <Text style={[styles.footer, { color: colors.muted }]}>O OTA serve apenas para manter esta tela de bloqueio corrigida. A atualização do jogo exige o novo APK.</Text>
+                    <Text style={[styles.footer, { color: colors.muted }]}>O APK não é mais aberto pelo GitHub. O botão leva sempre à página oficial de download.</Text>
                   </View>
                 </View>
               </Modal>
@@ -147,7 +171,6 @@ jobs:
             body: { fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 9 },
             notice: { marginTop: 18, borderWidth: 1, borderRadius: 15, paddingHorizontal: 13, paddingVertical: 12 },
             noticeText: { fontSize: 11, lineHeight: 16, fontWeight: '700', textAlign: 'center' },
-            syncText: { marginTop: 10, fontSize: 10, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
             errorText: { marginTop: 12, fontSize: 11, lineHeight: 16, fontWeight: '700', textAlign: 'center' },
             primaryButton: { height: 56, borderRadius: 16, marginTop: 20, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' },
             primaryText: { color: '#080808', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
@@ -160,7 +183,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas env:pull --environment preview --path .env.local --non-interactive
 
-      - name: Deliver mandatory APK gate to v1.0.1 runtime
+      - name: Deliver OTA-first gate to ${{ matrix.label }} runtime
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --channel production --environment preview --platform android --message "Legacy v1.0.1 gate now requires Trainer Collection 1.2.0 APK" --non-interactive
+        run: eas update --channel production --environment preview --platform android --message "${{ matrix.label }} gate: OTA first, then Trainer Collection 1.2.0 via official site" --non-interactive
