@@ -6,6 +6,16 @@ on:
       - "feature/v1.2-adventure-3d"
     paths:
       - .github/workflows/apply-v12-ui-patches.yml
+      - scripts/patch-v12-ui.mjs
+      - src/components/BattleArena3D.native.tsx
+      - src/components/BattleArena3D.web.tsx
+      - src/components/AdaptiveBattleArena.tsx
+      - src/services/adventure.ts
+      - app/adventure.tsx
+      - app/kanto-adventure.tsx
+      - app/pokemon-mastery.tsx
+      - app/battle-records.tsx
+      - app/adventure-challenges.tsx
 
 permissions:
   contents: write
