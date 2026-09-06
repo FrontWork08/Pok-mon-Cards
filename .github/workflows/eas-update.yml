@@ -69,10 +69,10 @@ jobs:
       - name: Verify OTA/native integrity
         run: npm run verify
 
-      - name: Load Expo preview environment
+      - name: Load Expo production environment
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas env:pull --environment preview --path .env.local --non-interactive
+        run: eas env:pull --environment production --path .env.local --non-interactive
 
       - name: Export web app
         env:
@@ -82,9 +82,9 @@ jobs:
       - name: Deploy web app to production
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas deploy --prod --environment preview --dev-domain pokemon-cards-frontwork --non-interactive
+        run: eas deploy --prod --environment production --dev-domain pokemon-cards-frontwork --non-interactive
 
       - name: Publish Android update to production
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --channel production --environment preview --platform android --message "Trainer Collection production $GITHUB_SHA" --non-interactive
+        run: eas update --channel production --environment production --platform android --message "Trainer Collection production $GITHUB_SHA" --non-interactive
