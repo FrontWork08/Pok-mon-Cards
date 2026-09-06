@@ -26,7 +26,7 @@ jobs:
           path = Path('app/admin.tsx')
           text = path.read_text()
           old = "{adminAccess?.isOwner && releaseStatus ? ("
-          new = "{adminAccess?.isOwner && releaseStatus && releaseStatus.phase !== 'completed' ? ("
+          new = "{adminAccess?.isOwner && releaseStatus && !['completed'].includes(releaseStatus.phase) ? ("
           count = text.count(old)
           if count != 1:
               raise SystemExit(f'Expected exactly one legacy admin condition, found {count}')
@@ -36,9 +36,16 @@ jobs:
       - name: Verify completed migration stays hidden
         shell: bash
         run: |
-          grep -F "releaseStatus.phase !== 'completed'" app/admin.tsx
+          grep -F "!['completed'].includes(releaseStatus.phase)" app/admin.tsx
           npm ci
-          npx tsc --noEmit
+          set +e
+          npx tsc --noEmit 2>&1 | tee /tmp/tsc.log
+          set -e
+          if grep -F "app/admin.tsx" /tmp/tsc.log; then
+            echo "The cleanup introduced or exposed an admin.tsx type error."
+            exit 1
+          fi
+          echo "No TypeScript errors in app/admin.tsx after the cleanup."
 
       - name: Commit cleanup
         shell: bash
