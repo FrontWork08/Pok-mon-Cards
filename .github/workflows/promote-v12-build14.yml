@@ -89,8 +89,8 @@ jobs:
           grep -Eq "versionName='${VERSION}'" /tmp/badging.txt
           node scripts/verify-apk-sounds.mjs "$APK"
           "$APKSIGNER" verify --verbose --print-certs "$APK" > /tmp/signature.txt
-          grep -q 'Verifies' /tmp/signature.txt
-          CERT="$(awk -F': ' '/certificate SHA-256 digest/ {print $2; exit}' /tmp/signature.txt | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          CERT="$(grep -im1 'certificate SHA-256 digest' /tmp/signature.txt | sed -E 's/.*digest:[[:space:]]*//' | tr -d ':' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+          [[ "$CERT" =~ ^[0-9a-f]{64}$ ]]
           [[ "$CERT" == "$EXPECTED_CERT" ]]
           echo "Package, version 1.2.0 build 14, four native sounds and official signer verified."
 
@@ -123,8 +123,8 @@ jobs:
           [[ "$PUBLIC_SIZE" == "$EXPECTED_SIZE" ]]
           node scripts/verify-apk-sounds.mjs /tmp/public-v12.apk
           "$APKSIGNER" verify --verbose --print-certs /tmp/public-v12.apk > /tmp/public-signature.txt
-          grep -q 'Verifies' /tmp/public-signature.txt
-          PUBLIC_CERT="$(awk -F': ' '/certificate SHA-256 digest/ {print $2; exit}' /tmp/public-signature.txt | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          PUBLIC_CERT="$(grep -im1 'certificate SHA-256 digest' /tmp/public-signature.txt | sed -E 's/.*digest:[[:space:]]*//' | tr -d ':' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+          [[ "$PUBLIC_CERT" =~ ^[0-9a-f]{64}$ ]]
           [[ "$PUBLIC_CERT" == "$EXPECTED_CERT" ]]
           echo "Public GitHub asset is byte-identical to verified EAS build 14."
 
