@@ -11,7 +11,7 @@
     "apk": "node scripts/android-apk.mjs build",
     "apk:download": "node scripts/android-apk.mjs download",
     "audit:project": "node scripts/project-audit.mjs",
-    "verify": "npx tsc --noEmit && node scripts/project-audit.mjs && node scripts/regression-audit.mjs && node scripts/scroll-performance-audit.mjs && node scripts/full-game-audit.mjs && node scripts/apk-security-audit.mjs && node scripts/trainer-identity-audit.mjs && node scripts/battle-lab-filter-audit.mjs && node scripts/admin-card-grant-audit.mjs && node scripts/team3-controls-audit.mjs && node scripts/battle-reliability-audit.mjs && node scripts/native-11-audit.mjs",
+    "verify": "npx tsc --noEmit && node scripts/project-audit.mjs && node scripts/regression-audit.mjs && node scripts/scroll-performance-audit.mjs && node scripts/full-game-audit.mjs && node scripts/apk-security-audit.mjs && node scripts/trainer-identity-audit.mjs && node scripts/battle-lab-filter-audit.mjs && node scripts/admin-card-grant-audit.mjs && node scripts/team3-controls-audit.mjs && node scripts/battle-reliability-audit.mjs && node scripts/native-11-audit.mjs && node scripts/three-model-audit.mjs",
     "audit:regression": "node scripts/regression-audit.mjs",
     "audit:scroll": "node scripts/scroll-performance-audit.mjs",
     "audit:full": "node scripts/full-game-audit.mjs",
