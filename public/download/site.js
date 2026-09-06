@@ -2,12 +2,8 @@
   'use strict';
 
   const EXPECTED_PACKAGE = 'com.frontwork.pokemoncards';
-  const ALLOWED_HOSTS = [
-    'expo.dev',
-    'github.com',
-    'objects.githubusercontent.com',
-    'github-releases.githubusercontent.com',
-  ];
+  const EXPECTED_EXPO_OWNER = 'frontwork';
+  const EXPECTED_EXPO_PROJECT = 'pokemon-cards';
 
   const $ = (id) => document.getElementById(id);
   const buttons = [$('download-button'), $('download-button-secondary')].filter(Boolean);
@@ -54,15 +50,18 @@
     }).format(date);
   }
 
-  function safeDownloadUrl(value) {
+  function safeInstallerUrl(value) {
     if (typeof value !== 'string' || !value.trim()) return null;
     try {
       const url = new URL(value);
       if (url.protocol !== 'https:') return null;
-      const host = url.hostname.toLowerCase();
-      const allowed = ALLOWED_HOSTS.some((item) => host === item || host.endsWith(`.${item}`));
-      if (!allowed) return null;
-      if (!url.pathname.toLowerCase().includes('.apk')) return null;
+      if (url.hostname.toLowerCase() !== 'expo.dev') return null;
+
+      const expectedPrefix = `/accounts/${EXPECTED_EXPO_OWNER}/projects/${EXPECTED_EXPO_PROJECT}/builds/`;
+      if (!url.pathname.startsWith(expectedPrefix)) return null;
+
+      const buildId = url.pathname.slice(expectedPrefix.length).split('/')[0];
+      if (!/^[0-9a-f-]{36}$/i.test(buildId)) return null;
       return url;
     } catch {
       return null;
@@ -84,6 +83,7 @@
       button.setAttribute('aria-disabled', 'false');
       button.href = url.href;
       button.target = '_self';
+      button.rel = 'noopener';
     });
   }
 
@@ -114,7 +114,7 @@
 
   function verifyRelease(release, trusted) {
     const errors = [];
-    const url = safeDownloadUrl(release?.downloadUrl);
+    const installerUrl = safeInstallerUrl(release?.easBuildUrl || release?.downloadUrl);
     const apkHash = normalizeHex(release?.sha256);
     const releaseCert = normalizeHex(release?.verification?.certificateSha256);
     const trustedCert = normalizeHex(trusted?.certificateSha256);
@@ -123,7 +123,7 @@
     if (release?.status !== 'ready') errors.push('release ainda não está pronta');
     if (release?.packageName !== EXPECTED_PACKAGE) errors.push('package Android divergente');
     if (trusted?.packageName !== EXPECTED_PACKAGE) errors.push('certificado não pertence ao package oficial');
-    if (!url) errors.push('URL oficial inválida');
+    if (!installerUrl) errors.push('instalador oficial do Expo inválido');
     if (!/^[a-f0-9]{64}$/.test(apkHash)) errors.push('SHA-256 do APK inválido');
     if (release?.verification?.sha256Verified !== true) errors.push('hash ainda não foi conferido no pipeline');
     if (release?.verification?.signatureVerified !== true) errors.push('assinatura Android ainda não foi verificada');
@@ -133,7 +133,7 @@
     if (!(schemes.v2 || schemes.v3 || schemes.v4)) errors.push('nenhum esquema moderno de assinatura foi verificado');
     if (!release?.verification?.verifiedAt) errors.push('data da verificação ausente');
 
-    return { ok: errors.length === 0, errors, url, apkHash, releaseCert, schemes };
+    return { ok: errors.length === 0, errors, installerUrl, apkHash, releaseCert, schemes };
   }
 
   async function loadRelease() {
@@ -160,7 +160,7 @@
       if (copyHashButton) copyHashButton.disabled = !validSha256(result.apkHash);
       if (certHashEl) certHashEl.textContent = result.releaseCert || 'Certificado indisponível';
       if (copyCertButton) copyCertButton.disabled = !validSha256(result.releaseCert);
-      if (originEl) originEl.textContent = result.url?.hostname || 'Release não validada';
+      if (originEl) originEl.textContent = result.installerUrl?.hostname || 'Release não validada';
 
       if (!result.ok) {
         if (signatureEl) signatureEl.textContent = 'Não validada';
@@ -173,9 +173,9 @@
         signatureEl.textContent = `Verificada • APK Signature Scheme ${scheme}`;
       }
 
-      enableDownloads(result.url);
+      enableDownloads(result.installerUrl);
       if (messageEl) {
-        messageEl.textContent = 'APK oficial verificado • SHA-256 confere • assinatura Android e certificado oficial validados';
+        messageEl.textContent = 'APK oficial verificado • instalação encaminhada pelo Expo EAS • sem download pelo GitHub';
       }
     } catch {
       if (versionEl) versionEl.textContent = '—';
