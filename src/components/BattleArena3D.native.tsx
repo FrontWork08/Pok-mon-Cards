@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { PixelBattleFighter } from '@/components/PixelBattleArena';
+import {
+  readPokemon3DModelArrayBuffer,
+  resolvePokemon3DModel,
+  type Pokemon3DAnimationRole,
+  type Pokemon3DModelManifest,
+} from '@/services/pokemon3dModels';
 
 type Fighter3D = PixelBattleFighter & { types?: string[] | null };
 
@@ -14,6 +21,19 @@ type Props = {
   title?: string;
   subtitle?: string;
   quality?: 'low' | 'medium' | 'high';
+};
+
+type AnimationRuntime = {
+  mixer: THREE.AnimationMixer | null;
+  actions: Partial<Record<Pokemon3DAnimationRole, THREE.AnimationAction>>;
+};
+
+type BattleSnapshot = {
+  my: Fighter3D | null;
+  rival: Fighter3D | null;
+  winner: 'me' | 'rival' | null;
+  resultKey: string | number | null;
+  actionStamp: number;
 };
 
 const TYPE_TINT: Record<string, number> = {
@@ -36,6 +56,22 @@ const TYPE_TINT: Record<string, number> = {
   steel: 0x8897a5,
   normal: 0xa8a29a,
 };
+
+const ANIMATION_HINTS: Record<Pokemon3DAnimationRole, string[]> = {
+  idle: ['idle', 'wait', 'stand', 'breath'],
+  attack: ['attack', 'strike', 'move', 'skill', 'bite', 'punch', 'kick'],
+  hit: ['hit', 'hurt', 'damage', 'impact'],
+  faint: ['faint', 'ko', 'death', 'down', 'defeat'],
+  victory: ['victory', 'win', 'celebrate', 'happy'],
+};
+
+function fighterPokemonId(fighter: Fighter3D | null) {
+  for (const candidate of [fighter?.pokemonId, fighter?.pokedexNumber]) {
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.trunc(parsed);
+  }
+  return null;
+}
 
 function tintFor(fighter: Fighter3D | null, fallback: number) {
   const type = String(fighter?.types?.[0] ?? '').toLowerCase();
@@ -115,30 +151,195 @@ function makeCreature(color: number, quality: 'low' | 'medium' | 'high') {
   return group;
 }
 
+function disposeObject(root: THREE.Object3D) {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    if (object.geometry) geometries.add(object.geometry);
+    const list = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of list) {
+      if (!material) continue;
+      materials.add(material);
+      for (const value of Object.values(material as unknown as Record<string, unknown>)) {
+        if (value instanceof THREE.Texture) textures.add(value);
+      }
+    }
+  });
+  textures.forEach((texture) => texture.dispose());
+  materials.forEach((material) => material.dispose());
+  geometries.forEach((geometry) => geometry.dispose());
+}
+
+function normalizeModel(
+  root: THREE.Object3D,
+  manifest: Pokemon3DModelManifest,
+  quality: 'low' | 'medium' | 'high',
+) {
+  root.rotation.y += Number(manifest.rotation_y || 0);
+  root.updateMatrixWorld(true);
+  let bounds = new THREE.Box3().setFromObject(root);
+  const size = bounds.getSize(new THREE.Vector3());
+  const modelHeight = Math.max(0.01, size.y);
+  const targetHeight = quality === 'high' ? 1.82 : quality === 'medium' ? 1.76 : 1.68;
+  const autoScale = targetHeight / modelHeight;
+  root.scale.multiplyScalar(autoScale * Math.max(0.01, Number(manifest.scale || 1)));
+  root.updateMatrixWorld(true);
+
+  bounds = new THREE.Box3().setFromObject(root);
+  const center = bounds.getCenter(new THREE.Vector3());
+  root.position.x += -center.x + Number(manifest.offset_x || 0);
+  root.position.y += -0.86 - bounds.min.y + Number(manifest.offset_y || 0);
+  root.position.z += -center.z + Number(manifest.offset_z || 0);
+
+  root.traverse((object) => {
+    if (object instanceof THREE.Mesh) {
+      object.castShadow = quality === 'high';
+      object.receiveShadow = quality !== 'low';
+    }
+  });
+  root.updateMatrixWorld(true);
+}
+
+function findAnimationClip(
+  clips: THREE.AnimationClip[],
+  manifest: Pokemon3DModelManifest,
+  role: Pokemon3DAnimationRole,
+) {
+  const explicit = String(manifest.animations?.[role] ?? '').trim().toLowerCase();
+  if (explicit) {
+    const exact = clips.find((clip) => clip.name.toLowerCase() === explicit);
+    if (exact) return exact;
+  }
+  const hints = ANIMATION_HINTS[role];
+  return clips.find((clip) => {
+    const name = clip.name.toLowerCase();
+    return hints.some((hint) => name.includes(hint));
+  }) ?? null;
+}
+
+function makeAnimationRuntime(
+  root: THREE.Object3D,
+  clips: THREE.AnimationClip[],
+  manifest: Pokemon3DModelManifest,
+): AnimationRuntime {
+  if (!clips.length) return { mixer: null, actions: {} };
+  const mixer = new THREE.AnimationMixer(root);
+  const actions: AnimationRuntime['actions'] = {};
+  for (const role of Object.keys(ANIMATION_HINTS) as Pokemon3DAnimationRole[]) {
+    const clip = findAnimationClip(clips, manifest, role);
+    if (clip) actions[role] = mixer.clipAction(clip);
+  }
+  const idle = actions.idle;
+  if (idle) {
+    idle.reset();
+    idle.setLoop(THREE.LoopRepeat, Infinity);
+    idle.play();
+  }
+  return { mixer, actions };
+}
+
+function playAnimation(runtime: AnimationRuntime | null, role: Pokemon3DAnimationRole) {
+  const action = runtime?.actions[role];
+  if (!action) return false;
+  action.reset();
+  if (role === 'idle') {
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+  } else {
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = true;
+  }
+  action.fadeIn(0.08).play();
+  return true;
+}
+
+async function loadRemoteCreature(
+  container: THREE.Group,
+  fallback: THREE.Object3D,
+  fighter: Fighter3D | null,
+  quality: 'low' | 'medium' | 'high',
+  isCurrent: () => boolean,
+) {
+  const pokemonId = fighterPokemonId(fighter);
+  if (!pokemonId) return null;
+  const asset = await resolvePokemon3DModel(pokemonId, quality);
+  if (!asset || !isCurrent()) return null;
+
+  try {
+    const buffer = await readPokemon3DModelArrayBuffer(asset.localUri);
+    if (!isCurrent()) return null;
+    const loader = new GLTFLoader();
+    const gltf = await new Promise<{ scene: THREE.Group; animations: THREE.AnimationClip[] }>((resolve, reject) => {
+      loader.parse(buffer, '', (loaded) => resolve({
+        scene: loaded.scene,
+        animations: loaded.animations ?? [],
+      }), reject);
+    });
+    if (!isCurrent()) {
+      disposeObject(gltf.scene);
+      return null;
+    }
+    normalizeModel(gltf.scene, asset.manifest, quality);
+    container.remove(fallback);
+    disposeObject(fallback);
+    container.add(gltf.scene);
+    return makeAnimationRuntime(gltf.scene, gltf.animations, asset.manifest);
+  } catch (error) {
+    console.warn('[3D] GLB parse/render failed; keeping procedural fallback', pokemonId, error);
+    return null;
+  }
+}
+
 export function BattleArena3D({
   my,
   rival,
   resultKey = null,
   winner = null,
   title = 'ARENA 3D',
-  subtitle = 'Modo 3D nativo • fallback automático para 2D',
+  subtitle = 'Modo 3D nativo • modelos remotos com fallback automático',
   quality = 'medium',
 }: Props) {
   const animationFrame = useRef<number | null>(null);
   const disposed = useRef(false);
-  const actionStamp = useMemo(() => (resultKey == null ? 0 : Date.now()), [resultKey]);
+  const contextGeneration = useRef(0);
+  const [modelState, setModelState] = useState<'loading' | 'remote' | 'fallback'>('loading');
   const myTint = useMemo(() => tintFor(my, 0x5f8fd1), [my?.name, my?.types]);
   const rivalTint = useMemo(() => tintFor(rival, 0xc96868), [rival?.name, rival?.types]);
+  const myPokemonId = fighterPokemonId(my);
+  const rivalPokemonId = fighterPokemonId(rival);
+  const sceneKey = `${myPokemonId ?? 'none'}:${rivalPokemonId ?? 'none'}:${quality}`;
+  const battleRef = useRef<BattleSnapshot>({ my, rival, winner, resultKey, actionStamp: resultKey == null ? 0 : Date.now() });
+
+  useEffect(() => {
+    const previous = battleRef.current;
+    battleRef.current = {
+      my,
+      rival,
+      winner,
+      resultKey,
+      actionStamp: previous.resultKey !== resultKey && resultKey != null ? Date.now() : previous.actionStamp,
+    };
+  }, [my, rival, resultKey, winner]);
+
+  useEffect(() => {
+    setModelState('loading');
+  }, [sceneKey]);
 
   useEffect(() => {
     disposed.current = false;
     return () => {
       disposed.current = true;
+      contextGeneration.current += 1;
       if (animationFrame.current != null) cancelAnimationFrame(animationFrame.current);
     };
   }, []);
 
   const onContextCreate = useCallback((gl: ExpoWebGLRenderingContext) => {
+    const generation = ++contextGeneration.current;
+    let cleaned = false;
+    const isCurrent = () => !disposed.current && contextGeneration.current === generation;
     const renderer = new THREE.WebGLRenderer({
       context: gl as any,
       antialias: quality !== 'low',
@@ -186,48 +387,117 @@ export function BattleArena3D({
     ring.position.y = -0.88;
     scene.add(ring);
 
-    const myModel = makeCreature(myTint, quality);
+    const myModel = new THREE.Group();
     myModel.position.set(-1.65, -0.12, 0.55);
     myModel.rotation.y = 0.42;
+    const myFallback = makeCreature(myTint, quality);
+    myModel.add(myFallback);
     scene.add(myModel);
 
-    const rivalModel = makeCreature(rivalTint, quality);
+    const rivalModel = new THREE.Group();
     rivalModel.position.set(1.65, -0.12, -0.35);
     rivalModel.rotation.y = -2.7;
+    const rivalFallback = makeCreature(rivalTint, quality);
+    rivalModel.add(rivalFallback);
     scene.add(rivalModel);
 
+    let myRuntime: AnimationRuntime | null = null;
+    let rivalRuntime: AnimationRuntime | null = null;
+    void Promise.all([
+      loadRemoteCreature(myModel, myFallback, my, quality, isCurrent).then((runtime) => { myRuntime = runtime; return runtime; }),
+      loadRemoteCreature(rivalModel, rivalFallback, rival, quality, isCurrent).then((runtime) => { rivalRuntime = runtime; return runtime; }),
+    ]).then((runtimes) => {
+      if (isCurrent()) setModelState(runtimes.some(Boolean) ? 'remote' : 'fallback');
+    }).catch((error) => {
+      console.warn('[3D] remote model hydration failed', error);
+      if (isCurrent()) setModelState('fallback');
+    });
+
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      myRuntime?.mixer?.stopAllAction();
+      rivalRuntime?.mixer?.stopAllAction();
+      disposeObject(scene);
+      renderer.dispose();
+    };
+
     const clock = new THREE.Clock();
+    let lastResultKey: string | number | null = null;
+    let firstTriggered = false;
+    let secondTriggered = false;
+    let outcomeTriggered = false;
+
     const animate = () => {
-      if (disposed.current) {
-        renderer.dispose();
+      if (!isCurrent()) {
+        cleanup();
         return;
       }
-      const time = clock.getElapsedTime();
-      myModel.position.y = -0.12 + Math.sin(time * 2.1) * 0.055;
-      rivalModel.position.y = -0.12 + Math.sin(time * 2 + 1.4) * 0.055;
-      myModel.rotation.z = Math.sin(time * 1.5) * 0.018;
-      rivalModel.rotation.z = Math.sin(time * 1.42 + 1) * 0.018;
+      const delta = Math.min(0.05, clock.getDelta());
+      const time = clock.elapsedTime;
+      myRuntime?.mixer?.update(delta);
+      rivalRuntime?.mixer?.update(delta);
 
-      if (actionStamp) {
-        const elapsed = (Date.now() - actionStamp) % 2400;
-        const first = my?.firstPlayer ? 'me' : 'rival';
+      const battle = battleRef.current;
+      if (battle.resultKey !== lastResultKey) {
+        lastResultKey = battle.resultKey;
+        firstTriggered = false;
+        secondTriggered = false;
+        outcomeTriggered = false;
+      }
+
+      const myBaseY = -0.12 + Math.sin(time * 2.1) * 0.055;
+      const rivalBaseY = -0.12 + Math.sin(time * 2 + 1.4) * 0.055;
+      myModel.position.set(-1.65, myBaseY, 0.55);
+      rivalModel.position.set(1.65, rivalBaseY, -0.35);
+      myModel.rotation.z = battle.my?.knockedOut ? 1.3 : Math.sin(time * 1.5) * 0.018;
+      rivalModel.rotation.z = battle.rival?.knockedOut ? -1.3 : Math.sin(time * 1.42 + 1) * 0.018;
+
+      const elapsed = battle.actionStamp > 0 ? Date.now() - battle.actionStamp : -1;
+      if (elapsed >= 0 && elapsed <= 2400) {
+        const first = battle.my?.firstPlayer ? 'me' : battle.rival?.firstPlayer ? 'rival' : 'me';
         const phase = (start: number) => Math.max(0, Math.min(1, (elapsed - start) / 220));
         const pulse = (value: number) => Math.sin(Math.PI * value);
         const firstStrike = pulse(phase(170));
         const secondStrike = pulse(phase(1100));
         myModel.position.x = -1.65 + (first === 'me' ? firstStrike : secondStrike) * 0.48;
         rivalModel.position.x = 1.65 - (first === 'rival' ? firstStrike : secondStrike) * 0.48;
-      }
 
-      if (my?.knockedOut) myModel.rotation.z = Math.min(1.3, myModel.rotation.z + 0.04);
-      if (rival?.knockedOut) rivalModel.rotation.z = Math.max(-1.3, rivalModel.rotation.z - 0.04);
+        if (!firstTriggered && elapsed >= 120) {
+          firstTriggered = true;
+          if (first === 'me') {
+            playAnimation(myRuntime, 'attack');
+            playAnimation(rivalRuntime, 'hit');
+          } else {
+            playAnimation(rivalRuntime, 'attack');
+            playAnimation(myRuntime, 'hit');
+          }
+        }
+        if (!secondTriggered && elapsed >= 1020) {
+          secondTriggered = true;
+          if (first === 'me') {
+            playAnimation(rivalRuntime, 'attack');
+            playAnimation(myRuntime, 'hit');
+          } else {
+            playAnimation(myRuntime, 'attack');
+            playAnimation(rivalRuntime, 'hit');
+          }
+        }
+        if (!outcomeTriggered && elapsed >= 1550) {
+          outcomeTriggered = true;
+          if (battle.my?.knockedOut) playAnimation(myRuntime, 'faint');
+          if (battle.rival?.knockedOut) playAnimation(rivalRuntime, 'faint');
+          if (!battle.my?.knockedOut && battle.winner === 'me') playAnimation(myRuntime, 'victory');
+          if (!battle.rival?.knockedOut && battle.winner === 'rival') playAnimation(rivalRuntime, 'victory');
+        }
+      }
 
       renderer.render(scene, camera);
       gl.endFrameEXP();
       animationFrame.current = requestAnimationFrame(animate);
     };
     animate();
-  }, [actionStamp, my?.firstPlayer, my?.knockedOut, myTint, quality, rival?.knockedOut, rivalTint]);
+  }, [my, myTint, quality, rival, rivalTint]);
 
   const myHpPercent = hpPercent(my);
   const rivalHpPercent = hpPercent(rival);
@@ -235,6 +505,7 @@ export function BattleArena3D({
   const myMaxHp = Math.max(1, Number(my?.maxHp ?? my?.hp ?? 1));
   const rivalCurrentHp = Math.max(0, Number(rival?.hp ?? 0));
   const rivalMaxHp = Math.max(1, Number(rival?.maxHp ?? rival?.hp ?? 1));
+  const badgeLabel = modelState === 'remote' ? '3D GLB' : modelState === 'loading' ? '3D…' : '3D';
 
   return (
     <View style={styles.shell}>
@@ -243,10 +514,10 @@ export function BattleArena3D({
           <Text style={styles.kicker}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
-        <View style={styles.badge}><Text style={styles.badgeText}>3D</Text></View>
+        <View style={styles.badge}><Text style={styles.badgeText}>{badgeLabel}</Text></View>
       </View>
       <View style={styles.viewport}>
-        <GLView style={StyleSheet.absoluteFill} onContextCreate={onContextCreate} />
+        <GLView key={sceneKey} style={StyleSheet.absoluteFill} onContextCreate={onContextCreate} />
         <View style={[styles.hpBox, styles.rivalHp]}>
           <Text numberOfLines={1} style={styles.name}>{rival?.name ?? 'Rival'}</Text>
           <View style={styles.hpTrack}>
