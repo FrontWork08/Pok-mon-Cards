@@ -19,11 +19,20 @@ Deno.serve(async(req:Request)=>{
   const {error:maintenanceError}=await admin.rpc("server_assert_app_active",{p_player_id:user.id});
   if(maintenanceError){const message=maintenanceError.message??"APP_MAINTENANCE";return json({error:message},message.includes("APP_MAINTENANCE")?503:500)}
   const body=await req.json().catch(()=>({}));
-  async function driveBot(battleId:string){const {data,error}=await admin.rpc("server_ranked_team3_bot_take_turn",{p_battle_id:battleId});if(error)throw error;return data}
+  async function driveBot(battleId:string){
+    const adventure=await admin.rpc("server_adventure_team3_bot_take_turn",{p_battle_id:battleId});
+    if(!adventure.error&&adventure.data?.handled)return adventure.data;
+    const {data,error}=await admin.rpc("server_ranked_team3_bot_take_turn",{p_battle_id:battleId});if(error)throw error;return data;
+  }
   async function state(battleId:string){const {data,error}=await admin.rpc("server_get_battle_team_state",{p_actor_id:user.id,p_battle_id:battleId});if(error)throw error;return data}
   try{
     if(body.action==="matchmaking_join"){const {data,error}=await admin.rpc("server_matchmaking_join_team3",{p_player_id:user.id});if(error)throw error;return json({data})}
-    if(body.action==="eligible_cards"){const {data,error}=await admin.rpc("server_list_team_battle_cards",{p_actor_id:user.id,p_battle_id:body.battleId,p_search:body.search??null,p_limit:Number(body.limit??120),p_offset:Number(body.offset??0)});if(error)throw error;return json({data})}
+    if(body.action==="eligible_cards"){
+      const args={p_actor_id:user.id,p_battle_id:body.battleId,p_search:body.search??null,p_limit:Number(body.limit??120),p_offset:Number(body.offset??0)};
+      const adventure=await admin.rpc("server_list_adventure_team_battle_cards",args);
+      if(!adventure.error&&adventure.data)return json({data:adventure.data});
+      const {data,error}=await admin.rpc("server_list_team_battle_cards",args);if(error)throw error;return json({data});
+    }
     if(body.action==="create"){const {data:battleId,error}=await admin.rpc("server_create_team_battle",{p_actor_id:user.id,p_opponent_id:body.opponentId,p_rematch_of:body.rematchOf??null});if(error)throw error;return json({data:{battleId,mode:"team3",route:`/team-battle/${battleId}`}})}
     if(body.action==="respond"){const {data,error}=await admin.rpc("server_respond_team_battle",{p_actor_id:user.id,p_battle_id:body.battleId,p_accept:Boolean(body.accept)});if(error)throw error;return json({data})}
     if(body.action==="rematch"){
