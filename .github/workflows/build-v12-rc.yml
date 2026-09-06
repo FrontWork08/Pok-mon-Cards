@@ -1,6 +1,6 @@
 name: Build Trainer Collection 1.2 RC
 
-# RC retry after all pre-build regression and native contract fixes.
+# RC retry after Android Three/Babel bundle fix passed locally.
 on:
   workflow_dispatch:
   push:
