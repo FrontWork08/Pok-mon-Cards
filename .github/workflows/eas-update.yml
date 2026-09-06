@@ -76,7 +76,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas env:pull --environment production --path .env.local --non-interactive
 
-      - name: Stage verified APK for direct official-site download
+      - name: Stage verified APK source
         shell: bash
         run: |
           set -euo pipefail
@@ -92,12 +92,25 @@ jobs:
           curl --fail --location --retry 5 --retry-delay 2 "$ARCHIVE_URL" -o "public/download/$FILE_NAME"
           ACTUAL_SHA="$(sha256sum "public/download/$FILE_NAME" | awk '{print $1}')"
           [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
-          echo "Verified APK staged at /download/$FILE_NAME"
+          echo "Verified APK source ready: $FILE_NAME"
 
       - name: Export web app
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: npx expo export --platform web
+
+      - name: Inject verified APK into exported site
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_NAME="$(node -p "require('./public/download/release.json').downloadFileName")"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          mkdir -p dist/download
+          cp "public/download/$FILE_NAME" "dist/download/$FILE_NAME"
+          ACTUAL_SHA="$(sha256sum "dist/download/$FILE_NAME" | awk '{print $1}')"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          test "$(stat -c%s "dist/download/$FILE_NAME")" -gt 100000000
+          echo "Direct APK injected into dist/download/$FILE_NAME"
 
       - name: Deploy web app to production
         env:
@@ -112,9 +125,10 @@ jobs:
           EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
           SITE_APK="https://pokemon-cards-frontwork.expo.app/download/$FILE_NAME"
           curl --fail --location --retry 6 --retry-delay 3 "$SITE_APK" -o /tmp/trainer-site.apk
+          test "$(stat -c%s /tmp/trainer-site.apk)" -gt 100000000
           ACTUAL_SHA="$(sha256sum /tmp/trainer-site.apk | awk '{print $1}')"
           [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
-          echo "Direct official-site APK download is byte-identical to the verified release."
+          echo "Direct official-site APK is byte-identical to the verified release: $FILE_NAME"
 
       - name: Publish Android update to production
         env:
