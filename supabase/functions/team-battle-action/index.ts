@@ -41,7 +41,7 @@ Deno.serve(async(req:Request)=>{
       const opponentId=previous.challenger_id===user.id?previous.opponent_id:previous.challenger_id;const {data:battleId,error}=await admin.rpc("server_create_team_battle",{p_actor_id:user.id,p_opponent_id:opponentId,p_rematch_of:previous.id});if(error)throw error;return json({data:{battleId,mode:"team3",route:`/team-battle/${battleId}`}})
     }
     if(body.action==="state"){await driveBot(String(body.battleId));return json({data:await state(String(body.battleId))})}
-    if(body.action==="set_team"){const cardIds=Array.isArray(body.cardIds)?body.cardIds.map(String):[];const {data:result,error}=await admin.rpc("server_set_battle_team",{p_actor_id:user.id,p_battle_id:body.battleId,p_card_ids:cardIds});if(error)throw error;const bot=await driveBot(String(body.battleId));return json({data:{...result,bot}})}
+    if(body.action==="set_team"){const cardIds=Array.isArray(body.cardIds)?body.cardIds.map(String):[];const {data:result,error}=await admin.rpc("server_set_adventure_battle_team",{p_actor_id:user.id,p_battle_id:body.battleId,p_card_ids:cardIds});if(error)throw error;const bot=await driveBot(String(body.battleId));return json({data:{...result,bot}})}
     if(body.action==="attack"){
       const battleId=String(body.battleId);const expectedTurn=Number(body.expectedTurn??0);
       if(expectedTurn>0){const before=await state(battleId);if(before?.status!=="revealing"||Number(before?.turn??0)!==expectedTurn||before?.myLocked){return json({data:{recovered:true,staleTurn:Number(before?.turn??0)!==expectedTurn,state:before}})}}
