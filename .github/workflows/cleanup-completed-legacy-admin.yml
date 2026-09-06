@@ -1,0 +1,54 @@
+name: Cleanup Completed Legacy Admin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/cleanup-completed-legacy-admin.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Hide completed legacy transition panel
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/admin.tsx')
+          text = path.read_text()
+          old = "{adminAccess?.isOwner && releaseStatus ? ("
+          new = "{adminAccess?.isOwner && releaseStatus && releaseStatus.phase !== 'completed' ? ("
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one legacy admin condition, found {count}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Verify completed migration stays hidden
+        shell: bash
+        run: |
+          grep -F "releaseStatus.phase !== 'completed'" app/admin.tsx
+          npm ci
+          npx tsc --noEmit
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          if git diff --quiet -- app/admin.tsx; then
+            echo "Legacy admin panel already hidden."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/admin.tsx
+          git commit -m "admin: hide completed 10-card transition controls"
+          git push origin HEAD:main
