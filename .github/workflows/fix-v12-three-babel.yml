@@ -30,9 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Add Babel static class block transform
+      - name: Add Babel 7 static class block transform
         run: |
-          npm install --save-dev @babel/plugin-transform-class-static-block
+          npm install --save-dev @babel/plugin-transform-class-static-block@7
           cat > babel.config.js <<'EOF'
           module.exports = function (api) {
             api.cache(true);
