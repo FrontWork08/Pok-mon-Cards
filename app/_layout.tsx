@@ -410,9 +410,31 @@ function AppStack() {
         </View>
       ) : null}
       {liveNotification && !maintenanceBlocked ? (
-        <Pressable onPress={openLiveNotification} style={[styles.notificationToast,{top:Math.max(insets.top,8)+64,backgroundColor:colors.surface,borderColor:colors.yellow}]}>
-          <View style={[styles.notificationIcon,{backgroundColor:colors.yellow}]}><Text style={styles.notificationIconText}>!</Text></View>
-          <View style={styles.notificationCopy}><Text style={[styles.notificationTitle,{color:colors.text}]} numberOfLines={1}>{liveNotification.title}</Text><Text style={[styles.notificationBody,{color:colors.muted}]} numberOfLines={2}>{liveNotification.body}</Text></View>
+        <Pressable
+          onPress={openLiveNotification}
+          style={[
+            styles.notificationToast,
+            liveNotification.type === 'store_gift' ? styles.giftNotificationToast : null,
+            {
+              top: Math.max(insets.top, 8) + 64,
+              backgroundColor: liveNotification.type === 'store_gift' ? '#2A1D08' : colors.surface,
+              borderColor: liveNotification.type === 'store_gift' ? '#F5C451' : colors.yellow,
+            },
+          ]}
+        >
+          <View style={[
+            styles.notificationIcon,
+            liveNotification.type === 'store_gift' ? styles.giftNotificationIcon : null,
+            { backgroundColor: colors.yellow },
+          ]}>
+            <Text style={liveNotification.type === 'store_gift' ? styles.giftNotificationEmoji : styles.notificationIconText}>
+              {liveNotification.type === 'store_gift' ? '🎁' : '!'}
+            </Text>
+          </View>
+          <View style={styles.notificationCopy}>
+            <Text style={[styles.notificationTitle,{color:colors.text}]} numberOfLines={1}>{liveNotification.title}</Text>
+            <Text style={[styles.notificationBody,{color:liveNotification.type === 'store_gift' ? '#F7DF9A' : colors.muted}]} numberOfLines={2}>{liveNotification.body}</Text>
+          </View>
         </Pressable>
       ) : null}
       {matchmaking?.status === 'waiting' && !maintenanceBlocked ? (
@@ -474,6 +496,9 @@ const styles = StyleSheet.create({
   notificationToast:{position:'absolute',zIndex:5000,left:12,right:12,maxWidth:560,alignSelf:'center',borderWidth:1,borderRadius:18,padding:12,flexDirection:'row',alignItems:'center',gap:10,shadowColor:'#000',shadowOpacity:.35,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:12},
   notificationIcon:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center'},
   notificationIconText:{color:'#07111F',fontSize:16,fontWeight:'900'},
+  giftNotificationToast:{borderWidth:2,shadowOpacity:.5,shadowRadius:22},
+  giftNotificationIcon:{width:38,height:38,borderRadius:14},
+  giftNotificationEmoji:{fontSize:22,lineHeight:27},
   notificationCopy:{flex:1,minWidth:0},
   notificationTitle:{fontSize:12,fontWeight:'900'},
   notificationBody:{fontSize:10,lineHeight:14,marginTop:2},
