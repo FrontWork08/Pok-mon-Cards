@@ -24,11 +24,14 @@ requireText(service, 'readPokemon3DModelArrayBuffer', 'model cache');
 requireText(service, 'manifest.version', 'cache invalidation');
 
 const arena = read('src/components/BattleArena3D.native.tsx');
-requireText(arena, "from 'three/examples/jsm/loaders/GLTFLoader.js'", 'native arena');
+requireText(arena, "three/examples/jsm/loaders/GLTFLoader.js", 'native arena');
+requireText(arena, 'createExpoThreeRenderer', 'Expo GL canvas compatibility');
+requireText(arena, 'canvas: canvas as any', 'Expo GL canvas compatibility');
 requireText(arena, 'resolvePokemon3DModel', 'native arena');
 requireText(arena, "playAnimation(myRuntime, 'attack')", 'battle animations');
 requireText(arena, "playAnimation(rivalRuntime, 'faint')", 'battle animations');
 requireText(arena, 'makeCreature', 'procedural fallback');
+requireText(arena, 'contextError', 'safe render failure fallback');
 
 const adaptive = read('src/components/AdaptiveBattleArena.tsx');
 requireText(adaptive, "mode==='3d'", 'adaptive arena');
@@ -44,4 +47,4 @@ else {
   requireText(migration, 'enable row level security', '3D migration');
 }
 
-if (!process.exitCode) console.log('[3d-audit] remote GLB runtime, cache, registry and fallbacks are wired.');
+if (!process.exitCode) console.log('[3d-audit] remote GLB runtime, cache, Expo GL canvas shim, safe render fallback and registry are wired.');
