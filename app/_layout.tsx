@@ -210,7 +210,7 @@ function AppStack() {
         lastOpenedMatch.current !== state.matched_battle_id
       ) {
         lastOpenedMatch.current = state.matched_battle_id;
-        router.push(`/battle/${state.matched_battle_id}`);
+        router.push((state.mode_choice === 'team3' ? `/team-battle/${state.matched_battle_id}` : `/battle/${state.matched_battle_id}`) as never);
       }
     };
 
@@ -333,7 +333,7 @@ function AppStack() {
     return <Redirect href="/login" />;
   }
 
-  const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/') && !pathname.startsWith('/auth/') && pathname !== '/reset-password';
+  const showChrome = Boolean(userId) && !accountRestriction && !maintenanceBlocked && !pathname.startsWith('/battle/') && !pathname.startsWith('/team-battle/') && !pathname.startsWith('/auth/') && pathname !== '/reset-password';
   const matchmakingBottom = showChrome
     ? Math.max(bottomNavHeight + 10, Math.max(insets.bottom, 5) + 77)
     : Math.max(insets.bottom + 12, 18);
