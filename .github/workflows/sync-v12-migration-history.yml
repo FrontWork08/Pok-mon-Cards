@@ -22,6 +22,21 @@ jobs:
           ref: feature/v1.2-adventure-3d
           fetch-depth: 0
 
+      - name: Verify source migrations exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            supabase/migrations/20260906051500_adventure_modes_v12.sql \
+            supabase/migrations/20260906140000_enforce_adventure_team_rules_server_side.sql \
+            supabase/migrations/20260906141000_track_pokemon_mastery_knockouts.sql \
+            supabase/migrations/20260906141500_dedupe_mastery_by_species_and_track_kos.sql; do
+            test -f "$file" || { echo "Missing source: $file"; exit 1; }
+          done
+
+      - name: Check synchronizer syntax
+        run: node --check scripts/sync-v12-migration-history.mjs
+
       - name: Synchronize migration filenames and depth snapshot
         run: node scripts/sync-v12-migration-history.mjs
 
