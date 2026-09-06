@@ -4,9 +4,10 @@ const assert = (ok, msg) => { if (!ok) fail.push(msg); };
 const app = JSON.parse(readFileSync('app.json','utf8'));
 const pkg = JSON.parse(readFileSync('package.json','utf8'));
 const expo = app.expo ?? {};
-assert(expo.version === '1.1.0', 'app version must be 1.1.0');
+assert(expo.version === '1.2.0', 'app version must be 1.2.0');
 assert(pkg.dependencies?.['expo-local-authentication'], 'expo-local-authentication missing');
 assert(pkg.dependencies?.['expo-quick-actions'], 'expo-quick-actions missing');
+assert(pkg.dependencies?.['expo-gl'], 'expo-gl missing from 1.2 native runtime');
 const plugin = (name) => (expo.plugins ?? []).find((p) => (Array.isArray(p) ? p[0] : p) === name);
 assert(Boolean(plugin('expo-local-authentication')), 'local authentication config plugin missing');
 assert(Boolean(plugin('expo-quick-actions')), 'quick actions config plugin missing');
@@ -17,7 +18,8 @@ for (const sound of ['tc_default.wav','tc_battle.wav','tc_social.wav','tc_trade.
   assert(existsSync(path) && statSync(path).size > 1000, `native notification sound missing: ${sound}`);
   assert(notificationConfig?.sounds?.some((item) => String(item).endsWith(sound)), `notification plugin does not bundle ${sound}`);
 }
-assert(notificationConfig?.defaultChannel === 'default_v11', 'v1.1 default notification channel missing');
+// Existing v11 channel ids stay stable across 1.2 so Android users do not get duplicate channels.
+assert(notificationConfig?.defaultChannel === 'default_v11', 'stable default notification channel missing');
 const filters = expo.android?.intentFilters ?? [];
 const verified = filters.find((f) => f.autoVerify === true && (f.data ?? []).some((d) => d.host === 'pokemon-cards-frontwork.expo.app' && d.pathPrefix === '/auth/callback'));
 assert(Boolean(verified), 'verified Android App Link for auth callback missing');
@@ -42,4 +44,4 @@ assert(gate.includes('unlockingRef') && gate.includes('lockAndPrompt'), 'device 
 assert(!gate.includes('if (locked && enabled && !unlocking)'), 'device security gate reintroduced automatic retry prompt loop');
 assert(existsSync('src/components/NativeQuickActionsBootstrap.tsx'), 'quick actions bootstrap missing');
 if (fail.length) { console.error(fail.map((x) => `- ${x}`).join('\n')); process.exit(1); }
-console.log('Trainer Collection 1.1 native contracts: OK');
+console.log('Trainer Collection 1.2 native contracts: OK');
