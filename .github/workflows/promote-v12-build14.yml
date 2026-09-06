@@ -1,0 +1,184 @@
+name: Promote Trainer Collection 1.2 Build 14
+
+on:
+  push:
+    branches:
+      - "feature/v1.2-adventure-3d"
+    paths:
+      - .github/workflows/promote-v12-build14.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trainer-collection-v12-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EAS_BUILD_ID: 8b34e33f-7c0d-4851-b8ad-8e5654b6dd01
+      EAS_BUILD_URL: https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/8b34e33f-7c0d-4851-b8ad-8e5654b6dd01
+      EAS_ARTIFACT_URL: https://expo.dev/artifacts/eas/fxYe1bkpEg0QlyXrv9ucIZjqW87vbiVbPf5mpx3sYww.apk
+      EXPECTED_SHA256: 744194ae33d3da645595d81d7528eb5dcfe73c8e44a1ba18cd14dcc26ef604a7
+      EXPECTED_SIZE: "109383648"
+      EXPECTED_CERT: 7b4e0052f1bdf07e0c33abc4176de96f9cf7a64a8f325ae7c5dcbb2083cc2843
+      VERSION: 1.2.0
+      VERSION_CODE: "14"
+      PACKAGE_NAME: com.frontwork.pokemoncards
+      TAG: android-v1.2.0
+      FRIENDLY_NAME: Trainer-Collection-v1.2.0.apk
+
+    steps:
+      - name: Checkout final 1.2 branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/v1.2-adventure-3d
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare Trainer Collection artwork
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/generate-trainer-assets.py
+
+      - name: Run final project verification
+        run: npm run verify
+
+      - name: Locate Android verification tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER_PATH="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          AAPT_PATH="$(find "$SDK_ROOT/build-tools" -type f -name aapt 2>/dev/null | sort -V | tail -n 1)"
+          test -x "$APKSIGNER_PATH"
+          test -x "$AAPT_PATH"
+          echo "APKSIGNER=$APKSIGNER_PATH" >> "$GITHUB_ENV"
+          echo "AAPT=$AAPT_PATH" >> "$GITHUB_ENV"
+
+      - name: Download exact verified EAS build 14
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 5 --retry-delay 2 "$EAS_ARTIFACT_URL" -o "/tmp/$FRIENDLY_NAME"
+          ACTUAL_SHA="$(sha256sum "/tmp/$FRIENDLY_NAME" | awk '{print $1}')"
+          ACTUAL_SIZE="$(stat -c%s "/tmp/$FRIENDLY_NAME")"
+          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA256,,}" ]]
+          [[ "$ACTUAL_SIZE" == "$EXPECTED_SIZE" ]]
+          echo "Exact EAS build 14 matched pinned SHA-256 and byte size."
+
+      - name: Verify package, version, sounds and official signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="/tmp/$FRIENDLY_NAME"
+          "$AAPT" dump badging "$APK" > /tmp/badging.txt
+          grep -Eq "package: name='${PACKAGE_NAME}'" /tmp/badging.txt
+          grep -Eq "versionCode='${VERSION_CODE}'" /tmp/badging.txt
+          grep -Eq "versionName='${VERSION}'" /tmp/badging.txt
+          node scripts/verify-apk-sounds.mjs "$APK"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > /tmp/signature.txt
+          grep -q 'Verifies' /tmp/signature.txt
+          CERT="$(awk -F': ' '/certificate SHA-256 digest/ {print $2; exit}' /tmp/signature.txt | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          [[ "$CERT" == "$EXPECTED_CERT" ]]
+          echo "Package, version 1.2.0 build 14, four native sounds and official signer verified."
+
+      - name: Publish official GitHub release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; replacing asset with the pinned verified APK."
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Trainer Collection v1.2.0" \
+              --notes "APK oficial Trainer Collection 1.2.0 (Android build 14). Validado por SHA-256, pacote/versão, quatro sons nativos e certificado oficial de assinatura antes da publicação."
+          fi
+          gh release upload "$TAG" "/tmp/$FRIENDLY_NAME" --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Re-download public asset and verify it byte for byte
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${FRIENDLY_NAME}"
+          curl --fail --location --retry 5 --retry-delay 2 "$DOWNLOAD_URL" -o /tmp/public-v12.apk
+          PUBLIC_SHA="$(sha256sum /tmp/public-v12.apk | awk '{print $1}')"
+          PUBLIC_SIZE="$(stat -c%s /tmp/public-v12.apk)"
+          [[ "${PUBLIC_SHA,,}" == "${EXPECTED_SHA256,,}" ]]
+          [[ "$PUBLIC_SIZE" == "$EXPECTED_SIZE" ]]
+          node scripts/verify-apk-sounds.mjs /tmp/public-v12.apk
+          "$APKSIGNER" verify --verbose --print-certs /tmp/public-v12.apk > /tmp/public-signature.txt
+          grep -q 'Verifies' /tmp/public-signature.txt
+          PUBLIC_CERT="$(awk -F': ' '/certificate SHA-256 digest/ {print $2; exit}' /tmp/public-signature.txt | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          [[ "$PUBLIC_CERT" == "$EXPECTED_CERT" ]]
+          echo "Public GitHub asset is byte-identical to verified EAS build 14."
+
+      - name: Write official 1.2 download metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${FRIENDLY_NAME}"
+          node <<'NODE'
+          const fs = require('fs');
+          const now = new Date().toISOString();
+          const release = {
+            appName: 'Trainer Collection',
+            packageName: process.env.PACKAGE_NAME,
+            version: process.env.VERSION,
+            buildVersion: process.env.VERSION_CODE,
+            downloadUrl: process.env.DOWNLOAD_URL,
+            downloadFileName: process.env.FRIENDLY_NAME,
+            downloadProvider: 'GitHub Release',
+            sha256: process.env.EXPECTED_SHA256,
+            sizeBytes: Number(process.env.EXPECTED_SIZE),
+            publishedAt: now,
+            channel: 'production',
+            status: 'ready',
+            easBuildId: process.env.EAS_BUILD_ID,
+            easBuildUrl: process.env.EAS_BUILD_URL,
+            verification: {
+              sha256Verified: true,
+              signatureVerified: true,
+              certificateSha256: process.env.EXPECTED_CERT,
+              signerMatchesTrustedCertificate: true,
+              verifiedAt: now,
+              verifier: 'Android apksigner + aapt + SHA-256 + native WAV content hashes'
+            }
+          };
+          fs.writeFileSync('public/download/release.json', JSON.stringify(release, null, 2) + '\n');
+          NODE
+
+      - name: Clean one-shot 1.2 workflows and commit release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm --ignore-unmatch \
+            .github/workflows/apply-v12-ui-patches.yml \
+            .github/workflows/build-v12-rc.yml \
+            .github/workflows/fix-v12-gift-toast.yml \
+            .github/workflows/fix-v12-three-babel.yml \
+            .github/workflows/inspect-v12-apk-resources.yml \
+            .github/workflows/prepare-v12-3d.yml \
+            .github/workflows/sync-v12-migration-history.yml \
+            .github/workflows/v12-android-bundle-diagnostic.yml \
+            .github/workflows/promote-v12-build14.yml
+          git add public/download/release.json
+          git commit -m "release: finalize Trainer Collection 1.2.0 build 14"
+          git push origin HEAD:feature/v1.2-adventure-3d
