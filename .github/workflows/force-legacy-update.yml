@@ -89,8 +89,6 @@ jobs:
                 if (!cancelled) setGateReady(true);
               };
 
-              // Never let the forced APK screen stop an OTA for this same runtime.
-              // We check/fetch/reload first; the gate only appears after that attempt.
               const refreshOtaFirst = async () => {
                 if (!Updates.isEnabled) {
                   finishGateBootstrap();
@@ -186,4 +184,5 @@ jobs:
       - name: Deliver OTA-first gate to ${{ matrix.label }} runtime
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --channel production --environment preview --platform android --message "${{ matrix.label }} gate: OTA first, then Trainer Collection 1.2.0 via official site" --non-interactive
+        run: |
+          eas update --channel production --environment preview --platform android --message "${{ matrix.label }} gate - OTA first, then Trainer Collection 1.2.0 via official site" --non-interactive
