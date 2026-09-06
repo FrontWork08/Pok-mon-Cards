@@ -1,0 +1,64 @@
+name: Prepare Rayquaza 1.2.1 Hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/hotfix-rayquaza-v121.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main with tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore exact Trainer Collection 1.1.0 Rayquaza artwork
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          git checkout android-v1.1.0 -- \
+            assets/icon.png \
+            assets/adaptive-icon.png \
+            assets/trainer-poster-base64 \
+            public/icon.png \
+            scripts/generate-trainer-assets.py
+          test "$(git rev-parse HEAD:assets/trainer-poster-base64)" = "$(git rev-parse android-v1.1.0:assets/trainer-poster-base64)"
+
+      - name: Bump native hotfix to 1.2.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm version 1.2.1 --no-git-tag-version
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'app.json';
+          const app = JSON.parse(fs.readFileSync(p, 'utf8'));
+          app.expo.version = '1.2.1';
+          fs.writeFileSync(p, JSON.stringify(app, null, 2) + '\n');
+          NODE
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/native-11-audit.mjs')
+          s = p.read_text('utf8')
+          s = s.replace("assert(expo.version === '1.2.0', 'app version must be 1.2.0');", "assert(expo.version === '1.2.1', 'app version must be 1.2.1');")
+          s = s.replace("console.log('Trainer Collection 1.2 native contracts: OK');", "console.log('Trainer Collection 1.2.1 native contracts: OK');")
+          p.write_text(s, 'utf8')
+          PY
+
+      - name: Commit hotfix and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/hotfix-rayquaza-v121.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.json package.json package-lock.json scripts/native-11-audit.mjs scripts/generate-trainer-assets.py assets public/icon.png .github/workflows/hotfix-rayquaza-v121.yml
+          git commit -m "release: prepare 1.2.1 with exact v1.1 Rayquaza artwork"
+          git push origin HEAD:main
