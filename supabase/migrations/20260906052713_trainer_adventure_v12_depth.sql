@@ -1,31 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
-const dir='supabase/migrations';
-const mv=(from,to)=>{
-  const a=path.join(dir,from),b=path.join(dir,to);
-  if(fs.existsSync(b)){ if(fs.existsSync(a)) fs.rmSync(a); return; }
-  if(!fs.existsSync(a)) throw new Error(`Missing migration to rename: ${from}`);
-  fs.renameSync(a,b);
-};
-const write=(name,content)=>fs.writeFileSync(path.join(dir,name),content.trimStart()+'\n');
-
-mv('20260906051500_adventure_modes_v12.sql','20260906051640_trainer_adventure_v12_core.sql');
-mv('20260906140000_enforce_adventure_team_rules_server_side.sql','20260906140601_enforce_adventure_team_rules_server_side.sql');
-mv('20260906141000_track_pokemon_mastery_knockouts.sql','20260906141032_track_pokemon_mastery_knockouts.sql');
-mv('20260906141500_dedupe_mastery_by_species_and_track_kos.sql','20260906141119_dedupe_mastery_by_species_and_track_kos.sql');
-
-const markers={
- '20260906052020_trainer_adventure_v12_runtime.sql':'Runtime wiring is included in the self-contained v1.2 core snapshot kept at 20260906051640.',
- '20260906052055_trainer_adventure_v12_progression.sql':'Progression and reward finalization are included in the self-contained v1.2 core snapshot kept at 20260906051640.',
- '20260906052119_trainer_adventure_v12_state_api.sql':'Adventure state APIs are included in the self-contained v1.2 core snapshot kept at 20260906051640.',
- '20260906052223_trainer_adventure_v12_card_filter.sql':'Adventure eligible-card filtering is included in the self-contained v1.2 core snapshot kept at 20260906051640.',
- '20260906052241_trainer_adventure_v12_bot_ai.sql':'Adventure bot AI is included in the self-contained v1.2 core snapshot kept at 20260906051640.',
- '20260906052736_trainer_adventure_v12_opponent_identity.sql':'Opponent Pokémon identity is exposed by the shared team3 Game Boy battle state; this marker preserves the production migration version.'
-};
-for(const [name,note] of Object.entries(markers)) write(name,`-- Trainer Collection 1.2 migration-history marker.\n-- ${note}\n-- Intentionally no-op on a fresh database because the core snapshot is self-contained.`);
-
-write('20260906052713_trainer_adventure_v12_depth.sql',String.raw`
 -- Trainer Collection 1.2 depth refinements.
 -- Mirrors the final production behavior layered after the self-contained core snapshot.
 
@@ -203,6 +175,4 @@ end;
 $$;
 
 grant execute on function public.server_start_adventure_battle(text,text) to authenticated;
-`);
 
-console.log('Trainer Collection 1.2 migration history synchronized to production versions.');

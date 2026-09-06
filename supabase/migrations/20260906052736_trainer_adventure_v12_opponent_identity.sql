@@ -1,0 +1,3 @@
+-- Trainer Collection 1.2 migration-history marker.
+-- Opponent Pokémon identity is exposed by the shared team3 Game Boy battle state; this marker preserves the production migration version.
+-- Intentionally no-op on a fresh database because the core snapshot is self-contained.

@@ -1,0 +1,3 @@
+-- Trainer Collection 1.2 migration-history marker.
+-- Adventure bot AI is included in the self-contained v1.2 core snapshot kept at 20260906051640.
+-- Intentionally no-op on a fresh database because the core snapshot is self-contained.
