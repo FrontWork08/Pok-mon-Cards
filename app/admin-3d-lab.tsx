@@ -5,6 +5,7 @@ import { Screen } from '@/components/Screen';
 import { getMyAdminAccess } from '@/services/admin';
 import { invalidatePokemon3DManifest, resolvePokemon3DModel } from '@/services/pokemon3dModels';
 import { ingestPokemon3DLabModel, type Pokemon3DLabIngestResult } from '@/services/pokemon3dLab';
+import { ingestOriginal3DLabModels } from '@/services/pokemon3dLabBuiltins';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 type LabPokemon = {
@@ -81,6 +82,9 @@ export default function Admin3DLabScreen() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [lastImport, setLastImport] = useState<Pokemon3DLabIngestResult | null>(null);
+  const [builtinImporting, setBuiltinImporting] = useState(false);
+  const [builtinImportError, setBuiltinImportError] = useState<string | null>(null);
+  const [builtinImportDone, setBuiltinImportDone] = useState(0);
   const [probe, setProbe] = useState<Record<number, ProbeState>>({ 25: 'pending', 6: 'pending', 130: 'pending' });
   const stressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const stressStep = useRef(0);
@@ -148,6 +152,26 @@ export default function Admin3DLabScreen() {
       setImportError(error instanceof Error ? error.message : 'Falha ao importar GLB');
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function importOriginalLabModels() {
+    if (builtinImporting) return;
+    setBuiltinImporting(true);
+    setBuiltinImportError(null);
+    setBuiltinImportDone(0);
+    try {
+      const results = await ingestOriginal3DLabModels();
+      setBuiltinImportDone(results.length);
+      invalidatePokemon3DManifest(undefined, 'lab');
+      await probeModels();
+      setRendererState('idle');
+      setArenaComponent(null);
+      setRendererError(null);
+    } catch (error) {
+      setBuiltinImportError(error instanceof Error ? error.message : 'Falha ao importar os modelos originais do laboratório');
+    } finally {
+      setBuiltinImporting(false);
     }
   }
 
@@ -274,6 +298,10 @@ export default function Admin3DLabScreen() {
       <TextInput value={sourceLicenseUrl} onChangeText={setSourceLicenseUrl} autoCapitalize="none" autoCorrect={false} placeholder="Link da licença (opcional)" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,borderColor:colors.border,backgroundColor:'#08131F'}]} />
       {importError ? <Text selectable style={[styles.note,{color:'#FF8290'}]}>{importError}</Text> : null}
       {lastImport ? <Text style={[styles.note,{color:'#65D894'}]}>Último import: #{lastImport.pokemon_id} • v{lastImport.version} • {(lastImport.byte_size/1024/1024).toFixed(2)} MB • {lastImport.inspection.meshCount} mesh(es) • {lastImport.inspection.animationNames.length} animação(ões)</Text> : null}
+      <Text style={[styles.note,{color:'#BDA8FF'}]}>Teste recomendado: modelos low-poly originais do projeto, reconhecíveis por espécie, sem arquivos extraídos de jogos. Eles continuam exclusivos da forma LAB.</Text>
+      {builtinImportError ? <Text selectable style={[styles.note,{color:'#FF8290'}]}>{builtinImportError}</Text> : null}
+      {builtinImportDone === 3 ? <Text style={[styles.note,{color:'#65D894'}]}>3/3 modelos originais validados e registrados no LAB.</Text> : null}
+      <Pressable onPress={() => void importOriginalLabModels()} disabled={builtinImporting} style={[styles.primary,{backgroundColor:builtinImporting?'#5C5870':'#BDA8FF'},builtinImporting&&styles.disabled]}><Ionicons name={builtinImporting?'hourglass-outline':'layers-outline'} size={18} color={builtinImporting?'#FFF':'#161126'}/><Text style={[styles.primaryText,{color:builtinImporting?'#FFF':'#161126'}]}>{builtinImporting?'VALIDANDO 3 MODELOS…':'IMPORTAR 3 MODELOS ORIGINAIS DE TESTE'}</Text></Pressable>
       <Pressable onPress={() => void importLabModel()} disabled={importing} style={[styles.primary,{backgroundColor:importing?'#5C5870':colors.yellow},importing&&styles.disabled]}><Ionicons name={importing?'hourglass-outline':'cloud-upload-outline'} size={18} color={importing?'#FFF':'#08131F'}/><Text style={[styles.primaryText,{color:importing?'#FFF':'#08131F'}]}>{importing?'VALIDANDO GLB…':'IMPORTAR GLB PARA LAB'}</Text></Pressable>
     </View>
 
