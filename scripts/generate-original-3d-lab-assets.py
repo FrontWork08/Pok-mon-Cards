@@ -12,7 +12,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 
 def colored(mesh, rgba):
-    mesh.visual.face_colors = np.tile(np.array(rgba, dtype=np.uint8), (len(mesh.faces), 1))
+    mesh.visual.vertex_colors = np.tile(np.array(rgba, dtype=np.uint8), (len(mesh.vertices), 1))
     return mesh
 
 
