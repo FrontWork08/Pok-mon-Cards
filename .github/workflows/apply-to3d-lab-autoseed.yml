@@ -1,0 +1,81 @@
+name: Apply to3D lab autoseed
+
+on:
+  push:
+    branches:
+      - fix/3d-lab-use-generated-models
+    paths:
+      - .github/workflows/apply-to3d-lab-autoseed.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/3d-lab-use-generated-models
+      - name: Make real GLBs mandatory in lab
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/admin-3d-lab.tsx')
+          text = path.read_text()
+
+          old = "import { ingestOriginal3DLabModels } from '@/services/pokemon3dLabBuiltins';"
+          new = "import { ensureOriginal3DLabModels } from '@/services/pokemon3dLabBuiltins';"
+          if old not in text: raise SystemExit('builtin import anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = "  const rival = useMemo(() => clonePokemon(TEST_POKEMON[pair[1]], rivalPatch), [rivalPatch, pair]);\n"
+          new = old + "  const modelsReady = ([25, 6, 130] as const).every((id) => probe[id] === 'remote');\n"
+          if old not in text: raise SystemExit('modelsReady anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = "  useEffect(() => {\n    if (allowed) void probeModels();\n  }, [allowed]);\n"
+          new = """  useEffect(() => {\n    if (!allowed) return;\n    let active = true;\n    void (async () => {\n      setBuiltinImporting(true);\n      setBuiltinImportError(null);\n      try {\n        const result = await ensureOriginal3DLabModels();\n        if (!active) return;\n        setBuiltinImportDone(result.readyIds.length);\n        invalidatePokemon3DManifest(undefined, 'lab');\n        await probeModels();\n      } catch (error) {\n        if (active) setBuiltinImportError(error instanceof Error ? error.message : 'Falha ao preparar os modelos 3D gerados');\n      } finally {\n        if (active) setBuiltinImporting(false);\n      }\n    })();\n    return () => { active = false; };\n  }, [allowed]);\n"""
+          if old not in text: raise SystemExit('auto prepare effect anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = """  async function importOriginalLabModels() {\n    if (builtinImporting) return;\n    setBuiltinImporting(true);\n    setBuiltinImportError(null);\n    setBuiltinImportDone(0);\n    try {\n      const results = await ingestOriginal3DLabModels();\n      setBuiltinImportDone(results.length);\n      invalidatePokemon3DManifest(undefined, 'lab');\n      await probeModels();\n      setRendererState('idle');\n      setArenaComponent(null);\n      setRendererError(null);\n    } catch (error) {\n      setBuiltinImportError(error instanceof Error ? error.message : 'Falha ao importar os modelos originais do laboratório');\n    } finally {\n      setBuiltinImporting(false);\n    }\n  }\n"""
+          new = """  async function importOriginalLabModels() {\n    if (builtinImporting) return;\n    setBuiltinImporting(true);\n    setBuiltinImportError(null);\n    try {\n      const result = await ensureOriginal3DLabModels();\n      setBuiltinImportDone(result.readyIds.length);\n      invalidatePokemon3DManifest(undefined, 'lab');\n      await probeModels();\n      setRendererState('idle');\n      setArenaComponent(null);\n      setRendererError(null);\n    } catch (error) {\n      setBuiltinImportError(error instanceof Error ? error.message : 'Falha ao preparar os modelos 3D gerados');\n    } finally {\n      setBuiltinImporting(false);\n    }\n  }\n"""
+          if old not in text: raise SystemExit('manual prepare anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = "  async function startRenderer() {\n    if (rendererState === 'loading') return;"
+          new = "  async function startRenderer() {\n    if (!modelsReady) {\n      setBuiltinImportError('Teste 3D bloqueado: aguarde Pikachu, Charizard e Gyarados aparecerem como GLB REAL CARREGADO.');\n      return;\n    }\n    if (rendererState === 'loading') return;"
+          if old not in text: raise SystemExit('renderer guard anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = "  const probeLabel = (id: number) => probe[id] === 'remote' ? 'GLB remoto pronto' : probe[id] === 'fallback' ? 'Fallback seguro' : probe[id] === 'error' ? 'Falha no probe' : 'Verificando…';\n  const probeColor = (id: number) => probe[id] === 'remote' ? '#65D894' : probe[id] === 'fallback' ? '#FFD447' : probe[id] === 'error' ? '#FF8290' : colors.muted;"
+          new = "  const probeLabel = (id: number) => probe[id] === 'remote' ? 'GLB REAL CARREGADO' : probe[id] === 'fallback' ? 'GLB AUSENTE • FALLBACK BLOQUEADO' : probe[id] === 'error' ? 'FALHA AO CARREGAR GLB' : 'Preparando GLB…';\n  const probeColor = (id: number) => probe[id] === 'remote' ? '#65D894' : probe[id] === 'fallback' ? '#FF8290' : probe[id] === 'error' ? '#FF8290' : colors.muted;"
+          if old not in text: raise SystemExit('probe label anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = "      <Text style={[styles.note,{color:'#BDA8FF'}]}>Os 3 modelos originais de teste agora são carregados automaticamente pelo manifesto LAB. A importação manual abaixo fica apenas para testar outros GLBs autorizados.</Text>"
+          new = "      <Text style={[styles.note,{color:'#BDA8FF'}]}>Pikachu, Charizard e Gyarados são preparados automaticamente com os GLBs gerados pelo to3D. O renderizador fica bloqueado enquanto qualquer um deles estiver ausente.</Text>\n      {builtinImporting ? <Text style={[styles.note,{color:'#FFD447'}]}>Preparando e validando os modelos gerados…</Text> : null}"
+          if old not in text: raise SystemExit('lab note anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = "{builtinImporting?'VALIDANDO 3 MODELOS…':'REVALIDAR 3 MODELOS NO STORAGE'}"
+          new = "{builtinImporting?'VALIDANDO 3 MODELOS…':'REPARAR / REVALIDAR MODELOS GERADOS'}"
+          if old not in text: raise SystemExit('button label anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = "        <Text style={[styles.body,{color:colors.muted}]}>A tela do laboratório abre primeiro sem carregar o GLView. Toque abaixo para iniciar o renderizador de forma isolada.</Text>\n        <Pressable onPress={() => void startRenderer()} style={[styles.primary,{backgroundColor:colors.yellow}]}><Ionicons name=\"play\" size={18} color=\"#08131F\"/><Text style={[styles.primaryText,{color:'#08131F'}]}>INICIAR TESTE 3D</Text></Pressable>"
+          new = "        <Text style={[styles.body,{color:modelsReady?colors.muted:'#FFB6C0'}]}>{modelsReady ? 'Os 3 GLBs reais estão prontos. Toque abaixo para iniciar o renderizador de forma isolada.' : 'Aguardando 3/3 GLBs reais. O fallback procedural não será aceito neste teste.'}</Text>\n        <Pressable onPress={() => void startRenderer()} disabled={!modelsReady || builtinImporting} style={[styles.primary,{backgroundColor:modelsReady&&!builtinImporting?colors.yellow:'#5C5870'},(!modelsReady||builtinImporting)&&styles.disabled]}><Ionicons name=\"play\" size={18} color={modelsReady?'#08131F':'#FFF'}/><Text style={[styles.primaryText,{color:modelsReady?'#08131F':'#FFF'}]}>{modelsReady?'INICIAR TESTE 3D':'AGUARDANDO GLBs REAIS'}</Text></Pressable>"
+          if old not in text: raise SystemExit('renderer idle UI anchor missing')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Commit patch and remove workflow
+        run: |
+          git config user.name "FrontWork08"
+          git config user.email "frontwork08@users.noreply.github.com"
+          git rm .github/workflows/apply-to3d-lab-autoseed.yml
+          git add app/admin-3d-lab.tsx
+          git commit -m "fix: require generated GLBs in 3D lab"
+          git push origin HEAD:fix/3d-lab-use-generated-models
