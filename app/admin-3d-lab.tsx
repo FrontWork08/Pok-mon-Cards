@@ -5,7 +5,7 @@ import { Screen } from '@/components/Screen';
 import { getMyAdminAccess } from '@/services/admin';
 import { invalidatePokemon3DManifest, resolvePokemon3DModel } from '@/services/pokemon3dModels';
 import { ingestPokemon3DLabModel, type Pokemon3DLabIngestResult } from '@/services/pokemon3dLab';
-import { ingestOriginal3DLabModels } from '@/services/pokemon3dLabBuiltins';
+import { ensureOriginal3DLabModels } from '@/services/pokemon3dLabBuiltins';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 type LabPokemon = {
@@ -92,6 +92,7 @@ export default function Admin3DLabScreen() {
   const pair = PAIRS[pairIndex] ?? PAIRS[0];
   const my = useMemo(() => clonePokemon(TEST_POKEMON[pair[0]], myPatch), [myPatch, pair]);
   const rival = useMemo(() => clonePokemon(TEST_POKEMON[pair[1]], rivalPatch), [rivalPatch, pair]);
+  const modelsReady = ([25, 6, 130] as const).every((id) => probe[id] === 'remote');
 
   useEffect(() => {
     let active = true;
@@ -127,7 +128,24 @@ export default function Admin3DLabScreen() {
   }
 
   useEffect(() => {
-    if (allowed) void probeModels();
+    if (!allowed) return;
+    let active = true;
+    void (async () => {
+      setBuiltinImporting(true);
+      setBuiltinImportError(null);
+      try {
+        const result = await ensureOriginal3DLabModels();
+        if (!active) return;
+        setBuiltinImportDone(result.readyIds.length);
+        invalidatePokemon3DManifest(undefined, 'lab');
+        await probeModels();
+      } catch (error) {
+        if (active) setBuiltinImportError(error instanceof Error ? error.message : 'Falha ao preparar os modelos 3D gerados');
+      } finally {
+        if (active) setBuiltinImporting(false);
+      }
+    })();
+    return () => { active = false; };
   }, [allowed]);
 
   async function importLabModel() {
@@ -159,23 +177,26 @@ export default function Admin3DLabScreen() {
     if (builtinImporting) return;
     setBuiltinImporting(true);
     setBuiltinImportError(null);
-    setBuiltinImportDone(0);
     try {
-      const results = await ingestOriginal3DLabModels();
-      setBuiltinImportDone(results.length);
+      const result = await ensureOriginal3DLabModels();
+      setBuiltinImportDone(result.readyIds.length);
       invalidatePokemon3DManifest(undefined, 'lab');
       await probeModels();
       setRendererState('idle');
       setArenaComponent(null);
       setRendererError(null);
     } catch (error) {
-      setBuiltinImportError(error instanceof Error ? error.message : 'Falha ao importar os modelos originais do laboratório');
+      setBuiltinImportError(error instanceof Error ? error.message : 'Falha ao preparar os modelos 3D gerados');
     } finally {
       setBuiltinImporting(false);
     }
   }
 
   async function startRenderer() {
+    if (!modelsReady) {
+      setBuiltinImportError('Teste 3D bloqueado: aguarde Pikachu, Charizard e Gyarados aparecerem como GLB REAL CARREGADO.');
+      return;
+    }
     if (rendererState === 'loading') return;
     setRendererState('loading');
     setRendererError(null);
@@ -266,8 +287,8 @@ export default function Admin3DLabScreen() {
     return <Screen title="3D Lab • Admin" subtitle="Área de teste isolada"><View style={[styles.card,{backgroundColor:colors.surface,borderColor:'#D96575'}]}><Ionicons name="lock-closed" size={24} color="#FF8290"/><Text style={[styles.title,{color:colors.text}]}>Acesso bloqueado</Text><Text style={[styles.body,{color:colors.muted}]}>Este laboratório foi limitado ao proprietário para não expor o teste 3D aos jogadores.</Text></View></Screen>;
   }
 
-  const probeLabel = (id: number) => probe[id] === 'remote' ? 'GLB remoto pronto' : probe[id] === 'fallback' ? 'Fallback seguro' : probe[id] === 'error' ? 'Falha no probe' : 'Verificando…';
-  const probeColor = (id: number) => probe[id] === 'remote' ? '#65D894' : probe[id] === 'fallback' ? '#FFD447' : probe[id] === 'error' ? '#FF8290' : colors.muted;
+  const probeLabel = (id: number) => probe[id] === 'remote' ? 'GLB REAL CARREGADO' : probe[id] === 'fallback' ? 'GLB AUSENTE • FALLBACK BLOQUEADO' : probe[id] === 'error' ? 'FALHA AO CARREGAR GLB' : 'Preparando GLB…';
+  const probeColor = (id: number) => probe[id] === 'remote' ? '#65D894' : probe[id] === 'fallback' ? '#FF8290' : probe[id] === 'error' ? '#FF8290' : colors.muted;
 
   return <Screen title="3D Lab • Primeiro teste" subtitle="Owner-only • nada aqui altera batalha, ELO, inventário ou economia">
     <View style={[styles.card,{backgroundColor:colors.surface,borderColor:colors.border}]}>
@@ -298,10 +319,11 @@ export default function Admin3DLabScreen() {
       <TextInput value={sourceLicenseUrl} onChangeText={setSourceLicenseUrl} autoCapitalize="none" autoCorrect={false} placeholder="Link da licença (opcional)" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,borderColor:colors.border,backgroundColor:'#08131F'}]} />
       {importError ? <Text selectable style={[styles.note,{color:'#FF8290'}]}>{importError}</Text> : null}
       {lastImport ? <Text style={[styles.note,{color:'#65D894'}]}>Último import: #{lastImport.pokemon_id} • v{lastImport.version} • {(lastImport.byte_size/1024/1024).toFixed(2)} MB • {lastImport.inspection.meshCount} mesh(es) • {lastImport.inspection.animationNames.length} animação(ões)</Text> : null}
-      <Text style={[styles.note,{color:'#BDA8FF'}]}>Os 3 modelos originais de teste agora são carregados automaticamente pelo manifesto LAB. A importação manual abaixo fica apenas para testar outros GLBs autorizados.</Text>
+      <Text style={[styles.note,{color:'#BDA8FF'}]}>Pikachu, Charizard e Gyarados são preparados automaticamente com os GLBs gerados pelo to3D. O renderizador fica bloqueado enquanto qualquer um deles estiver ausente.</Text>
+      {builtinImporting ? <Text style={[styles.note,{color:'#FFD447'}]}>Preparando e validando os modelos gerados…</Text> : null}
       {builtinImportError ? <Text selectable style={[styles.note,{color:'#FF8290'}]}>{builtinImportError}</Text> : null}
       {builtinImportDone === 3 ? <Text style={[styles.note,{color:'#65D894'}]}>3/3 modelos originais validados e registrados no LAB.</Text> : null}
-      <Pressable onPress={() => void importOriginalLabModels()} disabled={builtinImporting} style={[styles.primary,{backgroundColor:builtinImporting?'#5C5870':'#BDA8FF'},builtinImporting&&styles.disabled]}><Ionicons name={builtinImporting?'hourglass-outline':'layers-outline'} size={18} color={builtinImporting?'#FFF':'#161126'}/><Text style={[styles.primaryText,{color:builtinImporting?'#FFF':'#161126'}]}>{builtinImporting?'VALIDANDO 3 MODELOS…':'REVALIDAR 3 MODELOS NO STORAGE'}</Text></Pressable>
+      <Pressable onPress={() => void importOriginalLabModels()} disabled={builtinImporting} style={[styles.primary,{backgroundColor:builtinImporting?'#5C5870':'#BDA8FF'},builtinImporting&&styles.disabled]}><Ionicons name={builtinImporting?'hourglass-outline':'layers-outline'} size={18} color={builtinImporting?'#FFF':'#161126'}/><Text style={[styles.primaryText,{color:builtinImporting?'#FFF':'#161126'}]}>{builtinImporting?'VALIDANDO 3 MODELOS…':'REPARAR / REVALIDAR MODELOS GERADOS'}</Text></Pressable>
       <Pressable onPress={() => void importLabModel()} disabled={importing} style={[styles.primary,{backgroundColor:importing?'#5C5870':colors.yellow},importing&&styles.disabled]}><Ionicons name={importing?'hourglass-outline':'cloud-upload-outline'} size={18} color={importing?'#FFF':'#08131F'}/><Text style={[styles.primaryText,{color:importing?'#FFF':'#08131F'}]}>{importing?'VALIDANDO GLB…':'IMPORTAR GLB PARA LAB'}</Text></Pressable>
     </View>
 
@@ -310,8 +332,8 @@ export default function Admin3DLabScreen() {
     {rendererState === 'idle' ? (
       <View style={[styles.card,{backgroundColor:colors.surface,borderColor:'#50D7F0'}]}>
         <View style={styles.row}><Ionicons name="cube-outline" size={21} color="#7FEAFF"/><Text style={[styles.title,{color:colors.text}]}>Render 3D ainda não iniciado</Text></View>
-        <Text style={[styles.body,{color:colors.muted}]}>A tela do laboratório abre primeiro sem carregar o GLView. Toque abaixo para iniciar o renderizador de forma isolada.</Text>
-        <Pressable onPress={() => void startRenderer()} style={[styles.primary,{backgroundColor:colors.yellow}]}><Ionicons name="play" size={18} color="#08131F"/><Text style={[styles.primaryText,{color:'#08131F'}]}>INICIAR TESTE 3D</Text></Pressable>
+        <Text style={[styles.body,{color:modelsReady?colors.muted:'#FFB6C0'}]}>{modelsReady ? 'Os 3 GLBs reais estão prontos. Toque abaixo para iniciar o renderizador de forma isolada.' : 'Aguardando 3/3 GLBs reais. O fallback procedural não será aceito neste teste.'}</Text>
+        <Pressable onPress={() => void startRenderer()} disabled={!modelsReady || builtinImporting} style={[styles.primary,{backgroundColor:modelsReady&&!builtinImporting?colors.yellow:'#5C5870'},(!modelsReady||builtinImporting)&&styles.disabled]}><Ionicons name="play" size={18} color={modelsReady?'#08131F':'#FFF'}/><Text style={[styles.primaryText,{color:modelsReady?'#08131F':'#FFF'}]}>{modelsReady?'INICIAR TESTE 3D':'AGUARDANDO GLBs REAIS'}</Text></Pressable>
       </View>
     ) : rendererState === 'loading' ? (
       <View style={[styles.card,{backgroundColor:colors.surface,borderColor:colors.border}]}><ActivityIndicator color={colors.yellow}/><Text style={[styles.body,{color:colors.muted}]}>Carregando módulo 3D de forma protegida…</Text></View>
