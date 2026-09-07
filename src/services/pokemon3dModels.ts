@@ -27,6 +27,13 @@ export type Pokemon3DModelAsset = {
 };
 
 const BUCKET = 'pokemon-3d';
+const LAB_ASSET_COMMIT = 'e4bec85de903602876bbc7bcb55399fae4f74f9e';
+const LAB_RAW_ROOT = `https://raw.githubusercontent.com/FrontWork08/Pok-mon-Cards/${LAB_ASSET_COMMIT}/lab-assets/3d`;
+const BUILTIN_LAB_MANIFESTS: Record<number, Pokemon3DModelManifest> = {
+  25: { pokemon_id: 25, form_key: 'lab', storage_path: `${LAB_RAW_ROOT}/25-pikachu-lab-v1.glb`, format: 'glb', version: 1, sha256: null, byte_size: 27316, scale: 1, offset_x: 0, offset_y: 0, offset_z: 0, rotation_y: 0, animations: { idle: 'Idle', attack: 'Attack', hit: 'Hit', faint: 'Faint', victory: 'Victory' }, min_app_version: null },
+  6: { pokemon_id: 6, form_key: 'lab', storage_path: `${LAB_RAW_ROOT}/6-charizard-lab-v1.glb`, format: 'glb', version: 1, sha256: null, byte_size: 35160, scale: 1, offset_x: 0, offset_y: 0, offset_z: 0, rotation_y: 0, animations: { idle: 'Idle', attack: 'Attack', hit: 'Hit', faint: 'Faint', victory: 'Victory' }, min_app_version: null },
+  130: { pokemon_id: 130, form_key: 'lab', storage_path: `${LAB_RAW_ROOT}/130-gyarados-lab-v1.glb`, format: 'glb', version: 1, sha256: null, byte_size: 47404, scale: 1, offset_x: 0, offset_y: 0, offset_z: 0, rotation_y: 0, animations: { idle: 'Idle', attack: 'Attack', hit: 'Hit', faint: 'Faint', victory: 'Victory' }, min_app_version: null },
+};
 const MAX_MODEL_BYTES = 25 * 1024 * 1024;
 const MANIFEST_TTL_MS = 5 * 60 * 1000;
 const CACHE_LIMITS: Record<'low' | 'medium' | 'high', number> = {
@@ -75,6 +82,9 @@ async function getManifest(pokemonId: number, formKeyInput = 'default') {
   const id = validPokemonId(pokemonId);
   const formKey = normalizeFormKey(formKeyInput);
   if (!id || !formKey) return null;
+  if (formKey === 'lab' && BUILTIN_LAB_MANIFESTS[id]) {
+    return BUILTIN_LAB_MANIFESTS[id];
+  }
   const cacheKey = `${id}:${formKey}`;
   const cached = manifestCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
@@ -156,9 +166,9 @@ async function downloadModel(manifest: Pokemon3DModelManifest, quality: 'low' | 
     return localUri;
   }
 
-  const cleanPath = manifest.storage_path.replace(/^\/+/, '');
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(cleanPath);
-  const publicUrl = data.publicUrl;
+  const publicUrl = manifest.storage_path.startsWith('https://')
+    ? manifest.storage_path
+    : supabase.storage.from(BUCKET).getPublicUrl(manifest.storage_path.replace(/^\/+/, '')).data.publicUrl;
   if (!publicUrl) return null;
 
   try {
@@ -194,9 +204,10 @@ export async function resolvePokemon3DModel(
   if (!id || !formKey) return null;
   const manifest = await getManifest(id, formKey);
   if (!manifest) return null;
-  const cleanPath = manifest.storage_path.replace(/^\/+/, '');
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(cleanPath);
-  if (!data.publicUrl) return null;
+  const publicUrl = manifest.storage_path.startsWith('https://')
+    ? manifest.storage_path
+    : supabase.storage.from(BUCKET).getPublicUrl(manifest.storage_path.replace(/^\/+/, '')).data.publicUrl;
+  if (!publicUrl) return null;
 
   const key = `${id}:${manifest.form_key}:${manifest.version}:${manifest.sha256 ?? ''}:${quality}`;
   const pending = inflight.get(key);
@@ -204,7 +215,7 @@ export async function resolvePokemon3DModel(
 
   const task = (async () => {
     const localUri = await downloadModel(manifest, quality);
-    return localUri ? { manifest, localUri, publicUrl: data.publicUrl } : null;
+    return localUri ? { manifest, localUri, publicUrl } : null;
   })().finally(() => inflight.delete(key));
   inflight.set(key, task);
   return task;
