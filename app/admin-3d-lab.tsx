@@ -2,6 +2,7 @@ import { Component, type ComponentType, type ReactNode, useEffect, useMemo, useR
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
+import { SketchfabIntegrationCard } from '@/components/admin/SketchfabIntegrationCard';
 import { getMyAdminAccess } from '@/services/admin';
 import { invalidatePokemon3DManifest, resolvePokemon3DModel } from '@/services/pokemon3dModels';
 import { ingestPokemon3DLabModel, type Pokemon3DLabIngestResult } from '@/services/pokemon3dLab';
@@ -296,6 +297,8 @@ export default function Admin3DLabScreen() {
       <Text style={[styles.body,{color:colors.muted}]}>Objetivo: validar troca de espécies, remontagem da cena 3D, ataque, dano, KO, vitória e fallback em 100 ciclos antes de liberar qualquer lote de modelos.</Text>
       <Text style={[styles.note,{color:colors.muted}]}>Plataforma atual: {Platform.OS}. O teste visual real do GLView ocorre no Android/iOS; na Web a arena usa o fallback 2D.</Text>
     </View>
+
+    <SketchfabIntegrationCard />
 
     <View style={styles.probeGrid}>
       {TEST_POKEMON.map((pokemon) => <View key={pokemon.pokemonId} style={[styles.probe,{backgroundColor:colors.surface,borderColor:colors.border}]}>
