@@ -12,6 +12,8 @@ The Client Secret and OAuth access/refresh tokens are stored in Supabase Vault. 
 
 The Expo app already has the `pokemoncards` URL scheme. After the HTTPS OAuth callback is validated, the backend returns the owner to `pokemoncards://admin-3d-lab?sketchfab=connected`.
 
+The deployed Edge Function source is versioned at `supabase/functions/sketchfab-oauth/index.ts` so the backend contract remains auditable with the app source.
+
 ## Security
 
 - Only the Trainer Collection owner can configure or connect Sketchfab.
