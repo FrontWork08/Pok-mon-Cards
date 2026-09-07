@@ -1,0 +1,38 @@
+name: Generate original 3D lab assets
+
+on:
+  push:
+    branches:
+      - test/3d-original-species-models
+    paths:
+      - scripts/generate-original-3d-lab-assets.py
+      - .github/workflows/generate-original-3d-lab-assets.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: test/3d-original-species-models
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned generator dependencies
+        run: pip install --disable-pip-version-check numpy==2.2.6 trimesh==4.11.1
+      - name: Generate original GLBs
+        run: python scripts/generate-original-3d-lab-assets.py
+      - name: Commit generated binary assets
+        run: |
+          git config user.name "FrontWork08"
+          git config user.email "frontwork08@users.noreply.github.com"
+          git add lab-assets/3d/*.glb
+          if git diff --cached --quiet; then
+            echo "No generated asset changes"
+            exit 0
+          fi
+          git commit -m "test: add original Pokémon lab GLBs"
+          git push origin HEAD:test/3d-original-species-models
