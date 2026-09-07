@@ -1,35 +1,68 @@
+import { supabase } from '@/lib/supabase';
 import { ingestPokemon3DLabModel, type Pokemon3DLabIngestResult } from '@/services/pokemon3dLab';
 
 export const ORIGINAL_3D_LAB_MODELS = [
   {
     pokemonId: 25 as const,
     name: 'Pikachu',
-    sourceUrl: 'https://raw.githubusercontent.com/FrontWork08/Pok-mon-Cards/main/lab-assets/3d/25-pikachu-lab-v1.glb',
+    sourceUrl: 'https://storage.to3d.app/generated-3d/models/2026-09-07/task_9827bdc8-97d5-4f0c-b953-807032d0ee16_model.glb',
   },
   {
     pokemonId: 6 as const,
     name: 'Charizard',
-    sourceUrl: 'https://raw.githubusercontent.com/FrontWork08/Pok-mon-Cards/main/lab-assets/3d/6-charizard-lab-v1.glb',
+    sourceUrl: 'https://storage.to3d.app/generated-3d/models/2026-09-07/task_06a805ae-0d96-4d62-9008-ef1b4e629b3a_model.glb',
   },
   {
     pokemonId: 130 as const,
     name: 'Gyarados',
-    sourceUrl: 'https://raw.githubusercontent.com/FrontWork08/Pok-mon-Cards/main/lab-assets/3d/130-gyarados-lab-v1.glb',
+    sourceUrl: 'https://storage.to3d.app/generated-3d/models/2026-09-07/task_178d5703-429d-4dae-8ba9-823327d5eb79_model.glb',
   },
 ] as const;
 
-const SOURCE_AUTHOR = 'Trainer Collection 3D Lab';
-const SOURCE_PERMISSION = 'Modelo original gerado internamente para teste técnico do TCC; não é asset oficial nem extraído de jogo. Pokémon e personagens pertencem aos respectivos titulares.';
+const SOURCE_AUTHOR = 'Trainer Collection 3D Lab • to3D';
+const SOURCE_PERMISSION = 'Modelo 3D gerado para teste técnico isolado a partir de referência visual do Pokémon; não é asset extraído de jogo. Uso restrito ao laboratório interno do projeto.';
 
-export async function ingestOriginal3DLabModels(): Promise<Pokemon3DLabIngestResult[]> {
-  const results: Pokemon3DLabIngestResult[] = [];
+async function getRegisteredLabIds() {
+  const ids = ORIGINAL_3D_LAB_MODELS.map((model) => model.pokemonId);
+  const { data, error } = await supabase
+    .from('pokemon_3d_models')
+    .select('pokemon_id')
+    .eq('form_key', 'lab')
+    .eq('enabled', true)
+    .in('pokemon_id', ids);
+
+  if (error) throw new Error(`Não foi possível consultar os modelos 3D do LAB: ${error.message}`);
+  return new Set((data ?? []).map((row) => Number(row.pokemon_id)));
+}
+
+export async function ensureOriginal3DLabModels(): Promise<{
+  imported: Pokemon3DLabIngestResult[];
+  readyIds: number[];
+}> {
+  const registered = await getRegisteredLabIds();
+  const imported: Pokemon3DLabIngestResult[] = [];
+
   for (const model of ORIGINAL_3D_LAB_MODELS) {
-    results.push(await ingestPokemon3DLabModel({
+    if (registered.has(model.pokemonId)) continue;
+    const result = await ingestPokemon3DLabModel({
       pokemonId: model.pokemonId,
       sourceUrl: model.sourceUrl,
       sourceAuthor: SOURCE_AUTHOR,
       sourceLicense: SOURCE_PERMISSION,
-    }));
+    });
+    imported.push(result);
+    registered.add(model.pokemonId);
   }
-  return results;
+
+  return {
+    imported,
+    readyIds: ORIGINAL_3D_LAB_MODELS
+      .map((model) => model.pokemonId)
+      .filter((id) => registered.has(id)),
+  };
+}
+
+export async function ingestOriginal3DLabModels(): Promise<Pokemon3DLabIngestResult[]> {
+  const result = await ensureOriginal3DLabModels();
+  return result.imported;
 }
