@@ -36,3 +36,4 @@ jobs:
           fi
           git commit -m "test: add original Pokémon lab GLBs"
           git push origin HEAD:test/3d-original-species-models
+# vertex-color generator retry
