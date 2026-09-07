@@ -19,8 +19,8 @@ export const ORIGINAL_3D_LAB_MODELS = [
   },
 ] as const;
 
-const SOURCE_AUTHOR = 'Trainer Collection 3D Lab • to3D';
-const SOURCE_PERMISSION = 'Modelo 3D gerado para teste técnico isolado a partir de referência visual do Pokémon; não é asset extraído de jogo. Uso restrito ao laboratório interno do projeto.';
+const SOURCE_AUTHOR = 'Trainer Collection 3D Lab / to3D';
+const SOURCE_PERMISSION = 'Teste interno: GLB gerado via to3D a partir de referência visual. Não extraído de jogo; uso restrito ao 3D Lab.';
 
 async function getRegisteredLabIds() {
   const ids = ORIGINAL_3D_LAB_MODELS.map((model) => model.pokemonId);
