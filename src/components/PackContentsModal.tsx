@@ -87,20 +87,23 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
     setCollectionProgress(null);
     setProgressLoading(true);
 
-    void supabase
-      .rpc('get_my_pack_collection_progress', { p_set_id: pack.set_id })
-      .then(({ data, error: progressError }) => {
-        if (!active || progressError) return;
-        const value = (data ?? {}) as Record<string, unknown>;
+    void (async () => {
+      try {
+        const result = await (supabase as any).rpc('get_my_pack_collection_progress', { p_set_id: pack.set_id }) as {
+          data: unknown;
+          error: unknown;
+        };
+        if (!active || result.error) return;
+        const value = (result.data ?? {}) as Record<string, unknown>;
         setCollectionProgress({
           owned: Math.max(0, Number(value.owned ?? 0)),
           total: Math.max(0, Number(value.total ?? 0)),
           percent: Math.max(0, Math.min(100, Number(value.percent ?? 0))),
         });
-      })
-      .finally(() => {
+      } finally {
         if (active) setProgressLoading(false);
-      });
+      }
+    })();
 
     return () => { active = false; };
   }, [visible, pack?.id, pack?.set_id]);
