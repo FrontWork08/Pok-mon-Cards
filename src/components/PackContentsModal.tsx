@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatUsd } from '@/services/market';
 import { listPackCards, type Pack, type PackCardPreview } from '@/services/packs';
+import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 const PAGE_SIZE = 36;
@@ -25,6 +26,12 @@ type Props = {
   visible: boolean;
   pack: Pack | null;
   onClose: () => void;
+};
+
+type CollectionProgress = {
+  owned: number;
+  total: number;
+  percent: number;
 };
 
 export function PackContentsModal({ visible, pack, onClose }: Props) {
@@ -40,6 +47,8 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'number'|'price-high'>('number');
   const [failedImages, setFailedImages] = useState<Record<string, number>>({});
+  const [collectionProgress, setCollectionProgress] = useState<CollectionProgress | null>(null);
+  const [progressLoading, setProgressLoading] = useState(false);
 
   const hasMore = cards.length < total;
 
@@ -72,6 +81,33 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
     return () => { active = false; clearTimeout(timer); };
   }, [visible, pack?.id, pack?.set_id, search, sort]);
 
+  useEffect(() => {
+    if (!visible || !pack) return;
+    let active = true;
+    setCollectionProgress(null);
+    setProgressLoading(true);
+
+    void (async () => {
+      try {
+        const result = await (supabase as any).rpc('get_my_pack_collection_progress', { p_set_id: pack.set_id }) as {
+          data: unknown;
+          error: unknown;
+        };
+        if (!active || result.error) return;
+        const value = (result.data ?? {}) as Record<string, unknown>;
+        setCollectionProgress({
+          owned: Math.max(0, Number(value.owned ?? 0)),
+          total: Math.max(0, Number(value.total ?? 0)),
+          percent: Math.max(0, Math.min(100, Number(value.percent ?? 0))),
+        });
+      } finally {
+        if (active) setProgressLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [visible, pack?.id, pack?.set_id]);
+
   async function loadMore() {
     if (!pack || loadingMore || !hasMore) return;
     const nextPage = page + 1;
@@ -91,12 +127,19 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
     }
   }
 
-  const headerSubtitle = useMemo(
-    () => pack ? `${total || '—'} cartas cadastradas neste set` : '',
-    [pack, total],
-  );
+  const headerSubtitle = useMemo(() => {
+    if (!pack) return '';
+    const packTotal = collectionProgress?.total ?? total;
+    if (search.trim()) return `${total} encontradas na busca • ${packTotal || '—'} cartas no booster`;
+    return `${packTotal || '—'} cartas cadastradas neste booster`;
+  }, [collectionProgress?.total, pack, search, total]);
 
   if (!pack) return null;
+
+  const progressPercent = collectionProgress?.percent ?? 0;
+  const progressOwned = collectionProgress?.owned ?? 0;
+  const progressTotal = collectionProgress?.total ?? 0;
+  const progressComplete = progressTotal > 0 && progressOwned >= progressTotal;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -111,6 +154,24 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
           <Pressable onPress={onClose} style={[styles.close, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="close" size={22} color={colors.text} />
           </Pressable>
+        </View>
+
+        <View style={[styles.progressPanel,{backgroundColor:colors.surface,borderColor:progressComplete?colors.green:colors.border}]}>
+          <View style={styles.progressTopRow}>
+            <View style={styles.progressCopy}>
+              <Text style={[styles.progressKicker,{color:progressComplete?colors.green:colors.yellow}]}>SUA COLEÇÃO DESTE BOOSTER</Text>
+              <Text style={[styles.progressValue,{color:colors.text}]}>
+                {progressLoading ? 'Carregando progresso...' : `${progressOwned.toLocaleString('pt-BR')} / ${progressTotal.toLocaleString('pt-BR')} cartas`}
+              </Text>
+              <Text style={[styles.progressHint,{color:colors.muted}]}>Conta cartas diferentes que estão atualmente na sua Bag.</Text>
+            </View>
+            <View style={[styles.percentBadge,{backgroundColor:progressComplete?`${colors.green}20`:colors.accentSoft,borderColor:progressComplete?colors.green:colors.accent}]}>
+              <Text style={[styles.percentValue,{color:progressComplete?colors.green:colors.accent}]}>{progressLoading ? '…' : `${Math.round(progressPercent)}%`}</Text>
+            </View>
+          </View>
+          <View style={[styles.progressTrack,{backgroundColor:colors.surfaceAlt}]}>
+            <View style={[styles.progressFill,{width:`${progressPercent}%`,backgroundColor:progressComplete?colors.green:colors.yellow}]} />
+          </View>
         </View>
 
         <View style={[styles.tools,{borderBottomColor:colors.border}]}>
@@ -130,7 +191,7 @@ export function PackContentsModal({ visible, pack, onClose }: Props) {
           </View>
         ) : (
           <FlatList
-        {...VIRTUAL_LIST_PERF_PROPS}
+            {...VIRTUAL_LIST_PERF_PROPS}
             data={cards}
             keyExtractor={(item) => item.id}
             numColumns={2}
@@ -201,6 +262,16 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 10, marginTop: 3 },
   openHint: { fontSize: 8, lineHeight: 12, fontWeight: '800', marginTop: 5 },
   close: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  progressPanel:{marginHorizontal:12,marginTop:10,borderRadius:15,borderWidth:1,padding:12,gap:8},
+  progressTopRow:{flexDirection:'row',alignItems:'center',gap:10},
+  progressCopy:{flex:1,minWidth:0},
+  progressKicker:{fontSize:8,fontWeight:'900',letterSpacing:1},
+  progressValue:{fontSize:15,fontWeight:'900',marginTop:2},
+  progressHint:{fontSize:8,lineHeight:11,marginTop:2},
+  percentBadge:{minWidth:56,height:38,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center',paddingHorizontal:8},
+  percentValue:{fontSize:12,fontWeight:'900'},
+  progressTrack:{height:7,borderRadius:999,overflow:'hidden'},
+  progressFill:{height:'100%',borderRadius:999},
   tools:{paddingHorizontal:12,paddingVertical:9,borderBottomWidth:1,gap:8},searchBox:{height:44,borderRadius:13,borderWidth:1,paddingHorizontal:11,flexDirection:'row',alignItems:'center',gap:8},searchInput:{flex:1,height:'100%',fontSize:12},sortRow:{flexDirection:'row',gap:7},sortChip:{minHeight:34,borderRadius:10,borderWidth:1,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},sortText:{fontSize:8,fontWeight:'900'},
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 28 },
   loadingText: { fontSize: 11 },
@@ -218,4 +289,3 @@ const styles = StyleSheet.create({
   detailsText:{fontSize:7,fontWeight:'900'},
   footerLoader: { marginVertical: 18 },
 });
-
