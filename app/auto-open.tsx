@@ -148,7 +148,7 @@ export default function AutoOpenScreen() {
           accessibilityLabel={`Inspecionar ${card.name}`}
           accessibilityHint="Abre os detalhes completos desta carta"
           onPress={()=>router.push(`/card/${card.id}`)}
-          style={({pressed})=>[styles.resultCard,{backgroundColor:pressed?colors.accentSoft:colors.surface,borderColor:pressed?colors.accent:colors.border,opacity:pressed?.82:1}]}
+          style={({pressed})=>[styles.resultCard,{backgroundColor:pressed?colors.accentSoft:colors.surface,borderColor:pressed?colors.accent:colors.border,opacity:pressed ? .82 : 1}]}
         >
           {card.image?<Image source={{uri:card.image}} style={styles.cardImage} resizeMode="contain" resizeMethod="resize" fadeDuration={0}/>:null}
           <View style={{flex:1,minWidth:0}}>
