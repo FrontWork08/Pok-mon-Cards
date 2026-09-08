@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BattleArena3D } from '@/components/BattleArena3D';
@@ -17,9 +17,11 @@ type Props={
   modelFormKey?:string;
 };
 
-export function AdaptiveBattleArena({my,rival,resultKey=null,winner=null,title,subtitle,turnOnly=false,prefer3D=true,modelFormKey='default'}:Props){
-  const available=Platform.OS!=='web';
-  const [mode,setMode]=useState<'3d'|'2d'>(available&&prefer3D?'3d':'2d');
+export function AdaptiveBattleArena({my,rival,resultKey=null,winner=null,title,subtitle,turnOnly=false,prefer3D=false,modelFormKey='default'}:Props){
+  // 3D is an internal experiment for the owner-only lab. Production battle modes
+  // must stay on the pixel arena until the 3D rollout is explicitly approved.
+  const lab3DAllowed=Platform.OS!=='web'&&prefer3D===true&&modelFormKey==='lab';
+  const [mode,setMode]=useState<'3d'|'2d'>(lab3DAllowed?'3d':'2d');
   const quality=useMemo<'low'|'medium'|'high'>(()=>{
     if(Platform.OS!=='android')return'medium';
     const version=Number(Platform.Version);
@@ -28,12 +30,20 @@ export function AdaptiveBattleArena({my,rival,resultKey=null,winner=null,title,s
     return'medium';
   },[]);
 
+  useEffect(()=>{
+    if(!lab3DAllowed)setMode('2d');
+  },[lab3DAllowed]);
+
+  if(!lab3DAllowed){
+    return <PixelBattleArena my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 2D'} subtitle={subtitle} turnOnly={turnOnly}/>;
+  }
+
   return <View>
     <View style={styles.toolbar}>
       <View style={styles.copy}><Ionicons name="cube-outline" size={15} color="#8DD7FF"/><Text style={styles.copyText}>{mode==='3d'?'Renderização 3D':'Arena 2D leve'}</Text></View>
-      {available?<Pressable onPress={()=>setMode(current=>current==='3d'?'2d':'3d')} style={styles.toggle}><Ionicons name={mode==='3d'?'grid-outline':'cube-outline'} size={14} color="#FFD447"/><Text style={styles.toggleText}>{mode==='3d'?'USAR 2D':'USAR 3D'}</Text></Pressable>:null}
+      <Pressable onPress={()=>setMode(current=>current==='3d'?'2d':'3d')} style={styles.toggle}><Ionicons name={mode==='3d'?'grid-outline':'cube-outline'} size={14} color="#FFD447"/><Text style={styles.toggleText}>{mode==='3d'?'USAR 2D':'USAR 3D'}</Text></Pressable>
     </View>
-    {mode==='3d'&&available?
+    {mode==='3d'?
       <BattleArena3D my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 3D'} subtitle={subtitle??'Modelos 3D em tempo real • Game Boy rules'} quality={quality} modelFormKey={modelFormKey}/>
       :<PixelBattleArena my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 2D'} subtitle={subtitle} turnOnly={turnOnly}/>
     }
