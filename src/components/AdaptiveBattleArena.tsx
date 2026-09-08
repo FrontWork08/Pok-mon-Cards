@@ -29,13 +29,25 @@ export function AdaptiveBattleArena({my,rival,resultKey=null,winner=null,title,s
     if(Number.isFinite(version)&&version>=33)return'high';
     return'medium';
   },[]);
+  // PixelBattleArena animates/narrates a turn whenever resultKey is present.
+  // Some live battle screens only pass current HP/ids (without the resolved moves),
+  // so forwarding their key would fabricate messages such as "não causou dano".
+  // Only animate when the caller actually supplied resolved action data or a winner.
+  const hasResolvedAnimation=Boolean(
+    winner
+    || String(my?.attackName??'').trim()
+    || String(rival?.attackName??'').trim()
+    || Number(my?.damage??0)>0
+    || Number(rival?.damage??0)>0
+  );
+  const pixelResultKey=hasResolvedAnimation?resultKey:null;
 
   useEffect(()=>{
     if(!lab3DAllowed)setMode('2d');
   },[lab3DAllowed]);
 
   if(!lab3DAllowed){
-    return <PixelBattleArena my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 2D'} subtitle={subtitle} turnOnly={turnOnly}/>;
+    return <PixelBattleArena my={my} rival={rival} resultKey={pixelResultKey} winner={winner} title={title??'ARENA 2D'} subtitle={subtitle} turnOnly={turnOnly}/>;
   }
 
   return <View>
@@ -45,7 +57,7 @@ export function AdaptiveBattleArena({my,rival,resultKey=null,winner=null,title,s
     </View>
     {mode==='3d'?
       <BattleArena3D my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 3D'} subtitle={subtitle??'Modelos 3D em tempo real • Game Boy rules'} quality={quality} modelFormKey={modelFormKey}/>
-      :<PixelBattleArena my={my} rival={rival} resultKey={resultKey} winner={winner} title={title??'ARENA 2D'} subtitle={subtitle} turnOnly={turnOnly}/>
+      :<PixelBattleArena my={my} rival={rival} resultKey={pixelResultKey} winner={winner} title={title??'ARENA 2D'} subtitle={subtitle} turnOnly={turnOnly}/>
     }
   </View>;
 }

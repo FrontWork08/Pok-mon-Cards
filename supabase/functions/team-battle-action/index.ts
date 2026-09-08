@@ -19,12 +19,35 @@ Deno.serve(async(req:Request)=>{
   const {error:maintenanceError}=await admin.rpc("server_assert_app_active",{p_player_id:user.id});
   if(maintenanceError){const message=maintenanceError.message??"APP_MAINTENANCE";return json({error:message},message.includes("APP_MAINTENANCE")?503:500)}
   const body=await req.json().catch(()=>({}));
+
   async function driveBot(battleId:string){
     const adventure=await admin.rpc("server_adventure_team3_bot_take_turn",{p_battle_id:battleId});
     if(!adventure.error&&adventure.data?.handled)return adventure.data;
     const {data,error}=await admin.rpc("server_ranked_team3_bot_take_turn",{p_battle_id:battleId});if(error)throw error;return data;
   }
   async function state(battleId:string){const {data,error}=await admin.rpc("server_get_battle_team_state",{p_actor_id:user.id,p_battle_id:battleId});if(error)throw error;return data}
+  async function settleExpired(battleId:string){
+    const {data:battle,error}=await admin.from("battles").select("status,selection_deadline").eq("id",battleId).single();
+    if(error)throw error;
+    const status=String(battle?.status??"");
+    const deadline=String(battle?.selection_deadline??"");
+    if(!["drafting","revealing"].includes(status)||!deadline)return null;
+    const deadlineMs=new Date(deadline).getTime();
+    if(!Number.isFinite(deadlineMs)||deadlineMs>Date.now())return null;
+    const {data,error:timeoutError}=await admin.rpc("server_timeout_team_battle",{p_actor_id:user.id,p_battle_id:battleId});
+    if(timeoutError){
+      const message=readableError(timeoutError);
+      if(message.includes("NOT_EXPIRED")||message.includes("INVALID_STATUS"))return null;
+      throw timeoutError;
+    }
+    return data;
+  }
+  async function recoverExpired(battleId:string){
+    const timedOut=await settleExpired(battleId);
+    if(timedOut)await driveBot(battleId);
+    return {timedOut,state:await state(battleId)};
+  }
+
   try{
     if(body.action==="matchmaking_join"){const {data,error}=await admin.rpc("server_matchmaking_join_team3",{p_player_id:user.id});if(error)throw error;return json({data})}
     if(body.action==="eligible_cards"){
@@ -40,18 +63,46 @@ Deno.serve(async(req:Request)=>{
       if(previous.mode!=="team3")throw new Error("INVALID_MODE");if(previous.status!=="completed")throw new Error("BATTLE_NOT_COMPLETED");if(![previous.challenger_id,previous.opponent_id].includes(user.id))throw new Error("FORBIDDEN");
       const opponentId=previous.challenger_id===user.id?previous.opponent_id:previous.challenger_id;const {data:battleId,error}=await admin.rpc("server_create_team_battle",{p_actor_id:user.id,p_opponent_id:opponentId,p_rematch_of:previous.id});if(error)throw error;return json({data:{battleId,mode:"team3",route:`/team-battle/${battleId}`}})
     }
-    if(body.action==="state"){await driveBot(String(body.battleId));return json({data:await state(String(body.battleId))})}
-    if(body.action==="set_team"){const cardIds=Array.isArray(body.cardIds)?body.cardIds.map(String):[];const {data:result,error}=await admin.rpc("server_set_adventure_battle_team",{p_actor_id:user.id,p_battle_id:body.battleId,p_card_ids:cardIds});if(error)throw error;const bot=await driveBot(String(body.battleId));return json({data:{...result,bot}})}
+    if(body.action==="state"){
+      const battleId=String(body.battleId);
+      await driveBot(battleId);
+      const timedOut=await settleExpired(battleId);
+      if(timedOut)await driveBot(battleId);
+      return json({data:await state(battleId)});
+    }
+    if(body.action==="set_team"){const cardIds=Array.isArray(body.cardIds)?body.cardIds.map(String):[];const {data:result,error}=await admin.rpc("server_set_adventure_battle_team",{p_actor_id:user.id,p_battle_id:body.battleId,p_card_ids:cardIds});if(error)throw error;const bot=await driveBot(String(body.battleId));return json({data:{...result,bot,state:await state(String(body.battleId))}})}
     if(body.action==="attack"){
       const battleId=String(body.battleId);const expectedTurn=Number(body.expectedTurn??0);
+      await driveBot(battleId);
+      const expired=await settleExpired(battleId);
+      if(expired){await driveBot(battleId);return json({data:{recovered:true,timedOut:true,timeout:expired,state:await state(battleId)}})}
       if(expectedTurn>0){const before=await state(battleId);if(before?.status!=="revealing"||Number(before?.turn??0)!==expectedTurn||before?.myLocked){return json({data:{recovered:true,staleTurn:Number(before?.turn??0)!==expectedTurn,state:before}})}}
       const {data:action,error}=await admin.rpc("server_choose_battle_team_attack",{p_actor_id:user.id,p_battle_id:battleId,p_attack_name:String(body.attackName??"")});
-      if(error){const message=readableError(error);if(message.includes("ACTION_ALREADY_LOCKED")){return json({data:{recovered:true,state:await state(battleId)}})}throw error}
+      if(error){
+        const message=readableError(error);
+        if(message.includes("ACTION_ALREADY_LOCKED"))return json({data:{recovered:true,state:await state(battleId)}});
+        if(message.includes("SELECTION_EXPIRED")){const recovery=await recoverExpired(battleId);return json({data:{recovered:true,timedOut:Boolean(recovery.timedOut),timeout:recovery.timedOut,state:recovery.state}})}
+        throw error;
+      }
       let resolved=null;if(action?.bothActionsLocked){const result=await admin.rpc("server_resolve_team_turn",{p_battle_id:battleId});if(result.error)throw result.error;resolved=result.data}
       const bot=await driveBot(battleId);const after=await state(battleId);return json({data:{...action,resolved,bot,state:after}})
     }
-    if(body.action==="switch"){const {data:action,error}=await admin.rpc("server_choose_battle_team_switch",{p_actor_id:user.id,p_battle_id:body.battleId,p_slot:Number(body.slot)});if(error)throw error;let resolved=action?.resolved??null;if(action?.bothActionsLocked){const result=await admin.rpc("server_resolve_team_turn",{p_battle_id:body.battleId});if(result.error)throw result.error;resolved=result.data}const bot=await driveBot(String(body.battleId));return json({data:{...action,resolved,bot}})}
-    if(body.action==="timeout"){const {data:result,error}=await admin.rpc("server_timeout_team_battle",{p_actor_id:user.id,p_battle_id:body.battleId});if(error)throw error;const bot=await driveBot(String(body.battleId));return json({data:{...result,bot}})}
+    if(body.action==="switch"){
+      const battleId=String(body.battleId);
+      await driveBot(battleId);
+      const expired=await settleExpired(battleId);
+      if(expired){await driveBot(battleId);return json({data:{recovered:true,timedOut:true,timeout:expired,state:await state(battleId)}})}
+      const {data:action,error}=await admin.rpc("server_choose_battle_team_switch",{p_actor_id:user.id,p_battle_id:battleId,p_slot:Number(body.slot)});
+      if(error){
+        const message=readableError(error);
+        if(message.includes("ACTION_ALREADY_LOCKED"))return json({data:{recovered:true,state:await state(battleId)}});
+        if(message.includes("SELECTION_EXPIRED")){const recovery=await recoverExpired(battleId);return json({data:{recovered:true,timedOut:Boolean(recovery.timedOut),timeout:recovery.timedOut,state:recovery.state}})}
+        throw error;
+      }
+      let resolved=action?.resolved??null;if(action?.bothActionsLocked){const result=await admin.rpc("server_resolve_team_turn",{p_battle_id:battleId});if(result.error)throw result.error;resolved=result.data}
+      const bot=await driveBot(battleId);return json({data:{...action,resolved,bot,state:await state(battleId)}})
+    }
+    if(body.action==="timeout"){const battleId=String(body.battleId);const {data:result,error}=await admin.rpc("server_timeout_team_battle",{p_actor_id:user.id,p_battle_id:battleId});if(error)throw error;const bot=await driveBot(battleId);return json({data:{...result,bot,state:await state(battleId)}})}
     if(body.action==="forfeit"){const {data,error}=await admin.rpc("server_forfeit_battle",{p_actor_id:user.id,p_battle_id:body.battleId});if(error)throw error;return json({data})}
     if(body.action==="cancel"){const {data,error}=await admin.rpc("server_cancel_battle",{p_actor_id:user.id,p_battle_id:body.battleId});if(error)throw error;return json({data:{status:data}})}
     return json({error:"Invalid action"},400)
