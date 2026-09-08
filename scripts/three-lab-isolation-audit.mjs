@@ -10,6 +10,9 @@ const fail = (message) => {
 const need = (text, token, label) => {
   if (!text.includes(token)) fail(`${label}: missing ${token}`);
 };
+const needMatch = (text, pattern, label) => {
+  if (!pattern.test(text)) fail(`${label}: expected pattern ${pattern}`);
+};
 
 const service = read('src/services/pokemon3dModels.ts');
 need(service, "formKeyInput = 'default'", 'model service default isolation');
@@ -31,7 +34,8 @@ need(adaptive, 'modelFormKey={modelFormKey}', 'adaptive arena form forwarding');
 const lab = read('app/admin-3d-lab.tsx');
 need(lab, "resolvePokemon3DModel(pokemon.pokemonId, 'medium', 'lab')", 'admin lab probe isolation');
 need(lab, 'modelFormKey="lab"', 'admin lab renderer isolation');
-need(lab, 'prefer3D={true}', 'admin lab explicit 3D opt-in');
+// JSX boolean shorthand (`prefer3D`) is equivalent to `prefer3D={true}`.
+needMatch(lab, /\bprefer3D(?:\s*=\s*\{\s*true\s*\})?\s*\n\s*modelFormKey=["']lab["']/, 'admin lab explicit 3D opt-in');
 need(lab, 'ingestPokemon3DLabModel', 'admin lab ingest UI');
 need(lab, 'IMPORTAR GLB PARA LAB', 'admin lab ingest action');
 
@@ -44,6 +48,8 @@ const allowed3DFiles = new Set([
   path.normalize('src/components/BattleArena3D.web.tsx'),
 ]);
 const scanRoots = ['app', 'src'];
+const true3DProp = /<[^>]+\bprefer3D(?:\s*=\s*\{\s*true\s*\})?(?=\s|\/?>)/s;
+const labFormProp = /<[^>]+\bmodelFormKey\s*=\s*["']lab["']/s;
 const walk = (dir) => {
   for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
     const relative = path.join(dir, entry.name);
@@ -51,8 +57,8 @@ const walk = (dir) => {
     else if (/\.(ts|tsx)$/.test(entry.name) && !allowed3DFiles.has(path.normalize(relative))) {
       const text = read(relative);
       if (text.includes('BattleArena3D')) fail(`${relative}: direct 3D renderer reference outside lab bridge`);
-      if (text.includes('prefer3D={true}')) fail(`${relative}: 3D opt-in outside owner lab`);
-      if (text.includes('modelFormKey="lab"')) fail(`${relative}: lab model form used outside owner lab`);
+      if (true3DProp.test(text)) fail(`${relative}: 3D opt-in outside owner lab`);
+      if (labFormProp.test(text)) fail(`${relative}: lab model form used outside owner lab`);
     }
   }
 };
