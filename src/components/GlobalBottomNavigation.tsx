@@ -84,11 +84,14 @@ export function GlobalBottomNavigation() {
               accessibilityRole="button"
               accessibilityLabel={item.label}
               accessibilityState={{ selected: active }}
-              onPress={() => router.replace(item.href as never)}
+              onPress={() => {
+                if (active) return;
+                router.replace(item.href as never);
+              }}
               style={({ pressed }) => [
                 styles.item,
                 active && { backgroundColor: colors.accentSoft },
-                pressed && styles.pressed,
+                pressed && !active && styles.pressed,
               ]}
             >
               <View

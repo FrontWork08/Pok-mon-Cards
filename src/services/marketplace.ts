@@ -61,86 +61,53 @@ export type MarketOffer = {
 export type MarketOffersHub = { incoming: MarketOffer[]; outgoing: MarketOffer[] };
 export type CardPricePoint = { priceUsd:number; recordedAt:string; source:string };
 
-function normalizeListing(row: any, shops: Map<string, any>, guilds: Map<string, any>): MarketplaceListing {
-  const shop = shops.get(row.seller_id);
-  const membership = guilds.get(row.seller_id);
-  const guild = Array.isArray(membership?.guilds) ? membership.guilds[0] : membership?.guilds;
-  const card = Array.isArray(row.cards) ? row.cards[0] : row.cards;
-  const seller = Array.isArray(row.seller) ? row.seller[0] : row.seller;
+function normalizeHubListing(row:any):MarketplaceListing {
   return {
-    id: String(row.id),
-    sellerId: String(row.seller_id),
-    buyerId: row.buyer_id ? String(row.buyer_id) : null,
-    sellerName: String(seller?.username ?? 'Treinador'),
-    sellerIcon: String(seller?.profile_icon ?? 'pokeball'),
-    sellerAvatarPath: seller?.avatar_path ? String(seller.avatar_path) : null,
-    sellerAvatarUpdatedAt: seller?.avatar_updated_at ? String(seller.avatar_updated_at) : null,
-    sellerFrameId: seller?.equipped_frame_id ? String(seller.equipped_frame_id) : null,
-    sellerBackgroundId: seller?.equipped_background_id ? String(seller.equipped_background_id) : null,
-    shopName: String(shop?.name ?? `${seller?.username ?? 'Trainer'} Card Shop`),
-    shopTheme: (shop?.theme_style ?? 'guild') as ShopTheme,
-    guild: guild ? { id:String(guild.id), name:String(guild.name), color:String(guild.color) } : null,
-    card: {
-      id: String(card?.id ?? row.card_id),
-      name: String(card?.pokemon_name ?? 'Carta'),
-      rarity: card?.rarity ?? null,
-      image: card?.image_small ?? card?.image_large ?? null,
-      marketPriceUsd: card?.market_price_usd == null ? null : Number(card.market_price_usd),
+    id:String(row?.id??''),
+    sellerId:String(row?.sellerId??''),
+    buyerId:row?.buyerId?String(row.buyerId):null,
+    sellerName:String(row?.sellerName??'Treinador'),
+    sellerIcon:String(row?.sellerIcon??'pokeball'),
+    sellerAvatarPath:row?.sellerAvatarPath?String(row.sellerAvatarPath):null,
+    sellerAvatarUpdatedAt:row?.sellerAvatarUpdatedAt?String(row.sellerAvatarUpdatedAt):null,
+    sellerFrameId:row?.sellerFrameId?String(row.sellerFrameId):null,
+    sellerBackgroundId:row?.sellerBackgroundId?String(row.sellerBackgroundId):null,
+    shopName:String(row?.shopName??'Trainer Card Shop'),
+    shopTheme:(row?.shopTheme??'guild') as ShopTheme,
+    guild:row?.guild?{id:String(row.guild.id),name:String(row.guild.name),color:String(row.guild.color)}:null,
+    card:{
+      id:String(row?.card?.id??''),
+      name:String(row?.card?.name??'Carta'),
+      rarity:row?.card?.rarity??null,
+      image:row?.card?.image??null,
+      marketPriceUsd:row?.card?.marketPriceUsd==null?null:Number(row.card.marketPriceUsd),
     },
-    quantity: Number(row.quantity ?? 1),
-    price: Number(row.unit_price_coins ?? 0),
-    status: row.status,
-    boostedUntil: row.boosted_until ? String(row.boosted_until) : null,
-    boostTier: row.boost_tier ? String(row.boost_tier) : null,
-    shopHighlightUntil: shop?.highlight_until ? String(shop.highlight_until) : null,
-    createdAt: String(row.created_at),
+    quantity:Number(row?.quantity??1),
+    price:Number(row?.price??0),
+    status:(row?.status??'active') as MarketplaceListing['status'],
+    boostedUntil:row?.boostedUntil?String(row.boostedUntil):null,
+    boostTier:row?.boostTier?String(row.boostTier):null,
+    shopHighlightUntil:row?.shopHighlightUntil?String(row.shopHighlightUntil):null,
+    createdAt:String(row?.createdAt??''),
   };
 }
 
 export async function getMarketplaceHub(): Promise<MarketplaceHub> {
-  const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError) throw authError;
-  const myId = auth.user?.id;
-  if (!myId) throw new Error('Usuário não autenticado.');
-  const fields =
-    'id,seller_id,buyer_id,card_id,quantity,unit_price_coins,status,created_at,boosted_until,boost_tier,' +
-    'cards(id,pokemon_name,rarity,image_small,image_large,market_price_usd),' +
-    'seller:players!market_listings_seller_id_fkey(id,username,profile_icon,avatar_path,avatar_updated_at,equipped_frame_id,equipped_background_id)';
-  const [activeResult, mineResult] = await Promise.all([
-    supabase.from('market_listings').select(fields).eq('status','active').order('boosted_until',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).limit(100),
-    supabase.from('market_listings').select(fields).eq('seller_id',myId).order('created_at',{ascending:false}).limit(100),
-  ]);
-  if (activeResult.error) throw activeResult.error;
-  if (mineResult.error) throw mineResult.error;
-  const allRows = [...(activeResult.data ?? []), ...(mineResult.data ?? [])] as any[];
-  const sellerIds = [...new Set(allRows.map((row) => String(row.seller_id)))];
-  if (!sellerIds.includes(myId)) sellerIds.push(myId);
-  const [shopResult, guildResult] = await Promise.all([
-    supabase.from('player_shops').select('player_id,name,theme_style,highlight_until').in('player_id',sellerIds),
-    supabase.from('guild_members').select('player_id,guilds(id,name,color)').in('player_id',sellerIds),
-  ]);
-  if (shopResult.error) throw shopResult.error;
-  if (guildResult.error) throw guildResult.error;
-  const shops = new Map((shopResult.data ?? []).map((row:any) => [String(row.player_id), row]));
-  const guilds = new Map((guildResult.data ?? []).map((row:any) => [String(row.player_id), row]));
-  const myShop = shops.get(myId);
-  const ownedIdsResult = await supabase.from('player_economy_items').select('item_id').eq('player_id',myId);
-  if (ownedIdsResult.error) throw ownedIdsResult.error;
-  const ownedIds = (ownedIdsResult.data ?? []).map((row:any)=>String(row.item_id));
-  let ownedShopThemes:ShopTheme[]=[];
-  if (ownedIds.length) {
-    const ownedThemeResult = await supabase.from('economy_store_items').select('id,category,metadata').in('id',ownedIds).eq('category','shop_theme');
-    if (ownedThemeResult.error) throw ownedThemeResult.error;
-    ownedShopThemes=(ownedThemeResult.data ?? [])
-      .map((row:any)=>String(row.metadata?.themeStyle??''))
-      .filter((value:string):value is ShopTheme=>Boolean(value)) as ShopTheme[];
-  }
+  const {data,error}=await supabase.rpc('get_marketplace_hub_v2');
+  if(error) throw error;
+  if(!data?.myId) throw new Error('Usuário não autenticado.');
   return {
-    myId,
-    myShop: myShop ? { name:String(myShop.name), themeStyle:myShop.theme_style as ShopTheme, highlightUntil:myShop.highlight_until ? String(myShop.highlight_until) : null } : null,
-    ownedShopThemes,
-    listings: (activeResult.data ?? []).map((row:any) => normalizeListing(row,shops,guilds)),
-    myListings: (mineResult.data ?? []).map((row:any) => normalizeListing(row,shops,guilds)),
+    myId:String(data.myId),
+    myShop:data.myShop?{
+      name:String(data.myShop.name??''),
+      themeStyle:(data.myShop.themeStyle??'guild') as ShopTheme,
+      highlightUntil:data.myShop.highlightUntil?String(data.myShop.highlightUntil):null,
+    }:null,
+    ownedShopThemes:Array.isArray(data.ownedShopThemes)
+      ? data.ownedShopThemes.map((value:unknown)=>String(value)).filter(Boolean) as ShopTheme[]
+      : [],
+    listings:Array.isArray(data.listings)?data.listings.map(normalizeHubListing):[],
+    myListings:Array.isArray(data.myListings)?data.myListings.map(normalizeHubListing):[],
   };
 }
 

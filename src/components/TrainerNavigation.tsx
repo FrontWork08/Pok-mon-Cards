@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
@@ -101,6 +101,8 @@ export function TrainerNavigation() {
   const[expanded,setExpanded]=useState<MenuGroupId|null>(null);
   const[preferences,setPreferences]=useState<TrainerNavigationPreferences>(EMPTY_PREFERENCES);
   const[featureFlags,setFeatureFlags]=useState<Record<string,boolean>>({});
+  const navigationLocked=useRef(false);
+  const navigationUnlockTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const visibleItems=useMemo(()=>MENU_ITEMS.filter(item=>{
     if(item.adminOnly&&!isAdmin)return false;
@@ -108,6 +110,10 @@ export function TrainerNavigation() {
     return !flag||featureFlags[flag]!==false;
   }),[featureFlags,isAdmin]);
   const itemByHref=useMemo(()=>new Map(visibleItems.map(item=>[item.href,item])),[visibleItems]);
+  const itemsByGroup=useMemo(()=>new Map(GROUPS.map(group=>[
+    group.id,
+    visibleItems.filter(item=>item.group===group.id&&!item.adminOnly),
+  ])),[visibleItems]);
   const searchResults=useMemo(()=>{
     const term=normalizeSearch(search);
     if(!term)return[];
@@ -143,10 +149,29 @@ export function TrainerNavigation() {
     ]).then(([count,prefs,flags])=>{setUnread(count);setPreferences(prefs);setFeatureFlags(flags);});
   },[open,userId]);
 
+  useEffect(()=>{
+    navigationLocked.current=false;
+    if(navigationUnlockTimer.current){
+      clearTimeout(navigationUnlockTimer.current);
+      navigationUnlockTimer.current=null;
+    }
+  },[pathname]);
+
+  useEffect(()=>()=>{
+    if(navigationUnlockTimer.current)clearTimeout(navigationUnlockTimer.current);
+  },[]);
+
   if(!userId)return null;
 
   function navigate(href:string){
+    const alreadyActive=href==='/(tabs)'
+      ? pathname==='/'||pathname==='/(tabs)'||pathname==='/index'
+      : pathname===href||pathname.startsWith(href+'/');
     setOpen(false);setSearch('');
+    if(alreadyActive||navigationLocked.current)return;
+    navigationLocked.current=true;
+    if(navigationUnlockTimer.current)clearTimeout(navigationUnlockTimer.current);
+    navigationUnlockTimer.current=setTimeout(()=>{navigationLocked.current=false;navigationUnlockTimer.current=null;},800);
     void recordTrainerNavigationVisit(href).then(setPreferences).catch(()=>null);
     requestAnimationFrame(()=>router.replace(href as never));
   }
@@ -212,7 +237,7 @@ export function TrainerNavigation() {
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle,{color:colors.text}]}>Categorias</Text>
                 <View style={styles.groupList}>{GROUPS.map(group=>{
-                  const groupItems=visibleItems.filter(item=>item.group===group.id&&!item.adminOnly);
+                  const groupItems=itemsByGroup.get(group.id)??[];
                   const isExpanded=expanded===group.id;
                   return <View key={group.id} style={[styles.groupCard,{backgroundColor:colors.surface,borderColor:isExpanded?group.color:colors.border}]}>
                     <Pressable onPress={()=>setExpanded(isExpanded?null:group.id)} style={({pressed})=>[styles.groupHeader,pressed&&styles.pressed]}>
