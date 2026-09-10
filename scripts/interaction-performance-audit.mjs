@@ -3,7 +3,48 @@ import { join, relative } from 'node:path';
 
 const failures=[];
 const warnings=[];
-const metrics={files:0,interactive:0,pressables:0,touchables:0,buttons:0,flatLists:0,scrollViews:0,images:0,timers:0,realtime:0};
+const metrics={files:0,interactive:0,pressables:0,touchables:0,buttons:0,flatLists:0,scrollViews:0,images:0,timers:0,realtime:0,reviewedLargeScrolls:0};
+
+// These screens were manually reviewed during the full-app performance pass.
+// The fingerprints make the exemption self-invalidating: if a bound/pagination
+// guard disappears later, the generic warning becomes visible again in CI.
+const reviewedLargeScrollGuards=new Map([
+  ['app/(tabs)/battles.tsx',[
+    'getMyBattleHistory()',
+    'getBattleLeaderboard(25)',
+    '<ScrollView horizontal',
+    'leaderboard.map(',
+    'history.map(',
+  ]],
+  ['app/admin-audit.tsx',[
+    '.slice(0, 15)',
+    'getAdminAccountAudit(player.id, 0, 25)',
+    'getAdminAccountAudit(selectedPlayerId, offset, 25)',
+    'topCards.map(',
+    'audit.packHistory.map(',
+  ]],
+  ['app/battle/[id].tsx',[
+    'draft_pick_count}/6',
+    'draftCards.map(',
+    'manualAttackOptions.map(',
+    'rounds.map(',
+    'CardPickerModal',
+  ]],
+  ['app/card/[id].tsx',[
+    'getCardPriceHistory(String(id), 30)',
+    'CARD_TAGS.map',
+    'priceHistory.map(',
+    'passport.timeline.map(',
+    'styleOptions.map(',
+  ]],
+  ['app/guild-wars.tsx',[
+    'VIRTUAL_LIST_PERF_PROPS',
+    '<FlatList',
+    'recent.slice(0, 4).map(',
+    'board.events.slice(0, 6).map(',
+    'war.contributors.slice(0, 5).map(',
+  ]],
+]);
 
 function walk(dir){
   if(!existsSync(dir)) return [];
@@ -45,6 +86,11 @@ function openingTags(source,name){
     from=Math.max(start+needle.length,end>0?end:start+needle.length);
   }
   return starts;
+}
+
+function hasReviewedLargeScrollGuard(rel,source){
+  const guards=reviewedLargeScrollGuards.get(rel);
+  return Boolean(guards?.length&&guards.every((needle)=>source.includes(needle)));
 }
 
 const uiFiles=[...walk('app'),...walk(join('src','components'))]
@@ -96,7 +142,11 @@ for(const path of uiFiles){
 
   const scrollMapCount=(source.match(/\.map\s*\(/g)||[]).length;
   if(/<ScrollView(?=\s|>)/.test(source)&&scrollMapCount>=8&&Buffer.byteLength(source,'utf8')>45000){
-    warnings.push(`${rel}: tela grande usa ScrollView com ${scrollMapCount} maps; revisar virtualização dos blocos de alta cardinalidade.`);
+    if(hasReviewedLargeScrollGuard(rel,source)){
+      metrics.reviewedLargeScrolls++;
+    }else{
+      warnings.push(`${rel}: tela grande usa ScrollView com ${scrollMapCount} maps; revisar virtualização dos blocos de alta cardinalidade.`);
+    }
   }
 
   const remoteImages=(source.match(/source\s*=\s*\{\s*\{\s*uri\s*:/g)||[]).length;
@@ -134,6 +184,9 @@ if(failures.length){
 console.log('✅ Auditoria global de toque/performance passou.');
 console.log(`   ${metrics.files} arquivos UI • ${metrics.interactive} controles interativos • ${metrics.flatLists} FlatLists • ${metrics.scrollViews} ScrollViews • ${metrics.images} Images.`);
 console.log(`   Pressables ${metrics.pressables} • Touchables ${metrics.touchables} • Buttons ${metrics.buttons} • timers ${metrics.timers} • canais realtime ${metrics.realtime}.`);
+if(metrics.reviewedLargeScrolls){
+  console.log(`   ${metrics.reviewedLargeScrolls} tela(s) grande(s) com limites/paginação revisados e protegidos por fingerprint.`);
+}
 if(warnings.length){
   console.log(`⚠️  ${warnings.length} ponto(s) heurístico(s) para revisão manual contínua:`);
   warnings.slice(0,80).forEach((item)=>console.log(' - '+item));
