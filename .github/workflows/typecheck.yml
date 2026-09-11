@@ -13,10 +13,4 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - name: Dependency audit report
-        run: |
-          echo "=== RUNTIME ONLY ==="
-          npm audit --omit=dev --json || true
-          echo "=== FULL TREE ==="
-          npm audit --json || true
       - run: npm run verify
