@@ -35,6 +35,11 @@ const FUNCTIONS: FunctionResult[] = [
   {label:'Ranking de Coleções',description:'Posições por coleção',route:'/collection-ranking',keywords:'rank ranking coleção',icon:'podium'},
   {label:'Copa Trainer',description:'Torneios e brackets',route:'/tournaments',keywords:'copa torneio campeonato bracket',icon:'trophy'},
   {label:'Cosméticos',description:'Temas, molduras e fundos',route:'/cosmetics',keywords:'cosmético tema moldura fundo galaxy',icon:'color-wand'},
+  {label:'Primeiros Passos',description:'Tutorial interativo para começar',route:'/onboarding',keywords:'tutorial começar novato primeiros passos aprender',icon:'rocket'},
+  {label:'Metas do Treinador',description:'Objetivos pessoais e progresso',route:'/goals',keywords:'meta objetivo pessoal progresso alvo',icon:'flag'},
+  {label:'Coach de Deck',description:'Sugestões para melhorar seu time',route:'/deck-coach',keywords:'deck recomendação melhorar time coach',icon:'bulb'},
+  {label:'Comparar Cartas',description:'Stats Game Boy lado a lado',route:'/card-compare',keywords:'comparar carta stats atributos hp ataque defesa speed',icon:'git-compare'},
+  {label:'Insights do Treinador',description:'Estatísticas e recomendações pessoais',route:'/trainer-insights',keywords:'insights estatísticas recomendação treinador batalha',icon:'analytics'},
   {label:'Guia do Treinador',description:'Entenda ELO, PP, Speed, STAB e o ciclo do jogo',route:'/trainer-guide',keywords:'guia ajuda tutorial elo pp speed stab stats como funciona',icon:'help-circle'},
   {label:'Configurações',description:'Aparência, privacidade e preferências',route:'/settings',keywords:'configuração settings tema som privacidade',icon:'settings'},
 ];
