@@ -3,7 +3,7 @@
     "name": "Trainer Collection",
     "slug": "pokemon-cards",
     "owner": "frontwork",
-    "version": "1.2.1",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "pokemoncards",
@@ -122,11 +122,6 @@
     },
     "backgroundColor": "#07111F",
     "androidStatusBar": {
-      "backgroundColor": "#07111F",
-      "barStyle": "light-content"
-    },
-    "androidNavigationBar": {
-      "backgroundColor": "#07111F",
       "barStyle": "light-content"
     }
   }
