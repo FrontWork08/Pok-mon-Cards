@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { withReadRetry } from '@/lib/readRetry';
 
 export type PlayerGoalType = 'collection'|'pokemon'|'rank'|'battle'|'coins'|'custom';
 
@@ -64,7 +65,7 @@ export type PostgameInsights = {
 };
 
 export async function getMyGoals():Promise<PlayerGoal[]>{
-  const {data,error}=await supabase.rpc('get_my_goals');
+  const {data,error}=await withReadRetry(()=>supabase.rpc('get_my_goals'));
   if(error)throw error;
   return Array.isArray(data)?data.map((row:any)=>({
     id:String(row.id),
@@ -118,7 +119,7 @@ export async function archivePlayerGoal(goalId:string){
 }
 
 export async function getMyOnboardingProgress():Promise<OnboardingProgress>{
-  const {data,error}=await supabase.rpc('get_my_onboarding_progress');
+  const {data,error}=await withReadRetry(()=>supabase.rpc('get_my_onboarding_progress'));
   if(error)throw error;
   const value:any=data??{};
   return {
@@ -136,7 +137,7 @@ export async function getMyOnboardingProgress():Promise<OnboardingProgress>{
 }
 
 export async function getBattlePostgameInsights(battleId:string):Promise<PostgameInsights>{
-  const {data,error}=await supabase.rpc('get_battle_postgame_insights',{p_battle_id:battleId});
+  const {data,error}=await withReadRetry(()=>supabase.rpc('get_battle_postgame_insights',{p_battle_id:battleId}));
   if(error)throw error;
   const value:any=data??{};
   return {
