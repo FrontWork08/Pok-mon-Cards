@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { goBackOrHome } from '@/navigation/goBackOrHome';
 import { Screen } from '@/components/Screen';
-import { equipAchievementTitle, getMyAchievements, refreshAchievements, type PlayerAchievement } from '@/services/achievements';
+import { equipAchievementTitle, getAchievementRarity, getMyAchievements, refreshAchievements, type AchievementRarity, type PlayerAchievement } from '@/services/achievements';
 import { getMyProfile, type PlayerProfile } from '@/services/player';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
@@ -15,6 +15,7 @@ export default function AchievementsScreen() {
   const { colors } = useAppTheme();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [achievements, setAchievements] = useState<PlayerAchievement[]>([]);
+  const [rarity, setRarity] = useState<AchievementRarity[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
@@ -24,8 +25,8 @@ export default function AchievementsScreen() {
     try {
       setLoading(true); setNotice(null);
       await refreshAchievements();
-      const [player, rows] = await Promise.all([getMyProfile(), getMyAchievements()]);
-      setProfile(player); setAchievements(rows);
+      const [player, rows, rarityRows] = await Promise.all([getMyProfile(), getMyAchievements(), getAchievementRarity().catch(() => [])]);
+      setProfile(player); setAchievements(rows); setRarity(rarityRows);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível carregar suas conquistas.');
     } finally { setLoading(false); }
@@ -40,6 +41,7 @@ export default function AchievementsScreen() {
     if(hiddenSecret)return false;
     return filter === 'all' || (filter === 'unlocked' ? Boolean(item.unlocked_at) : !item.unlocked_at);
   }), [achievements, filter]);
+  const rarityById=useMemo(()=>new Map(rarity.map((item)=>[item.achievementId,item])),[rarity]);
   const secretUnlocked=achievements.filter((item)=>{
     const def=Array.isArray(item.achievement)?item.achievement[0]:item.achievement;
     return Boolean(def?.secret)&&Boolean(item.unlocked_at);
@@ -87,6 +89,7 @@ export default function AchievementsScreen() {
         <Text style={[styles.name, { color: colors.text }]}>{def.name}</Text>
         <Text style={[styles.title, { color: unlocked ? colors.yellow : colors.muted }]}>{def.title}</Text>
         <Text style={[styles.description, { color: colors.muted }]}>{def.description}</Text>
+        {unlocked&&rarityById.get(item.achievement_id)?<View style={styles.rarityRow}><Ionicons name="diamond-outline" size={13} color="#9B7BFF"/><Text style={[styles.rarityText,{color:colors.muted}]}>{rarityById.get(item.achievement_id)!.percentage.toLocaleString('pt-BR',{maximumFractionDigits:2})}% dos treinadores desbloquearam • {rarityById.get(item.achievement_id)!.unlockCount}/{rarityById.get(item.achievement_id)!.activePlayers}</Text></View>:null}
         <View style={[styles.track, { backgroundColor: colors.border }]}><View style={[styles.fill, { width: `${progress}%` as `${number}%`, backgroundColor: unlocked ? colors.yellow : colors.accent }]} /></View>
       </Pressable>;
     })}</View>
@@ -122,6 +125,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 14, fontWeight: '900', marginTop: 8 },
   title: { fontSize: 11, fontWeight: '900', marginTop: 2 },
   description: { fontSize: 9, lineHeight: 14, marginTop: 5 },
+  rarityRow:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7},rarityText:{fontSize:7.5,fontWeight:'800',flex:1},
   track: { height: 6, borderRadius: 999, overflow: 'hidden', marginTop: 10 },
   fill: { height: '100%', borderRadius: 999 },
   empty: { padding: 24, borderRadius: 18, borderWidth: 1, alignItems: 'center', gap: 8 },
