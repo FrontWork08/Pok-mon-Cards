@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   imageWrap:{width:'100%',aspectRatio:.72,borderRadius:11,overflow:'hidden',position:'relative'},
   image:{width:'100%',height:'100%'},
   placeholder:{flex:1,alignItems:'center',justifyContent:'center'},
-  lockOverlay:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(5,9,15,.72)',alignItems:'center',justifyContent:'center',gap:5},
+  lockOverlay:{...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },backgroundColor:'rgba(5,9,15,.72)',alignItems:'center',justifyContent:'center',gap:5},
   lockText:{color:'#F1F5F9',fontSize:7,fontWeight:'900',letterSpacing:.5},
   ownedBadge:{position:'absolute',left:6,bottom:6,borderRadius:999,paddingHorizontal:7,paddingVertical:4,flexDirection:'row',alignItems:'center',gap:3},
   ownedText:{color:'#07111F',fontSize:6,fontWeight:'900'},
