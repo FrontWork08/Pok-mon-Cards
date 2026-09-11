@@ -1,7 +1,7 @@
 name: Publish Production Update
 
-# Trainer Collection production deploy. Web/OTA updates always keep the currently
-# verified APK available as a direct same-origin download on the official site.
+# Trainer Collection production deploy. Web/OTA updates validate the currently
+# verified GitHub Release APK before publishing the official page and Android OTA.
 on:
   workflow_dispatch:
   push:
@@ -77,7 +77,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas env:pull --environment production --path .env.local --non-interactive
 
-      - name: Stage verified APK source
+      - name: Verify release archive
         shell: bash
         run: |
           set -euo pipefail
@@ -87,49 +87,39 @@ jobs:
           DOWNLOAD_URL="$(node -p "require('./public/download/release.json').downloadUrl")"
           PROVIDER="$(node -p "require('./public/download/release.json').downloadProvider")"
           [[ "$FILE_NAME" =~ ^Trainer-Collection-v[0-9]+\.[0-9]+\.[0-9]+\.apk$ ]]
-          [[ "$DOWNLOAD_URL" == "https://pokemon-cards-frontwork.expo.app/download/$FILE_NAME" ]]
-          [[ "$PROVIDER" == "Trainer Collection Site" ]]
-          mkdir -p public/download
-          curl --fail --location --retry 5 --retry-delay 2 "$ARCHIVE_URL" -o "public/download/$FILE_NAME"
-          ACTUAL_SHA="$(sha256sum "public/download/$FILE_NAME" | awk '{print $1}')"
+          [[ "$DOWNLOAD_URL" == "$ARCHIVE_URL" ]]
+          [[ "$PROVIDER" == "Trainer Collection GitHub Release" ]]
+          curl --fail --location --retry 5 --retry-delay 2 "$ARCHIVE_URL" -o /tmp/trainer-release.apk
+          test "$(stat -c%s /tmp/trainer-release.apk)" -gt 100000000
+          ACTUAL_SHA="$(sha256sum /tmp/trainer-release.apk | awk '{print $1}')"
           [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
-          echo "Verified APK source ready: $FILE_NAME"
+          echo "Verified GitHub Release APK ready: $FILE_NAME"
 
       - name: Export web app
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: npx expo export --platform web
 
-      - name: Inject verified APK into exported site
-        shell: bash
-        run: |
-          set -euo pipefail
-          FILE_NAME="$(node -p "require('./public/download/release.json').downloadFileName")"
-          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
-          mkdir -p dist/download
-          cp "public/download/$FILE_NAME" "dist/download/$FILE_NAME"
-          ACTUAL_SHA="$(sha256sum "dist/download/$FILE_NAME" | awk '{print $1}')"
-          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
-          test "$(stat -c%s "dist/download/$FILE_NAME")" -gt 100000000
-          echo "Direct APK injected into dist/download/$FILE_NAME"
-
       - name: Deploy web app to production
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas deploy --prod --environment production --dev-domain pokemon-cards-frontwork --non-interactive
 
-      - name: Verify direct APK from official site
+      - name: Verify official page metadata
         shell: bash
         run: |
           set -euo pipefail
-          FILE_NAME="$(node -p "require('./public/download/release.json').downloadFileName")"
           EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
-          SITE_APK="https://pokemon-cards-frontwork.expo.app/download/$FILE_NAME"
-          curl --fail --location --retry 6 --retry-delay 3 "$SITE_APK" -o /tmp/trainer-site.apk
-          test "$(stat -c%s /tmp/trainer-site.apk)" -gt 100000000
-          ACTUAL_SHA="$(sha256sum /tmp/trainer-site.apk | awk '{print $1}')"
-          [[ "${ACTUAL_SHA,,}" == "${EXPECTED_SHA,,}" ]]
-          echo "Direct official-site APK is byte-identical to the verified release: $FILE_NAME"
+          EXPECTED_URL="$(node -p "require('./public/download/release.json').downloadUrl")"
+          EXPECTED_PROVIDER="$(node -p "require('./public/download/release.json').downloadProvider")"
+          curl --fail --location --retry 6 --retry-delay 3 "https://pokemon-cards-frontwork.expo.app/download/release.json" -o /tmp/site-release.json
+          SITE_SHA="$(node -p "require('/tmp/site-release.json').sha256")"
+          SITE_URL="$(node -p "require('/tmp/site-release.json').downloadUrl")"
+          SITE_PROVIDER="$(node -p "require('/tmp/site-release.json').downloadProvider")"
+          [[ "${SITE_SHA,,}" == "${EXPECTED_SHA,,}" ]]
+          [[ "$SITE_URL" == "$EXPECTED_URL" ]]
+          [[ "$SITE_PROVIDER" == "$EXPECTED_PROVIDER" ]]
+          echo "Official page exposes the verified GitHub Release APK metadata."
 
       - name: Publish Android update to production
         env:
