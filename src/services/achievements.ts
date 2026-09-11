@@ -53,3 +53,22 @@ export async function getMyAchievements() {
   if (error) throw error;
   return (data ?? []) as unknown as PlayerAchievement[];
 }
+
+
+export type AchievementRarity = {
+  achievementId:string;
+  unlockCount:number;
+  activePlayers:number;
+  percentage:number;
+};
+
+export async function getAchievementRarity():Promise<AchievementRarity[]> {
+  const { data, error } = await supabase.rpc('get_achievement_rarity');
+  if (error) throw error;
+  return Array.isArray(data) ? data.map((row:any)=>({
+    achievementId:String(row.achievementId),
+    unlockCount:Number(row.unlockCount??0),
+    activePlayers:Number(row.activePlayers??0),
+    percentage:Number(row.percentage??0),
+  })) : [];
+}

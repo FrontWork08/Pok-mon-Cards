@@ -102,6 +102,8 @@ export async function claimDailyLogin() {
     coins: number;
     diamonds: number;
     nextClaimDate?: string;
+    shieldUsed?: boolean;
+    shieldsRemaining?: number;
   };
 }
 

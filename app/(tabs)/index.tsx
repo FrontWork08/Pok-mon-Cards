@@ -14,6 +14,7 @@ import { getThemeVisual } from '@/theme/themeCatalog';
 import { TrainerAvatar } from '@/components/TrainerAvatar';
 import { getTrainerJourneySummary, type TrainerJourneySummary } from '@/services/career';
 import { useWallet } from '@/wallet/WalletProvider';
+import { HomeSkeleton } from '@/components/SkeletonBlock';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -38,9 +39,9 @@ export default function HomeScreen() {
       };
     });
   },[battlePass]);
-  async function claimDaily(){if(!canClaimDaily||claiming)return;try{setClaiming(true);const reward=await claimDailyLogin();const diamondText=Number(reward.diamonds??0)>0?` + 💎 ${Number(reward.diamonds)}`:'';setNotice(reward.claimed?`Sequência diária ${reward.streak}: +🪙 ${Number(reward.coins).toLocaleString('pt-BR')}${diamondText}`:'A recompensa de hoje já foi coletada.');await load();}catch(err){setNotice(err instanceof Error?err.message:'Não foi possível receber a recompensa.');}finally{setClaiming(false);}}
+  async function claimDaily(){if(!canClaimDaily||claiming)return;try{setClaiming(true);const reward=await claimDailyLogin();const diamondText=Number(reward.diamonds??0)>0?` + 💎 ${Number(reward.diamonds)}`:'';const shieldText=reward.shieldUsed?` • 🛡️ Escudo de Sequência usado (${Number(reward.shieldsRemaining??0)} restante(s))`:'';setNotice(reward.claimed?`Sequência diária ${reward.streak}: +🪙 ${Number(reward.coins).toLocaleString('pt-BR')}${diamondText}${shieldText}`:'A recompensa de hoje já foi coletada.');await load();}catch(err){setNotice(err instanceof Error?err.message:'Não foi possível receber a recompensa.');}finally{setClaiming(false);}}
+  if(loading&&!loadedOnce.current)return <Screen title="Trainer Collection" subtitle="Preparando sua próxima ação..."><HomeSkeleton/></Screen>;
   return <Screen title={`Olá, ${profile?.username??'Trainer'}`} subtitle="Seu hub de coleção, packs, batalhas, amigos e progresso.">
-    {loading?<ActivityIndicator color={colors.yellow} size="large"/>:null}
     {notice?<View style={[styles.notice,{backgroundColor:isLight?'#FFF7D6':'#2B2818',borderColor:isLight?'#E5C95E':'#5A5125'}]}><Ionicons name="gift" size={20} color={colors.yellow}/><Text style={[styles.noticeText,{color:colors.text}]}>{notice}</Text><Pressable onPress={()=>setNotice(null)}><Ionicons name="close" size={18} color={colors.text}/></Pressable></View>:null}
     <View style={[styles.hero,{backgroundColor:colors.accentSoft,borderColor:colors.accent}]}>
       <View style={[styles.heroGlow,{backgroundColor:colors.accent}]} />
@@ -129,6 +130,10 @@ export default function HomeScreen() {
       <QuickAction icon="checkbox" label="Missões" sub="Ganhe recompensas" onPress={()=>router.push('/missions')}/>
       <QuickAction icon="search" label="Busca Global" sub="Ache qualquer coisa" onPress={()=>router.push('/search')}/>
       <QuickAction icon="compass" label="Minha Carreira" sub="Jornada e histórico" onPress={()=>router.push('/career')}/>
+      <QuickAction icon="rocket" label="Primeiros Passos" sub="Tutorial interativo" onPress={()=>router.push('/onboarding')}/>
+      <QuickAction icon="flag" label="Minhas Metas" sub="Objetivos pessoais" onPress={()=>router.push('/goals')}/>
+      <QuickAction icon="bulb" label="Coach de Deck" sub="Melhore seu time" onPress={()=>router.push('/deck-coach')}/>
+      <QuickAction icon="git-compare" label="Comparar Cartas" sub="Stats lado a lado" onPress={()=>router.push('/card-compare')}/>
     </View>
     <View style={styles.statsGrid}><Stat icon="albums" label="Cards" value={stats.totalCards.toLocaleString('pt-BR')} onPress={()=>router.push('/(tabs)/bag')}/><Stat icon="paw" label="Pokédex" value={String(stats.species)} onPress={()=>router.push('/pokedex')}/><Stat icon="swap-horizontal" label="Trocas" value={String(stats.completedTrades)} onPress={()=>router.push('/(tabs)/trade')}/><Stat icon="flash" label="XP" value={Number(profile?.xp??0).toLocaleString('pt-BR')}/></View>
     <GlobalChatHomeCard />
