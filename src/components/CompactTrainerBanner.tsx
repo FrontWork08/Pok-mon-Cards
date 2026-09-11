@@ -296,7 +296,7 @@ const styles=StyleSheet.create({
   },
   content:{position:'relative',zIndex:2},
   outerPulse:{
-    ...StyleSheet.absoluteFillObject,
+    ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
     margin:1,
     borderWidth:1.5,
     borderRadius:16,
@@ -339,7 +339,7 @@ const styles=StyleSheet.create({
     zIndex:9,
   },
   innerLine:{
-    ...StyleSheet.absoluteFillObject,
+    ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
     margin:4,
     borderRadius:13,
     borderWidth:.8,
