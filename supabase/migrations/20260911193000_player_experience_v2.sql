@@ -276,7 +276,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $rarity$
 declare
   v_player uuid := auth.uid();
   v_total bigint;
@@ -309,7 +309,7 @@ begin
 
   return v_result;
 end;
-$;
+$rarity$;
 
 revoke all on function public.get_achievement_rarity() from public, anon;
 grant execute on function public.get_achievement_rarity() to authenticated;
