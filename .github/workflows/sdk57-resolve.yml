@@ -27,6 +27,7 @@ jobs:
           cache: npm
       - name: Resolve SDK 57 dependency graph
         run: |
+          rm -f package-lock.json
           npm install
           npx expo install --fix
           npm install
