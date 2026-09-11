@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
   badgeText: { color: '#8DD7FF', fontSize: 10, fontWeight: '900' },
   viewport: { height: 310, position: 'relative' },
   renderError: {
-    ...StyleSheet.absoluteFillObject,
+    ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
     backgroundColor: '#101923',
     alignItems: 'center',
     justifyContent: 'center',
