@@ -46,7 +46,7 @@ export async function playBattleSound(kind:BattleSoundKind){
     const subscription=player.addListener('playbackStatusUpdate',(status)=>{
       if(status.didJustFinish){
         subscription.remove();
-        player.remove();
+        player.release();
       }
     });
     player.play();
