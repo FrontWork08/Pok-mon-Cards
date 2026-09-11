@@ -6,6 +6,7 @@ on:
       - native/sdk57-upgrade
     paths:
       - .github/workflows/sdk57-resolve.yml
+      - package.json
 
 permissions:
   contents: write
