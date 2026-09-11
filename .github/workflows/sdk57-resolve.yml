@@ -26,7 +26,8 @@ jobs:
           cache: npm
       - name: Resolve SDK 57 dependency graph
         run: |
-          npx --yes expo@57.0.22 install --fix
+          npm install
+          npx expo install --fix
           npm install
       - name: Inspect Expo compatibility
         continue-on-error: true
