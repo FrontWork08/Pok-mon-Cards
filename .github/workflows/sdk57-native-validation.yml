@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: sdk57-native-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     if: github.head_ref == 'native/sdk57-upgrade' || github.ref == 'refs/heads/native/sdk57-upgrade'
