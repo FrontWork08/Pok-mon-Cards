@@ -113,7 +113,7 @@ export function TrainerAvatar({
 
 const styles = StyleSheet.create({
   avatar: { position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  themeInset: { ...StyleSheet.absoluteFillObject, margin: 3, borderWidth: 1 },
+  themeInset: { ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }, margin: 3, borderWidth: 1 },
   themeGem: { position: 'absolute', width: 5, height: 5, borderRadius: 2 },
   themeGemTop: { top: 4, left: 4 },
   themeGemBottom: { right: 4, bottom: 4 },
