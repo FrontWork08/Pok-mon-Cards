@@ -124,9 +124,6 @@
     "experiments": {
       "typedRoutes": true
     },
-    "backgroundColor": "#07111F",
-    "androidStatusBar": {
-      "barStyle": "light-content"
-    }
+    "backgroundColor": "#07111F"
   }
 }
