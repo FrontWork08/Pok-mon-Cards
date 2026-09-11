@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import { createAudioPlayer } from 'expo-audio';
+import * as FileSystem from 'expo-file-system/legacy';
 
 type BattleSoundKind='confirm'|'round'|'victory'|'defeat';
 
@@ -39,14 +39,17 @@ export async function playBattleSound(kind:BattleSoundKind){
   try{
     const uri=await ensureUri();
     const profile=PROFILE[kind];
-    const{sound}=await Audio.Sound.createAsync(
-      {uri},
-      {shouldPlay:false,volume:profile.volume,rate:profile.rate,shouldCorrectPitch:false},
-    );
-    sound.setOnPlaybackStatusUpdate((status)=>{
-      if(status.isLoaded&&status.didJustFinish)void sound.unloadAsync().catch(()=>undefined);
+    const player=createAudioPlayer(uri,{updateInterval:100});
+    player.volume=profile.volume;
+    player.playbackRate=profile.rate;
+    player.shouldCorrectPitch=false;
+    const subscription=player.addListener('playbackStatusUpdate',(status)=>{
+      if(status.didJustFinish){
+        subscription.remove();
+        player.release();
+      }
     });
-    await sound.playAsync();
+    player.play();
   }catch{
     // Sound is optional and must never interrupt battle actions.
   }

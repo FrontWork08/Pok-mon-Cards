@@ -325,7 +325,7 @@ const styles=StyleSheet.create({
   flowTop:{position:'absolute',top:0,left:0,width:110,borderRadius:999,zIndex:12},
   flowBottom:{position:'absolute',bottom:0,left:0,width:110,borderRadius:999,zIndex:12},
   shine:{position:'absolute',top:-70,bottom:-70,width:26,borderRadius:999,zIndex:9},
-  innerStroke:{...StyleSheet.absoluteFillObject,margin:4,borderWidth:1,zIndex:7},
+  innerStroke:{...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },margin:4,borderWidth:1,zIndex:7},
   gem:{position:'absolute',width:7,height:7,borderRadius:2,zIndex:13},
   gemTL:{left:8,top:8},
   gemBR:{right:8,bottom:8},

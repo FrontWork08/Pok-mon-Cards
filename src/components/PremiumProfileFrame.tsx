@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   innerAura: {
-    ...StyleSheet.absoluteFillObject,
+    ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
     margin: 3,
     borderWidth: 1,
     zIndex: 2,

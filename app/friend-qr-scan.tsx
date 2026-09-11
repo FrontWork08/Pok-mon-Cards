@@ -140,7 +140,7 @@ const styles=StyleSheet.create({
   messageText:{fontSize:11,lineHeight:17,textAlign:'center',maxWidth:430},
   permissionButton:{minHeight:48,borderRadius:14,paddingHorizontal:18,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,marginTop:5},
   permissionButtonText:{color:'#07111F',fontSize:9,fontWeight:'900'},
-  overlay:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(2,7,13,.36)',paddingHorizontal:18,paddingTop:48,paddingBottom:26,justifyContent:'space-between'},
+  overlay:{...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },backgroundColor:'rgba(2,7,13,.36)',paddingHorizontal:18,paddingTop:48,paddingBottom:26,justifyContent:'space-between'},
   top:{flexDirection:'row',alignItems:'flex-start',gap:12},
   close:{width:44,height:44,borderRadius:15,backgroundColor:'rgba(8,15,24,.72)',borderWidth:1,borderColor:'rgba(255,255,255,.22)',alignItems:'center',justifyContent:'center'},
   topCopy:{flex:1},

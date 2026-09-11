@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   avatarEditor:{position:'relative',zIndex:2,alignItems:'center',gap:6},
   avatarQuickEdit:{minHeight:30,borderRadius:10,borderWidth:1,paddingHorizontal:9,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
   avatarQuickEditText:{fontSize:7,fontWeight:'900',letterSpacing:.45},
-  avatarLoading:{...StyleSheet.absoluteFillObject,borderRadius:22,backgroundColor:'rgba(0,0,0,.48)',alignItems:'center',justifyContent:'center'},
+  avatarLoading:{...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },borderRadius:22,backgroundColor:'rgba(0,0,0,.48)',alignItems:'center',justifyContent:'center'},
   avatarControls:{borderRadius:18,borderWidth:1,padding:12,flexDirection:'row',alignItems:'center',gap:12,flexWrap:'wrap'},
   avatarControlsCopy:{flex:1,minWidth:190},
   avatarControlsTitle:{fontSize:12,fontWeight:'900'},

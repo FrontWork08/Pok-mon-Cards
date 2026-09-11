@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   stackHost:{flex:1,minHeight:0},
   appChrome:{zIndex:1500,paddingHorizontal:12,paddingBottom:7,borderBottomWidth:1},
   maintenanceBlocker: {
-    ...StyleSheet.absoluteFillObject,
+    ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
     zIndex: 7000,
     alignItems: 'center',
     justifyContent: 'center',
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   maintenanceRefreshText: { color: '#07111F', fontSize: 11, fontWeight: '900' },
   maintenanceSignOut: { marginTop: 10, minHeight: 42, paddingHorizontal: 22, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   maintenanceSignOutText: { fontSize: 10, fontWeight: '800' },
-  accountBlocker:{...StyleSheet.absoluteFillObject,zIndex:6000,alignItems:'center',justifyContent:'center',padding:22,backgroundColor:'rgba(4,9,17,0.93)'},
+  accountBlocker:{...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },zIndex:6000,alignItems:'center',justifyContent:'center',padding:22,backgroundColor:'rgba(4,9,17,0.93)'},
   accountBlockerCard:{width:'100%',maxWidth:460,borderWidth:1,borderRadius:26,padding:24,alignItems:'center'},
   accountBlockerIcon:{width:76,height:76,borderRadius:24,alignItems:'center',justifyContent:'center',marginBottom:14},
   accountBlockerEmoji:{fontSize:38},

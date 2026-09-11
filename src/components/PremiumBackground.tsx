@@ -72,7 +72,7 @@ export const PremiumBackground = memo(function PremiumBackground() {
 });
 
 const styles = StyleSheet.create({
-  layer: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', pointerEvents: 'none' } as any,
+  layer: { ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }, overflow: 'hidden', pointerEvents: 'none' } as any,
   pokemonGlowRight: { position:'absolute', right:-90, top:'3%', width:330, height:330, borderRadius:999 },
   pokemonGlowLeft: { position:'absolute', left:-100, bottom:'-3%', width:240, height:240, borderRadius:999 },
   themePokemonRight:{position:'absolute',right:-38,top:'2%',width:300,height:370,transform:[{rotate:'6deg'}]},

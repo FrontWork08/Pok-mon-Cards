@@ -7,6 +7,16 @@ on:
   push:
     branches:
       - apk-release
+      - main
+    paths:
+      - app.json
+      - package.json
+      - package-lock.json
+      - eas.json
+      - src/services/soundEffects.ts
+      - src/services/battleEffects.ts
+      - scripts/native-runtime-baseline.json
+      - .github/workflows/android-apk.yml
 
 permissions:
   contents: write

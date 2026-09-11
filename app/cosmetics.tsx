@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   itemCell:{ flexGrow:1, flexBasis:180, maxWidth:260, minWidth:170 },
   item: { width:'100%', minHeight: 205, borderRadius: 19, borderWidth: 2, padding: 13 },
   preview: { width: 58, height: 58, borderRadius: 19, borderWidth: 2, alignItems: 'center', justifyContent: 'center', position:'relative', overflow:'hidden' },
-  galaxyDots:{...StyleSheet.absoluteFillObject},
+  galaxyDots:{...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }},
   galaxyDotA:{position:'absolute',width:5,height:5,borderRadius:999,backgroundColor:'#fff',left:9,top:12},
   galaxyDotB:{position:'absolute',width:3,height:3,borderRadius:999,backgroundColor:'#55E6FF',right:10,top:17},
   galaxyDotC:{position:'absolute',width:4,height:4,borderRadius:999,backgroundColor:'#D8B8FF',right:16,bottom:10},

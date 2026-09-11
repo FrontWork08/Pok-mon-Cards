@@ -33,7 +33,11 @@ assert(pkg.dependencies?.['react-native'] === baseline.reactNative, 'Versão do 
 
 assert(apkWorkflow.includes('workflow_dispatch:'), 'Workflow do APK perdeu o gatilho manual.');
 assert(apkWorkflow.includes('- apk-release'), 'Workflow do APK perdeu a branch dedicada apk-release.');
-assert(!/branches:\s*\n\s*-\s*main\b/m.test(apkWorkflow), 'Workflow do APK não pode gerar APK em pushes normais do main.');
+assert(apkWorkflow.includes('- main'), 'Workflow do APK deve gerar novo binário quando um release nativo chega ao main.');
+assert(apkWorkflow.includes('- app.json'), 'Workflow do APK precisa observar app.json para releases nativos.');
+assert(apkWorkflow.includes('- package.json'), 'Workflow do APK precisa observar package.json para releases nativos.');
+assert(apkWorkflow.includes('- package-lock.json'), 'Workflow do APK precisa observar package-lock.json para releases nativos.');
+assert(otaWorkflow.includes('[native-release]'), 'OTA deve aguardar a publicação do APK em merges nativos.');
 assert(otaWorkflow.includes('- app/**'), 'OTA não observa alterações em app/**.');
 assert(otaWorkflow.includes('- src/**'), 'OTA não observa alterações em src/**.');
 assert(otaWorkflow.includes('- assets/**'), 'OTA não observa alterações em assets/**.');
@@ -61,4 +65,4 @@ if (failures.length) {
 }
 
 console.log('✅ Auditoria OTA/native passou.');
-console.log('   APK só é liberado por workflow_dispatch ou pela branch dedicada apk-release; app/src/assets continuam via Expo Updates.');
+console.log('   OTA comum permanece em app/src/assets; releases nativos do main geram e verificam o APK antes de liberar Web/OTA do novo runtime.');
