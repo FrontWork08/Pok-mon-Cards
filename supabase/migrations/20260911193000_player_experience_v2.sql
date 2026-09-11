@@ -44,7 +44,7 @@ on public.player_goals for delete
 to authenticated
 using ((select auth.uid()) = player_id);
 
-revoke all on public.player_goals from anon;
+revoke all on public.player_goals from public, anon;
 grant select, insert, update, delete on public.player_goals to authenticated;
 
 create or replace function public.get_my_goals()
@@ -269,6 +269,50 @@ $$;
 
 revoke all on function public.get_battle_postgame_insights(uuid) from public, anon;
 grant execute on function public.get_battle_postgame_insights(uuid) to authenticated;
+
+
+create or replace function public.get_achievement_rarity()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_player uuid := auth.uid();
+  v_total bigint;
+  v_result jsonb;
+begin
+  if v_player is null then raise exception 'UNAUTHORIZED'; end if;
+
+  select count(*) into v_total
+  from public.players p
+  where p.account_status='active';
+
+  select coalesce(jsonb_agg(
+    jsonb_build_object(
+      'achievementId', d.id,
+      'unlockCount', coalesce(x.unlock_count,0),
+      'activePlayers', v_total,
+      'percentage', case when v_total=0 then 0 else round((coalesce(x.unlock_count,0)::numeric * 100) / v_total, 2) end
+    )
+    order by d.sort_order, d.id
+  ), '[]'::jsonb)
+  into v_result
+  from public.achievement_definitions d
+  left join (
+    select pa.achievement_id, count(*)::bigint as unlock_count
+    from public.player_achievements pa
+    where pa.unlocked_at is not null
+    group by pa.achievement_id
+  ) x on x.achievement_id=d.id
+  where d.active=true;
+
+  return v_result;
+end;
+$;
+
+revoke all on function public.get_achievement_rarity() from public, anon;
+grant execute on function public.get_achievement_rarity() to authenticated;
 
 alter table public.player_login_streaks
   add column if not exists streak_shields smallint not null default 2,
