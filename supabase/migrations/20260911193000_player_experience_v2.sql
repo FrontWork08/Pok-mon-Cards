@@ -416,3 +416,31 @@ begin
   );
 end;
 $$;
+
+
+insert into public.app_update_logs(id,version,title,summary,changes,published_at,active)
+values(
+  3,
+  '1.2.1 • OTA 11/09',
+  'Experiência do Treinador V2',
+  'Uma atualização focada em orientar melhor cada jogador, explicar batalhas e tornar o progresso mais pessoal.',
+  array[
+    'Primeiros Passos agora acompanha automaticamente o tutorial real do jogador.',
+    'Metas pessoais permitem acompanhar coleção, ELO, vitórias, Coins e objetivos próprios.',
+    'Coach de Deck recomenda melhorias usando cartas que você já possui.',
+    'Comparador mostra stats do modo Pokémon lado a lado.',
+    'Fim de batalha ganhou resumo explicativo, ELO, replay e análise rodada por rodada.',
+    'Conquistas desbloqueadas mostram a raridade global entre treinadores ativos.',
+    'Sequência diária ganhou até dois Escudos de Sequência por mês para proteger um único dia perdido.',
+    'Home recebeu carregamento visual mais suave e atalhos para as novas ferramentas.'
+  ],
+  now(),
+  true
+)
+on conflict(id) do update set
+  version=excluded.version,
+  title=excluded.title,
+  summary=excluded.summary,
+  changes=excluded.changes,
+  published_at=excluded.published_at,
+  active=excluded.active;
