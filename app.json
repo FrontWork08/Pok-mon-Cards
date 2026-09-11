@@ -18,6 +18,15 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#07111F",
+          "imageWidth": 200
+        }
+      ],
       "expo-secure-store",
       [
         "expo-image-picker",
@@ -56,11 +65,6 @@
       ],
       "expo-quick-actions"
     ],
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#07111F"
-    },
     "android": {
       "package": "com.frontwork.pokemoncards",
       "googleServicesFile": "./google-services.json",
