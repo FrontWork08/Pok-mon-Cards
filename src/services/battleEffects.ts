@@ -92,7 +92,7 @@ function createWav(notes: Note[]) {
 async function ensureNativeSound(kind: BattleSound) {
   const cached = cachedUris.get(kind);
   if (cached) return cached;
-  const FileSystem = await import('expo-file-system');
+  const FileSystem = await import('expo-file-system/legacy');
   if (!FileSystem.cacheDirectory) throw new Error('Audio cache unavailable');
   const uri = `${FileSystem.cacheDirectory}pokemon-battle-${kind}.wav`;
   const info = await FileSystem.getInfoAsync(uri);
@@ -127,16 +127,21 @@ function playWeb(kind: BattleSound) {
 export async function playBattleSound(kind: BattleSound) {
   if (Platform.OS === 'web') { playWeb(kind); return; }
   try {
-    const { Audio } = await import('expo-av');
+    const { createAudioPlayer, setAudioModeAsync } = await import('expo-audio');
     if (!configured) {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: false, shouldDuckAndroid: true });
+      await setAudioModeAsync({ playsInSilentMode: false, interruptionMode: 'duckOthers' });
       configured = true;
     }
     const uri = await ensureNativeSound(kind);
-    const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true, volume: 0.8 });
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinish) sound.unloadAsync().catch(() => null);
+    const player = createAudioPlayer(uri, { updateInterval: 100 });
+    player.volume = 0.8;
+    const subscription = player.addListener('playbackStatusUpdate', (status) => {
+      if (status.didJustFinish) {
+        subscription.remove();
+        player.release();
+      }
     });
+    player.play();
   } catch {
     // Sound is optional; battle flow must never fail because audio could not play.
   }
