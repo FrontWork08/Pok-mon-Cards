@@ -1,0 +1,46 @@
+name: Resolve Expo SDK 57 Upgrade
+
+on:
+  push:
+    branches:
+      - native/sdk57-upgrade
+    paths:
+      - .github/workflows/sdk57-resolve.yml
+
+permissions:
+  contents: write
+
+jobs:
+  resolve:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native/sdk57-upgrade
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Resolve SDK 57 dependency graph
+        run: |
+          npm install
+          npx expo install expo@^57.0.22 --fix
+          npm install
+      - name: Inspect Expo compatibility
+        continue-on-error: true
+        run: npx expo-doctor@latest
+      - name: Save resolved dependencies
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m 'build: resolve Expo SDK 57 dependencies'
+            git push origin HEAD:native/sdk57-upgrade
+          else
+            echo 'Dependency graph already resolved.'
+          fi
