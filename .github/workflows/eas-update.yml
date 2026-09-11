@@ -32,6 +32,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[native-release]')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
