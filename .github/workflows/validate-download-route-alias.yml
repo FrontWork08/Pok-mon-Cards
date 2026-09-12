@@ -1,0 +1,70 @@
+name: Validate Download Route Alias
+
+on:
+  push:
+    branches:
+      - fix/download-route-alias
+    paths:
+      - .github/workflows/validate-download-route-alias.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: test -n "$EXPO_TOKEN"
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Prepare artwork
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/generate-trainer-assets.py
+      - name: Verify project
+        run: npm run verify
+      - name: Load production environment
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas env:pull --environment production --path .env.local --non-interactive
+      - name: Export server web build
+        run: |
+          npx expo export --platform web
+          test -d dist/server
+      - name: Deploy preview
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas deploy --alias download-route-test --environment production --dev-domain pokemon-cards-frontwork --non-interactive
+      - name: Validate /download aliases
+        shell: bash
+        run: |
+          set -euo pipefail
+          SITE="https://pokemon-cards-frontwork--download-route-test.expo.app"
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            A="$(curl -sS -o /dev/null -w '%{http_code} %{url_effective}' -L "$SITE/download" || true)"
+            B="$(curl -sS -o /dev/null -w '%{http_code} %{url_effective}' -L "$SITE/download/" || true)"
+            echo "/download => $A"
+            echo "/download/ => $B"
+            if [[ "$A" == "200 $SITE/download/index.html" && "$B" == "200 $SITE/download/index.html" ]]; then
+              break
+            fi
+            sleep 4
+          done
+          [[ "$A" == "200 $SITE/download/index.html" ]]
+          [[ "$B" == "200 $SITE/download/index.html" ]]
+          curl --fail --location "$SITE/download/index.html" -o /tmp/download.html
+          grep -q 'href="https://pokemon-cards-frontwork.expo.app/download-apk"' /tmp/download.html
+          echo "Official /download aliases and same-site APK button verified."
