@@ -8,6 +8,8 @@ const OFFICIAL_DOWNLOAD_PATH = '/download-apk';
 
 let release;
 let trusted;
+let appConfig;
+let sameSiteRoute = '';
 try {
   release = JSON.parse(readFileSync('public/download/release.json', 'utf8'));
 } catch (error) {
@@ -17,6 +19,16 @@ try {
   trusted = JSON.parse(readFileSync('public/download/trusted-signing-cert.json', 'utf8'));
 } catch (error) {
   failures.push(`trusted-signing-cert.json inválido: ${error instanceof Error ? error.message : error}`);
+}
+try {
+  appConfig = JSON.parse(readFileSync('app.json', 'utf8'));
+} catch (error) {
+  failures.push(`app.json inválido: ${error instanceof Error ? error.message : error}`);
+}
+try {
+  sameSiteRoute = readFileSync('app/download-apk+api.ts', 'utf8');
+} catch (error) {
+  failures.push(`rota same-site ausente: ${error instanceof Error ? error.message : error}`);
 }
 
 if (release && trusted) {
