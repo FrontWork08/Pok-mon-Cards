@@ -211,7 +211,7 @@ jobs:
           VERIFIED=0
           for attempt in 1 2 3 4 5 6; do
             CACHE_BUSTER="${GITHUB_SHA}-${attempt}"
-            curl --fail --location --retry 2 --retry-delay 1 "https://pokemon-cards-frontwork.expo.app/download/release.json?v=${CACHE_BUSTER}" -o /tmp/site-release.json
+            curl --fail --location --retry 2 --retry-delay 1 "https://pokemon-cards-frontwork.expo.app/download-release?v=${CACHE_BUSTER}" -o /tmp/site-release.json
             SITE_SHA="$(node -p "require('/tmp/site-release.json').sha256")"
             SITE_URL="$(node -p "require('/tmp/site-release.json').downloadUrl")"
             SITE_FILE="$(node -p "require('/tmp/site-release.json').downloadFileName")"
