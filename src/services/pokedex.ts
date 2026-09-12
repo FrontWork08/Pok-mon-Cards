@@ -22,6 +22,10 @@ export type PokemonCardVersion = {
 
 let pokedexCatalogCache: PokedexEntry[] | null = null;
 let pokedexCatalogRequest: Promise<PokedexEntry[]> | null = null;
+let ownedPokedexRequest: Promise<number[]> | null = null;
+const pokemonVersionsCache = new Map<number, PokemonCardVersion[]>();
+const pokemonVersionsRequests = new Map<number, Promise<PokemonCardVersion[]>>();
+const MAX_VERSION_CACHE_ENTRIES = 24;
 
 export async function getPokedexCatalog(force = false): Promise<PokedexEntry[]> {
   if (!force && pokedexCatalogCache) return pokedexCatalogCache;
@@ -48,23 +52,62 @@ export async function getPokedexCatalog(force = false): Promise<PokedexEntry[]> 
 }
 
 export async function getMyOwnedPokedexNumbers(): Promise<number[]> {
-  const { data, error } = await supabase.rpc('get_my_owned_pokedex_numbers');
-  if (error) throw error;
-  return Array.isArray(data)
-    ? data.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
-    : [];
+  // Do not cache the result: newly opened cards must appear immediately. Only
+  // coalesce simultaneous focus/render requests to avoid duplicate RPC work.
+  if (ownedPokedexRequest) return ownedPokedexRequest;
+  ownedPokedexRequest = (async () => {
+    const { data, error } = await supabase.rpc('get_my_owned_pokedex_numbers');
+    if (error) throw error;
+    return Array.isArray(data)
+      ? data.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+      : [];
+  })();
+  try {
+    return await ownedPokedexRequest;
+  } finally {
+    ownedPokedexRequest = null;
+  }
 }
 
 export async function getPokemonCardVersions(pokedexNumber: number): Promise<PokemonCardVersion[]> {
-  const { data, error } = await supabase
-    .from('cards')
-    .select('id,pokemon_name,set_id,set_name,card_number,rarity,types,image_small,image_large')
-    .contains('pokedex_numbers', [pokedexNumber])
-    .order('set_name', { ascending: false })
-    .limit(500);
+  const cached = pokemonVersionsCache.get(pokedexNumber);
+  if (cached) {
+    // Refresh insertion order so the map behaves as a small LRU cache.
+    pokemonVersionsCache.delete(pokedexNumber);
+    pokemonVersionsCache.set(pokedexNumber, cached);
+    return cached;
+  }
 
-  if (error) throw error;
-  return (data ?? []) as PokemonCardVersion[];
+  const existing = pokemonVersionsRequests.get(pokedexNumber);
+  if (existing) return existing;
+
+  const request = (async () => {
+    const { data, error } = await supabase
+      .from('cards')
+      .select('id,pokemon_name,set_id,set_name,card_number,rarity,types,image_small,image_large')
+      .contains('pokedex_numbers', [pokedexNumber])
+      .order('set_name', { ascending: false })
+      .limit(500);
+
+    if (error) throw error;
+    const rows = (data ?? []) as PokemonCardVersion[];
+    pokemonVersionsCache.set(pokedexNumber, rows);
+    while (pokemonVersionsCache.size > MAX_VERSION_CACHE_ENTRIES) {
+      const oldestKey = pokemonVersionsCache.keys().next().value as number | undefined;
+      if (oldestKey == null) break;
+      pokemonVersionsCache.delete(oldestKey);
+    }
+    return rows;
+  })();
+
+  pokemonVersionsRequests.set(pokedexNumber, request);
+  try {
+    return await request;
+  } finally {
+    if (pokemonVersionsRequests.get(pokedexNumber) === request) {
+      pokemonVersionsRequests.delete(pokedexNumber);
+    }
+  }
 }
 
 export function generationForNumber(number: number) {
