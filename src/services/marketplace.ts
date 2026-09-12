@@ -92,7 +92,9 @@ function normalizeHubListing(row:any):MarketplaceListing {
   };
 }
 
-export async function getMarketplaceHub(): Promise<MarketplaceHub> {
+let marketplaceHubRequest: Promise<MarketplaceHub> | null = null;
+
+async function fetchMarketplaceHub(): Promise<MarketplaceHub> {
   const {data,error}=await supabase.rpc('get_marketplace_hub_v2');
   if(error) throw error;
   if(!data?.myId) throw new Error('Usuário não autenticado.');
@@ -109,6 +111,19 @@ export async function getMarketplaceHub(): Promise<MarketplaceHub> {
     listings:Array.isArray(data.listings)?data.listings.map(normalizeHubListing):[],
     myListings:Array.isArray(data.myListings)?data.myListings.map(normalizeHubListing):[],
   };
+}
+
+export async function getMarketplaceHub(): Promise<MarketplaceHub> {
+  // Realtime events and focus changes can arrive almost together. Reusing one
+  // in-flight request avoids duplicate RPCs and JSON normalization work on
+  // slower Android devices without caching stale marketplace data.
+  if (marketplaceHubRequest) return marketplaceHubRequest;
+  marketplaceHubRequest = fetchMarketplaceHub();
+  try {
+    return await marketplaceHubRequest;
+  } finally {
+    marketplaceHubRequest = null;
+  }
 }
 
 const pendingMarketplaceOperations=new Map<string,string>();
@@ -221,10 +236,12 @@ export async function getCardPriceHistory(cardId:string,limit=30):Promise<CardPr
 }
 
 export function subscribeMarketplace(onChange:()=>void) {
+  // Offers have their own screen/RPC and are not part of MarketplaceHub. Listening
+  // to market_offers here caused the full marketplace to reload for unrelated
+  // offer chatter. Keep this channel limited to data rendered on this screen.
   const channel = supabase.channel(`marketplace-live-${Date.now()}`)
     .on('postgres_changes',{event:'*',schema:'public',table:'market_listings'},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'player_shops'},onChange)
-    .on('postgres_changes',{event:'*',schema:'public',table:'market_offers'},onChange)
     .subscribe();
   return () => { void supabase.removeChannel(channel); };
 }
