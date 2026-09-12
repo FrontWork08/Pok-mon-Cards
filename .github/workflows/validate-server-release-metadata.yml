@@ -1,0 +1,78 @@
+name: Validate Server Release Metadata
+
+on:
+  push:
+    branches:
+      - fix/server-release-metadata
+    paths:
+      - .github/workflows/validate-server-release-metadata.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: test -n "$EXPO_TOKEN"
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Prepare artwork
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/generate-trainer-assets.py
+      - name: Verify project
+        run: npm run verify
+      - name: Load production environment
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas env:pull --environment production --path .env.local --non-interactive
+      - name: Export server web build
+        run: |
+          npx expo export --platform web
+          test -d dist/server
+      - name: Deploy preview
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas deploy --alias same-site-download-test --environment production --dev-domain pokemon-cards-frontwork --non-interactive
+      - name: Verify server metadata and APK stream
+        shell: bash
+        run: |
+          set -euo pipefail
+          SITE="https://pokemon-cards-frontwork--same-site-download-test.expo.app"
+          EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
+          ARCHIVE="$(node -p "require('./public/download/release.json').archiveUrl")"
+
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --location "$SITE/download-release?v=$attempt" -o /tmp/release.json; then
+              URL="$(node -p "require('/tmp/release.json').downloadUrl")"
+              PROVIDER="$(node -p "require('/tmp/release.json').downloadProvider")"
+              SHA="$(node -p "require('/tmp/release.json').sha256")"
+              if [[ "$URL" == "https://pokemon-cards-frontwork.expo.app/download-apk" && "$PROVIDER" == "Trainer Collection Site" && "${SHA,,}" == "${EXPECTED_SHA,,}" ]]; then
+                break
+              fi
+            fi
+            sleep 4
+          done
+          [[ "$URL" == "https://pokemon-cards-frontwork.expo.app/download-apk" ]]
+          [[ "$PROVIDER" == "Trainer Collection Site" ]]
+          [[ "${SHA,,}" == "${EXPECTED_SHA,,}" ]]
+
+          curl --fail --location --retry 6 --retry-delay 3 --retry-all-errors --range 0-1048575 -D /tmp/site-headers.txt "$SITE/download-apk" -o /tmp/site.bin
+          curl --fail --location --retry 4 --retry-delay 2 --range 0-1048575 "$ARCHIVE" -o /tmp/archive.bin
+          [[ "$(sha256sum /tmp/site.bin | awk '{print $1}')" == "$(sha256sum /tmp/archive.bin | awk '{print $1}')" ]]
+          grep -qi 'content-disposition: attachment; filename="Trainer-Collection-v1.3.0.apk"' /tmp/site-headers.txt
+          echo "Server metadata + same-site APK stream verified."
