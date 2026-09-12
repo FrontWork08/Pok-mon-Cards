@@ -101,7 +101,10 @@
   }
 
   async function loadJson(path) {
-    const response = await fetch(path, {
+    const requestPath = path.endsWith('/release.json')
+      ? `${path}?v=${Date.now()}`
+      : path;
+    const response = await fetch(requestPath, {
       cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' },
     });
     if (!response.ok) throw new Error(`${path} indisponível`);
