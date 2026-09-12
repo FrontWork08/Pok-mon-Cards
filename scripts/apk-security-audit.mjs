@@ -44,6 +44,10 @@ if (release && trusted) {
   ok(validFileName, 'Nome público do APK não segue Trainer-Collection-vX.Y.Z.apk.');
   ok(validSiteDownload, 'Download público precisa permanecer no domínio oficial do Trainer Collection.');
   ok(release.downloadProvider === 'Trainer Collection Site', 'Provedor público precisa ser o site oficial do Trainer Collection.');
+  ok(appConfig.expo?.web?.output === 'server', 'Web precisa usar output server para manter o download APK no domínio oficial.');
+  ok(sameSiteRoute.includes("Content-Disposition"), 'Rota same-site precisa forçar download como attachment.');
+  ok(sameSiteRoute.includes("request.headers.get('range')"), 'Rota same-site precisa suportar Range para retomada de downloads.');
+  ok(sameSiteRoute.includes("archive.origin !== 'https://github.com'"), 'Proxy precisa aceitar somente o archive oficial esperado.');
   ok(/^[a-f0-9]{64}$/.test(apkHash), 'SHA-256 do APK ausente ou inválido.');
   ok(Number(release.sizeBytes) > 0, 'Tamanho do APK ausente ou inválido.');
   ok(release.verification?.sha256Verified === true, 'APK não está marcado como hash verificado.');
