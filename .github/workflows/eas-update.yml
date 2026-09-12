@@ -112,13 +112,21 @@ jobs:
           EXPECTED_SHA="$(node -p "require('./public/download/release.json').sha256")"
           EXPECTED_URL="$(node -p "require('./public/download/release.json').downloadUrl")"
           EXPECTED_PROVIDER="$(node -p "require('./public/download/release.json').downloadProvider")"
-          curl --fail --location --retry 6 --retry-delay 3 "https://pokemon-cards-frontwork.expo.app/download/release.json" -o /tmp/site-release.json
-          SITE_SHA="$(node -p "require('/tmp/site-release.json').sha256")"
-          SITE_URL="$(node -p "require('/tmp/site-release.json').downloadUrl")"
-          SITE_PROVIDER="$(node -p "require('/tmp/site-release.json').downloadProvider")"
-          [[ "${SITE_SHA,,}" == "${EXPECTED_SHA,,}" ]]
-          [[ "$SITE_URL" == "$EXPECTED_URL" ]]
-          [[ "$SITE_PROVIDER" == "$EXPECTED_PROVIDER" ]]
+          VERIFIED=0
+          for attempt in 1 2 3 4 5 6; do
+            CACHE_BUSTER="${GITHUB_SHA}-${attempt}"
+            curl --fail --location --retry 2 --retry-delay 1 "https://pokemon-cards-frontwork.expo.app/download/release.json?v=${CACHE_BUSTER}" -o /tmp/site-release.json
+            SITE_SHA="$(node -p "require('/tmp/site-release.json').sha256")"
+            SITE_URL="$(node -p "require('/tmp/site-release.json').downloadUrl")"
+            SITE_PROVIDER="$(node -p "require('/tmp/site-release.json').downloadProvider")"
+            if [[ "${SITE_SHA,,}" == "${EXPECTED_SHA,,}" && "$SITE_URL" == "$EXPECTED_URL" && "$SITE_PROVIDER" == "$EXPECTED_PROVIDER" ]]; then
+              VERIFIED=1
+              break
+            fi
+            echo "Release metadata not propagated yet (attempt ${attempt}/6)."
+            sleep 3
+          done
+          [[ "$VERIFIED" == "1" ]]
           echo "Official page exposes the verified GitHub Release APK metadata."
 
       - name: Publish Android update to production
