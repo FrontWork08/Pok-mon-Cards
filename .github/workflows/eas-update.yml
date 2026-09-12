@@ -87,8 +87,8 @@ jobs:
           DOWNLOAD_URL="$(node -p "require('./public/download/release.json').downloadUrl")"
           PROVIDER="$(node -p "require('./public/download/release.json').downloadProvider")"
           [[ "$FILE_NAME" =~ ^Trainer-Collection-v[0-9]+\.[0-9]+\.[0-9]+\.apk$ ]]
-          [[ "$DOWNLOAD_URL" == "$ARCHIVE_URL" ]]
-          [[ "$PROVIDER" == "Trainer Collection GitHub Release" ]]
+          [[ "$DOWNLOAD_URL" == "https://pokemon-cards-frontwork.expo.app/download-apk" ]]
+          [[ "$PROVIDER" == "Trainer Collection Site" ]]
           curl --fail --location --retry 5 --retry-delay 2 "$ARCHIVE_URL" -o /tmp/trainer-release.apk
           test "$(stat -c%s /tmp/trainer-release.apk)" -gt 100000000
           ACTUAL_SHA="$(sha256sum /tmp/trainer-release.apk | awk '{print $1}')"
@@ -127,7 +127,15 @@ jobs:
             sleep 3
           done
           [[ "$VERIFIED" == "1" ]]
-          echo "Official page exposes the verified GitHub Release APK metadata."
+          echo "Official page exposes the verified same-site APK metadata."
+
+          SITE_CHUNK=/tmp/site-apk-chunk.bin
+          ARCHIVE_CHUNK=/tmp/archive-apk-chunk.bin
+          curl --fail --location --retry 4 --retry-delay 2 --range 0-1048575             -D /tmp/site-apk-headers.txt             "https://pokemon-cards-frontwork.expo.app/download-apk"             -o "$SITE_CHUNK"
+          head -c 1048576 /tmp/trainer-release.apk > "$ARCHIVE_CHUNK"
+          [[ "$(sha256sum "$SITE_CHUNK" | awk '{print $1}')" == "$(sha256sum "$ARCHIVE_CHUNK" | awk '{print $1}')" ]]
+          grep -qi 'content-disposition: attachment; filename="Trainer-Collection-v1.3.0.apk"' /tmp/site-apk-headers.txt
+          echo "Same-site APK stream matches the verified release archive."
 
       - name: Publish Android update to production
         env:
