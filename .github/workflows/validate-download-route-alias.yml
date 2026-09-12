@@ -6,6 +6,7 @@ on:
       - fix/download-route-alias
     paths:
       - .github/workflows/validate-download-route-alias.yml
+      - app/+not-found.tsx
 
 permissions:
   contents: read
