@@ -35,7 +35,10 @@ export type BagPage = {
   totalFiltered: number;
 };
 
-export async function getMyBagOverview(): Promise<BagOverview> {
+let bagOverviewRequest: Promise<BagOverview> | null = null;
+const bagPageRequests = new Map<string, Promise<BagPage>>();
+
+async function fetchMyBagOverview(): Promise<BagOverview> {
   const { data, error } = await supabase.rpc('get_my_bag_overview');
   if (error) throw error;
   const value = (data ?? {}) as any;
@@ -50,26 +53,64 @@ export async function getMyBagOverview(): Promise<BagOverview> {
   };
 }
 
+export async function getMyBagOverview(): Promise<BagOverview> {
+  // Focus + pull-to-refresh can overlap. Share only the active request; no result
+  // is cached, so collection changes are still visible on the next call.
+  if (bagOverviewRequest) return bagOverviewRequest;
+  bagOverviewRequest = fetchMyBagOverview();
+  try {
+    return await bagOverviewRequest;
+  } finally {
+    bagOverviewRequest = null;
+  }
+}
+
 export async function getMyBagPage(
   offset: number,
   limit: number,
   filters: BagPageFilters,
 ): Promise<BagPage> {
-  const { data, error } = await supabase.rpc('get_my_bag_page', {
-    p_offset: offset,
-    p_limit: limit,
-    p_search: filters.search.trim() || null,
-    p_set_query: filters.setQuery.trim() || null,
-    p_quick_filter: filters.quickFilter,
-    p_type_filter: filters.typeFilter,
-    p_rarity_filter: filters.rarityFilter,
-    p_generation: filters.generation,
-    p_sort_mode: filters.sortMode,
-  });
-  if (error) throw error;
-  const value = (data ?? {}) as any;
-  return {
-    items: Array.isArray(value.items) ? value.items as OwnedCardEntry[] : [],
-    totalFiltered: Number(value.totalFiltered ?? 0),
-  };
+  const normalizedSearch = filters.search.trim();
+  const normalizedSetQuery = filters.setQuery.trim();
+  const requestKey = JSON.stringify([
+    offset,
+    limit,
+    normalizedSearch,
+    normalizedSetQuery,
+    filters.quickFilter,
+    filters.typeFilter,
+    filters.rarityFilter,
+    filters.generation,
+    filters.sortMode,
+  ]);
+
+  const existing = bagPageRequests.get(requestKey);
+  if (existing) return existing;
+
+  const request = (async () => {
+    const { data, error } = await supabase.rpc('get_my_bag_page', {
+      p_offset: offset,
+      p_limit: limit,
+      p_search: normalizedSearch || null,
+      p_set_query: normalizedSetQuery || null,
+      p_quick_filter: filters.quickFilter,
+      p_type_filter: filters.typeFilter,
+      p_rarity_filter: filters.rarityFilter,
+      p_generation: filters.generation,
+      p_sort_mode: filters.sortMode,
+    });
+    if (error) throw error;
+    const value = (data ?? {}) as any;
+    return {
+      items: Array.isArray(value.items) ? value.items as OwnedCardEntry[] : [],
+      totalFiltered: Number(value.totalFiltered ?? 0),
+    };
+  })();
+
+  bagPageRequests.set(requestKey, request);
+  try {
+    return await request;
+  } finally {
+    if (bagPageRequests.get(requestKey) === request) bagPageRequests.delete(requestKey);
+  }
 }
