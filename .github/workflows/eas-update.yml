@@ -113,7 +113,7 @@ jobs:
           EXPECTED_URL="$(node -p "require('./public/download/release.json').downloadUrl")"
           EXPECTED_PROVIDER="$(node -p "require('./public/download/release.json').downloadProvider")"
           VERIFIED=0
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
             CACHE_BUSTER="${GITHUB_SHA}-${attempt}"
             curl --fail --location --retry 2 --retry-delay 1 "https://pokemon-cards-frontwork.expo.app/download-release?v=${CACHE_BUSTER}" -o /tmp/site-release.json
             SITE_SHA="$(node -p "require('/tmp/site-release.json').sha256")"
@@ -123,8 +123,8 @@ jobs:
               VERIFIED=1
               break
             fi
-            echo "Release metadata not propagated yet (attempt ${attempt}/6)."
-            sleep 3
+            echo "Release metadata not propagated yet (attempt ${attempt}/15)."
+            sleep 4
           done
           [[ "$VERIFIED" == "1" ]]
           echo "Official page exposes the verified same-site APK metadata."
