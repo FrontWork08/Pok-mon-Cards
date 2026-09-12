@@ -2,8 +2,8 @@
   'use strict';
 
   const EXPECTED_PACKAGE = 'com.frontwork.pokemoncards';
-  const RELEASE_ORIGIN = 'https://github.com';
-  const RELEASE_REPO_PREFIX = '/FrontWork08/Pok-mon-Cards/releases/download/';
+  const OFFICIAL_ORIGIN = 'https://pokemon-cards-frontwork.expo.app';
+  const OFFICIAL_DOWNLOAD_PATH = '/download-apk';
   const $ = (id) => document.getElementById(id);
   const buttons = [$('download-button'), $('download-button-secondary')].filter(Boolean);
 
@@ -47,17 +47,14 @@
     }).format(date);
   }
 
-  function safeReleaseApkUrl(release) {
+  function safeSiteApkUrl(release) {
     const fileName = String(release?.downloadFileName || '').trim();
     if (!/^Trainer-Collection-v\d+\.\d+\.\d+\.apk$/.test(fileName)) return null;
     try {
       const url = new URL(String(release?.downloadUrl || ''));
-      if (url.origin !== RELEASE_ORIGIN) return null;
-      const version = String(release?.version || '').trim();
-      if (!/^\d+\.\d+\.\d+$/.test(version)) return null;
-      const expectedPath = `${RELEASE_REPO_PREFIX}android-v${version}/${fileName}`;
-      if (url.pathname !== expectedPath) return null;
-      if (String(release?.archiveUrl || '') !== url.href) return null;
+      if (url.origin !== OFFICIAL_ORIGIN) return null;
+      if (url.pathname !== OFFICIAL_DOWNLOAD_PATH) return null;
+      if (url.search || url.hash) return null;
       return url;
     } catch {
       return null;
@@ -113,7 +110,7 @@
 
   function verifyRelease(release, trusted) {
     const errors = [];
-    const apkUrl = safeReleaseApkUrl(release);
+    const apkUrl = safeSiteApkUrl(release);
     const apkHash = normalizeHex(release?.sha256);
     const releaseCert = normalizeHex(release?.verification?.certificateSha256);
     const trustedCert = normalizeHex(trusted?.certificateSha256);
@@ -122,8 +119,8 @@
     if (release?.status !== 'ready') errors.push('release ainda não está pronta');
     if (release?.packageName !== EXPECTED_PACKAGE) errors.push('package Android divergente');
     if (trusted?.packageName !== EXPECTED_PACKAGE) errors.push('certificado não pertence ao package oficial');
-    if (release?.downloadProvider !== 'Trainer Collection GitHub Release') errors.push('provedor oficial do APK inválido');
-    if (!apkUrl) errors.push('arquivo APK do release oficial inválido');
+    if (release?.downloadProvider !== 'Trainer Collection Site') errors.push('provedor oficial do APK inválido');
+    if (!apkUrl) errors.push('rota de download do site oficial inválida');
     if (!/^[a-f0-9]{64}$/.test(apkHash)) errors.push('SHA-256 do APK inválido');
     if (release?.verification?.sha256Verified !== true) errors.push('hash ainda não foi conferido no pipeline');
     if (release?.verification?.signatureVerified !== true) errors.push('assinatura Android ainda não foi verificada');
@@ -173,7 +170,7 @@
 
       enableDownloads(result.apkUrl, release.downloadFileName);
       if (messageEl) {
-        messageEl.textContent = `Download iniciado pela página oficial • arquivo verificado no GitHub Release: ${release.downloadFileName}`;
+        messageEl.textContent = `Download direto pelo site oficial • ${release.downloadFileName}`;
       }
     } catch {
       if (versionEl) versionEl.textContent = '—';
