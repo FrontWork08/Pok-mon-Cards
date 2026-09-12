@@ -131,7 +131,7 @@ jobs:
 
           SITE_CHUNK=/tmp/site-apk-chunk.bin
           ARCHIVE_CHUNK=/tmp/archive-apk-chunk.bin
-          curl --fail --location --retry 4 --retry-delay 2 --range 0-1048575             -D /tmp/site-apk-headers.txt             "https://pokemon-cards-frontwork.expo.app/download-apk"             -o "$SITE_CHUNK"
+          curl --fail --location --retry 6 --retry-delay 3 --retry-all-errors --range 0-1048575             -D /tmp/site-apk-headers.txt             "https://pokemon-cards-frontwork.expo.app/download-apk"             -o "$SITE_CHUNK"
           head -c 1048576 /tmp/trainer-release.apk > "$ARCHIVE_CHUNK"
           [[ "$(sha256sum "$SITE_CHUNK" | awk '{print $1}')" == "$(sha256sum "$ARCHIVE_CHUNK" | awk '{print $1}')" ]]
           grep -qi 'content-disposition: attachment; filename="Trainer-Collection-v1.3.0.apk"' /tmp/site-apk-headers.txt
