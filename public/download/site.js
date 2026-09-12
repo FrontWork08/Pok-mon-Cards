@@ -98,7 +98,7 @@
   }
 
   async function loadJson(path) {
-    const requestPath = path.endsWith('/release.json')
+    const requestPath = path === '/download-release'
       ? `${path}?v=${Date.now()}`
       : path;
     const response = await fetch(requestPath, {
@@ -137,7 +137,7 @@
     disableDownloads('Verificando arquivo, assinatura e certificado oficial…');
     try {
       const [release, trusted] = await Promise.all([
-        loadJson('/download/release.json'),
+        loadJson('/download-release'),
         loadJson('/download/trusted-signing-cert.json'),
       ]);
 
