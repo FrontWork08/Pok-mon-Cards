@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 const failures = [];
 const ok = (condition, message) => { if (!condition) failures.push(message); };
 const normalizeHex = (value) => String(value ?? '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
-const RELEASE_ORIGIN = 'https://github.com';
-const RELEASE_REPO_PREFIX = '/FrontWork08/Pok-mon-Cards/releases/download/';
+const OFFICIAL_ORIGIN = 'https://pokemon-cards-frontwork.expo.app';
+const OFFICIAL_DOWNLOAD_PATH = '/download-apk';
 
 let release;
 let trusted;
@@ -28,15 +28,13 @@ if (release && trusted) {
   try { downloadUrl = new URL(String(release.downloadUrl || '')); } catch {}
 
   const validFileName = /^Trainer-Collection-v\d+\.\d+\.\d+\.apk$/.test(fileName);
-  const version = String(release.version || '');
-  const expectedReleasePath = `${RELEASE_REPO_PREFIX}android-v${version}/${fileName}`;
-  const validReleaseDownload = Boolean(
+  const validSiteDownload = Boolean(
     downloadUrl
-    && downloadUrl.origin === RELEASE_ORIGIN
+    && downloadUrl.origin === OFFICIAL_ORIGIN
     && validFileName
-    && /^\d+\.\d+\.\d+$/.test(version)
-    && downloadUrl.pathname === expectedReleasePath
-    && String(release.archiveUrl || '') === downloadUrl.href
+    && downloadUrl.pathname === OFFICIAL_DOWNLOAD_PATH
+    && !downloadUrl.search
+    && !downloadUrl.hash
   );
 
   ok(release.appName === 'Trainer Collection', 'Nome do APK oficial inesperado.');
@@ -44,8 +42,8 @@ if (release && trusted) {
   ok(trusted.packageName === 'com.frontwork.pokemoncards', 'Package do certificado fixado divergente.');
   ok(release.status === 'ready', 'Release APK não está marcada como ready.');
   ok(validFileName, 'Nome público do APK não segue Trainer-Collection-vX.Y.Z.apk.');
-  ok(validReleaseDownload, 'Download público precisa apontar para o APK do GitHub Release oficial do Trainer Collection.');
-  ok(release.downloadProvider === 'Trainer Collection GitHub Release', 'Provedor público precisa ser o GitHub Release oficial do Trainer Collection.');
+  ok(validSiteDownload, 'Download público precisa permanecer no domínio oficial do Trainer Collection.');
+  ok(release.downloadProvider === 'Trainer Collection Site', 'Provedor público precisa ser o site oficial do Trainer Collection.');
   ok(/^[a-f0-9]{64}$/.test(apkHash), 'SHA-256 do APK ausente ou inválido.');
   ok(Number(release.sizeBytes) > 0, 'Tamanho do APK ausente ou inválido.');
   ok(release.verification?.sha256Verified === true, 'APK não está marcado como hash verificado.');
@@ -66,4 +64,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('✅ APK security audit: página oficial + GitHub Release verificado, nome amigável, SHA-256, assinatura e certificado consistentes.');
+console.log('✅ APK security audit: download same-site, archive verificado, nome amigável, SHA-256, assinatura e certificado consistentes.');
