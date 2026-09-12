@@ -124,6 +124,9 @@
     "experiments": {
       "typedRoutes": true
     },
-    "backgroundColor": "#07111F"
+    "backgroundColor": "#07111F",
+    "web": {
+      "output": "server"
+    }
   }
 }
