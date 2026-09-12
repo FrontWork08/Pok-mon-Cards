@@ -230,7 +230,7 @@ jobs:
           node scripts/verify-apk-sounds.mjs /tmp/release-final.apk
           "$APKSIGNER" verify --verbose --print-certs /tmp/release-final.apk >/tmp/release-final-signature.txt
 
-          curl --fail --location --retry 4 --retry-delay 2 --range 0-1048575             -D /tmp/site-apk-headers.txt             "$EXPECTED_URL"             -o /tmp/site-apk-chunk.bin
+          curl --fail --location --retry 6 --retry-delay 3 --retry-all-errors --range 0-1048575             -D /tmp/site-apk-headers.txt             "$EXPECTED_URL"             -o /tmp/site-apk-chunk.bin
           head -c 1048576 /tmp/release-final.apk > /tmp/archive-apk-chunk.bin
           [[ "$(sha256sum /tmp/site-apk-chunk.bin | awk '{print $1}')" == "$(sha256sum /tmp/archive-apk-chunk.bin | awk '{print $1}')" ]]
           grep -qi "content-disposition: attachment; filename=\"$EXPECTED_FILE\"" /tmp/site-apk-headers.txt
