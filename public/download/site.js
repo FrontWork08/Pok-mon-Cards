@@ -98,14 +98,24 @@
   }
 
   async function loadJson(path) {
-    const requestPath = path === '/download-release'
-      ? `${path}?v=${Date.now()}`
-      : path;
-    const response = await fetch(requestPath, {
-      cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' },
-    });
-    if (!response.ok) throw new Error(`${path} indisponível`);
-    return response.json();
+    const attempts = path === '/download-release' ? 5 : 1;
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const requestPath = path === '/download-release'
+          ? `${path}?v=${Date.now()}-${attempt}`
+          : path;
+        const response = await fetch(requestPath, {
+          cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) throw new Error(`${path} indisponível`);
+        return response.json();
+      } catch (error) {
+        lastError = error;
+        if (attempt < attempts) await new Promise((resolve) => window.setTimeout(resolve, 900));
+      }
+    }
+    throw lastError || new Error(`${path} indisponível`);
   }
 
   function verifyRelease(release, trusted) {
