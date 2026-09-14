@@ -5,6 +5,7 @@ import ts from 'typescript';
 const app = fs.readFileSync('app/team-battle/[id].tsx', 'utf8');
 const helperSource = fs.readFileSync('src/battles/teamSelection.ts', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/20260904233403_team3_forfeit_respects_team_selection.sql', 'utf8');
+const authMigration = fs.readFileSync('supabase/migrations/20260914140500_fix_team3_edge_auth_context.sql', 'utf8');
 
 const required = [
   "getMyDecks",
@@ -25,6 +26,14 @@ if (app.includes('Alert.alert')) missing.push('Team 3x3 must use in-game confirm
 const surrenderCount = (app.match(/Desistir da batalha/g) ?? []).length;
 if (surrenderCount < 2) missing.push('Surrender control must exist during setup and live battle');
 if (!migration.includes('private.battle_team_members')) missing.push('Team selection must affect forfeit neutrality');
+for (const invariant of [
+  "server_set_adventure_battle_team",
+  "server_list_adventure_team_battle_cards",
+  "auth.role() is distinct from ''service_role''",
+  "auth.uid() is distinct from p_actor_id",
+]) {
+  if (!authMigration.includes(invariant)) missing.push(`Team 3x3 Edge auth regression guard missing: ${invariant}`);
+}
 if (missing.length) {
   console.error('❌ Team 3x3 required-controls audit failed:', missing);
   process.exit(1);
@@ -52,4 +61,4 @@ if (ids(filterAndSortTeamCards(cards, { sortMode: 'hp' })) !== 'b,c,a') throw ne
 if (ids(filterAndSortTeamCards(cards, { sortMode: 'speed' })) !== 'a,c,b') throw new Error('speed sort regression');
 const types = getAvailableTeamTypes(cards).join(',');
 if (types !== 'fire,flying,water') throw new Error(`type catalog regression: ${types}`);
-console.log('✅ Team 3x3 controls: deck, filters, sorting and surrender invariants verified.');
+console.log('✅ Team 3x3 controls: deck, filters, sorting, surrender and Edge auth invariants verified.');
