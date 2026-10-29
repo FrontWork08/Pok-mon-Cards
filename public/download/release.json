@@ -2,11 +2,11 @@
   "appName": "Trainer Collection",
   "packageName": "com.frontwork.pokemoncards",
   "version": "1.3.0",
-  "buildVersion": "19",
+  "buildVersion": "20",
   "downloadUrl": "https://pokemon-cards-frontwork.expo.app/download-apk",
-  "sha256": "54b6cee4fa560f3889f5c480024b6784e13ae139fd80ed1bc57599bd64299835",
-  "sizeBytes": 142807131,
-  "publishedAt": "2026-09-12T01:16:08.625Z",
+  "sha256": "2d00d981fcb4b127c1e73dee78c914bd1360b1094b4b858926a452c8bfc2ac34",
+  "sizeBytes": 144562859,
+  "publishedAt": "2026-10-29T16:44:41.854Z",
   "channel": "production",
   "status": "ready",
   "verification": {
@@ -15,7 +15,7 @@
     "certificateSha256": "7b4e0052f1bdf07e0c33abc4176de96f9cf7a64a8f325ae7c5dcbb2083cc2843",
     "certificateSubject": "CN=, OU=, O=, L=, ST=, C=",
     "signerMatchesTrustedCertificate": true,
-    "verifiedAt": "2026-09-12T01:16:08.533Z",
+    "verifiedAt": "2026-10-29T16:44:41.742Z",
     "verifier": "Android apksigner",
     "schemes": {
       "v1": false,
@@ -26,7 +26,7 @@
   },
   "downloadFileName": "Trainer-Collection-v1.3.0.apk",
   "downloadProvider": "Trainer Collection Site",
-  "easBuildId": "1d3cb8bc-f82b-497e-a54e-44d552706de3",
-  "easBuildUrl": "https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/1d3cb8bc-f82b-497e-a54e-44d552706de3",
+  "easBuildId": "64f902a3-3652-4cf7-b08d-481184c20073",
+  "easBuildUrl": "https://expo.dev/accounts/frontwork/projects/pokemon-cards/builds/64f902a3-3652-4cf7-b08d-481184c20073",
   "archiveUrl": "https://github.com/FrontWork08/Pok-mon-Cards/releases/download/android-v1.3.0/Trainer-Collection-v1.3.0.apk"
 }
