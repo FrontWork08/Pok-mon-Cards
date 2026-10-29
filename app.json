@@ -22,9 +22,9 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "resizeMode": "cover",
+          "resizeMode": "contain",
           "backgroundColor": "#07111F",
-          "imageWidth": 200
+          "imageWidth": 340
         }
       ],
       "expo-secure-store",
