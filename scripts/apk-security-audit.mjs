@@ -10,6 +10,7 @@ let release;
 let trusted;
 let appConfig;
 let sameSiteRoute = '';
+let sameSiteMetadataRoute = '';
 try {
   release = JSON.parse(readFileSync('public/download/release.json', 'utf8'));
 } catch (error) {
@@ -29,6 +30,11 @@ try {
   sameSiteRoute = readFileSync('app/download-apk+api.ts', 'utf8');
 } catch (error) {
   failures.push(`rota same-site ausente: ${error instanceof Error ? error.message : error}`);
+}
+try {
+  sameSiteMetadataRoute = readFileSync('app/download-release+api.ts', 'utf8');
+} catch (error) {
+  failures.push(`rota de metadata same-site ausente: ${error instanceof Error ? error.message : error}`);
 }
 
 if (release && trusted) {
@@ -60,6 +66,8 @@ if (release && trusted) {
   ok(sameSiteRoute.includes("Content-Disposition"), 'Rota same-site precisa forçar download como attachment.');
   ok(sameSiteRoute.includes("request.headers.get('range')"), 'Rota same-site precisa suportar Range para retomada de downloads.');
   ok(sameSiteRoute.includes("archive.origin !== 'https://github.com'"), 'Proxy precisa aceitar somente o archive oficial esperado.');
+  ok(sameSiteMetadataRoute.includes("Response.json(release"), 'Metadata público precisa vir do deployment server atual.');
+  ok(sameSiteMetadataRoute.includes("'Cache-Control': 'no-store, max-age=0'"), 'Metadata server-side não pode ficar preso em cache estático.');
   ok(/^[a-f0-9]{64}$/.test(apkHash), 'SHA-256 do APK ausente ou inválido.');
   ok(Number(release.sizeBytes) > 0, 'Tamanho do APK ausente ou inválido.');
   ok(release.verification?.sha256Verified === true, 'APK não está marcado como hash verificado.');
