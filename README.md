@@ -1,5 +1,55 @@
 # Trainer Collection
 
+> **Documentação atualizada do estado do jogo — novembro de 2026.**  
+> Aplicativo de coleção Pokémon para Android e Web, com coleção, boosters, batalhas, modos de equipe, economia, mercado, trocas, guildas, recursos sociais, ferramentas administrativas e sistemas de progressão.
+
+## Estado atual do jogo
+
+O Trainer Collection é um jogo online com conta individual e dados sincronizados pelo backend. O jogador coleciona Pokémon, monta decks e equipes, participa de batalhas, negocia cartas, progride em rankings e interage com outros treinadores.
+
+### Funcionalidades disponíveis no projeto
+
+- **Conta e perfil:** cadastro/login por e-mail e Google, recuperação de senha, sessão persistente, perfil público, foto, nível, moedas, diamantes, títulos, estatísticas, vitrine e QR Code de amizade.
+- **Coleção (Bag):** inventário de cartas, cópias, busca, filtros por tipo, raridade, geração e coleção, ordenação por valor e atributos, duplicadas e consulta de preço.
+- **Boosters:** loja de packs, abertura individual e em lote, raridades, probabilidades controladas no servidor, pity, histórico, animações, prévia ampliada, cartas novas/CHASE e valores de mercado.
+- **Auto Booster e Auto Booster+:** abertura automatizada em lotes; a versão Plus permite configurar até 100 aberturas e condições de parada por valor de carta ou raridade, mediante a Gamepass correspondente.
+- **Decks:** criação e edição, limite de cartas, busca, filtros, ordenação e visualização dos atributos.
+- **Batalhas individuais:** Draft 3 e motor Game Boy (game_v1) com seleção de Pokémon, escolha manual de golpes, Energia/PP, turnos, condições de batalha, troca de Pokémon quando permitida, HP persistente, histórico, desistência e resolução no servidor.
+- **Arena 2D:** apresentação em pixel art com sprites, HP, animações de entrada, movimento, ataque e impacto. A arena apresenta visualmente o resultado calculado pelo servidor.
+- **Batalhas em equipe 3×3:** seleção ordenada de três Pokémon, escolha de deck ou Bag como origem, filtros e ordenação por atributos, Pokémon líder no primeiro slot, ataques, troca de Pokémon durante a partida, HP persistente e sincronização do estado da batalha.
+- **Modos e adversários:** partidas casuais/competitivas e suporte a adversários controlados por IA em filas compatíveis, com limites de aplicação de ELO contra bots.
+- **Rankings:** classificação de batalha por ELO, ranking de coleção e classificações semanais com regras próprias.
+- **Economia:** Coins e Diamantes, compra de boosters, conversão controlada, venda unitária/em lote de duplicadas e validações financeiras no servidor.
+- **Trainer Shop e cosméticos:** molduras, fundos, temas, estilos e efeitos de identidade; itens adquiridos podem ser equipados e removidos conforme as regras da loja.
+- **Marketplace:** anúncios de cartas, compra, cancelamento e ofertas entre jogadores, com atualização de estado e validação server-side.
+- **Trocas diretas:** seleção de cartas e quantidades, propostas, confirmações dos participantes e transferência validada pelo servidor.
+- **Amigos e comunicação:** solicitações de amizade, QR Code, presença online/oculta, chat global, privado e de guilda, caixa de entrada e notificações.
+- **Guildas e guerras:** membros, liderança/cargos, convites, missões, chat, ranking coletivo, ginásios, defensores, ataques e recuperação de HP.
+- **Progressão:** XP, níveis, missões diárias e semanais, conquistas, títulos, Battle Pass e recompensas.
+- **Copa Trainer e torneios:** telas e fluxos de torneio, incluindo regras de inscrição e premiação em Coins configuradas pelo jogo.
+- **Gamepasses e códigos:** catálogo de benefícios, ativação administrativa de Gamepasses e resgate de códigos com recompensas configuradas, como Coins, Diamantes, cartas ou cargas Lucky.
+- **Painel administrativo:** anúncios globais, manutenção/pausa de atividades, gestão de saldos, VIP, títulos, permissões, contas, auditoria, eventos e ferramentas de moderação.
+- **Laboratórios e ferramentas internas:** auditoria e experimentação de batalhas, modelos 3D e recursos de administração/desenvolvimento.
+- **Experiência Web/PWA:** versão Web, manifesto e service worker para recursos de instalação/experiência progressiva.
+- **Atualizações:** Expo Updates/OTA para alterações compatíveis; alterações nativas exigem nova build Android.
+
+### Como funciona o sistema de batalha
+
+O projeto contém motores e modos de batalha distintos. O modo Game Boy (game_v1) utiliza atributos e regras de combate de Pokémon, seleção manual de golpes e PP, turnos, HP persistente e troca de Pokémon. O Draft 3 possui fluxo próprio de seleção e confirmação de golpes. O catálogo e os modos TCG legados também possuem implementação de regras TCG com Energia virtual (incluindo as versões internas v5/v6); isso não significa que todas as partidas atuais usem o motor TCG.
+
+A arena 2D é uma camada de apresentação: não decide vencedores nem calcula dano por conta própria. O servidor é responsável por validar ações e resolver os resultados. As regras implementadas são próprias do projeto e não devem ser descritas como uma reprodução oficial, integral ou perfeita de todos os jogos Pokémon.
+
+### Qualidade, segurança e desempenho
+
+O repositório inclui auditorias automatizadas de contratos entre telas, Edge Functions e RPCs; rotas; segurança de chamadas; dependências; fluxo do jogador; batalha; modelos 3D; controles de equipe; scroll e interações. O comando npm run verify reúne as verificações configuradas no projeto.
+
+As listas extensas usam estratégias de paginação/virtualização em áreas como coleção, seletores e mercado. Operações sensíveis — como saldo, compra, troca, abertura de pack e resolução de batalha — são validadas no backend com autenticação, RLS, RPCs e Edge Functions.
+
+> **Nota de precisão:** esta seção descreve funcionalidades identificadas no código do repositório. A presença de uma tela ou serviço não garante que todos os recursos estejam ativos para todas as contas, que dependências externas estejam configuradas ou que cada fluxo tenha sido validado em produção.
+
+---
+
+
 > **Projeto de software para feira escolar / Trabalho de Conclusão de Curso (TCC)**  
 > Aplicativo social de coleção de cartas Pokémon com abertura de boosters, gerenciamento de coleção, batalhas, decks, trocas, economia virtual, guildas, ranking, missões e recursos em tempo real.
 
@@ -247,7 +297,7 @@ As batalhas utilizam dados como:
 - efeitos entre turnos;
 - condições de entrada de determinadas formas.
 
-O sistema atualmente utiliza a versão interna **TCG v6** das regras implementadas no projeto.
+O repositório contém motores distintos: o modo Game Boy (game_v1) e implementações TCG legadas/alternativas (v5/v6). O motor efetivamente utilizado depende do modo e da versão da partida.
 
 > O sistema é continuamente auditado e testado. Ele cobre grande parte das regras necessárias para as cartas do catálogo, mas não é apresentado como uma reprodução oficial ou perfeita de todas as regras do Pokémon TCG.
 
@@ -322,7 +372,7 @@ A arena:
 
 Essa arena é apenas uma representação visual.
 
-**O resultado real continua sendo calculado pelo motor de batalha TCG v6 no servidor.**
+**O resultado real continua sendo calculado pelo motor correspondente ao modo da partida no servidor.**
 
 ---
 
