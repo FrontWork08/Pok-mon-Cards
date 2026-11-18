@@ -3,6 +3,14 @@
 > **Projeto de software para feira escolar / Trabalho de Conclusão de Curso (TCC)**  
 > Aplicativo social de coleção de cartas Pokémon com abertura de boosters, gerenciamento de coleção, batalhas, decks, trocas, economia virtual, guildas, ranking, missões e recursos em tempo real.
 
+## Acesso ao Trainer Collection
+
+- **Jogar pela Web:** https://pokemon-cards-frontwork.expo.app/
+- **Baixar APK Android 1.2.1:** https://pokemon-cards-frontwork.expo.app/download/Trainer-Collection-v1.2.1.apk
+- **Página de download:** https://pokemon-cards-frontwork.expo.app/download/
+
+> O APK é distribuído diretamente pelo site oficial do projeto. O link acima não direciona para o GitHub nem para uma página intermediária do Expo.
+
 ---
 
 ## 1. Visão geral do projeto
