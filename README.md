@@ -3,13 +3,14 @@
 > **Projeto de software para feira escolar / Trabalho de Conclusão de Curso (TCC)**  
 > Aplicativo social de coleção de cartas Pokémon com abertura de boosters, gerenciamento de coleção, batalhas, decks, trocas, economia virtual, guildas, ranking, missões e recursos em tempo real.
 
-## Acesso ao Trainer Collection
+## Acesso ao Trainer Collection — versão 1.3.0
 
+- **Versão atual:** 1.3.0 (Android build 20)
 - **Jogar pela Web:** https://pokemon-cards-frontwork.expo.app/
-- **Baixar APK Android 1.2.1:** https://pokemon-cards-frontwork.expo.app/download/Trainer-Collection-v1.2.1.apk
-- **Página de download:** https://pokemon-cards-frontwork.expo.app/download/
+- **Baixar APK Android 1.3.0:** https://pokemon-cards-frontwork.expo.app/download-apk
+- **Página oficial de download:** https://pokemon-cards-frontwork.expo.app/download/
 
-> O APK é distribuído diretamente pelo site oficial do projeto. O link acima não direciona para o GitHub nem para uma página intermediária do Expo.
+> O APK Android 1.3.0 é distribuído diretamente pelo domínio oficial do Trainer Collection. A página de download valida os metadados, o SHA-256 e a assinatura do arquivo antes de habilitar o download. O GitHub mantém o código-fonte e o histórico do projeto; não é o destino do botão público de download.
 
 ---
 
