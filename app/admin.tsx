@@ -106,6 +106,7 @@ export default function AdminScreen() {
   const [removeDiamondAmount, setRemoveDiamondAmount] = useState('1');
   const [correctionNote, setCorrectionNote] = useState('');
   const [note, setNote] = useState('');
+  const [currencyGrantConfirm, setCurrencyGrantConfirm] = useState<'coins' | 'diamonds' | null>(null);
   const [adminCodes, setAdminCodes] = useState<AdminRedeemCode[]>([]);
   const [newCode, setNewCode] = useState('');
   const [codeCoins, setCodeCoins] = useState('');
@@ -508,17 +509,8 @@ export default function AdminScreen() {
 
   function confirmSendCoins() {
     if (selectedPlayers.length < 1 || amountNumber < 1 || working) return;
-    const total = amountNumber * selectedPlayers.length;
-    Alert.alert(
-      'Confirmar crédito em grupo',
-      'Adicionar 🪙 ' + amountNumber.toLocaleString('pt-BR') +
-      ' para cada um dos ' + selectedPlayers.length.toLocaleString('pt-BR') +
-      ' jogadores selecionados? Total: 🪙 ' + total.toLocaleString('pt-BR') + '.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Adicionar', onPress: () => { void sendCoins(); } },
-      ],
-    );
+    setError(null);
+    setCurrencyGrantConfirm('coins');
   }
 
   async function sendDiamonds() {
@@ -535,11 +527,9 @@ export default function AdminScreen() {
   }
 
   function confirmSendDiamonds() {
-    Alert.alert(
-      'Confirmar Diamantes',
-      `Adicionar 💎 ${diamondAmountNumber.toLocaleString('pt-BR')} para cada um dos ${selectedPlayers.length} jogadores selecionados?`,
-      [{text:'Cancelar',style:'cancel'},{text:'Adicionar',onPress:()=>{void sendDiamonds();}}],
-    );
+    if (selectedPlayers.length < 1 || diamondAmountNumber < 1 || working) return;
+    setError(null);
+    setCurrencyGrantConfirm('diamonds');
   }
 
   async function removeSelectedCurrency(currency: 'coins' | 'diamonds') {
@@ -2549,6 +2539,21 @@ export default function AdminScreen() {
                 {working ? 'ADICIONANDO...' : 'ADICIONAR PARA ' + selectedPlayers.length.toLocaleString('pt-BR') + ' JOGADOR(ES)'}
               </Text>
             </Pressable>
+            {currencyGrantConfirm === 'coins' ? (
+              <View style={{ borderWidth: 1, borderColor: colors.yellow, borderRadius: 12, padding: 12, gap: 9, backgroundColor: colors.surfaceAlt }}>
+                <Text style={{ color: colors.text, fontSize: 12, fontWeight: '800' }}>
+                  Confirmar {amountNumber.toLocaleString('pt-BR')} Coins para cada um dos {selectedPlayers.length} jogadores? Total: {(amountNumber * selectedPlayers.length).toLocaleString('pt-BR')} Coins.
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable disabled={working} onPress={() => setCurrencyGrantConfirm(null)} style={{ flex: 1, minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>CANCELAR</Text>
+                  </Pressable>
+                  <Pressable disabled={working} onPress={() => { setCurrencyGrantConfirm(null); void sendCoins(); }} style={{ flex: 1, minHeight: 42, borderRadius: 10, backgroundColor: colors.yellow, alignItems: 'center', justifyContent: 'center', opacity: working ? 0.5 : 1 }}>
+                    <Text style={{ color: '#07111F', fontWeight: '900', fontSize: 11 }}>CONFIRMAR E ADICIONAR</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </View>
 
                     </CollapsibleSection>
@@ -2564,6 +2569,21 @@ export default function AdminScreen() {
             <View style={styles.quickRow}>{[1,5,10,25,50,100].map((quick)=><Pressable key={quick} onPress={()=>setDiamondAmount(String(quick))} style={[styles.quickChip,{backgroundColor:diamondAmountNumber===quick?'#68D9FF':colors.surfaceAlt,borderColor:diamondAmountNumber===quick?'#68D9FF':colors.border}]}><Text style={[styles.quickText,{color:diamondAmountNumber===quick?'#07111F':colors.text}]}>{quick}</Text></Pressable>)}</View>
             <TextInput value={diamondAmount} onChangeText={(value)=>setDiamondAmount(value.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Quantidade de Diamantes" placeholderTextColor={colors.muted} style={[styles.input,{color:colors.text,backgroundColor:colors.surfaceAlt,borderColor:colors.border}]}/>
             <Pressable disabled={selectedPlayers.length<1||diamondAmountNumber<1||working} onPress={confirmSendDiamonds} style={[styles.grantButton,{backgroundColor:selectedPlayers.length&&diamondAmountNumber?'#68D9FF':colors.surfaceAlt,opacity:working?.75:1}]}><Ionicons name="diamond" size={20} color="#07111F"/><Text style={styles.grantButtonText}>ADICIONAR DIAMANTES</Text></Pressable>
+            {currencyGrantConfirm === 'diamonds' ? (
+              <View style={{ borderWidth: 1, borderColor: '#68D9FF', borderRadius: 12, padding: 12, gap: 9, backgroundColor: colors.surfaceAlt }}>
+                <Text style={{ color: colors.text, fontSize: 12, fontWeight: '800' }}>
+                  Confirmar {diamondAmountNumber.toLocaleString('pt-BR')} Diamantes para cada um dos {selectedPlayers.length} jogadores? Total: {(diamondAmountNumber * selectedPlayers.length).toLocaleString('pt-BR')} Diamantes.
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable disabled={working} onPress={() => setCurrencyGrantConfirm(null)} style={{ flex: 1, minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>CANCELAR</Text>
+                  </Pressable>
+                  <Pressable disabled={working} onPress={() => { setCurrencyGrantConfirm(null); void sendDiamonds(); }} style={{ flex: 1, minHeight: 42, borderRadius: 10, backgroundColor: '#68D9FF', alignItems: 'center', justifyContent: 'center', opacity: working ? 0.5 : 1 }}>
+                    <Text style={{ color: '#07111F', fontWeight: '900', fontSize: 11 }}>CONFIRMAR E ADICIONAR</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </View>
 
                     </CollapsibleSection>
