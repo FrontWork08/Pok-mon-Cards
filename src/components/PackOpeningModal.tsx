@@ -50,6 +50,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const [cards, setCards] = useState<OpenedCard[]>([]);
   const [cardIndex, setCardIndex] = useState(0);
   const [faceUp, setFaceUp] = useState(false);
+  const [finalRevealActive, setFinalRevealActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageFailureLevel, setImageFailureLevel] = useState<Record<string, number>>({});
   const [summaryPreviewCard, setSummaryPreviewCard] = useState<OpenedCard | null>(null);
@@ -78,11 +79,12 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   const coreFlash = useRef(new Animated.Value(0)).current;
   const shockwave = useRef(new Animated.Value(0)).current;
   const cardImpact = useRef(new Animated.Value(0)).current;
+  const finalSuspense = useRef(new Animated.Value(0)).current;
 
   function resetOpening() {
     packY.setValue(0); packRotate.setValue(0); packScale.setValue(1); packOpacity.setValue(1); seamCharge.setValue(0); tear.setValue(0); openingFlash.setValue(0); openingCore.setValue(0); openingShock.setValue(0); openingColor.setValue(0); floorPulse.setValue(0);
   }
-  function resetReveal() { flip.setValue(0); revealBurst.setValue(0); screenFlash.setValue(0); coreFlash.setValue(0); shockwave.setValue(0); cardImpact.setValue(0); }
+  function resetReveal() { flip.setValue(0); revealBurst.setValue(0); screenFlash.setValue(0); coreFlash.setValue(0); shockwave.setValue(0); cardImpact.setValue(0); finalSuspense.stopAnimation(); finalSuspense.setValue(0); setFinalRevealActive(false); }
 
   useEffect(() => {
     if (!visible) return;
@@ -194,18 +196,39 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   }
 
   function revealCurrent() {
-    if (faceUp) return;
+    if (faceUp || finalRevealActive) return;
     const theme = rarityTheme(cards[cardIndex]?.rarity);
     const high = theme.tier >= 4;
-    setFaceUp(true); resetReveal();
-    Animated.parallel([
-      Animated.spring(flip, { toValue: 1, friction: 7, tension: 72, useNativeDriver: USE_NATIVE_DRIVER }),
-      Animated.sequence([Animated.delay(45), Animated.timing(screenFlash, { toValue: flashStrength(theme.tier), duration: high ? 68 : 90, useNativeDriver: USE_NATIVE_DRIVER }), Animated.delay(high ? 28 : 12), Animated.timing(screenFlash, { toValue: 0, duration: high ? 250 : 185, useNativeDriver: USE_NATIVE_DRIVER })]),
-      Animated.sequence([Animated.delay(35), Animated.timing(coreFlash, { toValue: 1, duration: high ? 82 : 105, useNativeDriver: USE_NATIVE_DRIVER }), Animated.timing(coreFlash, { toValue: 0, duration: high ? 400 : 310, useNativeDriver: USE_NATIVE_DRIVER })]),
-      Animated.sequence([Animated.delay(72), Animated.timing(shockwave, { toValue: 1, duration: high ? 640 : 510, useNativeDriver: USE_NATIVE_DRIVER })]),
-      Animated.sequence([Animated.delay(58), Animated.timing(revealBurst, { toValue: 1, duration: high ? 145 : 180, useNativeDriver: USE_NATIVE_DRIVER }), Animated.timing(revealBurst, { toValue: 0, duration: high ? 640 : 510, useNativeDriver: USE_NATIVE_DRIVER })]),
-      Animated.sequence([Animated.delay(68), Animated.timing(cardImpact, { toValue: 1, duration: 105, useNativeDriver: USE_NATIVE_DRIVER }), Animated.spring(cardImpact, { toValue: 0, friction: 5, tension: 75, useNativeDriver: USE_NATIVE_DRIVER })]),
-    ]).start();
+    const isLastCard = cards.length > 0 && cardIndex === cards.length - 1;
+    setFaceUp(true);
+    resetReveal();
+
+    const playCardReveal = () => {
+      Animated.parallel([
+        Animated.spring(flip, { toValue: 1, friction: 7, tension: 72, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.sequence([Animated.delay(45), Animated.timing(screenFlash, { toValue: flashStrength(theme.tier), duration: high ? 68 : 90, useNativeDriver: USE_NATIVE_DRIVER }), Animated.delay(high ? 28 : 12), Animated.timing(screenFlash, { toValue: 0, duration: high ? 250 : 185, useNativeDriver: USE_NATIVE_DRIVER })]),
+        Animated.sequence([Animated.delay(35), Animated.timing(coreFlash, { toValue: 1, duration: high ? 82 : 105, useNativeDriver: USE_NATIVE_DRIVER }), Animated.timing(coreFlash, { toValue: 0, duration: high ? 400 : 310, useNativeDriver: USE_NATIVE_DRIVER })]),
+        Animated.sequence([Animated.delay(72), Animated.timing(shockwave, { toValue: 1, duration: high ? 640 : 510, useNativeDriver: USE_NATIVE_DRIVER })]),
+        Animated.sequence([Animated.delay(58), Animated.timing(revealBurst, { toValue: 1, duration: high ? 145 : 180, useNativeDriver: USE_NATIVE_DRIVER }), Animated.timing(revealBurst, { toValue: 0, duration: high ? 640 : 510, useNativeDriver: USE_NATIVE_DRIVER })]),
+        Animated.sequence([Animated.delay(68), Animated.timing(cardImpact, { toValue: 1, duration: 105, useNativeDriver: USE_NATIVE_DRIVER }), Animated.spring(cardImpact, { toValue: 0, friction: 5, tension: 75, useNativeDriver: USE_NATIVE_DRIVER })]),
+      ]).start();
+    };
+
+    if (!isLastCard) {
+      playCardReveal();
+      return;
+    }
+
+    // A última carta sempre recebe suspense; a raridade só controla a força do impacto final.
+    setFinalRevealActive(true);
+    Animated.sequence([
+      Animated.timing(finalSuspense, { toValue: 1, duration: 420, useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.delay(420),
+      Animated.timing(finalSuspense, { toValue: 0.72, duration: 180, useNativeDriver: USE_NATIVE_DRIVER }),
+    ]).start(() => {
+      setFinalRevealActive(false);
+      playCardReveal();
+    });
   }
 
   function nextCard() {
@@ -400,6 +423,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
         <View style={styles.rewardHeader}><Text style={styles.rewardCounter}>RECOMPENSA {cardIndex + 1} / {cards.length}</Text><View style={[styles.raritySignal, { borderColor: `${revealColor}80`, backgroundColor: revealSoft }]}><View style={[styles.signalDot, { backgroundColor: revealColor }]} /><Text style={[styles.signalText, { color: revealColor }]}>{revealLabel}</Text></View></View>
         <View style={styles.revealArena}>
           <Animated.View pointerEvents="none" style={[styles.rarityAura, { backgroundColor: revealColor, opacity: faceUp ? auraOpacity : .16, transform: [{ scale: auraScale }] }]} />
+          {finalRevealActive ? <Animated.View pointerEvents="none" style={[styles.finalSuspenseOverlay, { opacity: finalSuspense }]}><View style={styles.finalSuspenseLine} /><Text style={styles.finalSuspenseKicker}>ÚLTIMA CARTA</Text><Text style={styles.finalSuspenseTitle}>O que vem a seguir?</Text><Text style={styles.finalSuspenseSubtitle}>A revelação final está chegando...</Text></Animated.View> : null}
           <Animated.View pointerEvents="none" style={[styles.coreFlash, { opacity: coreOpacity, transform: [{ scale: coreScale }] }]} />
           <Animated.View pointerEvents="none" style={[styles.revealFlash, { backgroundColor: revealColor, opacity: revealBurst, transform: [{ scale: revealScale }] }]} />
           <Animated.View pointerEvents="none" style={[styles.shockwave, { borderColor: '#fff', opacity: shockOpacity, transform: [{ scale: shockScale }] }]} />
@@ -441,7 +465,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
             </Animated.View>
           </Pressable>
         </View>
-        <View style={styles.actionRow}><Pressable style={[styles.nextButton, { borderColor: `${revealColor}90` }]} onPress={nextCard}><Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text><Ionicons name="arrow-forward" size={18} color="#F4F4F4" /></Pressable>{cards.length > 1 ? <Pressable style={styles.revealAllButton} onPress={revealAll}><Ionicons name="albums" size={17} color="#FFD447" /><Text style={styles.revealAllText}>REVELAR TODAS</Text></Pressable> : null}</View>
+        <View style={styles.actionRow}><Pressable style={[styles.nextButton, { borderColor: `${revealColor}90` }]} onPress={nextCard}><Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text><Ionicons name="arrow-forward" size={18} color="#F4F4F4" /></Pressable>{cards.length > 1 && cardIndex < cards.length - 1 ? <Pressable style={styles.revealAllButton} onPress={revealAll}><Ionicons name="albums" size={17} color="#FFD447" /><Text style={styles.revealAllText}>REVELAR TODAS</Text></Pressable> : null}</View>
       </View> : null}
 
       {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPullLabel ? <Text style={styles.bestPull}>{bestPullLabel}</Text> : null}<View style={styles.summaryValuePill}><Ionicons name="cash-outline" size={16} color="#65D894"/><Text style={styles.summaryValueText}>{totalMarketValueLabel}</Text></View><Text style={styles.summarySubtitle}>{pack.currency === 'diamonds' ? 'Sua carta lendária foi enviada para a Bag.' : 'Todos os cards foram enviados para sua Bag • +20 XP'}</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <Pressable
@@ -584,6 +608,7 @@ const styles = StyleSheet.create({
   revealAllText: { color:'#FFD447', fontSize:9, fontWeight:'900' },
   container: { flex: 1, backgroundColor: '#030303', overflow: 'hidden' }, shadeTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 120, backgroundColor: 'rgba(0,0,0,.48)' }, shadeBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, backgroundColor: 'rgba(0,0,0,.45)' }, header: { minHeight: 74, paddingHorizontal: 18, paddingTop: 17, flexDirection: 'row', alignItems: 'flex-start', gap: 12, zIndex: 30 }, kicker: { color: '#FFD447', fontSize: 9, fontWeight: '900', letterSpacing: 2 }, title: { color: '#F5F5F5', fontSize: 18, fontWeight: '900', marginTop: 4 }, closeButton: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111', borderWidth: 1, borderColor: '#292929' },
   openingStage: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingBottom: 26, overflow: 'hidden' }, floorHalo: { position: 'absolute', bottom: '23%', width: 380, height: 90, borderRadius: 220, backgroundColor: 'rgba(255,212,71,.15)' }, openingCore: { position: 'absolute', width: 280, height: 280, borderRadius: 280, backgroundColor: '#fff', zIndex: 3 }, openingShock: { position: 'absolute', width: 270, height: 270, borderRadius: 270, borderWidth: 5, borderColor: '#fff', backgroundColor: 'rgba(255,255,255,.07)', zIndex: 4 }, openingShockTwo: { position: 'absolute', width: 225, height: 225, borderRadius: 225, borderWidth: 4, borderColor: '#FFD447', backgroundColor: 'rgba(255,212,71,.04)', zIndex: 3 }, openingRay: { position: 'absolute', width: 4, height: 190, top: '50%', left: '50%', borderRadius: 10, backgroundColor: '#FFD447', zIndex: 3 }, openingSpark: { position: 'absolute', width: 6, height: 31, top: '50%', left: '50%', borderRadius: 8, zIndex: 5 }, openingCopy: { alignItems: 'center', marginTop: 16, maxWidth: 520, zIndex: 9 }, stageEyebrow: { color: '#858585', fontSize: 9, fontWeight: '900', letterSpacing: 2 }, stageTitle: { color: '#F7F7F7', fontSize: 23, lineHeight: 29, fontWeight: '900', textAlign: 'center', marginTop: 5 }, stageSubtitle: { color: '#8D8D8D', fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 6 }, openButton: { marginTop: 15, minWidth: 220, height: 52, borderRadius: 12, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, backgroundColor: '#FFD447', overflow: 'hidden', zIndex: 9 }, openButtonLine: { position: 'absolute', top: 0, left: 22, right: 22, height: 2, backgroundColor: 'rgba(255,255,255,.78)' }, openButtonText: { color: '#070707', fontSize: 11, fontWeight: '900', letterSpacing: .8 }, loadingTrack: { marginTop: 20, width: 230, height: 3, borderRadius: 99, overflow: 'hidden', backgroundColor: '#202020', zIndex: 9 }, loadingSweep: { width: '100%', height: '100%', backgroundColor: '#FFD447' }, errorBox: { marginTop: 14, maxWidth: 470, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#5A2528', backgroundColor: '#1A0D0E', zIndex: 9 }, errorText: { color: '#FFB3B7', fontSize: 10, fontWeight: '700', flex: 1 },
+  finalSuspenseOverlay:{...{position:'absolute',top:0,right:0,bottom:0,left:0},zIndex:30,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(2,5,12,.84)'}, finalSuspenseLine:{width:76,height:2,borderRadius:99,backgroundColor:'#FFD447',marginBottom:18}, finalSuspenseKicker:{color:'#FFD447',fontSize:11,fontWeight:'900',letterSpacing:3}, finalSuspenseTitle:{color:'#FFFFFF',fontSize:25,fontWeight:'900',textAlign:'center',marginTop:9}, finalSuspenseSubtitle:{color:'#B8C0CA',fontSize:10,fontWeight:'700',marginTop:8,letterSpacing:.5},
   rewardStage: { flex: 1, alignItems: 'center', paddingHorizontal: 16, paddingBottom: 20 }, rewardHeader: { width: '100%', maxWidth: 760, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 7, marginTop: 6 }, rewardCounter: { color: '#797979', fontSize: 9, fontWeight: '900', letterSpacing: 1.6 }, raritySignal: { minHeight: 32, borderRadius: 999, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', gap: 6, alignItems: 'center' }, signalDot: { width: 7, height: 7, borderRadius: 99 }, signalText: { fontSize: 9, fontWeight: '900' }, revealArena: { flex: 1, width: '100%', maxWidth: 920, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, rarityAura: { position: 'absolute', width: 500, height: 500, borderRadius: 500 }, coreFlash: { position: 'absolute', width: 230, height: 230, borderRadius: 230, backgroundColor: '#fff', zIndex: 3 }, revealFlash: { position: 'absolute', width: 260, height: 260, borderRadius: 260, zIndex: 2 }, shockwave: { position: 'absolute', width: 260, height: 260, borderRadius: 260, borderWidth: 4, zIndex: 4 }, shockwaveTwo: { position: 'absolute', width: 215, height: 215, borderRadius: 215, borderWidth: 3, zIndex: 3 }, ray: { position: 'absolute', width: 3, height: 160, top: '50%', left: '50%', borderRadius: 10, zIndex: 3 }, spark: { position: 'absolute', width: 5, height: 26, top: '50%', left: '50%', borderRadius: 8, zIndex: 5 }, pedestal: { position: 'absolute', bottom: '11%', width: 320, height: 66, borderRadius: 160, borderWidth: 2, opacity: .36 }, pedestalBase: { position: 'absolute', bottom: '8%', width: 260, height: 38, borderRadius: 130, backgroundColor: '#070707' }, tapArea: { zIndex: 10 }, flipScene: { width: 330, height: 460 }, flipSceneCompact: { width: 250, height: 350 }, cardFace: { ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }, borderRadius: 20, borderWidth: 2, overflow: 'hidden', backgroundColor: '#090909' }, cardBack: { alignItems: 'center', justifyContent: 'center', gap: 13 }, backGlow: { ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }, opacity: .65 }, backRing: { width: 140, height: 140, borderRadius: 70, borderWidth: 3, alignItems: 'center', justifyContent: 'center' }, hiddenTitle: { color: '#F4F4F4', fontSize: 12, fontWeight: '900', letterSpacing: 1.4 }, hiddenHint: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, cardFront: { padding: 8 }, rewardImage: { width: '100%', flex: 1 }, imageFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' }, rewardInfo: { padding: 8, alignItems: 'center' }, rewardName: { color: '#F7F7F7', fontSize: 16, fontWeight: '900' }, rewardRarity: { fontSize: 10, fontWeight: '900', marginTop: 2 }, nextButton: { minWidth: 200, height: 48, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#101010' }, nextButtonText: { color: '#F4F4F4', fontSize: 10, fontWeight: '900' },
   summaryContent: { padding: 20, paddingBottom: 44, alignItems: 'center' }, summaryHero: { alignItems: 'center', marginTop: 25, marginBottom: 20 }, summaryKicker: { color: '#FFD447', fontSize: 9, fontWeight: '900', letterSpacing: 1.8 }, summaryTitle: { color: '#F7F7F7', fontSize: 27, fontWeight: '900', marginTop: 4 }, bestPull: { color: '#FFD447', fontSize: 12, fontWeight: '900', marginTop: 7 }, summarySubtitle: { color: '#888', fontSize: 10, marginTop: 5 }, summaryGrid: { width: '100%', maxWidth: 900, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 9 }, summaryCard: { width: 150, borderRadius: 14, borderWidth: 1, padding: 6, backgroundColor: '#0C0C0C' }, summaryImage: { width: '100%', height: 190 }, summaryFallback: { height: 190, alignItems: 'center', justifyContent: 'center' }, summaryName: { color: '#F4F4F4', fontSize: 10, fontWeight: '900', marginTop: 5 }, summaryRarity: { fontSize: 8, fontWeight: '900', marginTop: 2 }, summaryActions: { marginTop: 22, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 10 }, summaryButton: { height: 50, minWidth: 210, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFD447' }, summaryBagButton: { width: 50, height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#5A4A18', backgroundColor: '#19160C', alignItems: 'center', justifyContent: 'center' }, summaryButtonText: { color: '#070707', fontSize: 10, fontWeight: '900' },
   openingColorWash: { ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }, backgroundColor: '#FFD447', zIndex: 90 }, colorWash: { ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }, zIndex: 90 }, fullFlash: { ...{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }, backgroundColor: '#fff', zIndex: 100 },
