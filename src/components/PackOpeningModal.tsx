@@ -232,6 +232,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
   }
 
   function nextCard() {
+    if (finalRevealActive) return;
     if (!faceUp) { revealCurrent(); return; }
     if (cardIndex >= cards.length - 1) { setStage('summary'); onFinished?.(); return; }
     setCardIndex((value) => value + 1); setFaceUp(false); resetReveal(); requestAnimationFrame(() => { animateCardIn(); startRarityPulse(); });
@@ -465,7 +466,7 @@ export function PackOpeningModal({ visible, pack, onClose, onPurchase, onFinishe
             </Animated.View>
           </Pressable>
         </View>
-        <View style={styles.actionRow}><Pressable style={[styles.nextButton, { borderColor: `${revealColor}90` }]} onPress={nextCard}><Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text><Ionicons name="arrow-forward" size={18} color="#F4F4F4" /></Pressable>{cards.length > 1 && cardIndex < cards.length - 1 ? <Pressable style={styles.revealAllButton} onPress={revealAll}><Ionicons name="albums" size={17} color="#FFD447" /><Text style={styles.revealAllText}>REVELAR TODAS</Text></Pressable> : null}</View>
+        <View style={styles.actionRow}><Pressable disabled={finalRevealActive} style={[styles.nextButton, { borderColor: `${revealColor}90`, opacity: finalRevealActive ? .55 : 1 }]} onPress={nextCard}><Text style={styles.nextButtonText}>{!faceUp ? 'REVELAR' : cardIndex >= cards.length - 1 ? 'VER RESULTADO' : 'PRÓXIMA CARTA'}</Text><Ionicons name="arrow-forward" size={18} color="#F4F4F4" /></Pressable>{cards.length > 1 && cardIndex < cards.length - 1 ? <Pressable style={styles.revealAllButton} onPress={revealAll}><Ionicons name="albums" size={17} color="#FFD447" /><Text style={styles.revealAllText}>REVELAR TODAS</Text></Pressable> : null}</View>
       </View> : null}
 
       {stage === 'summary' ? <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}><View style={styles.summaryHero}><Text style={styles.summaryKicker}>PACK FINALIZADO</Text><Text style={styles.summaryTitle}>Coleção atualizada.</Text>{bestPullLabel ? <Text style={styles.bestPull}>{bestPullLabel}</Text> : null}<View style={styles.summaryValuePill}><Ionicons name="cash-outline" size={16} color="#65D894"/><Text style={styles.summaryValueText}>{totalMarketValueLabel}</Text></View><Text style={styles.summarySubtitle}>{pack.currency === 'diamonds' ? 'Sua carta lendária foi enviada para a Bag.' : 'Todos os cards foram enviados para sua Bag • +20 XP'}</Text></View><View style={styles.summaryGrid}>{cards.map((card, index) => { const cardTheme = rarityTheme(card.rarity); const key = `summary-${card.id}-${index}`; return <Pressable
